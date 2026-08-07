@@ -1,0 +1,15 @@
+# 统一文本文件换行符为仓库内 LF，检出时按平台处理
+* text=auto eol=lf
+
+# Windows 入口脚本保持 CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 二进制资源不转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.docx binary
+*.ico binary

@@ -1,0 +1,8204 @@
+document: design
+count: 331
+tables:
+- source_index: 1
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 7696
+  - 2158
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: bottom
+  chapter: 系统概述
+- source_index: 2
+  kind: xml
+  file: design/tables/tbl_0002.xml
+  chapter: 系统概述
+- source_index: 3
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 4783
+  - 5071
+  tblw_type: auto
+  tblw_w: 0
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: bottom
+  chapter: 系统概述
+- source_index: 4
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 5
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1384
+  - 7088
+  tblw_type: dxa
+  tblw_w: 8472
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 6
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 465
+  - 1488
+  - 1234
+  - 1120
+  - 1810
+  - 2076
+  - 1645
+  tblw_type: pct
+  tblw_w: 4992
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 7
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1384
+  - 7088
+  tblw_type: dxa
+  tblw_w: 8472
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 8
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 4927
+  - 4927
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 9
+  kind: xml
+  file: design/tables/tbl_0009.xml
+  chapter: 设备端功能设计
+- source_index: 10
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 11
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 1655
+  - 1458
+  - 2372
+  - 1852
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 12
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1764
+  - 8264
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 13
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1764
+  - 8264
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 14
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1696
+  - 8280
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 15
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1384
+  - 7088
+  tblw_type: dxa
+  tblw_w: 8472
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 16
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 465
+  - 1488
+  - 1234
+  - 1120
+  - 1810
+  - 2076
+  - 1645
+  tblw_type: pct
+  tblw_w: 4992
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 17
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1384
+  - 7088
+  tblw_type: dxa
+  tblw_w: 8472
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 18
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 4146
+  - 4150
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 19
+  kind: xml
+  file: design/tables/tbl_0019.xml
+  chapter: 设备端功能设计
+- source_index: 20
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1526
+  - 2835
+  - 1362
+  - 2040
+  - 2040
+  tblw_type: dxa
+  tblw_w: 9803
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 21
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1696
+  - 8280
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 设备端功能设计
+- source_index: 22
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 4500
+  - 4500
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: '27'
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 23
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2138
+  - 2118
+  - 2635
+  - 2109
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: null
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 24
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1800
+  - 1800
+  - 1800
+  - 1800
+  - 1800
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: null
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 25
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 3000
+  - 3000
+  - 3000
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: null
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 26
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1261
+  - 3790
+  - 1344
+  - 1344
+  - 1261
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: null
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 27
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 4500
+  - 4500
+  tblw_type: dxa
+  tblw_w: 9000
+  trh: null
+  fmt:
+    ind:
+    - '110'
+    - dxa
+    lay: autofit
+    cm:
+    - '90'
+    - '110'
+    - '90'
+    - '110'
+    bd: single:auto:4:0
+    va: center
+  chapter: 设备端功能设计
+- source_index: 28
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1197
+  - 8831
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 29
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1108
+  - 1450
+  - 875
+  - 2800
+  - 1975
+  - 2027
+  tblw_type: dxa
+  tblw_w: 10235
+  trh: '5788'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 30
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 926
+  - 9102
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 31
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1433
+  - 8595
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 32
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1595
+  - 4016
+  - 720
+  - 611
+  - 2147
+  - 939
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 33
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1169
+  - 8859
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 34
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 35
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1699
+  - 1699
+  - 1699
+  - 1699
+  - 1699
+  - 1703
+  tblw_type: dxa
+  tblw_w: 10198
+  trh: '3906'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 36
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1340
+  - 5778
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 37
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 38
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1320
+  - 1722
+  - 843
+  - 2537
+  - 2312
+  - 1294
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 39
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1129
+  - 8899
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 40
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 41
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1233
+  - 2225
+  - 862
+  - 1325
+  - 3731
+  - 652
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 42
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1655
+  - 6008
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 43
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 44
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1283
+  - 1925
+  - 962
+  - 982
+  - 4233
+  - 643
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 45
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1408
+  - 8620
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 46
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 47
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1170
+  - 2288
+  - 1062
+  - 1912
+  - 2181
+  - 1415
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 48
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1108
+  - 8920
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 49
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 50
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1420
+  - 2298
+  - 865
+  - 1815
+  - 2290
+  - 1340
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 51
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1474
+  - 8554
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 52
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 53
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1695
+  - 1283
+  - 878
+  - 2464
+  - 2342
+  - 1366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 54
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1483
+  - 8545
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 55
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 56
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1395
+  - 2663
+  - 730
+  - 1860
+  - 2086
+  - 1294
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 57
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 740
+  - 9288
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 58
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 59
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1458
+  - 1675
+  - 962
+  - 1825
+  - 2575
+  - 1533
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 60
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1251
+  - 8777
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 61
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 62
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1133
+  - 1756
+  - 1134
+  - 1223
+  - 2488
+  - 1964
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 63
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1046
+  - 6717
+  tblw_type: auto
+  tblw_w: 0
+  trh: '275'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 64
+  kind: xml
+  file: design/tables/tbl_0064.xml
+  chapter: WEB端功能设计
+- source_index: 65
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1386
+  - 2946
+  - 1297
+  - 1436
+  - 1397
+  - 1392
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1043'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+  chapter: WEB端功能设计
+- source_index: 66
+  kind: xml
+  file: design/tables/tbl_0066.xml
+  chapter: WEB端功能设计
+- source_index: 67
+  kind: xml
+  file: design/tables/tbl_0067.xml
+  chapter: WEB端功能设计
+- source_index: 68
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1301
+  - 1989
+  - 1343
+  - 2546
+  - 1308
+  - 1367
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:000000:8:0
+  chapter: WEB端功能设计
+- source_index: 69
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 4320
+  - 4320
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:000000:8:0
+  chapter: WEB端功能设计
+- source_index: 70
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 71
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1333
+  - 1596
+  - 843
+  - 2425
+  - 2537
+  - 1294
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 72
+  kind: xml
+  file: design/tables/tbl_0072.xml
+  chapter: WEB端功能设计
+- source_index: 73
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 74
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1520
+  - 2007
+  - 830
+  - 1927
+  - 2476
+  - 1268
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 75
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1483
+  - 8545
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 76
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 77
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 945
+  - 1638
+  - 762
+  - 1475
+  - 3738
+  - 1592
+  tblw_type: dxa
+  tblw_w: 10150
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 78
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1420
+  - 8608
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 79
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 80
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 686
+  - 2700
+  - 748
+  - 686
+  - 2708
+  - 2500
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 81
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 663
+  - 9365
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 82
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 83
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1570
+  - 2675
+  - 950
+  - 1225
+  - 1800
+  - 1808
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 84
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 885
+  - 9143
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 85
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 86
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1158
+  - 3112
+  - 900
+  - 975
+  - 2325
+  - 1558
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 87
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 885
+  - 9143
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 88
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 89
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1574
+  - 1230
+  - 708
+  - 708
+  - 2981
+  - 2827
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 90
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1142
+  - 8886
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: WEB端功能设计
+- source_index: 91
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 92
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1028
+  - 2401
+  - 1009
+  - 1445
+  - 3971
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 93
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 94
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 95
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1502
+  - 1925
+  - 1438
+  - 2312
+  - 2677
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 96
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 97
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 98
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1502
+  - 2388
+  - 975
+  - 2312
+  - 2677
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 99
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 100
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 101
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 913
+  - 1725
+  - 2499
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 102
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '5211'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 103
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '5211'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 104
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '3061'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 105
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '3061'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 106
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2047
+  - 7807
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '3061'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 107
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2002
+  - 7852
+  tblw_type: pct
+  tblw_w: 5000
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 108
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 109
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 913
+  - 1725
+  - 2499
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 110
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '3061'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 111
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 112
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 913
+  - 1725
+  - 2499
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 113
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1252
+  - 8602
+  tblw_type: pct
+  tblw_w: 5000
+  trh: '3061'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 114
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 115
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 913
+  - 1725
+  - 2499
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 116
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1681
+  - 8169
+  tblw_type: pct
+  tblw_w: 4998
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 117
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 118
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 913
+  - 1725
+  - 2499
+  - 1448
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 119
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1681
+  - 8169
+  tblw_type: pct
+  tblw_w: 4998
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 120
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 121
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 122
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2415
+  - 7784
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 123
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 124
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 125
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2415
+  - 7784
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 126
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 127
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 128
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2415
+  - 7784
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 129
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 130
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 131
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 132
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 133
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 134
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 135
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 136
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 137
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 138
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 139
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 140
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 141
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 142
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 143
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 144
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 145
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 146
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 147
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 148
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 149
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 150
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 151
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 152
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 153
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 154
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 155
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 156
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 157
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 158
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 159
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 160
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 161
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 162
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 163
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 164
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 165
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 166
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 167
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 168
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 169
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 170
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 171
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 172
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 173
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 174
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 175
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 176
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 177
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 178
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 179
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 180
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 181
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 182
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 183
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 184
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 185
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 186
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 187
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 188
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 189
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 190
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2345
+  - 975
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 191
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 192
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 193
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2200
+  - 1120
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 194
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 195
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 196
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2345
+  - 975
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 197
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 198
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 199
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1599
+  - 2197
+  - 975
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '452'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 200
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 201
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 202
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1451
+  - 2345
+  - 975
+  - 2282
+  - 1972
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 203
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 204
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 205
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1353
+  - 2443
+  - 1307
+  - 2357
+  - 1565
+  - 1211
+  tblw_type: pct
+  tblw_w: 5194
+  trh: '2218'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 206
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1665
+  - 8534
+  tblw_type: pct
+  tblw_w: 5175
+  trh: '2248'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: WEB端功能设计
+- source_index: 207
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2236
+  - 1376
+  - 1129
+  - 1376
+  - 3907
+  tblw_type: pct
+  tblw_w: 4998
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 208
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1231
+  - 1370
+  - 1515
+  - 2068
+  - 1507
+  - 2333
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 209
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2356
+  - 1177
+  - 1177
+  - 834
+  - 4480
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 210
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1818
+  - 1159
+  - 829
+  - 829
+  - 1049
+  - 4344
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 211
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2356
+  - 1177
+  - 1177
+  - 834
+  - 4480
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 212
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1818
+  - 1159
+  - 829
+  - 829
+  - 1049
+  - 4344
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 213
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2357
+  - 1446
+  - 1178
+  - 1446
+  - 3597
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 214
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1200
+  - 1332
+  - 1475
+  - 2012
+  - 1734
+  - 2271
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 215
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2357
+  - 1176
+  - 1176
+  - 815
+  - 4502
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 216
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1200
+  - 1332
+  - 1475
+  - 2012
+  - 1734
+  - 2271
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 217
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 3621
+  - 2784
+  - 3621
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 218
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2310
+  - 1230
+  - 6486
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 219
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1821
+  - 1300
+  - 6905
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 220
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 3751
+  - 1611
+  - 4664
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 221
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1833
+  - 1308
+  - 6885
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 222
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2704
+  - 1589
+  - 5733
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 223
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2357
+  - 1176
+  - 1439
+  - 712
+  - 4342
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 224
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1035
+  - 1110
+  - 870
+  - 870
+  - 1274
+  - 4865
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 225
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2488
+  - 1176
+  - 1308
+  - 654
+  - 4400
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 226
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2359
+  - 1252
+  - 883
+  - 883
+  - 637
+  - 4012
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 227
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 3761
+  - 1254
+  - 1789
+  - 1254
+  - 1968
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 228
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1454
+  - 1454
+  - 1131
+  - 1131
+  - 1778
+  - 3076
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 229
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 3761
+  - 1254
+  - 1789
+  - 1254
+  - 1968
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 230
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2636
+  - 1336
+  - 1337
+  - 1810
+  - 982
+  - 1927
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 231
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2374
+  - 1186
+  - 1581
+  - 923
+  - 3962
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 232
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1582
+  - 1757
+  - 1232
+  - 1232
+  - 1934
+  - 2287
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 233
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2374
+  - 1186
+  - 1581
+  - 923
+  - 3962
+  tblw_type: pct
+  tblw_w: 4999
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 234
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 2630
+  - 1333
+  - 1341
+  - 1817
+  - 984
+  - 1923
+  tblw_type: pct
+  tblw_w: 4998
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 移动端功能设计
+- source_index: 235
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1343
+  - 8295
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 236
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2466
+  - 2389
+  - 2353
+  - 2646
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 237
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1011
+  - 7500
+  - 1343
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 238
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1493
+  - 8145
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: top
+  chapter: 第三方功能设计
+- source_index: 239
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 2646
+  - 2295
+  - 2087
+  - 2826
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 240
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 893
+  - 7500
+  - 1246
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 241
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1590
+  - 8048
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: top
+  chapter: 第三方功能设计
+- source_index: 242
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1986
+  - 2368
+  - 2819
+  - 2681
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 243
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 936
+  - 7200
+  - 1718
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 244
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1365
+  - 7843
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 245
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1504
+  - 8134
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: top
+  chapter: 第三方功能设计
+- source_index: 246
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 3276
+  - 2047
+  - 2354
+  - 2177
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 247
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 904
+  - 7543
+  - 1192
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 第三方功能设计
+- source_index: 248
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1951
+  - 7903
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 249
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 4396
+  - 1009
+  - 3622
+  - 827
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 第三方功能设计
+- source_index: 250
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1809
+  - 8045
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 251
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 8186
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 252
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2152
+  - 2636
+  - 4836
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 253
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1499
+  - 3895
+  - 4460
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 254
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1526
+  - 8328
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 255
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2515
+  - 3183
+  - 4156
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 256
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1809
+  - 3877
+  - 4168
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 257
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 6210
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 258
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 4329
+  - 3726
+  - 1799
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 259
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1642
+  - 4430
+  - 3782
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 260
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 8186
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 261
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2031
+  - 3724
+  - 3786
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 262
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1809
+  - 4133
+  - 3912
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 263
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1809
+  - 8045
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 264
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2878
+  - 4053
+  - 2923
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 265
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1517
+  - 4677
+  - 3660
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 266
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 8186
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 267
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2273
+  - 4329
+  - 2736
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 268
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1969
+  - 4015
+  - 3870
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 269
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1526
+  - 8328
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 270
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 3119
+  - 4268
+  - 2467
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 271
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1760
+  - 4533
+  - 3561
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 272
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 4299
+  - 3887
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 第三方功能设计
+- source_index: 273
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7566
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:000000:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 性能设计
+- source_index: 274
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7146
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 性能设计
+- source_index: 275
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7934
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 性能设计
+- source_index: 276
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 954
+  - 8900
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 性能设计
+- source_index: 277
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7356
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 通讯设计
+- source_index: 278
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 6633
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 通讯设计
+- source_index: 279
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 5676
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 通讯设计
+- source_index: 280
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7776
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 通讯设计
+- source_index: 281
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7590
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 通讯设计
+- source_index: 282
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7182
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口设计
+- source_index: 283
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 6936
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口设计
+- source_index: 284
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1057
+  - 8797
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口设计
+- source_index: 285
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7146
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口设计
+- source_index: 286
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 287
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 288
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 289
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 290
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 291
+  kind: markdown
+  style: '44'
+  col_widths:
+  - 1774
+  - 8254
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 兼容设计
+- source_index: 292
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7776
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 用户界面设计
+- source_index: 293
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 953
+  - 8901
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 用户界面设计
+- source_index: 294
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 913
+  - 8941
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 用户界面设计
+- source_index: 295
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 8616
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 用户界面设计
+- source_index: 296
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 988
+  - 8866
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 用户界面设计
+- source_index: 297
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1056
+  - 8798
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 安全设计
+- source_index: 298
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1001
+  - 8853
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 安全设计
+- source_index: 299
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7776
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 安全设计
+- source_index: 300
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 8406
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 安全设计
+- source_index: 301
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7146
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 安全设计
+- source_index: 302
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7356
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 日志设计
+- source_index: 303
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 6096
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 日志设计
+- source_index: 304
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 6516
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 日志设计
+- source_index: 305
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1050
+  - 8804
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 日志设计
+- source_index: 306
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 6936
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 日志设计
+- source_index: 307
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 8498
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 308
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1033
+  - 8821
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 309
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1024
+  - 8830
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 310
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7356
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 311
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1060
+  - 7146
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 312
+  kind: markdown
+  style: '45'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 存储设计
+- source_index: 313
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 8186
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 314
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1384
+  - 2147
+  - 2234
+  - 4089
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 315
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1242
+  - 5701
+  - 2911
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 316
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2518
+  - 7336
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 317
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 3603
+  - 3608
+  - 2643
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 318
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1668
+  - 4826
+  - 3360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 319
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2235
+  - 7619
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 320
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 2999
+  - 2785
+  - 4070
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 321
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 937
+  - 5207
+  - 3710
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 322
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1242
+  - 8612
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 323
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1384
+  - 2147
+  - 2234
+  - 4089
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 324
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1016
+  - 5491
+  - 3347
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 325
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1242
+  - 8612
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 326
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1305
+  - 942
+  - 6353
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 327
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 3603
+  - 3321
+  - 2930
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 328
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1356
+  - 5229
+  - 3269
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 329
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 1384
+  - 8470
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 330
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 4329
+  - 3368
+  - 2157
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计
+- source_index: 331
+  kind: markdown
+  style: '142'
+  col_widths:
+  - 997
+  - 6190
+  - 2667
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储设计

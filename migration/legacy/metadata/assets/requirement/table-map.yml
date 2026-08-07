@@ -1,0 +1,12992 @@
+document: requirement
+count: 528
+tables:
+- source_index: 1
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 2
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 3
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1471
+  - 1297
+  - 1123
+  - 4732
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 4
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1510
+  - 1147
+  - 1147
+  - 4819
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 5
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1660
+  - 1131
+  - 1131
+  - 4701
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 6
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1238
+  - 2670
+  - 1582
+  - 1938
+  - 2600
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 7
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 8
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 9
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1398
+  - 1230
+  - 1230
+  - 1230
+  - 3330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 10
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1958
+  - 1650
+  - 1230
+  - 2175
+  - 2700
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 11
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1958
+  - 958
+  - 958
+  - 3316
+  - 2838
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 12
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1398
+  - 1207
+  - 1055
+  - 1055
+  - 5313
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 13
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1398
+  - 1353
+  - 1164
+  - 1164
+  - 4949
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 14
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1398
+  - 1230
+  - 1266
+  - 2490
+  - 2490
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 15
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 16
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 17
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1567
+  - 1180
+  - 1777
+  - 4099
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 18
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1200
+  - 1400
+  - 1200
+  - 4823
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 19
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1340
+  - 1154
+  - 1988
+  - 4141
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 20
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1230
+  - 1230
+  - 1440
+  - 4170
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 21
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1201
+  - 1402
+  - 1201
+  - 4819
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 22
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1030
+  - 1173
+  - 1030
+  - 5390
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 23
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1539
+  - 8489
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 24
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 25
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 26
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1509
+  - 1509
+  - 4170
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 27
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1377
+  - 1137
+  - 1366
+  - 993
+  - 5155
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 28
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 985
+  - 1114
+  - 985
+  - 5644
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 29
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1440
+  - 1230
+  - 4170
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 30
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 31
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 32
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1440
+  - 1230
+  - 4170
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 33
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1163
+  - 1351
+  - 1650
+  - 4564
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 34
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 2573
+  - 1290
+  - 1118
+  - 3747
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 35
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 36
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1398
+  - 1132
+  - 1265
+  - 4933
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 37
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 38
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1517
+  - 1334
+  - 1150
+  - 4727
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 39
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1188
+  - 1384
+  - 1188
+  - 4968
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 40
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 960
+  - 1080
+  - 960
+  - 5728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 41
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: '522'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 42
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 43
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1476
+  - 5466
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 44
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1440
+  - 2123
+  - 3330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 45
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 46
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1555
+  - 1365
+  - 1174
+  - 4634
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 47
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1172
+  - 1362
+  - 2144
+  - 4050
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 48
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1650
+  - 1323
+  - 1323
+  - 3855
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 49
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1551
+  - 8477
+  tblw_type: dxa
+  tblw_w: 10028
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 50
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1310
+  - 1092
+  - 1583
+  - 4743
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 51
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1315
+  - 8539
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 52
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1470
+  - 1085
+  - 1955
+  - 4218
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 53
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1171
+  - 942
+  - 3750
+  - 2865
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 54
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1650
+  - 1440
+  - 1230
+  - 3330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 55
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1305
+  - 1237
+  - 824
+  - 5362
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1528'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 56
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1650
+  - 1440
+  - 1230
+  - 4066
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 57
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1293
+  - 1428
+  - 1073
+  - 1638
+  - 4596
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 58
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1293
+  - 2700
+  - 5640
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 59
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 810
+  - 2070
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 60
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 810
+  - 1230
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 61
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 875
+  - 8979
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 62
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 63
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1133
+  - 1311
+  - 1210
+  - 5074
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 64
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1452
+  - 1085
+  - 1247
+  - 1990
+  - 4254
+  tblw_type: auto
+  tblw_w: 0
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 65
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1139
+  - 1320
+  - 1500
+  - 4769
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 66
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1565
+  - 8289
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 67
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2432
+  - 1223
+  - 1223
+  - 1223
+  - 3927
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 68
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1483
+  - 8371
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 69
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1893
+  - 1338
+  - 1604
+  - 1535
+  - 3658
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 70
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1483
+  - 8371
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 71
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1893
+  - 1338
+  - 1604
+  - 1535
+  - 3658
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 72
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 73
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 74
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1440
+  - 1440
+  - 4380
+  tblw_type: auto
+  tblw_w: 0
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 75
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1058
+  - 1149
+  - 2767
+  - 3559
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '195'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 76
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1037
+  - 1183
+  - 2202
+  - 4306
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 77
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1483
+  - 8371
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 78
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1893
+  - 1338
+  - 1604
+  - 1535
+  - 3658
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 79
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1476
+  - 7356
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 80
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 81
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1230
+  - 1440
+  - 4380
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 82
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1907
+  - 1230
+  - 1440
+  - 1230
+  - 2700
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 83
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1012
+  - 1149
+  - 3010
+  - 3557
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 84
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1124
+  - 1299
+  - 1474
+  - 4831
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 85
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1476
+  - 7986
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 86
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 87
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1440
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 88
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1127
+  - 1303
+  - 1128
+  - 5065
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 89
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1476
+  - 5466
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 90
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 91
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 2070
+  - 1440
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 92
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 1127
+  - 1303
+  - 1128
+  - 5065
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 93
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1405
+  - 2002
+  - 1201
+  - 1201
+  - 4219
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 94
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1898
+  - 1156
+  - 1156
+  - 4518
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 95
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1639
+  - 2700
+  - 1405
+  - 1114
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 96
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1476
+  - 6516
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 97
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 98
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 99
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 100
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1031
+  - 1278
+  - 856
+  - 5563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1298'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 101
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 865
+  - 1319
+  - 1319
+  - 1424
+  - 1985
+  - 1701
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+  chapter: 功能需求
+- source_index: 102
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1172
+  - 1362
+  - 2144
+  - 4050
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 103
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1388
+  - 8466
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 104
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1151
+  - 829
+  - 1378
+  - 5370
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 105
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 737
+  - 9117
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1000'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 106
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1293
+  - 1155
+  - 833
+  - 1386
+  - 5361
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 107
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1275
+  - 931
+  - 3687
+  - 2835
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 108
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1285
+  - 1531
+  - 1102
+  - 1692
+  - 4418
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 109
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1300
+  - 1230
+  - 1102
+  - 2390
+  - 3969
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 110
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 111
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 112
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2580
+  - 1623
+  - 1211
+  - 1211
+  - 3403
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 113
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2985
+  - 1054
+  - 941
+  - 1339
+  - 3709
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 114
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2961
+  - 2245
+  - 1212
+  - 1059
+  - 2551
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 115
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2961
+  - 1706
+  - 943
+  - 1513
+  - 2905
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 116
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2816
+  - 1228
+  - 808
+  - 912
+  - 4264
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 117
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1230
+  - 1703
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 118
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1349
+  - 8679
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 119
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 120
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 121
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2712
+  - 1150
+  - 1012
+  - 1699
+  - 3455
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 122
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3117
+  - 1061
+  - 1061
+  - 1885
+  - 2904
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 123
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3000
+  - 1440
+  - 1230
+  - 1230
+  - 1650
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 124
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2743
+  - 1127
+  - 995
+  - 1719
+  - 3444
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 125
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 126
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 127
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1032
+  - 1033
+  - 1033
+  - 5011
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 128
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1002
+  - 1002
+  - 1002
+  - 5103
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 129
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1230
+  - 1230
+  - 1230
+  - 1067
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 130
+  kind: xml
+  file: requirement/tables/tbl_0130.xml
+  chapter: 功能需求
+- source_index: 131
+  kind: xml
+  file: requirement/tables/tbl_0131.xml
+  chapter: 功能需求
+- source_index: 132
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 133
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 134
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1171
+  - 1029
+  - 1029
+  - 4880
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 135
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1228
+  - 1228
+  - 1071
+  - 4582
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 136
+  kind: xml
+  file: requirement/tables/tbl_0136.xml
+  chapter: 功能需求
+- source_index: 137
+  kind: xml
+  file: requirement/tables/tbl_0137.xml
+  chapter: 功能需求
+- source_index: 138
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1514
+  - 8514
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 139
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 140
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 141
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 988
+  - 833
+  - 833
+  - 5455
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 142
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1132
+  - 1310
+  - 1132
+  - 4535
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 143
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1186
+  - 1381
+  - 1186
+  - 4356
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 144
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1433
+  - 1100
+  - 1100
+  - 4476
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 145
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1020
+  - 1230
+  - 1230
+  - 4380
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 146
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1724
+  - 2622
+  - 1268
+  - 1101
+  - 3313
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 147
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1732
+  - 2717
+  - 1171
+  - 1028
+  - 3380
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 148
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1899
+  - 2571
+  - 1164
+  - 1023
+  - 3371
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 149
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1440
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 150
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1230
+  - 1230
+  - 3960
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 151
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1650
+  - 1230
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 152
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1618
+  - 1211
+  - 1211
+  - 4069
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 153
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1618
+  - 1415
+  - 1211
+  - 3865
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 154
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1737
+  - 1169
+  - 1169
+  - 4034
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 155
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1517
+  - 1333
+  - 1150
+  - 4109
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 156
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1230
+  - 1230
+  - 3540
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 157
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1604
+  - 1449
+  - 898
+  - 1295
+  - 4782
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 158
+  kind: xml
+  file: requirement/tables/tbl_0158.xml
+  chapter: 功能需求
+- source_index: 159
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 160
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 161
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 988
+  - 833
+  - 833
+  - 5455
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 162
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1132
+  - 1310
+  - 1132
+  - 4535
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 163
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1352
+  - 1352
+  - 1164
+  - 4241
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 164
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1433
+  - 1100
+  - 1100
+  - 4476
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 165
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1020
+  - 1230
+  - 1230
+  - 4380
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 166
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 2019
+  - 1132
+  - 1132
+  - 3826
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 167
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1937
+  - 1046
+  - 1046
+  - 4080
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 168
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1440
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 169
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1230
+  - 1230
+  - 3960
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 170
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1650
+  - 1230
+  - 1230
+  - 3750
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 171
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1618
+  - 1211
+  - 1211
+  - 4069
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 172
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1618
+  - 1415
+  - 1211
+  - 3865
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 173
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1737
+  - 1169
+  - 1169
+  - 4034
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 174
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1517
+  - 1333
+  - 1150
+  - 4109
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 175
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1919
+  - 1230
+  - 1230
+  - 1230
+  - 3540
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 176
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1604
+  - 1449
+  - 898
+  - 1295
+  - 4782
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 177
+  kind: xml
+  file: requirement/tables/tbl_0177.xml
+  chapter: 功能需求
+- source_index: 178
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 179
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1524
+  - 8330
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 180
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1658
+  - 1442
+  - 4523
+  - 2405
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 181
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3673
+  - 782
+  - 782
+  - 4791
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 182
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3673
+  - 728
+  - 1050
+  - 4577
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 183
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3673
+  - 865
+  - 1103
+  - 4387
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 184
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 4007
+  - 971
+  - 1009
+  - 4041
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 185
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 4007
+  - 740
+  - 2650
+  - 2631
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 186
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3813
+  - 901
+  - 1640
+  - 3674
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 187
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3813
+  - 1032
+  - 1530
+  - 3653
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 188
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 3813
+  - 1032
+  - 1530
+  - 3653
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 189
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 190
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1968
+  - 1968
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 191
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1968
+  - 1968
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 192
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1968
+  - 1968
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 193
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 194
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1658
+  - 2278
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 195
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1968
+  - 1968
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 196
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1831
+  - 1635
+  - 1800
+  - 2010
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 197
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 198
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 199
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 200
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 201
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 202
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 203
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 204
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 205
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 206
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 207
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1446'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 208
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 209
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 210
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 211
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2166
+  - 2109
+  - 1649
+  - 1258
+  - 2672
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 212
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1964
+  - 1964
+  - 1373
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 213
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1964
+  - 1964
+  - 1373
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 214
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1964
+  - 1964
+  - 1373
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 215
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1964
+  - 1964
+  - 1373
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 216
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1964
+  - 1964
+  - 1373
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 217
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 218
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1965
+  - 1583
+  - 1753
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 219
+  kind: xml
+  file: requirement/tables/tbl_0219.xml
+  chapter: 功能需求
+- source_index: 220
+  kind: xml
+  file: requirement/tables/tbl_0220.xml
+  chapter: 功能需求
+- source_index: 221
+  kind: xml
+  file: requirement/tables/tbl_0221.xml
+  chapter: 功能需求
+- source_index: 222
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 223
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1994
+  - 1965
+  - 1965
+  - 1371
+  - 2559
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 224
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2192
+  - 1917
+  - 1918
+  - 749
+  - 3078
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 225
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1968
+  - 1373
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 226
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1613
+  - 1486
+  - 1143
+  - 1168
+  - 1036
+  - 1218
+  - 1234
+  - 953
+  tblw_type: auto
+  tblw_w: 0
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 227
+  kind: xml
+  file: requirement/tables/tbl_0227.xml
+  chapter: 功能需求
+- source_index: 228
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1850
+  - 2085
+  - 1748
+  - 1593
+  - 2563
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 229
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1550
+  - 3204
+  - 5274
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 230
+  kind: xml
+  file: requirement/tables/tbl_0230.xml
+  chapter: 功能需求
+- source_index: 231
+  kind: xml
+  file: requirement/tables/tbl_0231.xml
+  chapter: 功能需求
+- source_index: 232
+  kind: xml
+  file: requirement/tables/tbl_0232.xml
+  chapter: 功能需求
+- source_index: 233
+  kind: xml
+  file: requirement/tables/tbl_0233.xml
+  chapter: 功能需求
+- source_index: 234
+  kind: xml
+  file: requirement/tables/tbl_0234.xml
+  chapter: 功能需求
+- source_index: 235
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 1968
+  - 1693
+  - 1183
+  - 3028
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 236
+  kind: xml
+  file: requirement/tables/tbl_0236.xml
+  chapter: 功能需求
+- source_index: 237
+  kind: xml
+  file: requirement/tables/tbl_0237.xml
+  chapter: 功能需求
+- source_index: 238
+  kind: xml
+  file: requirement/tables/tbl_0238.xml
+  chapter: 功能需求
+- source_index: 239
+  kind: xml
+  file: requirement/tables/tbl_0239.xml
+  chapter: 功能需求
+- source_index: 240
+  kind: xml
+  file: requirement/tables/tbl_0240.xml
+  chapter: 功能需求
+- source_index: 241
+  kind: xml
+  file: requirement/tables/tbl_0241.xml
+  chapter: 功能需求
+- source_index: 242
+  kind: xml
+  file: requirement/tables/tbl_0242.xml
+  chapter: 功能需求
+- source_index: 243
+  kind: xml
+  file: requirement/tables/tbl_0243.xml
+  chapter: 功能需求
+- source_index: 244
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1951
+  - 7908
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '1035'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 245
+  kind: xml
+  file: requirement/tables/tbl_0245.xml
+  chapter: 功能需求
+- source_index: 246
+  kind: xml
+  file: requirement/tables/tbl_0246.xml
+  chapter: 功能需求
+- source_index: 247
+  kind: xml
+  file: requirement/tables/tbl_0247.xml
+  chapter: 功能需求
+- source_index: 248
+  kind: xml
+  file: requirement/tables/tbl_0248.xml
+  chapter: 功能需求
+- source_index: 249
+  kind: xml
+  file: requirement/tables/tbl_0249.xml
+  chapter: 功能需求
+- source_index: 250
+  kind: xml
+  file: requirement/tables/tbl_0250.xml
+  chapter: 功能需求
+- source_index: 251
+  kind: xml
+  file: requirement/tables/tbl_0251.xml
+  chapter: 功能需求
+- source_index: 252
+  kind: xml
+  file: requirement/tables/tbl_0252.xml
+  chapter: 功能需求
+- source_index: 253
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1634
+  - 1819
+  - 1547
+  - 1444
+  - 3395
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 254
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1634
+  - 1819
+  - 1547
+  - 1444
+  - 3395
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 255
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1634
+  - 1819
+  - 1547
+  - 1444
+  - 3395
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 256
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1380
+  - 1095
+  - 2841
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 257
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1380
+  - 1845
+  - 2091
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 258
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2643
+  - 1784
+  - 1759
+  - 1337
+  - 2331
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 259
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2748
+  - 2772
+  - 2182
+  - 2152
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 260
+  kind: xml
+  file: requirement/tables/tbl_0260.xml
+  chapter: 功能需求
+- source_index: 261
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 262
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1380
+  - 1845
+  - 2091
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 263
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1380
+  - 1845
+  - 2091
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 264
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1440
+  - 1320
+  - 2556
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 265
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 266
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1440
+  - 1320
+  - 2556
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 267
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1440
+  - 1320
+  - 2556
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 268
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1967
+  - 2556
+  - 1440
+  - 1320
+  - 2556
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 269
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1978
+  - 2374
+  - 3261
+  tblw_type: auto
+  tblw_w: 0
+  trh: '981'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 270
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 271
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 272
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 273
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 274
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2360
+  - 3299
+  - 3299
+  tblw_type: dxa
+  tblw_w: 8958
+  trh: '471'
+  fmt:
+    ind:
+    - '93'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    va: center
+  chapter: 功能需求
+- source_index: 275
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 276
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 277
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 278
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 279
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 280
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 281
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 2461
+  - 1397
+  - 1281
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 282
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 2360
+  - 3299
+  tblw_type: dxa
+  tblw_w: 5659
+  trh: '471'
+  fmt:
+    ind:
+    - '93'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    va: center
+  chapter: 功能需求
+- source_index: 283
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 284
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 285
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 286
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 287
+  kind: xml
+  file: requirement/tables/tbl_0287.xml
+  chapter: 功能需求
+- source_index: 288
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 289
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 290
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 291
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 292
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 293
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 294
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 295
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 296
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 297
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 298
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 299
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 300
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2236
+  - 1944
+  - 1379
+  - 1757
+  - 2538
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 301
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 302
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 303
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 304
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 305
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 306
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 307
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 308
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 309
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 310
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 311
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 312
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 313
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 314
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 315
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 316
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 317
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 318
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 319
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 320
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 321
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 322
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 323
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 324
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 325
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1582
+  - 1395
+  - 1665
+  - 2415
+  - 2797
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 326
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 327
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 328
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 329
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 330
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 331
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 332
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 333
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 334
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 335
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 336
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 337
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 338
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 339
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 340
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 341
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 342
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2192
+  - 1919
+  - 1365
+  - 1735
+  - 2417
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 343
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 344
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1899
+  - 1674
+  - 1180
+  - 1478
+  - 3516
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 345
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: dxa
+  tblw_w: 9854
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 346
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1876
+  - 2375
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 347
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 348
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 349
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2241
+  - 1967
+  - 1395
+  - 1777
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 350
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1861
+  - 1508
+  - 992
+  - 1843
+  - 1701
+  - 1949
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 351
+  kind: xml
+  file: requirement/tables/tbl_0351.xml
+  chapter: 功能需求
+- source_index: 352
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 353
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 功能需求
+- source_index: 354
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2340
+  - 2340
+  - 2340
+  - 2340
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  chapter: 功能需求
+- source_index: 355
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 功能需求
+- source_index: 356
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 功能需求
+- source_index: 357
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+  chapter: 功能需求
+- source_index: 358
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1859
+  - 1839
+  - 1822
+  - 1829
+  - 2505
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+  chapter: 功能需求
+- source_index: 359
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+  chapter: 功能需求
+- source_index: 360
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+  chapter: 功能需求
+- source_index: 361
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 功能需求
+- source_index: 362
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: '614'
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  chapter: 功能需求
+- source_index: 363
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+  chapter: 功能需求
+- source_index: 364
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 365
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 366
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 367
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 368
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1999
+  - 1286
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 369
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 370
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 371
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 372
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 373
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 374
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 375
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 376
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 377
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 378
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 379
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 380
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 381
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 382
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 383
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 384
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 385
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 386
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 387
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 388
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 389
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 390
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 391
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 392
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 393
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 394
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 395
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 396
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 397
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 398
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 399
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 400
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 401
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 402
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 403
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 404
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 405
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 406
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 407
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 408
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 409
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 410
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 411
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 412
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 413
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 414
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 415
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 416
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 417
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 418
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1391
+  - 2066
+  - 1620
+  - 1620
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 419
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 420
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 421
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 422
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 423
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1825
+  - 868
+  - 814
+  - 1935
+  - 4586
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 424
+  kind: markdown
+  style: '42'
+  col_widths:
+  - 1825
+  - 2023
+  - 3452
+  - 2728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '0'
+    - '0'
+    - '0'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    tcm:
+    - '90'
+    - '195'
+    - '90'
+    - '195'
+    va: center
+  chapter: 功能需求
+- source_index: 425
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 426
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 427
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 428
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '90'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 429
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 430
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 431
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 432
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 433
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 434
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 435
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 436
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 1381
+  - 3396
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 437
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 438
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 439
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 440
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 441
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 442
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 443
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 4320
+  - 4320
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 444
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1716
+  - 1716
+  - 1716
+  - 1736
+  - 1485
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 445
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2160
+  - 2160
+  - 2160
+  - 2160
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 446
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2454
+  - 2454
+  - 2454
+  - 2492
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 447
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: '339'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 448
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 3284
+  - 3285
+  - 3285
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 449
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1733
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 450
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 4320
+  - 4320
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 451
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 2127
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 452
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 453
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 454
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 455
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1733
+  - 1733
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 456
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 457
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 2325
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 458
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  - 1728
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 功能需求
+- source_index: 459
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 460
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 461
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 462
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 463
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 464
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 465
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 466
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 467
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 468
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 469
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 470
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 471
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 472
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 473
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 474
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 475
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 476
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1792
+  - 1665
+  - 1620
+  - 2303
+  - 2474
+  tblw_type: auto
+  tblw_w: 0
+  trh: '485'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 功能需求
+- source_index: 477
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 性能需求
+- source_index: 478
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 性能需求
+- source_index: 479
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 性能需求
+- source_index: 480
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 性能需求
+- source_index: 481
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 性能需求
+- source_index: 482
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 3511
+  - 2836
+  - 2872
+  tblw_type: auto
+  tblw_w: 0
+  trh: '1504'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 性能需求
+- source_index: 483
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 通讯需求
+- source_index: 484
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 通讯需求
+- source_index: 485
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 通讯需求
+- source_index: 486
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 通讯需求
+- source_index: 487
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 通讯需求
+- source_index: 488
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 接口需求
+- source_index: 489
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 接口需求
+- source_index: 490
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 接口需求
+- source_index: 491
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1056
+  - 8701
+  tblw_type: auto
+  tblw_w: 0
+  trh: '596'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口需求
+- source_index: 492
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1056
+  - 8701
+  tblw_type: auto
+  tblw_w: 0
+  trh: '596'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    va: bottom
+  chapter: 接口需求
+- source_index: 493
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1815
+  - 7823
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 494
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1515
+  - 2678
+  - 3034
+  - 2409
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 495
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1590
+  - 2389
+  - 3707
+  - 1950
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 496
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1472
+  - 2025
+  - 3730
+  - 2409
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 497
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1493
+  - 2207
+  - 3527
+  - 2409
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 498
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1493
+  - 1822
+  - 3912
+  - 2409
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 499
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1461
+  - 1757
+  - 4009
+  - 2409
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 500
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1633
+  - 2517
+  - 4018
+  - 1468
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 501
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1729
+  - 1982
+  - 4211
+  - 1714
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: fixed
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 502
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2361
+  - 3525
+  - 3753
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+  chapter: 接口需求
+- source_index: 503
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 用户界面需求
+- source_index: 504
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 用户界面需求
+- source_index: 505
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 用户界面需求
+- source_index: 506
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 用户界面需求
+- source_index: 507
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 安全需求
+- source_index: 508
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 安全需求
+- source_index: 509
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 安全需求
+- source_index: 510
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1810
+  - 8049
+  tblw_type: dxa
+  tblw_w: 9859
+  trh: '553'
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 安全需求
+- source_index: 511
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 安全需求
+- source_index: 512
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 2340
+  - 2340
+  - 2340
+  - 2340
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  chapter: 安全需求
+- source_index: 513
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 安全需求
+- source_index: 514
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 9360
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+  chapter: 安全需求
+- source_index: 515
+  kind: markdown
+  style: '43'
+  col_widths:
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  - 1872
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    cs:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+  chapter: 安全需求
+- source_index: 516
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 日志需求
+- source_index: 517
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 日志需求
+- source_index: 518
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 519
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 520
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 法律和合规性需求
+- source_index: 521
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 兼容性需求
+- source_index: 522
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 兼容性需求
+- source_index: 523
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1488
+  - 8366
+  tblw_type: auto
+  tblw_w: 0
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    va: bottom
+  chapter: 兼容性需求
+- source_index: 524
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1668
+  - 8646
+  tblw_type: dxa
+  tblw_w: 10314
+  trh: null
+  fmt:
+    ind:
+    - '0'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    hdr:
+    - 0
+    - 1
+    - 2
+    - 3
+    va: bottom
+  chapter: 存储需求
+- source_index: 525
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 2343
+  - 3402
+  - 2693
+  - 1843
+  tblw_type: dxa
+  tblw_w: 10281
+  trh: null
+  fmt:
+    ind:
+    - '-108'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储需求
+- source_index: 526
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1876
+  - 2946
+  - 3167
+  - 2292
+  tblw_type: dxa
+  tblw_w: 10281
+  trh: null
+  fmt:
+    ind:
+    - '-108'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储需求
+- source_index: 527
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1632
+  - 3177
+  - 3138
+  - 2334
+  tblw_type: dxa
+  tblw_w: 10281
+  trh: null
+  fmt:
+    ind:
+    - '-108'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    hdr:
+    - 0
+    va: bottom
+  chapter: 存储需求
+- source_index: 528
+  kind: markdown
+  style: '143'
+  col_widths:
+  - 1632
+  - 3177
+  - 3138
+  - 2334
+  tblw_type: dxa
+  tblw_w: 10281
+  trh: null
+  fmt:
+    ind:
+    - '-108'
+    - dxa
+    lay: autofit
+    cm:
+    - '0'
+    - '108'
+    - '0'
+    - '108'
+    bd: single:auto:4:0
+    va: center
+  chapter: 存储需求

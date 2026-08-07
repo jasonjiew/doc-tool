@@ -1,0 +1,331 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk" xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData">
+  <w:tblPr>
+    <w:tblStyle w:val="44"/>
+    <w:tblW w:w="0" w:type="auto"/>
+    <w:tblInd w:w="0" w:type="dxa"/>
+    <w:tblBorders>
+      <w:top w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      <w:left w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      <w:bottom w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      <w:right w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      <w:insideH w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      <w:insideV w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+    </w:tblBorders>
+    <w:tblLayout w:type="autofit"/>
+    <w:tblCellMar>
+      <w:top w:w="0" w:type="dxa"/>
+      <w:left w:w="0" w:type="dxa"/>
+      <w:bottom w:w="0" w:type="dxa"/>
+      <w:right w:w="0" w:type="dxa"/>
+    </w:tblCellMar>
+  </w:tblPr>
+  <w:tblGrid>
+    <w:gridCol w:w="503"/>
+    <w:gridCol w:w="9525"/>
+  </w:tblGrid>
+  <w:tr w14:paraId="76A8553F">
+    <w:tblPrEx>
+      <w:tblBorders>
+        <w:top w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:left w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:bottom w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:right w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideH w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideV w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      </w:tblBorders>
+    </w:tblPrEx>
+    <w:trPr>
+      <w:tblHeader/>
+    </w:trPr>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:p w14:paraId="7E2FB17B">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="center"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:kern w:val="0"/>
+            <w:szCs w:val="21"/>
+            <w:lang w:bidi="ar"/>
+          </w:rPr>
+          <w:t>功能</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:p w14:paraId="06B8B299">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="center"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:kern w:val="0"/>
+            <w:szCs w:val="21"/>
+            <w:lang w:bidi="ar"/>
+          </w:rPr>
+          <w:t>核心逻辑描述</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+  </w:tr>
+  <w:tr w14:paraId="1E66A1A6">
+    <w:tblPrEx>
+      <w:tblBorders>
+        <w:top w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:left w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:bottom w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:right w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideH w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideV w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      </w:tblBorders>
+      <w:tblCellMar>
+        <w:top w:w="0" w:type="dxa"/>
+        <w:left w:w="0" w:type="dxa"/>
+        <w:bottom w:w="0" w:type="dxa"/>
+        <w:right w:w="0" w:type="dxa"/>
+      </w:tblCellMar>
+    </w:tblPrEx>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:p w14:paraId="32DB3E89">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="left"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+          <w:t>新增/修改</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:tbl>
+        <w:tblPr>
+          <w:tblStyle w:val="44"/>
+        <!-- Fit the nested table to its 9525-twip parent cell.  The migrated
+             17100-twip fixed width clipped business text past the A4 page. -->
+        <w:tblW w:w="0" w:type="auto"/>
+          <w:tblInd w:w="0" w:type="dxa"/>
+          <w:tblLayout w:type="autofit"/>
+          <w:tblCellMar>
+            <w:top w:w="0" w:type="dxa"/>
+            <w:left w:w="0" w:type="dxa"/>
+            <w:bottom w:w="0" w:type="dxa"/>
+            <w:right w:w="0" w:type="dxa"/>
+          </w:tblCellMar>
+        </w:tblPr>
+        <w:tblGrid>
+          <w:gridCol w:w="9525"/>
+        </w:tblGrid>
+        <w:tr w14:paraId="7407C635">
+          <w:tblPrEx>
+            <w:tblCellMar>
+              <w:top w:w="0" w:type="dxa"/>
+              <w:left w:w="0" w:type="dxa"/>
+              <w:bottom w:w="0" w:type="dxa"/>
+              <w:right w:w="0" w:type="dxa"/>
+            </w:tblCellMar>
+          </w:tblPrEx>
+          <w:tc>
+            <w:tcPr>
+              <w:tcW w:w="0" w:type="auto"/>
+              <w:tcMar>
+                <w:top w:w="90" w:type="dxa"/>
+                <w:left w:w="195" w:type="dxa"/>
+                <w:bottom w:w="90" w:type="dxa"/>
+                <w:right w:w="195" w:type="dxa"/>
+              </w:tcMar>
+              <w:vAlign w:val="center"/>
+            </w:tcPr>
+            <w:p w14:paraId="1FFACFEF">
+              <w:pPr>
+                <w:widowControl/>
+                <w:jc w:val="left"/>
+                <w:rPr>
+                  <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+                  <w:szCs w:val="21"/>
+                </w:rPr>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+                  <w:kern w:val="0"/>
+                  <w:szCs w:val="21"/>
+                  <w:lang w:bidi="ar"/>
+                </w:rPr>
+                <w:br w:type="textWrapping"/>
+              </w:r>
+              <w:r>
+                <w:rPr>
+                  <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+                  <w:kern w:val="0"/>
+                  <w:szCs w:val="21"/>
+                  <w:lang w:bidi="ar"/>
+                </w:rPr>
+                <w:t>1. 检查是否存在传入的服务包ID，若存在则进入更新逻辑，不存在则创建新的服务包记录。 2. 根据服务包类型设置价格：如果不是收费类型，则价格设置为0。 3. 更新或初始化服务包的基本信息，如名称、周期、价格等。 4. 更新或添加相关的大项目和小项目信息，计算最终价格。 5. 更新服务包的标签信息，清空原有标签后添加新标签。 6. 更新服务包项目的关系配置，先删除原有关系后添加新关系。 7. 返回操作成功的消息。</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+        </w:tr>
+      </w:tbl>
+      <w:p w14:paraId="694BDCE8">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="left"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+      </w:p>
+    </w:tc>
+  </w:tr>
+  <w:tr w14:paraId="613D85DF">
+    <w:tblPrEx>
+      <w:tblBorders>
+        <w:top w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:left w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:bottom w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:right w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideH w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+        <w:insideV w:val="single" w:color="auto" w:sz="4" w:space="0"/>
+      </w:tblBorders>
+      <w:tblCellMar>
+        <w:top w:w="0" w:type="dxa"/>
+        <w:left w:w="0" w:type="dxa"/>
+        <w:bottom w:w="0" w:type="dxa"/>
+        <w:right w:w="0" w:type="dxa"/>
+      </w:tblCellMar>
+    </w:tblPrEx>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:p w14:paraId="62543053">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="left"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:b/>
+            <w:bCs/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+          <w:t>列表</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+    <w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+        <w:tcMar>
+          <w:top w:w="90" w:type="dxa"/>
+          <w:left w:w="195" w:type="dxa"/>
+          <w:bottom w:w="90" w:type="dxa"/>
+          <w:right w:w="195" w:type="dxa"/>
+        </w:tcMar>
+        <w:vAlign w:val="center"/>
+      </w:tcPr>
+      <w:p w14:paraId="52CEC3E2">
+        <w:pPr>
+          <w:widowControl/>
+          <w:jc w:val="left"/>
+          <w:rPr>
+            <w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:szCs w:val="21"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:hint="eastAsia" w:ascii="宋体" w:hAnsi="宋体" w:cs="宋体"/>
+            <w:szCs w:val="21"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="F6F8FA"/>
+          </w:rPr>
+          <w:t>1. 通过给定的查询条件（如服务包对象）和分页信息（对象）来查询服务包记录。 2. 从远程服务获取初始标签列表并将其转换为映射，以便快速访问。 3. 对每个服务包记录，从远程服务查询部门信息，并为每个服务包装配部门名称。 4. 对每个服务包记录，根据其标签ID列表查询标签名称，并组装成字符串添加到服务包信息中。 5. 将处理过的服务包记录集合设置回分页对象并返回。</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>
+  </w:tr>
+</w:tbl>

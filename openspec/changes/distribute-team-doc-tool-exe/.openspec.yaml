@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-08-07
+goal: 团队成员无需安装 Python，只需安装 Release EXE，即可安全完成 Word 首次拆分、Markdown 迭代维护和一键合并。

@@ -1,0 +1,40 @@
+documentType: requirement
+
+documentNo: KF-2090-1-001
+documentName: 康尚健康云软件需求说明书
+documentVersion: "3.8"
+
+# 仅用于迁移基线验收；日常 build 不依赖原始 Word
+baseline:
+  file: ../../KF-2090-1-001 康尚健康云软件需求说明书(3.8).docx
+
+template:
+  file: ../templates/requirement-template.docx
+
+# 章节内容根: 自动递归扫描, 目录结构即章节树(无需登记每个 Markdown)
+contentRoot:
+  path: ../content/requirement
+
+# 图片资源根目录(Markdown 内相对路径基于此)
+assetRoot: ../assets/requirement
+
+# 复杂表格 XML 资源目录
+tableRoot: ../assets/requirement/tables
+
+# heading 级别 -> Word 段落样式(数字)
+headingStyles:
+  1: "2"
+  2: "3"
+  3: "5"
+  4: "6"
+  5: "7"
+  6: "8"
+
+# 正文段落默认样式
+bodyStyle: "4"
+
+output:
+  file: "../output/{documentNo} {documentName}({documentVersion})-REBUILD.docx"
+
+refresh:
+  timeoutSeconds: 900

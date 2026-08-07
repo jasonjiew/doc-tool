@@ -1,0 +1,32 @@
+document: design
+chapters:
+- chapter: 引言
+  file: 01-引言.md
+- chapter: 系统概述
+  file: 02-系统概述.md
+- chapter: 设备端功能设计
+  file: 03-设备端功能设计.md
+- chapter: WEB端功能设计
+  file: 04-WEB端功能设计.md
+- chapter: 移动端功能设计
+  file: 05-移动端功能设计.md
+- chapter: 第三方功能设计
+  file: 06-第三方功能设计.md
+- chapter: 性能设计
+  file: 07-性能设计.md
+- chapter: 通讯设计
+  file: 08-通讯设计.md
+- chapter: 接口设计
+  file: 09-接口设计.md
+- chapter: 兼容设计
+  file: 10-兼容设计.md
+- chapter: 用户界面设计
+  file: 11-用户界面设计.md
+- chapter: 安全设计
+  file: 12-安全设计.md
+- chapter: 日志设计
+  file: 13-日志设计.md
+- chapter: 法律和合规性需求
+  file: 14-法律和合规性需求.md
+- chapter: 存储设计
+  file: 15-存储设计.md

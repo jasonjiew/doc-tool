@@ -1,0 +1,26 @@
+document: requirement
+chapters:
+- chapter: 引言
+  file: 01-引言.md
+- chapter: 系统概述
+  file: 02-系统概述.md
+- chapter: 功能需求
+  file: 03-功能需求.md
+- chapter: 性能需求
+  file: 04-性能需求.md
+- chapter: 通讯需求
+  file: 05-通讯需求.md
+- chapter: 接口需求
+  file: 06-接口需求.md
+- chapter: 用户界面需求
+  file: 07-用户界面需求.md
+- chapter: 安全需求
+  file: 08-安全需求.md
+- chapter: 日志需求
+  file: 09-日志需求.md
+- chapter: 法律和合规性需求
+  file: 10-法律和合规性需求.md
+- chapter: 兼容性需求
+  file: 11-兼容性需求.md
+- chapter: 存储需求
+  file: 12-存储需求.md

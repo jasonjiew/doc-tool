@@ -1,0 +1,54 @@
+# --- 生产输出与用户项目数据（不得进入源码仓库） ---
+output/
+projects/
+logs/
+*.log
+
+# --- 原始/未净化 DOCX：仅允许净化模板与测试夹具中的 docx ---
+# 模板与测试夹具在白名单中显式登记，其余 docx 一律忽略
+*.docx
+!templates/*.docx
+!doc_tool/resources/templates/*.docx
+!scripts/tests/fixtures/**/*.docx
+
+# --- Python 构建产物 ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# --- PyInstaller / 安装器构建产物 ---
+build/
+dist/
+*.spec.bak
+
+# --- 虚拟环境与本地依赖 ---
+.venv/
+venv/
+env/
+
+# --- 密钥与本地配置 ---
+.env
+.env.local
+*.pem
+*.pfx
+*.key
+secrets.yaml
+
+# --- 历史二进制 BAT（含 NUL 字节，仅作留存，禁止作为入口） ---
+migration/legacy/binary-bat/*.bat
+
+# --- 编辑器与系统文件 ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+desktop.ini
+
+# --- 诊断临时输出 ---
+*.diag.xml
+*.diag.txt

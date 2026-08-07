@@ -1,0 +1,45 @@
+documentType: design
+
+documentNo: KF-2090-1-006
+documentName: 康尚健康云系统详细设计说明书
+documentVersion: "2.5"
+
+# 仅用于迁移基线验收；日常 build 不依赖原始 Word
+baseline:
+  file: ../../KF-2090-1-006 康尚健康云系统详细设计说明书(2.5).docx
+
+template:
+  file: ../templates/design-template.docx
+
+# 章节内容根: 自动递归扫描, 目录结构即章节树(无需登记每个 Markdown)
+contentRoot:
+  path: ../content/design
+
+# 图片资源根目录(Markdown 内相对路径基于此)
+assetRoot: ../assets/design
+
+# 复杂表格 XML 资源目录
+tableRoot: ../assets/design/tables
+
+# heading 级别 -> Word 段落样式(数字)
+# 详细设计文档有 9 级标题: 2=heading1, 4=heading2, 5=heading3, 6=heading4,
+#                          8=heading5, 9=heading6, 10=heading7, 11=heading8, 12=heading9
+headingStyles:
+  1: "2"
+  2: "4"
+  3: "5"
+  4: "6"
+  5: "8"
+  6: "9"
+  7: "10"
+  8: "11"
+  9: "12"
+
+# 正文段落默认样式 (Body Text)
+bodyStyle: "7"
+
+output:
+  file: "../output/{documentNo} {documentName}({documentVersion})-REBUILD.docx"
+
+refresh:
+  timeoutSeconds: 900
