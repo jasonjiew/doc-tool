@@ -15,5 +15,13 @@ paths:
 sourceSha256: ""                # 导入时由源 DOCX 只读副本计算
 createdWithVersion: 0.1.0
 lastSuccessfulBuildVersion: null
+headingStyles:                   # heading 级别 -> Word 段落样式 ID（由模板决定）
+  "1": "2"
+  "2": "3"
+  "3": "5"
+  "4": "6"
+  "5": "7"
+  "6": "8"
+bodyStyle: "4"                   # 正文段落默认样式 ID
 refresh:
   timeoutSeconds: 900

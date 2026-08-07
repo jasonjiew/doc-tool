@@ -696,13 +696,18 @@ class Report:
 
 
 def validate(
-    doc_type: str,
+    doc_type: Optional[str] = None,
     output_override: Optional[str] = None,
     baseline: bool = False,
     require_refreshed: bool = False,
     report_override: Optional[str] = None,
+    config: Optional[Dict] = None,
 ) -> bool:
-    config = load_config(doc_type)
+    if config is None:
+        if doc_type is None:
+            raise AutomationError("必须提供 doc_type 或 config 参数")
+        config = load_config(doc_type)
+    doc_type = config["documentType"]
     entries = validate_content_tree(config)
     output_path = os.path.abspath(output_override or config["paths"]["output"])
     report = Report(doc_type, output_path)

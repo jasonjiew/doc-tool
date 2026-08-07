@@ -68,18 +68,28 @@ def _update_all_story_fields(document) -> None:
                 break
 
 
-def refresh_worker(document: str) -> int:
+def refresh_worker(
+    document: Optional[str] = None, output_path: Optional[str] = None
+) -> int:
     try:
         import win32com.client
     except ImportError as exc:
         print("[FAIL] 未安装 pywin32，无法刷新 Word 域: {0}".format(exc), file=sys.stderr, flush=True)
         return 1
 
-    config = load_config(document)
-    output = config["paths"]["output"]
+    if output_path is None:
+        if document is None:
+            print("[FAIL] 刷新工作进程缺少输出路径", file=sys.stderr, flush=True)
+            return 1
+        config = load_config(document)
+        output_path = config["paths"]["output"]
+    output = os.path.abspath(output_path)
     if not os.path.isfile(output):
         print("[FAIL] 待刷新文档不存在: {0}".format(output), file=sys.stderr, flush=True)
         return 1
+    # 显示标签：项目上下文无 doc_type 时用文件名替代，避免消息出现 None。
+    if document is None:
+        document = os.path.basename(output)
 
     word = None
     opened = None
@@ -134,16 +144,38 @@ def refresh_worker(document: str) -> int:
                 _kill_process_tree(word_pid)
 
 
-def supervise(document: str) -> bool:
-    config = load_config(document)
-    timeout = int(config.get("refresh", {}).get("timeoutSeconds", 900))
-    command = [sys.executable, os.path.abspath(__file__), "--worker", document]
+def supervise(
+    document: Optional[str] = None,
+    output_path: Optional[str] = None,
+    timeout: Optional[int] = None,
+) -> bool:
+    """Supervise the Word refresh worker with a timeout.
+
+    Project context callers pass ``output_path`` and ``timeout`` directly;
+    legacy callers pass ``document`` and the config is loaded from disk.
+    """
+    if output_path is None or timeout is None:
+        if document is None:
+            raise AutomationError("必须提供 document 或 output_path 参数")
+        config = load_config(document)
+        if output_path is None:
+            output_path = config["paths"]["output"]
+        if timeout is None:
+            timeout = int(config.get("refresh", {}).get("timeoutSeconds", 900))
+    label = document or os.path.basename(output_path)
+    command = [
+        sys.executable,
+        os.path.abspath(__file__),
+        "--worker",
+        "--output",
+        os.path.abspath(output_path),
+    ]
     process = subprocess.Popen(command)
     try:
         return process.wait(timeout=timeout) == 0
     except subprocess.TimeoutExpired:
         print(
-            "[{0}] [FAIL] Word 刷新超过 {1} 秒，已终止本次专用进程".format(document, timeout),
+            "[{0}] [FAIL] Word 刷新超过 {1} 秒，已终止本次专用进程".format(label, timeout),
             file=sys.stderr,
             flush=True,
         )
@@ -158,7 +190,8 @@ def supervise(document: str) -> bool:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="使用独立 Word 进程刷新 TOC、NUMPAGES 和域")
     parser.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
-    parser.add_argument("--worker", choices=("requirement", "design"), help=argparse.SUPPRESS)
+    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--output", help=argparse.SUPPRESS)
     parser.add_argument(
         "--skip-word-refresh",
         action="store_true",
@@ -166,7 +199,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     args = parser.parse_args(argv)
     if args.worker:
-        return refresh_worker(args.worker)
+        if args.output:
+            return refresh_worker(output_path=args.output)
+        if args.document != "all":
+            return refresh_worker(document=args.document)
+        parser.error("--worker 需要 --output 或文档参数")
     if args.skip_word_refresh:
         print("[SKIP] 已按显式参数跳过 Word 实机刷新；不能视为正式验收通过。")
         return 0

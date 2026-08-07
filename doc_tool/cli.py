@@ -47,8 +47,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     if args.command == "build":
+        if args.project:
+            # 新入口：使用项目上下文驱动的应用服务。
+            from doc_tool.adapters.kernel import ensure_kernel_importable
+
+            ensure_kernel_importable()
+            from doc_tool.application.pipeline import run_pipeline
+            from doc_tool.domain.manifest import ProjectManifest
+            from doc_tool.domain.paths import ProjectPaths
+
+            manifest = ProjectManifest.load(args.project)
+            paths = manifest.resolve_paths(args.project)
+            result = run_pipeline(
+                manifest, paths, skip_word_refresh=args.skip_word_refresh
+            )
+            for event in result.events:
+                status = event.status.upper()
+                line = "[{0}] {1}".format(status, event.stage)
+                if event.detail:
+                    line += ": {0}".format(event.detail)
+                if event.error_code:
+                    line += " ({0})".format(event.error_code)
+                print(line)
+            return 0 if result.success else 1
+
         # 兼容层：委托现有 scripts/run_pipeline.py。
-        # --project 路径在任务 2.4 接入应用服务后生效。
         import os
         import subprocess
 

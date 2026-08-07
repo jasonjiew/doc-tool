@@ -758,8 +758,23 @@ def _validate_zip_xml(items: Dict[str, bytes]) -> None:
                 raise AutomationError("OOXML 无法解析 {0}: {1}".format(name, exc))
 
 
-def build(doc_type: str, output_override: Optional[str] = None) -> str:
-    config = load_config(doc_type)
+def build(
+    doc_type: Optional[str] = None,
+    output_override: Optional[str] = None,
+    config: Optional[Dict] = None,
+) -> str:
+    """Build a DOCX from a template + chapter tree + Markdown assets.
+
+    ``config`` allows the caller to pass a project-context configuration dict
+    (as produced by ``docx_common.load_config`` or
+    ``doc_tool.adapters.kernel.config_from_project``).  When ``config`` is
+    omitted, ``doc_type`` is used to load the legacy ``config/<doc>.yml``.
+    """
+    if config is None:
+        if doc_type is None:
+            raise AutomationError("必须提供 doc_type 或 config 参数")
+        config = load_config(doc_type)
+    doc_type = config["documentType"]
     validate_content_tree(config)
     template_path = config["paths"]["template"]
     output_path = os.path.abspath(output_override or config["paths"]["output"])

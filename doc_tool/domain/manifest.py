@@ -72,6 +72,10 @@ class ProjectManifest:
     createdWithVersion: str = APP_VERSION
     lastSuccessfulBuildVersion: Optional[str] = None
     refreshTimeoutSeconds: int = DEFAULT_REFRESH_TIMEOUT_SECONDS
+    # 模板相关的构建样式（v1 附加字段，向后兼容：旧清单无此字段时为空）。
+    # 由导入服务根据源文档类型从默认配置写入，构建时由适配层消费。
+    headingStyles: Dict[int, str] = field(default_factory=dict)
+    bodyStyle: str = ""
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
 
@@ -128,6 +132,8 @@ class ProjectManifest:
             "sourceSha256": self.sourceSha256,
             "createdWithVersion": self.createdWithVersion,
             "lastSuccessfulBuildVersion": self.lastSuccessfulBuildVersion,
+            "headingStyles": {str(k): v for k, v in self.headingStyles.items()},
+            "bodyStyle": self.bodyStyle,
             "refresh": {"timeoutSeconds": self.refreshTimeoutSeconds},
             "createdAt": self.createdAt,
             "updatedAt": self.updatedAt,
@@ -151,7 +157,11 @@ class ProjectManifest:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = manifest_path.with_suffix(".yml.tmp")
         tmp_path.write_text(self.to_yaml(), encoding="utf-8")
-        os.replace(tmp_path, manifest_path)
+        try:
+            os.replace(tmp_path, manifest_path)
+        except OSError:
+            # 跨卷/挂载点场景（如部分 D 盘配置）os.replace 会失败，回退到 shutil.move。
+            shutil.move(str(tmp_path), str(manifest_path))
         return manifest_path
 
     @staticmethod
@@ -214,6 +224,11 @@ class ProjectManifest:
             paths=dict(paths_data),
             createdWithVersion=data.get("createdWithVersion", APP_VERSION),
             lastSuccessfulBuildVersion=data.get("lastSuccessfulBuildVersion"),
+            headingStyles={
+                int(level): str(style_id)
+                for level, style_id in (data.get("headingStyles") or {}).items()
+            },
+            bodyStyle=str(data.get("bodyStyle", "") or ""),
             refreshTimeoutSeconds=int(refresh_data.get("timeoutSeconds", DEFAULT_REFRESH_TIMEOUT_SECONDS)),
             createdAt=data.get("createdAt"),
             updatedAt=data.get("updatedAt"),
