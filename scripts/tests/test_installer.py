@@ -39,6 +39,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ISS_PATH = os.path.join(REPO_ROOT, "packaging", "installer.iss")
 
+# 从应用版本模块获取当前版本，避免硬编码
+from doc_tool.domain.version import APP_VERSION
+
 
 def _read_iss():
     """读取 installer.iss 文件内容。"""
@@ -117,9 +120,9 @@ class InstallerArtifactTests(unittest.TestCase):
     """任务 8.8：安装器产物验证。"""
 
     def test_setup_exe_exists(self):
-        """KonsungDocTool-Setup-0.1.0.exe 已生成。"""
+        """当前版本的安装器 EXE 已生成。"""
         exe = os.path.join(REPO_ROOT, "packaging", "Output",
-                           "KonsungDocTool-Setup-0.1.0.exe")
+                           "KonsungDocTool-Setup-{0}.exe".format(APP_VERSION))
         if not os.path.isfile(exe):
             self.skipTest("安装器未构建，先运行 ISCC.exe")
         self.assertGreater(os.path.getsize(exe), 1024 * 1024,
@@ -128,7 +131,7 @@ class InstallerArtifactTests(unittest.TestCase):
     def test_sha256_exists(self):
         """SHA-256 哈希文件已生成。"""
         sha = os.path.join(REPO_ROOT, "packaging", "Output",
-                           "KonsungDocTool-Setup-0.1.0.exe.sha256")
+                           "KonsungDocTool-Setup-{0}.exe.sha256".format(APP_VERSION))
         if not os.path.isfile(sha):
             self.skipTest("SHA-256 文件未生成")
         with open(sha, encoding="ascii") as f:

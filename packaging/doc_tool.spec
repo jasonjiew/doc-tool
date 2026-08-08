@@ -29,7 +29,7 @@ from PyInstaller.utils.hooks import (
 SPEC_DIR = Path(SPECPATH).resolve()
 REPO_ROOT = SPEC_DIR.parent
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "1.0.0"
 
 block_cipher = None
 

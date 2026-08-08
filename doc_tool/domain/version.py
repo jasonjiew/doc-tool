@@ -14,8 +14,8 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：正式发布前为 0.x，1.0.0 对应计划第 10 节的正式交付。
-APP_VERSION = "0.1.0"
+# 应用语义版本：1.0.0 对应计划第 10 节的正式交付。
+APP_VERSION = "1.0.0"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
 PROJECT_SCHEMA_VERSION = 1

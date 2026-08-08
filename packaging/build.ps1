@@ -29,7 +29,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "0.1.0"
+$Version = "1.0.0"
 
 Write-Host "=== 康尚文档工具安装包构建 ===" -ForegroundColor Cyan
 Write-Host "版本: $Version"

@@ -16,7 +16,7 @@
 
 #define MyAppName "康尚文档工具"
 #define MyAppNameEn "KonsungDocTool"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "康尚医疗"
 #define MyAppURL "http://www.konsung.com"
 #define MyAppExeName "KonsungDocTool.exe"
