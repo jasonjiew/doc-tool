@@ -845,7 +845,9 @@ def build(
     try:
         with zipfile.ZipFile(temporary_path, "w", zipfile.ZIP_DEFLATED) as package:
             for name, data in items.items():
-                package.writestr(name, data)
+                info = zipfile.ZipInfo(filename=name, date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                package.writestr(info, data)
         with zipfile.ZipFile(temporary_path, "r") as package:
             bad_part = package.testzip()
             if bad_part:

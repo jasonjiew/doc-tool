@@ -24,4 +24,6 @@ if __name__ == "__main__":
         sys.exit(1)
     if run("test_import_preflight.py") != 0:
         sys.exit(1)
-    sys.exit(run("test_project_build.py"))
+    if run("test_project_build.py") != 0:
+        sys.exit(1)
+    sys.exit(run("test_import_project.py"))
