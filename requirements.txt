@@ -1,0 +1,17 @@
+# 运行依赖（锁定版本）
+# 安装：python -m pip install -r requirements.txt
+#
+# 这些依赖会被 PyInstaller 打包进 onedir 应用，最终用户无需安装 Python 或这些包。
+
+# YAML 解析：读取/写入 project.yml
+pyyaml==6.0.3
+
+# XML 解析：OOXML 构建、校验、导入预检
+lxml==6.1.1
+
+# 图片处理：截图尺寸计算、DPI 归一化
+pillow==12.3.0
+
+# Windows COM 支持：Microsoft Word 自动化刷新 TOC/NUMPAGES
+# 仅 Windows 平台需要；PyInstaller 会自动收集 pywin32 DLL
+pywin32==312

@@ -1,0 +1,11 @@
+# 构建依赖（仅开发/CI 环境，不打包进最终应用）
+# 安装：python -m pip install -r requirements-build.txt
+#
+# 这些工具仅在构建安装包时使用，最终用户机器不需要。
+
+# -r requirements.txt          # 运行依赖（构建前必须先安装）
+pyinstaller==6.14.0
+
+# Inno Setup 不通过 pip 安装，需单独下载：
+# https://jrsoftware.org/isdl.php
+# 安装后确保 ISCC.exe 在 PATH 中，或在 packaging/build.ps1 中指定路径。

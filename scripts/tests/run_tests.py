@@ -32,4 +32,11 @@ if __name__ == "__main__":
         sys.exit(1)
     if run("test_lock_log_cancel.py") != 0:
         sys.exit(1)
-    sys.exit(run("test_word_release.py"))
+    if run("test_word_release.py") != 0:
+        sys.exit(1)
+    if run("test_packaging.py") != 0:
+        sys.exit(1)
+    if run("test_installer.py") != 0:
+        sys.exit(1)
+    # test_frozen_smoke.py 需要先运行 pyinstaller，CI 中单独执行
+    sys.exit(0)

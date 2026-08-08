@@ -1,0 +1,56 @@
+第三方依赖许可清单
+===================
+
+本应用打包并分发以下第三方库及其许可。许可全文见各包的 LICENSE 文件。
+
+运行依赖（打包进最终应用）
+--------------------------
+
+1. PyYAML 6.0.3
+   许可：MIT License
+   用途：读取/写入 project.yml 项目清单
+   https://pypi.org/project/PyYAML/
+
+2. lxml 6.1.1
+   许可：BSD License (lxml), BSD-3-Clause (libxml2/libxslt)
+   用途：OOXML (word/document.xml 等) 解析与构建
+   https://pypi.org/project/lxml/
+
+3. Pillow 12.3.0
+   许可：MIT-CMU License (Pillow), HPND License (libjpeg/zlib 等)
+   用途：截图尺寸计算、DPI 归一化
+   https://pypi.org/project/Pillow/
+
+4. pywin32 312
+   许可：PSF-2.0 License (Python Software Foundation License)
+   用途：Microsoft Word COM 自动化 (win32com.client.DispatchEx)
+   https://pypi.org/project/pywin32/
+
+5. Python 3.13
+   许可：PSF-2.0 License (Python Software Foundation License)
+   用途：应用运行时（由 PyInstaller 冻结分发）
+   https://www.python.org/
+
+构建依赖（不打包进最终应用）
+----------------------------
+
+6. PyInstaller 6.14.0
+   许可：GPL-2.0-or-later License (PyInstaller bootstrap code),
+         BSD License (PyInstaller hooks)
+   用途：将 Python 应用冻结为 Windows onedir 可执行包
+   注：PyInstaller 的 bootstrap 代码随应用分发，但其许可允许非 GPL 应用使用。
+   https://pyinstaller.org/
+
+7. Inno Setup 6
+   许可：Inno Setup License (BSD-like, 免费商用)
+   用途：将 onedir 包封装为单个 Setup EXE 安装器
+   https://jrsoftware.org/isinfo.php
+
+Python 标准库（随 Python 分发）
+-------------------------------
+
+tkinter, ctypes, json, os, sys, pathlib, dataclasses, hashlib,
+subprocess, tempfile, shutil, zipfile, posixpath, re, copy,
+collections, datetime, functools, typing, unittest
+
+许可：PSF-2.0 License
