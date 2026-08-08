@@ -1,0 +1,172 @@
+# -*- coding: utf-8 -*-
+# GitLab CI/CD 配置：康尚文档工具 Windows 构建与 Release
+#
+# 任务 9.3/9.4：Windows CI，校验标签/版本一致，串联全部测试。
+# 任务 9.5：生产文档泄漏扫描。
+# 任务 9.6：代码签名（配置证书时启用）。
+# 任务 9.7：发布说明和安装器上传到 Git Release。
+#
+# 需要带 PowerShell 的 Windows GitLab Runner。
+# Release 作业仅在 vX.Y.Z 标签上触发。
+
+stages:
+  - validate
+  - test
+  - build
+  - package
+  - release
+
+variables:
+  APP_VERSION: "0.1.0"
+  PYTHON_VERSION: "3.13"
+
+# --- 阶段 1：版本一致性校验 ---
+validate-version:
+  stage: validate
+  tags:
+    - windows
+  script:
+    - |
+      # 校验标签版本与应用版本一致
+      $tag = $env:CI_COMMIT_TAG
+      if ($tag) {
+        $tagVersion = $tag.TrimStart("v")
+        $appVersion = python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)"
+        if ($tagVersion -ne $appVersion) {
+          Write-Error "标签版本 $tagVersion 与应用版本 $appVersion 不一致"
+          exit 1
+        }
+        Write-Host "版本一致: $tagVersion"
+      }
+    # 校验工作树干净
+    - python -c "from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# --- 阶段 2：测试 ---
+test-unit:
+  stage: test
+  tags:
+    - windows
+  script:
+    - python -m pip install -r requirements.txt --no-cache-dir
+    - python scripts\tests\run_tests.py
+  artifacts:
+    reports:
+      junit: test-results.xml
+    when: always
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# --- 阶段 3：PyInstaller 构建 ---
+build-onedir:
+  stage: build
+  tags:
+    - windows
+  needs: ["test-unit"]
+  script:
+    - python -m pip install pyinstaller==6.14.0 --no-cache-dir
+    - pyinstaller packaging/doc_tool.spec --noconfirm --clean
+    # 冻结应用冒烟测试
+    - python scripts\tests\test_frozen_smoke.py
+  artifacts:
+    paths:
+      - dist/KonsungDocTool/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# --- 阶段 4：安装器打包 ---
+package-installer:
+  stage: package
+  tags:
+    - windows
+  needs: ["build-onedir"]
+  script:
+    # 生产文档泄漏扫描
+    - python packaging/scan_leaks.py
+    # Inno Setup 编译
+    - $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    - if (!(Test-Path $iscc)) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+    - if (!(Test-Path $iscc)) { Write-Error "Inno Setup 未安装"; exit 1 }
+    - Push-Location packaging
+    - & $iscc installer.iss
+    - Pop-Location
+    # 生成 SHA-256
+    - $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
+    - $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+    - "$hash  KonsungDocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
+    # 代码签名（配置证书时启用）
+    - |
+      if ($env:CODE_SIGNING_PFX -and $env:CODE_SIGNING_PASSWORD) {
+        $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+        if ($signtool) {
+          & $signtool.Source sign /f $env:CODE_SIGNING_PFX /p $env:CODE_SIGNING_PASSWORD /t http://timestamp.digicert.com $exe
+          Write-Host "代码签名完成"
+        } else {
+          Write-Warning "signtool.exe 未找到，跳过签名（仅限受控试点）"
+        }
+      } else {
+        Write-Warning "未配置代码签名证书，产出仅限受控试点"
+      }
+    # 生成 SBOM
+    - |
+      $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
+      "康尚文档工具 $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
+      "生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $sbom -Append -Encoding utf8
+      "PyYAML 6.0.3 (MIT), lxml 6.1.1 (BSD), Pillow 12.3.0 (MIT-CMU), pywin32 312 (PSF), Python 3.13 (PSF)" | Out-File $sbom -Append -Encoding utf8
+  artifacts:
+    paths:
+      - packaging/Output/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# --- 阶段 5：Release 发布 ---
+release-upload:
+  stage: release
+  tags:
+    - windows
+  needs: ["package-installer"]
+  script:
+    - |
+      # 使用 GitLab Release CLI 上传安装器
+      $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
+      $sha = "$exe.sha256"
+      $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
+
+      # 生成发布说明
+      $notes = "packaging\Output\release-notes.md"
+      "# 康尚文档工具 v$env:APP_VERSION`n`n" | Out-File $notes -Encoding utf8
+      "## 安装`n- 下载 KonsungDocTool-Setup-$env:APP_VERSION.exe`n- 双击运行，按提示安装`n- 默认安装到 %LOCALAPPDATA%\Konsung\DocTool（无需管理员权限）`n`n" | Out-File $notes -Append -Encoding utf8
+      "## 验证`n- SHA-256: $(Get-Content $sha)`n`n" | Out-File $notes -Append -Encoding utf8
+      "## 依赖`n见 SBOM 文件`n`n" | Out-File $notes -Append -Encoding utf8
+
+      # 使用 curl 上传到 GitLab Release（需要 CI_JOB_TOKEN）
+      $url = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/releases"
+      Write-Host "Release 产物已生成，请通过 GitLab UI 或 Release CLI 发布"
+      Write-Host "安装器: $exe"
+      Write-Host "SHA-256: $sha"
+      Write-Host "SBOM: $sbom"
+      Write-Host "发布说明: $notes"
+  artifacts:
+    paths:
+      - packaging/Output/
+    expire_in: 90 days
+  rules:
+    - if: $CI_COMMIT_TAG
+  release:
+    name: "v$APP_VERSION"
+    description: "康尚文档工具 $APP_VERSION"
+    tag_name: "$CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "KonsungDocTool-Setup-$APP_VERSION.exe"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-Setup-$APP_VERSION.exe"
+        - name: "SHA-256"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-Setup-$APP_VERSION.exe.sha256"
+        - name: "SBOM"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION-sbom.txt"

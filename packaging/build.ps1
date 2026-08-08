@@ -36,9 +36,22 @@ Write-Host "版本: $Version"
 Write-Host "仓库根: $RepoRoot"
 Write-Host ""
 
-# --- 阶段 1：PyInstaller 构建 ---
+# --- 阶段 1：生产文档泄漏扫描 ---
+Write-Host "[1/5] 生产文档泄漏扫描..." -ForegroundColor Yellow
+Push-Location $RepoRoot
+try {
+    & python packaging\scan_leaks.py
+    if ($LASTEXITCODE -ne 0) {
+        throw "生产文档泄漏扫描失败 (exit $LASTEXITCODE)"
+    }
+} finally {
+    Pop-Location
+}
+Write-Host "  泄漏扫描通过。" -ForegroundColor Green
+
+# --- 阶段 2：PyInstaller 构建 ---
 if (-not $SkipPyInstaller) {
-    Write-Host "[1/4] PyInstaller 构建 onedir..." -ForegroundColor Yellow
+    Write-Host "[2/5] PyInstaller 构建 onedir..." -ForegroundColor Yellow
     Push-Location $RepoRoot
     try {
         & python -m PyInstaller packaging\doc_tool.spec --noconfirm --clean
@@ -50,12 +63,12 @@ if (-not $SkipPyInstaller) {
     }
     Write-Host "  PyInstaller 构建完成。" -ForegroundColor Green
 } else {
-    Write-Host "[1/4] 跳过 PyInstaller 构建。" -ForegroundColor DarkGray
+    Write-Host "[2/5] 跳过 PyInstaller 构建。" -ForegroundColor DarkGray
 }
 
-# --- 阶段 2：冒烟测试 ---
+# --- 阶段 3：冒烟测试 ---
 if (-not $SkipTests) {
-    Write-Host "[2/4] 冻结应用冒烟测试..." -ForegroundColor Yellow
+    Write-Host "[3/5] 冻结应用冒烟测试..." -ForegroundColor Yellow
     Push-Location $RepoRoot
     try {
         & python scripts\tests\test_frozen_smoke.py
@@ -67,11 +80,11 @@ if (-not $SkipTests) {
     }
     Write-Host "  冒烟测试通过。" -ForegroundColor Green
 } else {
-    Write-Host "[2/4] 跳过冒烟测试。" -ForegroundColor DarkGray
+    Write-Host "[3/5] 跳过冒烟测试。" -ForegroundColor DarkGray
 }
 
-# --- 阶段 3：Inno Setup 编译 ---
-Write-Host "[3/4] Inno Setup 编译安装器..." -ForegroundColor Yellow
+# --- 阶段 4：Inno Setup 编译 ---
+Write-Host "[4/5] Inno Setup 编译安装器..." -ForegroundColor Yellow
 
 # 查找 ISCC.exe
 $IsccPaths = @(
@@ -110,8 +123,8 @@ if ($Iscc) {
     $SetupExe = $null
 }
 
-# --- 阶段 4：生成 SHA-256 和依赖清单 ---
-Write-Host "[4/4] 生成 SHA-256 和依赖清单..." -ForegroundColor Yellow
+# --- 阶段 5：生成 SHA-256 和依赖清单 ---
+Write-Host "[5/5] 生成 SHA-256 和依赖清单..." -ForegroundColor Yellow
 
 $DistDir = "$RepoRoot\dist\KonsungDocTool"
 $ReleaseDir = "$RepoRoot\packaging\Output"
