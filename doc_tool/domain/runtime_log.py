@@ -123,6 +123,11 @@ class RuntimeLog:
     def log_file(self) -> Path:
         return self._log_file
 
+    @property
+    def app_version(self) -> str:
+        """应用版本（只读，供状态元数据等模块复用）。"""
+        return self._app_version
+
     def info(
         self, stage: str, status: str = "", metrics: Optional[Dict[str, Any]] = None
     ) -> None:

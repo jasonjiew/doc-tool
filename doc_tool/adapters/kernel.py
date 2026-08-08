@@ -118,7 +118,11 @@ def refresh_with_project(
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
 ) -> bool:
-    """以项目上下文调用 ``refresh_fields.supervise``，返回是否刷新成功。"""
+    """以项目上下文调用 ``refresh_fields.supervise``，返回是否刷新成功。
+
+    任务 7.2：刷新由专用 ``DispatchEx("Word.Application")`` 进程完成，
+    不复用、不关闭、不终止用户已打开的 Word。超时只 kill 本次专用进程树。
+    """
     ensure_kernel_importable()
     from refresh_fields import supervise  # noqa: E402
 

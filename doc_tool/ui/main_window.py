@@ -289,6 +289,19 @@ class MainWindow:
         summary = self._project_summary
         from doc_tool.adapters.kernel import ensure_kernel_importable
         from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.application.word_check import check_word_available
+
+        # 任务 7.1：正式合并前检查 Word 可用性，缺失时阻断并提示诊断构建
+        report = check_word_available(dispatch_check=True)
+        if not report.available:
+            reasons = "\n".join("  • {0}".format(r) for r in report.reasons) or "  • 未知原因"
+            self._show_error(
+                "Microsoft Word 不可用",
+                "正式合并需要本机交互式会话中的 Microsoft Word。",
+                "请改用「操作 → 诊断构建（无 Word）」，或在安装 Microsoft Word 的电脑上执行正式合并。\n"
+                "原因：\n{0}".format(reasons),
+            )
+            return
 
         try:
             ensure_kernel_importable()
@@ -403,10 +416,20 @@ class MainWindow:
         # 处理管线结果
         if hasattr(result, "events") and hasattr(result, "success"):
             if result.success:
-                self._status_var.set("任务成功完成")
-                # 更新最后构建版本
+                # 任务 7.4：根据输出状态元数据判断正式/诊断
+                from doc_tool.domain.output_state import is_formal_success
+
                 if result.output_path:
+                    formal = is_formal_success(result.output_path)
+                    if formal:
+                        self._status_var.set("正式合并成功（Word 已刷新，字段已校验）")
+                        self._log("✓ 正式输出：{0}".format(result.output_path))
+                    else:
+                        self._status_var.set("诊断构建完成（非正式，字段未实机刷新）")
+                        self._log("△ 诊断输出：{0}".format(result.output_path))
                     self._summary_vars["last_build"].set(APP_VERSION)
+                else:
+                    self._status_var.set("任务成功完成")
             else:
                 code = result.error_code or "未知"
                 self._status_var.set("任务失败（{0}）".format(code))

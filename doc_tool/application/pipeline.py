@@ -38,6 +38,7 @@ STAGE_BUILD = "build"
 STAGE_VALIDATE_PRE = "validate_pre"
 STAGE_WORD_REFRESH = "word_refresh"
 STAGE_VALIDATE_POST = "validate_post"
+STAGE_PUBLISH = "publish"
 
 
 @dataclass
@@ -119,6 +120,12 @@ def run_pipeline(
 
     任务 5.1/5.4/5.5：管线自动获取/释放项目锁，写入脱敏轮转日志，
     并在阶段边界检查取消令牌。Word 保存与构建原子写入受临界区保护。
+
+    任务 7.1：正式模式（``skip_word_refresh=False``）在启动前再次确认 Word
+    可用，避免锁已获取后才发现 Word 缺失。
+    任务 7.3：构建产物先写入临时文件，前校验、Word 刷新、后校验全部在
+    临时文件上进行；只有后校验通过后才原子发布到正式输出路径。
+    任务 7.4：发布完成后写入输出状态元数据，标注是否为正式成功。
     """
     from doc_tool.adapters.kernel import (
         build_with_project,
@@ -128,6 +135,36 @@ def run_pipeline(
 
     result = PipelineResult(success=False)
     log = RuntimeLog(paths, app_version=app_version)
+
+    # --- 任务 7.1：正式模式预检 Word 可用性 ---
+    if not skip_word_refresh:
+        from doc_tool.application.word_check import check_word_available
+
+        report = check_word_available(dispatch_check=True)
+        if not report.available:
+            err = WordNotAvailableError(
+                user_message="Microsoft Word 不可用：{0}".format(
+                    "；".join(report.reasons) or "未知原因"
+                ),
+                suggested_action=(
+                    "请改用「诊断构建（无 Word）」，或在安装 Microsoft Word 的电脑上执行正式合并。"
+                ),
+                details={
+                    "pywin32": str(report.pywin32_available),
+                    "interactive": str(report.interactive_session),
+                    "dispatchable": str(report.word_dispatchable),
+                },
+            )
+            result.error_code = err.code
+            result.events.append(StageEvent(
+                STAGE_BUILD, "failed", detail=err.user_message, error_code=err.code,
+            ))
+            log.error(STAGE_BUILD, exception=err, metrics={
+                "pywin32": report.pywin32_available,
+                "interactive": report.interactive_session,
+                "dispatchable": report.word_dispatchable,
+            })
+            return result
 
     # --- 获取项目锁 ---
     try:
@@ -170,19 +207,57 @@ def _run_pipeline_inner(
     refresh_with_project,
     validate_with_project,
 ) -> PipelineResult:
-    """管线内部执行（锁已获取），分离以便 finally 释放锁。"""
+    """管线内部执行（锁已获取），分离以便 finally 释放锁。
+
+    任务 7.3：构建产物先写入临时文件（与正式输出同目录，保证 ``os.replace``
+    原子）。前校验、Word 刷新、后校验全部在临时文件上进行。只有后校验
+    通过后才原子发布到正式输出路径，并写入状态元数据。任意阶段失败都
+    不修改正式输出，仅清理临时文件。
+    """
+    from doc_tool.domain.output_state import write_state
+    from doc_tool.domain.version import PROJECT_SCHEMA_VERSION, get_commit_id
+
     token = cancel_token or CancellationToken()
 
-    # --- 阶段 1：构建 ---
+    # --- 计算正式输出路径与临时输出路径 ---
+    output_name = "{0} {1}({2}).docx".format(
+        manifest.documentNo, manifest.documentName, manifest.documentVersion
+    )
+    formal_output = paths.output_dir / output_name
+    paths.output_dir.mkdir(parents=True, exist_ok=True)
+    # 临时文件与正式输出同目录，保证 os.replace 在同一卷上原子
+    temp_output = paths.output_dir / ("." + output_name + ".tmp")
+
+    # 用于状态元数据的阶段摘要
+    stage_summary: list = []
+
+    def _record_stage(stage: str, status: str) -> None:
+        stage_summary.append({"stage": stage, "status": status})
+
+    def _cleanup_temp() -> None:
+        try:
+            if temp_output.exists():
+                temp_output.unlink()
+        except OSError:
+            pass
+
+    # --- 阶段 1：构建到临时文件 ---
     token.check_cancel()
     result.events.append(StageEvent(STAGE_BUILD, "started"))
     log.info(STAGE_BUILD, "started")
     try:
-        output_path = build_with_project(manifest, paths)
-        result.output_path = output_path
-        result.events.append(StageEvent(STAGE_BUILD, "succeeded", detail=output_path))
-        log.info(STAGE_BUILD, "succeeded", {"output": os.path.basename(output_path)})
+        # 先删除可能残留的临时文件，避免上次失败遗留
+        _cleanup_temp()
+        built_path = build_with_project(manifest, paths, output_override=str(temp_output))
+        result.output_path = str(formal_output)  # 返回正式路径，而非临时
+        result.events.append(StageEvent(
+            STAGE_BUILD, "succeeded",
+            detail="构建到临时文件：{0}".format(temp_output.name),
+        ))
+        log.info(STAGE_BUILD, "succeeded", {"output": temp_output.name})
+        _record_stage(STAGE_BUILD, "succeeded")
     except CancelledError:
+        _cleanup_temp()
         raise
     except Exception as exc:
         err = _map_exception(exc)
@@ -191,24 +266,54 @@ def _run_pipeline_inner(
         ))
         log.error(STAGE_BUILD, exception=exc)
         result.error_code = err.code
+        _record_stage(STAGE_BUILD, "failed")
+        _cleanup_temp()
+        # 写入失败状态（不计算正式输出哈希，因为正式输出未更新）
+        write_state(
+            str(formal_output),
+            formal=False,
+            diagnostic=skip_word_refresh,
+            app_version=log.app_version,
+            commit=get_commit_id(),
+            schema_version=PROJECT_SCHEMA_VERSION,
+            stages=stage_summary,
+            failure_code=err.code,
+            compute_hash=False,
+        )
         return result
 
-    # --- 阶段 2：刷新前严格校验 ---
+    # --- 阶段 2：刷新前严格校验（临时文件） ---
     token.check_cancel()
     result.events.append(StageEvent(STAGE_VALIDATE_PRE, "started"))
     log.info(STAGE_VALIDATE_PRE, "started")
     try:
-        ok = validate_with_project(manifest, paths, baseline=baseline)
+        ok = validate_with_project(
+            manifest, paths, output_override=str(temp_output), baseline=baseline,
+        )
         result.events.append(StageEvent(
             STAGE_VALIDATE_PRE,
             "succeeded" if ok else "failed",
             detail="校验通过" if ok else "校验未通过",
         ))
         log.info(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
+        _record_stage(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
         if not ok:
             result.error_code = ValidationError.code
+            _cleanup_temp()
+            write_state(
+                str(formal_output),
+                formal=False,
+                diagnostic=skip_word_refresh,
+                app_version=log.app_version,
+                commit=get_commit_id(),
+                schema_version=PROJECT_SCHEMA_VERSION,
+                stages=stage_summary,
+                failure_code=ValidationError.code,
+                compute_hash=False,
+            )
             return result
     except CancelledError:
+        _cleanup_temp()
         raise
     except Exception as exc:
         err = _map_exception(exc)
@@ -217,75 +322,219 @@ def _run_pipeline_inner(
         ))
         log.error(STAGE_VALIDATE_PRE, exception=exc)
         result.error_code = err.code
+        _record_stage(STAGE_VALIDATE_PRE, "failed")
+        _cleanup_temp()
+        write_state(
+            str(formal_output),
+            formal=False,
+            diagnostic=skip_word_refresh,
+            app_version=log.app_version,
+            commit=get_commit_id(),
+            schema_version=PROJECT_SCHEMA_VERSION,
+            stages=stage_summary,
+            failure_code=err.code,
+            compute_hash=False,
+        )
         return result
 
-    # --- 阶段 3：Word 实机刷新（可选） ---
+    # --- 阶段 3：Word 实机刷新（可选，临时文件） ---
     token.check_cancel()
     if skip_word_refresh:
         result.events.append(StageEvent(
             STAGE_WORD_REFRESH, "skipped", detail="已显式跳过 Word 实机刷新",
         ))
         log.info(STAGE_WORD_REFRESH, "skipped")
-        result.success = True
-        return result
-
-    result.events.append(StageEvent(STAGE_WORD_REFRESH, "started"))
-    log.info(STAGE_WORD_REFRESH, "started")
-    try:
-        # Word 保存是临界区：取消在保存完成前不中断
-        with token.critical_section():
-            ok = refresh_with_project(manifest, paths)
-        if ok:
+        _record_stage(STAGE_WORD_REFRESH, "skipped")
+    else:
+        result.events.append(StageEvent(STAGE_WORD_REFRESH, "started"))
+        log.info(STAGE_WORD_REFRESH, "started")
+        try:
+            # Word 保存是临界区：取消在保存完成前不中断
+            with token.critical_section():
+                ok = refresh_with_project(
+                    manifest, paths, output_override=str(temp_output),
+                )
+            if ok:
+                result.events.append(StageEvent(
+                    STAGE_WORD_REFRESH, "succeeded",
+                    detail="TOC、NUMPAGES 与全部 story 域刷新完成",
+                ))
+                log.info(STAGE_WORD_REFRESH, "succeeded")
+                _record_stage(STAGE_WORD_REFRESH, "succeeded")
+            else:
+                err = WordNotAvailableError(
+                    user_message="Word 刷新失败，请查看日志中的详细错误",
+                )
+                result.events.append(StageEvent(
+                    STAGE_WORD_REFRESH, "failed",
+                    detail=err.user_message, error_code=err.code,
+                ))
+                log.error(STAGE_WORD_REFRESH, exception=err)
+                result.error_code = err.code
+                _record_stage(STAGE_WORD_REFRESH, "failed")
+                _cleanup_temp()
+                write_state(
+                    str(formal_output),
+                    formal=False,
+                    diagnostic=False,
+                    app_version=log.app_version,
+                    commit=get_commit_id(),
+                    schema_version=PROJECT_SCHEMA_VERSION,
+                    stages=stage_summary,
+                    failure_code=err.code,
+                    compute_hash=False,
+                )
+                return result
+        except CancelledError:
+            _cleanup_temp()
+            raise
+        except Exception as exc:
+            err = _map_exception(exc)
             result.events.append(StageEvent(
-                STAGE_WORD_REFRESH, "succeeded",
-                detail="TOC、NUMPAGES 与全部 story 域刷新完成",
+                STAGE_WORD_REFRESH, "failed", detail=err.user_message, error_code=err.code,
             ))
-            log.info(STAGE_WORD_REFRESH, "succeeded")
-        else:
-            result.events.append(StageEvent(
-                STAGE_WORD_REFRESH, "failed",
-                detail="Word 刷新失败，请查看日志中的详细错误",
-                error_code=WordNotAvailableError.code,
-            ))
-            log.error(STAGE_WORD_REFRESH, exception=WordNotAvailableError())
-            result.error_code = WordNotAvailableError.code
+            log.error(STAGE_WORD_REFRESH, exception=exc)
+            result.error_code = err.code
+            _record_stage(STAGE_WORD_REFRESH, "failed")
+            _cleanup_temp()
+            write_state(
+                str(formal_output),
+                formal=False,
+                diagnostic=False,
+                app_version=log.app_version,
+                commit=get_commit_id(),
+                schema_version=PROJECT_SCHEMA_VERSION,
+                stages=stage_summary,
+                failure_code=err.code,
+                compute_hash=False,
+            )
             return result
-    except CancelledError:
-        raise
-    except Exception as exc:
-        err = _map_exception(exc)
+
+    # --- 阶段 4：刷新后严格校验（临时文件） ---
+    # 诊断模式跳过后校验（无 Word 刷新，require_refreshed 无意义）
+    if skip_word_refresh:
         result.events.append(StageEvent(
-            STAGE_WORD_REFRESH, "failed", detail=err.user_message, error_code=err.code,
+            STAGE_VALIDATE_POST, "skipped",
+            detail="诊断模式跳过刷新后校验",
         ))
-        log.error(STAGE_WORD_REFRESH, exception=exc)
-        result.error_code = err.code
+        log.info(STAGE_VALIDATE_POST, "skipped")
+        _record_stage(STAGE_VALIDATE_POST, "skipped")
+        post_ok = True
+    else:
+        token.check_cancel()
+        result.events.append(StageEvent(STAGE_VALIDATE_POST, "started"))
+        log.info(STAGE_VALIDATE_POST, "started")
+        try:
+            ok = validate_with_project(
+                manifest, paths, output_override=str(temp_output),
+                baseline=baseline, require_refreshed=True,
+            )
+            result.events.append(StageEvent(
+                STAGE_VALIDATE_POST,
+                "succeeded" if ok else "failed",
+                detail="刷新后校验通过" if ok else "刷新后校验未通过",
+            ))
+            log.info(STAGE_VALIDATE_POST, "succeeded" if ok else "failed")
+            _record_stage(STAGE_VALIDATE_POST, "succeeded" if ok else "failed")
+            post_ok = ok
+            if not ok:
+                result.error_code = ValidationError.code
+        except CancelledError:
+            _cleanup_temp()
+            raise
+        except Exception as exc:
+            err = _map_exception(exc)
+            result.events.append(StageEvent(
+                STAGE_VALIDATE_POST, "failed", detail=err.user_message, error_code=err.code,
+            ))
+            log.error(STAGE_VALIDATE_POST, exception=exc)
+            result.error_code = err.code
+            _record_stage(STAGE_VALIDATE_POST, "failed")
+            _cleanup_temp()
+            write_state(
+                str(formal_output),
+                formal=False,
+                diagnostic=False,
+                app_version=log.app_version,
+                commit=get_commit_id(),
+                schema_version=PROJECT_SCHEMA_VERSION,
+                stages=stage_summary,
+                failure_code=err.code,
+                compute_hash=False,
+            )
+            return result
+
+    # --- 阶段 5：原子发布（临界区，不可取消） ---
+    if not post_ok:
+        _cleanup_temp()
+        write_state(
+            str(formal_output),
+            formal=False,
+            diagnostic=skip_word_refresh,
+            app_version=log.app_version,
+            commit=get_commit_id(),
+            schema_version=PROJECT_SCHEMA_VERSION,
+            stages=stage_summary,
+            failure_code=ValidationError.code,
+            compute_hash=False,
+        )
         return result
 
-    # --- 阶段 4：刷新后严格校验 ---
-    token.check_cancel()
-    result.events.append(StageEvent(STAGE_VALIDATE_POST, "started"))
-    log.info(STAGE_VALIDATE_POST, "started")
+    result.events.append(StageEvent(STAGE_PUBLISH, "started"))
+    log.info(STAGE_PUBLISH, "started")
     try:
-        ok = validate_with_project(
-            manifest, paths, baseline=baseline, require_refreshed=True
-        )
+        with token.critical_section():
+            # os.replace 在同一卷上原子：要么完全成功，要么正式输出不变
+            os.replace(str(temp_output), str(formal_output))
         result.events.append(StageEvent(
-            STAGE_VALIDATE_POST,
-            "succeeded" if ok else "failed",
-            detail="刷新后校验通过" if ok else "刷新后校验未通过",
+            STAGE_PUBLISH, "succeeded",
+            detail="已原子发布到：{0}".format(formal_output.name),
         ))
-        log.info(STAGE_VALIDATE_POST, "succeeded" if ok else "failed")
-        result.success = ok
-        if not ok:
-            result.error_code = ValidationError.code
+        log.info(STAGE_PUBLISH, "succeeded", {"output": formal_output.name})
+        _record_stage(STAGE_PUBLISH, "succeeded")
+        result.success = True
+        result.output_path = str(formal_output)
+
+        # 任务 7.4：写入输出状态元数据
+        is_formal = not skip_word_refresh
+        write_state(
+            str(formal_output),
+            formal=is_formal,
+            diagnostic=skip_word_refresh,
+            app_version=log.app_version,
+            commit=get_commit_id(),
+            schema_version=PROJECT_SCHEMA_VERSION,
+            stages=stage_summary,
+            failure_code="",
+            compute_hash=True,
+        )
+        log.info(STAGE_PUBLISH, "state_written", {
+            "formal": is_formal,
+            "diagnostic": skip_word_refresh,
+        })
     except CancelledError:
+        # 临界区内取消不中断，但这里已经是发布临界区
+        _cleanup_temp()
         raise
     except Exception as exc:
         err = _map_exception(exc)
         result.events.append(StageEvent(
-            STAGE_VALIDATE_POST, "failed", detail=err.user_message, error_code=err.code,
+            STAGE_PUBLISH, "failed", detail=err.user_message, error_code=err.code,
         ))
-        log.error(STAGE_VALIDATE_POST, exception=exc)
+        log.error(STAGE_PUBLISH, exception=exc)
         result.error_code = err.code
+        _record_stage(STAGE_PUBLISH, "failed")
+        _cleanup_temp()
+        write_state(
+            str(formal_output),
+            formal=False,
+            diagnostic=skip_word_refresh,
+            app_version=log.app_version,
+            commit=get_commit_id(),
+            schema_version=PROJECT_SCHEMA_VERSION,
+            stages=stage_summary,
+            failure_code=err.code,
+            compute_hash=False,
+        )
 
     return result

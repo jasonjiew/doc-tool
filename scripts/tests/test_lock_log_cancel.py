@@ -338,11 +338,16 @@ class PipelineLockAndCancelTests(unittest.TestCase):
 
     def test_pipeline_failure_preserves_previous_output(self):
         """构建失败时不覆盖上次有效输出。"""
+        from unittest.mock import patch
+
+        from doc_tool.adapters import kernel
         from doc_tool.application.pipeline import STAGE_BUILD, run_pipeline
         manifest = self._make_manifest(self.project_root)
         paths = manifest.resolve_paths(self.project_root)
-        # 第一次构建（构建阶段必须成功，校验可能因模板孤立关系失败）
-        result1 = run_pipeline(manifest, paths, skip_word_refresh=True)
+        # 第一次构建：mock 前校验通过，确保原子发布到正式输出
+        # （测试夹具模板有孤立关系会导致真实校验失败，无法到达发布阶段）
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            result1 = run_pipeline(manifest, paths, skip_word_refresh=True)
         build_ok = any(
             e.stage == STAGE_BUILD and e.status == "succeeded" for e in result1.events
         )
@@ -355,7 +360,7 @@ class PipelineLockAndCancelTests(unittest.TestCase):
         os.remove(str(paths.template_docx))
         result2 = run_pipeline(manifest, paths, skip_word_refresh=True)
         self.assertFalse(result2.success)
-        # 上次输出仍存在且未被修改
+        # 上次输出仍存在且未被修改（原子发布保证）
         self.assertTrue(os.path.isfile(output1))
         self.assertEqual(_sha256(output1), hash1)
 

@@ -54,36 +54,44 @@ def show_about_dialog(parent) -> None:
         )
         row += 1
 
-    # Word 可用性
+    # Word 可用性（任务 7.1：使用综合检查，含交互式会话与 DispatchEx 探测）
     word_frame = ttk.LabelFrame(frame, text="Microsoft Word", padding=8)
     word_frame.pack(fill="x", pady=4)
 
-    word_available = _check_word_available()
-    word_text = "可用" if word_available else "未检测到"
-    word_color = "green" if word_available else "red"
+    # 对话框内的检查默认不实际启动 Word，避免每次打开关于对话框都弹一次进程
+    from doc_tool.application.word_check import check_word_available
+
+    report = check_word_available(dispatch_check=False)
+
+    word_text = "可用（版本 {0}）".format(report.version) if report.available else "未检测到"
+    word_color = "green" if report.available else "red"
     ttk.Label(word_frame, text=word_text, foreground=word_color).pack(anchor="w")
 
-    if not word_available:
+    # 子项详情
+    detail_frame = ttk.Frame(word_frame)
+    detail_frame.pack(fill="x", pady=(4, 0))
+    for label, value in [
+        ("pywin32", "已安装" if report.pywin32_available else "未安装"),
+        ("交互式会话", "是" if report.interactive_session else "否"),
+    ]:
+        row = ttk.Frame(detail_frame)
+        row.pack(fill="x")
+        ttk.Label(row, text="  • {0}：".format(label), foreground="gray").pack(side="left")
+        ttk.Label(row, text=value, foreground="gray").pack(side="left")
+
+    if not report.available:
         ttk.Label(
             word_frame,
-            text="正式合并需要本机安装 Microsoft Word；\n可使用「诊断构建」进行无 Word 测试。",
+            text="正式合并需要本机安装 Microsoft Word 并在交互式会话中运行；\n可使用「诊断构建」进行无 Word 测试。",
             foreground="gray",
         ).pack(anchor="w", pady=(4, 0))
+        if report.reasons:
+            for reason in report.reasons:
+                ttk.Label(
+                    word_frame,
+                    text="  • {0}".format(reason),
+                    foreground="gray",
+                ).pack(anchor="w")
 
     # 关闭按钮
     ttk.Button(frame, text="关闭", command=dialog.destroy).pack(side="right", pady=(12, 0))
-
-
-def _check_word_available() -> bool:
-    """检查 Microsoft Word 是否可用（不实际启动 Word）。"""
-    try:
-        import ctypes
-
-        # 检查 pywin32 是否可用
-        import win32com.client  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-    except Exception:
-        return False
