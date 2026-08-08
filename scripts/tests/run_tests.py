@@ -28,4 +28,6 @@ if __name__ == "__main__":
         sys.exit(1)
     if run("test_import_project.py") != 0:
         sys.exit(1)
+    if run("test_gui_services.py") != 0:
+        sys.exit(1)
     sys.exit(run("test_lock_log_cancel.py"))
