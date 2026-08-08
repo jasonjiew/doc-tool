@@ -613,7 +613,8 @@ def process_markdown(
                 raise AutomationError("{0}:{1} 复杂表格缺少 XML 文件名".format(path, index + 1))
             table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
             try:
-                table_element = etree.fromstring(open(table_path, "rb").read())
+                with open(table_path, "rb") as table_file:
+                    table_element = etree.fromstring(table_file.read())
             except Exception as exc:
                 raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
             if table_element.tag != qn("tbl"):

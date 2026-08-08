@@ -10,6 +10,10 @@ import sys
 
 
 def main() -> int:
+    # PyInstaller 冻结应用使用 spawn 子进程对 Word COM 探测施加真实超时。
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     try:
         import tkinter as tk
     except ImportError:

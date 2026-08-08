@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -44,7 +45,9 @@ from doc_tool.adapters.importer import (
     split_into_tree,
 )
 from doc_tool.adapters.preflight import preflight
+from doc_tool.domain.cancellation import CancellationToken
 from doc_tool.domain.errors import (
+    CancelledError,
     DocToolError,
     InvalidDocxError,
     TargetProjectExistsError,
@@ -111,7 +114,10 @@ class ImportResult:
         return self.events[-1] if self.events else None
 
 
-def import_first_time(request: ImportRequest) -> ImportResult:
+def import_first_time(
+    request: ImportRequest,
+    cancel_token: Optional[CancellationToken] = None,
+) -> ImportResult:
     """执行事务化首次导入，返回结构化结果（不向调用方抛出异常）。
 
     任一阶段失败时：清理暂存目录、写入诊断日志、返回失败结果。源文档与已有
@@ -121,9 +127,14 @@ def import_first_time(request: ImportRequest) -> ImportResult:
     source_path = Path(request.source_docx)
     target = Path(request.target_project_root).resolve()
     staging: Optional[Path] = None
+    token = cancel_token or CancellationToken()
+
+    def _check_cancel() -> None:
+        token.check_cancel()
 
     try:
         # 1. 目标预写入拒绝 (4.6)
+        _check_cancel()
         _record(result, STAGE_VALIDATE_TARGET, "started")
         if target.exists():
             raise TargetProjectExistsError(
@@ -137,6 +148,7 @@ def import_first_time(request: ImportRequest) -> ImportResult:
                 detail="目标目录可用", metrics={"target": target.name})
 
         # 2. 预检（fail-closed 重新校验）
+        _check_cancel()
         _record(result, STAGE_PREFLIGHT, "started")
         preview = preflight(str(source_path))
         if request.document_type not in DOCUMENT_TYPES:
@@ -151,6 +163,7 @@ def import_first_time(request: ImportRequest) -> ImportResult:
         })
 
         # 3. 创建同卷暂存目录
+        _check_cancel()
         _record(result, STAGE_CREATE_STAGING, "started")
         staging = _create_staging(target)
         paths = ProjectPaths(staging)
@@ -159,12 +172,14 @@ def import_first_time(request: ImportRequest) -> ImportResult:
                 metrics={"staging": staging.name})
 
         # 4. 只读复制源文档 + SHA-256 (4.4)
+        _check_cancel()
         _record(result, STAGE_COPY_SOURCE, "started")
         sha256 = _copy_and_hash(source_path, paths.source_docx)
         result.source_sha256 = sha256
         _record(result, STAGE_COPY_SOURCE, "succeeded", metrics={"sha256": sha256[:12] + "..."})
 
         # 5. 生成模板 (4.1)
+        _check_cancel()
         _record(result, STAGE_GENERATE_TEMPLATE, "started")
         template_meta = generate_template(paths.source_docx, paths.template_docx)
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
@@ -173,6 +188,7 @@ def import_first_time(request: ImportRequest) -> ImportResult:
         })
 
         # 6. 提取正文/资源 (4.2)
+        _check_cancel()
         _record(result, STAGE_EXTRACT_CONTENT, "started")
         extraction = extract_content(
             paths.source_docx,
@@ -189,6 +205,7 @@ def import_first_time(request: ImportRequest) -> ImportResult:
         })
 
         # 7. 章节拆分 (4.3)
+        _check_cancel()
         _record(result, STAGE_SPLIT_CONTENT, "started")
         split_result = split_into_tree(paths.content_dir(request.document_type))
         _record(result, STAGE_SPLIT_CONTENT, "succeeded", metrics={
@@ -198,18 +215,21 @@ def import_first_time(request: ImportRequest) -> ImportResult:
         })
 
         # 8. 结构校验 (4.5)
+        _check_cancel()
         _record(result, STAGE_VALIDATE_STRUCTURE, "started")
         manifest = _build_manifest(request, paths, template_meta, sha256)
         _validate_structure(manifest, paths)
         _record(result, STAGE_VALIDATE_STRUCTURE, "succeeded")
 
         # 9. 保存清单 (4.4)
+        _check_cancel()
         _record(result, STAGE_SAVE_MANIFEST, "started")
         manifest.save(staging)
         _record(result, STAGE_SAVE_MANIFEST, "succeeded",
                 metrics={"manifest": "project.yml"})
 
         # 10. 试构建 (4.5)
+        _check_cancel()
         _record(result, STAGE_TRIAL_BUILD, "started")
         trial_output = _trial_build(manifest, paths)
         _record(result, STAGE_TRIAL_BUILD, "succeeded", metrics={
@@ -217,8 +237,10 @@ def import_first_time(request: ImportRequest) -> ImportResult:
         })
 
         # 11. 原子发布 (4.5)
+        _check_cancel()
         _record(result, STAGE_PUBLISH, "started")
-        _publish(staging, target)
+        with token.critical_section():
+            _publish(staging, target)
         staging = None  # 已发布，不再清理
         result.project_root = target
         _record(result, STAGE_PUBLISH, "succeeded", metrics={"project": target.name})
@@ -229,13 +251,21 @@ def import_first_time(request: ImportRequest) -> ImportResult:
     except Exception as exc:
         err = _map_exception(exc)
         result.error_code = err.code
-        _record(result, _current_stage(result), "failed",
+        status = "cancelled" if isinstance(err, CancelledError) else "failed"
+        _record(result, _current_stage(result), status,
                 detail=err.user_message, error_code=err.code)
-        # 失败隔离 (4.7)：清理暂存，写诊断日志
-        diag = _write_diagnostic_log(target, result, err, staging)
-        result.diagnostic_log = diag
+        # 失败隔离 (4.7)：先清理暂存，再把真实清理结果写入诊断日志。
+        staging_existed = staging is not None and staging.exists()
         if staging is not None and staging.exists():
             shutil.rmtree(str(staging), ignore_errors=True)
+        staging_cleaned = staging is None or not staging.exists()
+        try:
+            result.diagnostic_log = _write_diagnostic_log(
+                target, result, err, staging_existed, staging_cleaned
+            )
+        except OSError:
+            # 诊断目录本身不可写时仍返回结构化失败，不让异常处理再次抛异常。
+            result.diagnostic_log = None
         return result
 
 
@@ -265,14 +295,8 @@ def _create_staging(target: Path) -> Path:
     """在目标父目录同卷创建唯一暂存目录（兄弟位置，保证同卷原子重命名）。"""
     parent = target.parent
     parent.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    pid = os.getpid()
-    staging = parent / ".{0}.import-staging-{1}-{2}".format(target.name, pid, stamp)
-    if staging.exists():
-        # 极小概率冲突，追加随机后缀
-        staging = parent / ".{0}.import-staging-{1}-{2}-x".format(target.name, pid, stamp)
-    staging.mkdir(parents=True, exist_ok=False)
-    return staging
+    prefix = ".{0}.import-staging-{1}-".format(target.name, os.getpid())
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=str(parent)))
 
 
 def _copy_and_hash(source: Path, dest: Path) -> str:
@@ -421,7 +445,11 @@ def _publish(staging: Path, target: Path) -> None:
 
 
 def _write_diagnostic_log(
-    target: Path, result: ImportResult, err: DocToolError, staging: Optional[Path]
+    target: Path,
+    result: ImportResult,
+    err: DocToolError,
+    staging_existed: bool,
+    staging_cleaned: bool,
 ) -> Path:
     """失败诊断日志（脱敏）：写入目标父目录，不写入正式项目，不含正文。"""
     parent = target.parent
@@ -435,8 +463,8 @@ def _write_diagnostic_log(
         "errorMessage": err.user_message,
         "suggestedAction": err.suggested_action,
         "sourceSha256": result.source_sha256,
-        "stagingExisted": staging is not None and staging.exists(),
-        "stagingCleaned": staging is not None and not staging.exists(),
+        "stagingExisted": staging_existed,
+        "stagingCleaned": staging_cleaned,
         "events": [
             {
                 "stage": e.stage,
@@ -463,6 +491,6 @@ def _map_exception(exc: Exception) -> DocToolError:
             suggested_action="源文档结构不符合导入要求，请检查 Word 标题样式后重试。",
         )
     return DocToolError(
-        "导入过程中发生意外错误：{0}".format(exc),
+        "导入过程中发生意外错误。",
         details={"errorType": type(exc).__name__},
     )

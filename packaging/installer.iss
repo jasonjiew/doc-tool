@@ -78,7 +78,7 @@ Source: "..\dist\KonsungDocTool\*"; DestDir: "{app}"; Flags: ignoreversion recur
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 ; 桌面快捷方式（可选）
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 ; 安装完成后可选启动应用
@@ -88,10 +88,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 {#MyAppName}"; Fla
 ; 卸载前确保应用已关闭
 Filename: "{cmd}"; Parameters: "/C taskkill /IM {#MyAppExeName} /F /T 2>nul"; Flags: runhidden; RunOnceId: "KillApp"
 
-[UninstallDelete]
-; 卸载只删除安装目录下的文件（Type: filesandordirs 会删除整个目录）
-; 不删除用户项目（在安装目录外）
-Type: filesandordirs; Name: "{app}"
+; 不声明 [UninstallDelete] 的 filesandordirs {app}。Inno Setup 会删除自己安装
+; 的文件；安装目录中非安装器拥有的文件会被保留，符合非破坏性卸载要求。
 
 [Code]
 function InitializeSetup(): Boolean;

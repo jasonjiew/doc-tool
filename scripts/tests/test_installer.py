@@ -85,12 +85,12 @@ class InstallerConfigTests(unittest.TestCase):
         """升级时自动关闭旧进程。"""
         self.assertIn("CloseApplications=force", self.iss)
 
-    def test_uninstall_only_app_dir(self):
-        """卸载只删除安装目录。"""
-        # [UninstallDelete] 中 Type: filesandordirs; Name: "{app}"
-        self.assertIn("Type: filesandordirs", self.iss)
-        self.assertIn('Name: "{app}"', self.iss)
-        # 不应删除用户文档、桌面或其他系统目录
+    def test_uninstall_does_not_recursively_delete_unknown_app_files(self):
+        """卸载只移除安装器拥有文件，不递归删除整个安装目录。"""
+        self.assertNotRegex(
+            self.iss,
+            r"(?i)Type:\s*filesandordirs;\s*Name:\s*\"\{app\}\"",
+        )
         self.assertNotIn("{userdocs}", self.iss)
         self.assertNotIn("{commondocs}", self.iss)
 
@@ -102,6 +102,8 @@ class InstallerConfigTests(unittest.TestCase):
         """桌面快捷方式是可选的（unchecked）。"""
         self.assertIn("desktopicon", self.iss)
         self.assertIn("Flags: unchecked", self.iss)
+        self.assertIn("{userdesktop}", self.iss)
+        self.assertNotIn("{commondesktop}", self.iss)
 
     def test_output_filename_versioned(self):
         """输出文件名包含版本号。"""

@@ -32,14 +32,24 @@ validate-version:
       if ($tag) {
         $tagVersion = $tag.TrimStart("v")
         $appVersion = python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)"
-        if ($tagVersion -ne $appVersion) {
-          Write-Error "标签版本 $tagVersion 与应用版本 $appVersion 不一致"
+        $installerLine = Select-String -Path "packaging\installer.iss" -Pattern '#define\s+MyAppVersion\s+"([^"]+)"'
+        $installerVersion = $installerLine.Matches[0].Groups[1].Value
+        $buildLine = Select-String -Path "packaging\build.ps1" -Pattern '\$Version\s*=\s*"([^"]+)"'
+        $buildVersion = $buildLine.Matches[0].Groups[1].Value
+        if ($tagVersion -ne $appVersion -or $tagVersion -ne $installerVersion -or $tagVersion -ne $buildVersion) {
+          Write-Error "版本不一致: tag=$tagVersion app=$appVersion installer=$installerVersion build=$buildVersion"
           exit 1
         }
         Write-Host "版本一致: $tagVersion"
       }
-    # 校验工作树干净
-    - python -c "from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
+    # 校验工作树干净，禁止把本地修改标记为正式 Release
+    - |
+      $dirty = git status --porcelain --untracked-files=all
+      if ($dirty) {
+        $dirty | Write-Host
+        throw "工作树存在未提交或未跟踪文件，禁止正式发布"
+      }
+      python -c "from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
@@ -67,7 +77,7 @@ build-onedir:
     - windows
   needs: ["test-unit"]
   script:
-    - python -m pip install pyinstaller==6.14.0 --no-cache-dir
+    - python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
     - pyinstaller packaging/doc_tool.spec --noconfirm --clean
     # 冻结应用冒烟测试
     - python scripts\tests\test_frozen_smoke.py
@@ -86,34 +96,56 @@ package-installer:
     - windows
   needs: ["build-onedir"]
   script:
-    # 生产文档泄漏扫描
-    - python packaging/scan_leaks.py
-    # Inno Setup 编译
-    - $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-    - if (!(Test-Path $iscc)) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
-    - if (!(Test-Path $iscc)) { Write-Error "Inno Setup 未安装"; exit 1 }
-    - Push-Location packaging
-    - & $iscc installer.iss
-    - Pop-Location
-    # 生成 SHA-256
-    - $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
-    - $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
-    - "$hash  KonsungDocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
-    # 代码签名（配置证书时启用）
     - |
-      if ($env:CODE_SIGNING_PFX -and $env:CODE_SIGNING_PASSWORD) {
+      $ErrorActionPreference = "Stop"
+      python packaging/scan_leaks.py --strict
+      if ($LASTEXITCODE -ne 0) { throw "生产文档泄漏/允许清单扫描失败" }
+
+      $hasPfx = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PFX)
+      $hasPassword = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PASSWORD)
+      if ($hasPfx -xor $hasPassword) {
+        throw "代码签名配置不完整：证书与密码必须同时配置"
+      }
+      $signingEnabled = $hasPfx -and $hasPassword
+      $signtool = $null
+      if ($signingEnabled) {
         $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
-        if ($signtool) {
-          & $signtool.Source sign /f $env:CODE_SIGNING_PFX /p $env:CODE_SIGNING_PASSWORD /t http://timestamp.digicert.com $exe
-          Write-Host "代码签名完成"
-        } else {
-          Write-Warning "signtool.exe 未找到，跳过签名（仅限受控试点）"
-        }
+        if (-not $signtool) { throw "已配置代码签名，但 signtool.exe 不可用" }
+        $appExe = "dist\KonsungDocTool\KonsungDocTool.exe"
+        & $signtool.Source sign /fd SHA256 /f $env:CODE_SIGNING_PFX /p $env:CODE_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $appExe
+        if ($LASTEXITCODE -ne 0) { throw "应用程序代码签名失败" }
+        & $signtool.Source verify /pa /all $appExe
+        if ($LASTEXITCODE -ne 0) { throw "应用程序签名验证失败" }
       } else {
         Write-Warning "未配置代码签名证书，产出仅限受控试点"
       }
-    # 生成 SBOM
-    - |
+
+      $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+      if (!(Test-Path $iscc)) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+      if (!(Test-Path $iscc)) { throw "Inno Setup 未安装" }
+      Push-Location packaging
+      try {
+        & $iscc installer.iss
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup 编译失败" }
+      } finally {
+        Pop-Location
+      }
+
+      $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
+      powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test_installer_smoke.ps1 -InstallerPath $exe
+      if ($LASTEXITCODE -ne 0) { throw "安装级冒烟测试失败" }
+
+      if ($signingEnabled) {
+        & $signtool.Source sign /fd SHA256 /f $env:CODE_SIGNING_PFX /p $env:CODE_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+        if ($LASTEXITCODE -ne 0) { throw "安装器代码签名失败" }
+        & $signtool.Source verify /pa /all $exe
+        if ($LASTEXITCODE -ne 0) { throw "安装器签名验证失败" }
+      }
+
+      # 哈希必须在所有签名完成之后生成，否则发布的校验值会失效。
+      $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+      "$hash  KonsungDocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
+
       $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
       "康尚文档工具 $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
       "生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $sbom -Append -Encoding utf8
@@ -143,6 +175,9 @@ release-upload:
       "# 康尚文档工具 v$env:APP_VERSION`n`n" | Out-File $notes -Encoding utf8
       "## 安装`n- 下载 KonsungDocTool-Setup-$env:APP_VERSION.exe`n- 双击运行，按提示安装`n- 默认安装到 %LOCALAPPDATA%\Konsung\DocTool（无需管理员权限）`n`n" | Out-File $notes -Append -Encoding utf8
       "## 验证`n- SHA-256: $(Get-Content $sha)`n`n" | Out-File $notes -Append -Encoding utf8
+      "## 构建来源`n- 标签: $env:CI_COMMIT_TAG`n- 提交: $env:CI_COMMIT_SHA`n`n" | Out-File $notes -Append -Encoding utf8
+      "## 本版变更`n- 自包含桌面应用与事务化 Word 项目导入`n- 受保护的校验、Word 刷新和原子发布管线`n- 按用户安装、升级与非破坏性卸载`n`n" | Out-File $notes -Append -Encoding utf8
+      "## 已知限制`n- 正式合并需要交互式 Windows 会话和 Microsoft Word`n- 未配置公司代码签名证书时产物仅限受控试点`n`n" | Out-File $notes -Append -Encoding utf8
       "## 依赖`n见 SBOM 文件`n`n" | Out-File $notes -Append -Encoding utf8
 
       # 使用 curl 上传到 GitLab Release（需要 CI_JOB_TOKEN）
@@ -160,7 +195,7 @@ release-upload:
     - if: $CI_COMMIT_TAG
   release:
     name: "v$APP_VERSION"
-    description: "康尚文档工具 $APP_VERSION"
+    description: "packaging/Output/release-notes.md"
     tag_name: "$CI_COMMIT_TAG"
     assets:
       links:

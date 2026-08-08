@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 
 from doc_tool.domain.manifest import ProjectManifest
-from doc_tool.domain.paths import ProjectPaths
+from doc_tool.domain.paths import ProjectPaths, build_output_filename
 
 
 # doc_tool/adapters/kernel.py -> doc_tool/adapters/ -> doc_tool/ -> doc-automation/
@@ -49,12 +49,19 @@ def config_from_project(
     ``build_docx.build(config=...)`` 和 ``validate_docx.validate(config=...)``。
     """
     doc_type = manifest.documentType
-    output_name = "{0} {1}({2}).docx".format(
+    output_name = build_output_filename(
         manifest.documentNo, manifest.documentName, manifest.documentVersion
     )
     output_path = (
         Path(output_override) if output_override else paths.output_dir / output_name
     )
+    if not paths.is_inside(output_path):
+        from doc_tool.domain.errors import PathEscapeError
+
+        raise PathEscapeError(
+            "构建输出路径越出项目根目录。",
+            details={"output": output_path.name},
+        )
     config: Dict = {
         "documentType": doc_type,
         "documentNo": manifest.documentNo,
@@ -74,8 +81,9 @@ def config_from_project(
         "refresh": {"timeoutSeconds": manifest.refreshTimeoutSeconds},
     }
     # 源 DOCX 存在时作为基线，供 validate --baseline 使用。
-    if paths.source_docx.exists():
-        config["paths"]["baseline"] = str(paths.source_docx)
+    source_docx = paths.resolve(manifest.relative_source_docx())
+    if source_docx.exists():
+        config["paths"]["baseline"] = str(source_docx)
     return config
 
 
@@ -105,6 +113,11 @@ def validate_with_project(
     from validate_docx import validate  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
+    if report_override is None:
+        paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        report_override = paths.logs_dir / (
+            manifest.documentType + "-validation.md"
+        )
     return validate(
         config=config,
         baseline=baseline,

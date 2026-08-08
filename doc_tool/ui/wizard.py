@@ -17,6 +17,27 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from doc_tool.ui.task_bridge import POLL_INTERVAL_MS, TaskRunner, TaskSpec
+
+
+def format_preview_summary(preview) -> str:
+    """把 ``ImportPreview`` 转成向导文本；保持为纯函数便于无界面测试。"""
+    lines = ["标题计数："]
+    for level, count in sorted(preview.heading_level_counts.items()):
+        lines.append("  Heading {0}: {1}".format(level, count))
+    lines.extend([
+        "",
+        "图片数量：{0}".format(preview.image_count),
+        "表格数量：{0}".format(preview.table_count),
+        "",
+    ])
+    if preview.warnings:
+        lines.append("告警：")
+        lines.extend("  ⚠ {0}".format(warning) for warning in preview.warnings)
+    else:
+        lines.append("无告警。")
+    return "\n".join(lines)
+
 
 class ImportWizard:
     """新建项目向导。
@@ -32,6 +53,9 @@ class ImportWizard:
         self._preview = None  # PreflightPreview
         self._doc_type = "requirement"
         self._target_parent: Optional[str] = None
+        self._runner = TaskRunner()
+        self._poll_scheduled = False
+        self._project_info_error = ""
 
     def run(self) -> Optional[str]:
         """运行向导，返回项目路径或 None。"""
@@ -44,6 +68,7 @@ class ImportWizard:
         self._dialog.minsize(480, 420)
         self._dialog.transient(self.parent)
         self._dialog.grab_set()
+        self._dialog.protocol("WM_DELETE_WINDOW", self._cancel)
 
         # 步骤变量
         self._step = 0  # 0=选择源, 1=预检预览, 2=项目信息, 3=执行中, 4=结果
@@ -233,51 +258,32 @@ class ImportWizard:
 
     # --- 步骤 1：预检 ---
 
-    def _do_preflight(self) -> bool:
-        """执行预检，返回是否通过。"""
+    def _do_preflight(self):
+        """后台执行预检，只返回数据，不访问任何 Tk 控件。"""
         from doc_tool.adapters.preflight import preflight
         from doc_tool.domain.errors import DocToolError
 
         try:
-            self._preview = preflight(self._source_path)
+            preview = preflight(self._source_path)
         except DocToolError as exc:
-            self._show_preview_text(
-                "预检失败：{0}\n\n建议：{1}".format(exc.user_message, exc.suggested_action)
+            return (
+                False,
+                None,
+                "预检失败：{0}\n\n建议：{1}".format(
+                    exc.user_message, exc.suggested_action
+                ),
             )
-            return False
         except Exception as exc:
-            self._show_preview_text("预检失败：{0}".format(str(exc)[:200]))
-            return False
+            return False, None, "预检失败：{0}".format(str(exc)[:200])
 
-        # 展示预检结果
-        lines = []
-        p = self._preview
-        lines.append("标题计数：")
-        for level, count in sorted(p.headings.items()):
-            lines.append("  Heading {0}: {1}".format(level, count))
-        lines.append("")
-        lines.append("图片数量：{0}".format(p.image_count))
-        lines.append("表格数量：{0}".format(p.table_count))
-        lines.append("")
-
-        if p.warnings:
-            lines.append("告警：")
-            for w in p.warnings:
-                lines.append("  ⚠ {0}".format(w))
-        else:
-            lines.append("无告警。")
-
-        self._show_preview_text("\n".join(lines))
-
-        # 如果没有 Heading 1，阻断
-        if not any(level == 1 for level in p.headings):
-            self._show_preview_text(
+        text = format_preview_summary(preview)
+        if not preview.has_heading1:
+            text += (
                 "\n\n阻断：未检测到 Heading 1 标题样式，无法导入。\n"
                 "请在 Word 中为一级标题应用「标题 1」样式后重新导入。"
             )
-            return False
-
-        return True
+            return False, preview, text
+        return True, preview, text
 
     def _show_preview_text(self, text: str) -> None:
         self._preview_text.configure(state="normal")
@@ -289,6 +295,7 @@ class ImportWizard:
 
     def _validate_project_info(self) -> bool:
         """验证项目信息字段。"""
+        self._project_info_error = ""
         if not self._doc_no_var.get().strip():
             return False
         if not self._doc_name_var.get().strip():
@@ -296,6 +303,16 @@ class ImportWizard:
         if not self._project_name_var.get().strip():
             return False
         if not self._target_var.get().strip():
+            return False
+        project_name = self._project_name_var.get().strip()
+        if (
+            project_name in (".", "..")
+            or Path(project_name).name != project_name
+            or any(c in project_name for c in '<>:"/\\|?*')
+            or any(ord(c) < 32 for c in project_name)
+            or project_name.rstrip(" .") != project_name
+        ):
+            self._project_info_error = "项目目录名包含 Windows 不允许的字符或路径片段。"
             return False
         return True
 
@@ -316,36 +333,33 @@ class ImportWizard:
 
     def _do_import(self) -> None:
         """执行事务化导入。"""
-        import threading
-
         self._import_progress.start(15)
         self._import_status_var.set("正在导入…")
+        from doc_tool.application.import_project import ImportRequest, import_first_time
 
-        def run_import():
-            from doc_tool.application.import_project import ImportRequest, import_first_time
-
-            target_root = str(
-                Path(self._target_var.get()) / self._project_name_var.get()
-            )
-            request = ImportRequest(
-                source_docx=Path(self._source_path),
-                target_project_root=Path(target_root),
-                document_type=self._type_var.get(),
-                document_no=self._doc_no_var.get().strip(),
-                document_name=self._doc_name_var.get().strip(),
-                document_version=self._doc_version_var.get().strip(),
-            )
-            result = import_first_time(request)
-            self._dialog.after(0, lambda: self._show_import_result(result, target_root))
-
-        thread = threading.Thread(target=run_import, daemon=True)
-        thread.start()
+        target_root = str(Path(self._target_var.get()) / self._project_name_var.get())
+        request = ImportRequest(
+            source_docx=Path(self._source_path),
+            target_project_root=Path(target_root),
+            document_type=self._type_var.get(),
+            document_no=self._doc_no_var.get().strip(),
+            document_name=self._doc_name_var.get().strip(),
+            document_version=self._doc_version_var.get().strip(),
+        )
+        self._runner.start(
+            TaskSpec(name="import", target=import_first_time, args=(request,)),
+            on_done=lambda result: self._show_import_result(result, target_root),
+        )
+        self._schedule_poll()
 
     def _show_import_result(self, result, target_root: str) -> None:
         """显示导入结果。"""
         self._import_progress.stop()
 
-        if result.success:
+        if result is None:
+            self._result_label.configure(text="✗ 导入异常终止")
+            self._set_result_text("导入线程未返回结果，请查看应用日志。")
+        elif result.success:
             self._result = target_root
             self._result_label.configure(text="✓ 导入成功")
             detail_lines = [
@@ -360,7 +374,9 @@ class ImportWizard:
                 detail_lines.append("  {0}: {1}".format(event.stage, event.status))
             self._set_result_text("\n".join(detail_lines))
         else:
-            self._result_label.configure(text="✗ 导入失败")
+            self._result_label.configure(
+                text="⊘ 导入已取消" if result.error_code == "E5003" else "✗ 导入失败"
+            )
             error_lines = [
                 "错误码：{0}".format(result.error_code or "未知"),
                 "",
@@ -406,7 +422,9 @@ class ImportWizard:
                 from tkinter import messagebox
 
                 messagebox.showwarning(
-                    "信息不完整", "请填写所有必填字段。", parent=self._dialog
+                    "项目信息无效",
+                    self._project_info_error or "请填写所有必填字段。",
+                    parent=self._dialog,
                 )
                 return
             self._step = 3
@@ -417,27 +435,55 @@ class ImportWizard:
 
     def _run_preflight(self) -> None:
         """异步执行预检。"""
-        import threading
+        self._back_btn.configure(state="disabled")
+        started = self._runner.start(
+            TaskSpec(name="preflight", target=self._do_preflight),
+            on_done=self._after_preflight,
+        )
+        if not started:
+            self._show_preview_text("预检任务仍在运行，请稍候。")
+            return
+        self._schedule_poll()
 
-        def run():
-            ok = self._do_preflight()
-            self._dialog.after(0, lambda: self._after_preflight(ok))
-
-        thread = threading.Thread(target=run, daemon=True)
-        thread.start()
-
-    def _after_preflight(self, ok: bool) -> None:
+    def _after_preflight(self, response) -> None:
+        if response is None:
+            ok, preview, text = False, None, "预检异常终止。"
+        else:
+            ok, preview, text = response
+        self._preview = preview
+        self._show_preview_text(text)
+        if self._step == 1:
+            self._back_btn.configure(state="normal")
         if ok:
             self._next_btn.configure(state="normal")
         else:
             # 允许返回修改
             self._next_btn.configure(state="disabled")
 
+    def _schedule_poll(self) -> None:
+        if self._poll_scheduled:
+            return
+        self._poll_scheduled = True
+        self._dialog.after(POLL_INTERVAL_MS, self._poll_runner)
+
+    def _poll_runner(self) -> None:
+        self._poll_scheduled = False
+        self._runner.poll()
+        if self._runner.is_running:
+            self._schedule_poll()
+
     def _go_back(self) -> None:
+        if self._runner.is_running:
+            return
         if self._step > 0 and self._step != 3:  # 执行中不可返回
             self._step -= 1
             self._show_step()
 
     def _cancel(self) -> None:
+        if self._step == 3 and self._runner.is_running:
+            self._runner.cancel()
+            self._import_status_var.set("正在安全取消…")
+            self._cancel_btn.configure(state="disabled")
+            return
         self._result = None
         self._dialog.destroy()

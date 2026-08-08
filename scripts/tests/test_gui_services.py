@@ -20,6 +20,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 # scripts/tests/ -> scripts/ -> doc-automation/
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +74,21 @@ class TaskRunnerTests(unittest.TestCase):
         failed_events = [e for e in events if e.kind == "failed"]
         self.assertTrue(len(failed_events) >= 1)
         self.assertEqual(failed_events[0].error_code, "E2001")
+
+    def test_structured_failure_result_emits_failed_not_succeeded(self):
+        from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
+
+        runner = TaskRunner()
+        result = SimpleNamespace(
+            success=False,
+            error_code="E2002",
+            last_stage=SimpleNamespace(detail="校验未通过"),
+        )
+        runner.start(TaskSpec(name="validate", target=lambda: result))
+        runner.join(timeout=5)
+        events = runner.drain_events()
+        self.assertTrue(any(event.kind == "failed" for event in events))
+        self.assertFalse(any(event.kind == "succeeded" for event in events))
 
     def test_cancel_token_passed_to_target(self):
         """目标函数接受 cancel_token 参数时自动传入。"""
@@ -201,6 +217,21 @@ class ProjectServiceTests(unittest.TestCase):
         summary = open_project(self._tmp)
         self.assertFalse(summary.is_writable)
 
+    def test_validation_report_summary_contains_counts_and_failures(self):
+        from doc_tool.application.project_service import read_validation_report_summary
+
+        report = Path(self._tmp) / "validation.md"
+        report.write_text(
+            "# 报告\n\n- [PASS] ZIP 完整\n"
+            "- [FAIL] 章节编号错误 — expected=3.1.14\n",
+            encoding="utf-8",
+        )
+        summary = read_validation_report_summary(report)
+        self.assertTrue(summary["exists"])
+        self.assertEqual(summary["passCount"], 1)
+        self.assertEqual(summary["failCount"], 1)
+        self.assertIn("expected=3.1.14", summary["failures"][0])
+
     def test_recent_projects_add_and_load(self):
         """添加最近项目后可加载。"""
         from doc_tool.application.project_service import (
@@ -275,6 +306,22 @@ class HighDpiTests(unittest.TestCase):
         from doc_tool.ui.styles import setup_high_dpi
 
         setup_high_dpi()  # 不应抛出异常
+
+
+class ImportWizardPresentationTests(unittest.TestCase):
+    def test_preview_summary_uses_heading_level_counts(self):
+        from doc_tool.ui.wizard import format_preview_summary
+
+        preview = SimpleNamespace(
+            heading_level_counts={1: 2, 2: 3},
+            image_count=4,
+            table_count=5,
+            warnings=[],
+        )
+        text = format_preview_summary(preview)
+        self.assertIn("Heading 1: 2", text)
+        self.assertIn("Heading 2: 3", text)
+        self.assertIn("图片数量：4", text)
 
 
 # === 人工操作清单 ===

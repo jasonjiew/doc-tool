@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Union
 
-from doc_tool.domain.errors import PathEscapeError
+from doc_tool.domain.errors import PathEscapeError, ProjectManifestError
 
 
 # 项目内标准子目录（相对项目根），均为相对路径，不写入安装机器绝对路径。
@@ -29,6 +29,60 @@ SOURCE_DOCX_NAME = "source.docx"
 TEMPLATE_DOCX_NAME = "template.docx"
 MANIFEST_NAME = "project.yml"
 LOCK_NAME = "project.lock"
+
+
+_WINDOWS_INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
+_MAX_OUTPUT_FILENAME_UTF16_UNITS = 240
+
+
+def _sanitize_filename_part(value: str) -> str:
+    """替换 Windows 禁止字符并清理组件首尾空白。"""
+    sanitized = "".join(
+        "_" if char in _WINDOWS_INVALID_FILENAME_CHARS or ord(char) < 32 else char
+        for char in value
+    )
+    return sanitized.strip().rstrip(" .")
+
+
+def build_output_filename(document_no: str, document_name: str, document_version: str) -> str:
+    """构造安全的项目输出文件名。
+
+    输出名来自可编辑的 ``project.yml``，因此不能直接拼接到路径中。按规范
+    将 Windows 非法字符、路径分隔符和控制字符确定性替换为下划线，既保留
+    原始文档元数据，也避免把产物写到 ``output/`` 之外。
+    """
+    values = {
+        "documentNo": str(document_no),
+        "documentName": str(document_name),
+        "documentVersion": str(document_version),
+    }
+    for field_name, value in values.items():
+        if not value.strip():
+            raise ProjectManifestError(
+                "{0} 不能为空。".format(field_name),
+                details={"field": field_name},
+            )
+        values[field_name] = _sanitize_filename_part(value)
+        if not values[field_name]:
+            raise ProjectManifestError(
+                "{0} 清理文件名字符后为空。".format(field_name),
+                suggested_action="请填写至少一个可用于文件名的字符。",
+                details={"field": field_name},
+            )
+
+    filename = "{0} {1}({2}).docx".format(
+        values["documentNo"], values["documentName"], values["documentVersion"]
+    )
+    utf16_units = len(filename.encode("utf-16-le")) // 2
+    if utf16_units > _MAX_OUTPUT_FILENAME_UTF16_UNITS:
+        raise ProjectManifestError(
+            "输出文件名过长（{0} 个 UTF-16 字符，上限 {1}）。".format(
+                utf16_units, _MAX_OUTPUT_FILENAME_UTF16_UNITS
+            ),
+            suggested_action="请缩短文档编号、名称或版本后重试。",
+            details={"length": str(utf16_units)},
+        )
+    return filename
 
 
 class ProjectPaths:

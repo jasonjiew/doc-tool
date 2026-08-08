@@ -22,6 +22,8 @@
 from __future__ import annotations
 
 import os
+import multiprocessing
+import queue
 import sys
 import time
 from dataclasses import dataclass, field
@@ -120,6 +122,44 @@ def check_interactive_session() -> bool:
     return True
 
 
+def _dispatch_check_worker(result_queue) -> None:
+    """子进程内执行 Word DispatchEx，确保父进程可以施加真实超时。"""
+    word = None
+    word_pid = None
+    try:
+        import win32com.client
+
+        word = win32com.client.DispatchEx("Word.Application")
+        try:
+            import win32process
+
+            word_pid = int(win32process.GetWindowThreadProcessId(int(word.Hwnd))[1])
+            result_queue.put(("pid", word_pid))
+        except Exception:
+            word_pid = None
+        word.Visible = False
+        word.DisplayAlerts = 0
+        try:
+            word.AutomationSecurity = 3
+        except Exception:
+            pass
+        try:
+            version = str(word.Version)
+        except Exception:
+            version = ""
+        word.Quit(SaveChanges=False)
+        word = None
+        result_queue.put(("result", True, version))
+    except Exception:
+        result_queue.put(("result", False, ""))
+    finally:
+        if word is not None:
+            try:
+                word.Quit(SaveChanges=False)
+            except Exception:
+                _kill_process_tree(word_pid)
+
+
 def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
     """尝试启动专用 Word 进程并立即退出。
 
@@ -130,60 +170,48 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
     if not check_pywin32():
         return False, ""
 
-    try:
-        import win32com.client
-    except ImportError:
-        return False, ""
-
-    word = None
+    timeout_seconds = max(0.1, float(timeout_seconds))
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue()
+    process = context.Process(
+        target=_dispatch_check_worker,
+        args=(result_queue,),
+        name="doc-tool-word-check",
+    )
+    process.daemon = True
     word_pid = None
     try:
-        # 使用 DispatchEx 强制新建独立进程，绝不复用用户已有 Word
-        word = win32com.client.DispatchEx("Word.Application")
-        # 获取 PID 用于异常清理
-        try:
-            import win32process
-
-            word_pid = int(win32process.GetWindowThreadProcessId(int(word.Hwnd))[1])
-        except Exception:
-            word_pid = None
-
-        word.Visible = False
-        word.DisplayAlerts = 0  # wdAlertsNone
-        # 禁用文档宏自动执行
-        try:
-            word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
-        except Exception:
-            pass
-
-        # 读取版本（不打开任何文档）
-        try:
-            version = str(word.Version)
-        except Exception:
-            version = ""
-
-        # 立即退出，不保存任何文档
-        try:
-            word.Quit(SaveChanges=False)
-        except Exception:
-            _kill_process_tree(word_pid)
-        word = None
-        return True, version
-    except Exception:
-        # 启动失败
-        if word is not None:
+        process.start()
+        process.join(timeout_seconds)
+        messages = []
+        # multiprocessing.Queue may still be flushing just after the child
+        # exits.  Keep the wait bounded, but do not let get_nowait() turn that
+        # small race into a false negative.
+        queue_wait = 0.05 if process.is_alive() else 0.2
+        while True:
             try:
-                word.Quit(SaveChanges=False)
-            except Exception:
-                _kill_process_tree(word_pid)
-            word = None
+                messages.append(result_queue.get(timeout=queue_wait))
+                queue_wait = 0.01
+            except queue.Empty:
+                break
+        for message in messages:
+            if message and message[0] == "pid":
+                word_pid = int(message[1])
+        if process.is_alive():
+            _kill_process_tree(word_pid)
+            _kill_process_tree(process.pid)
+            process.join(2)
+            return False, ""
+        for message in reversed(messages):
+            if message and message[0] == "result":
+                return bool(message[1]), str(message[2])
+        return False, ""
+    except (OSError, RuntimeError):
+        if process.is_alive():
+            _kill_process_tree(process.pid)
         return False, ""
     finally:
-        if word is not None:
-            try:
-                word.Quit(SaveChanges=False)
-            except Exception:
-                _kill_process_tree(word_pid)
+        result_queue.close()
 
 
 def check_word_available(

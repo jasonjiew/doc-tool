@@ -208,7 +208,7 @@ class OutputStateTests(unittest.TestCase):
 
     def test_failure_state_records_error_code(self):
         """失败状态记录错误码。"""
-        from doc_tool.domain.output_state import read_state, write_state
+        from doc_tool.domain.output_state import read_last_attempt_state, write_state
 
         write_state(
             self.output_path,
@@ -218,11 +218,28 @@ class OutputStateTests(unittest.TestCase):
             failure_code="E3001",
             compute_hash=False,
         )
-        state = read_state(self.output_path)
+        state = read_last_attempt_state(self.output_path)
         self.assertIsNotNone(state)
         self.assertEqual(state.failureCode, "E3001")
         # compute_hash=False 时哈希为空
         self.assertEqual(state.outputSha256, "")
+
+    def test_formal_state_rejected_after_output_is_modified(self):
+        from doc_tool.domain.output_state import is_formal_success, write_state
+
+        write_state(self.output_path, formal=True, diagnostic=False)
+        self.assertTrue(is_formal_success(self.output_path))
+        Path(self.output_path).write_bytes(b"tampered after validation")
+        self.assertFalse(is_formal_success(self.output_path))
+
+    def test_string_false_is_not_accepted_as_boolean(self):
+        from doc_tool.domain.output_state import read_state, state_file_for
+
+        state_file_for(self.output_path).write_text(
+            json.dumps({"formal": "false", "diagnostic": False, "stages": []}),
+            encoding="utf-8",
+        )
+        self.assertIsNone(read_state(self.output_path))
 
     def test_missing_state_not_formal(self):
         """状态文件不存在时 is_formal_success 返回 False。"""
@@ -312,6 +329,8 @@ class PipelineWordReleaseTests(unittest.TestCase):
         paths.output_dir.mkdir(parents=True, exist_ok=True)
         formal.write_bytes(b"previous formal output")
         previous_hash = _sha256(str(formal))
+        from doc_tool.domain.output_state import write_state
+        write_state(str(formal), formal=True, diagnostic=False)
 
         # Word 可用但刷新返回 False（模拟超时/失败）
         # 同时 mock 前校验为 True，确保管线到达 Word 刷新阶段
@@ -329,12 +348,14 @@ class PipelineWordReleaseTests(unittest.TestCase):
         # 临时文件应被清理
         temp_file = paths.output_dir / ("." + formal.name + ".tmp")
         self.assertFalse(temp_file.exists())
-        # 状态文件标记失败
-        from doc_tool.domain.output_state import read_state
+        # 上一次正式状态保持不变，失败尝试写入独立状态文件
+        from doc_tool.domain.output_state import read_last_attempt_state, read_state
         state = read_state(str(formal))
         self.assertIsNotNone(state)
-        self.assertFalse(state.formal)
-        self.assertEqual(state.failureCode, "E3001")
+        self.assertTrue(state.formal)
+        attempt = read_last_attempt_state(str(formal))
+        self.assertIsNotNone(attempt)
+        self.assertEqual(attempt.failureCode, "E3001")
 
     def test_word_save_exception_preserves_previous_output(self):
         """Word 保存异常时映射到错误码，保留旧正式输出。"""
@@ -414,6 +435,8 @@ class PipelineWordReleaseTests(unittest.TestCase):
         paths.output_dir.mkdir(parents=True, exist_ok=True)
         formal.write_bytes(b"previous formal output")
         previous_hash = _sha256(str(formal))
+        from doc_tool.domain.output_state import write_state
+        write_state(str(formal), formal=True, diagnostic=False)
 
         fake_report = word_check.WordAvailability(available=True)
 
@@ -437,12 +460,14 @@ class PipelineWordReleaseTests(unittest.TestCase):
         # 临时文件应被清理
         temp_file = paths.output_dir / ("." + formal.name + ".tmp")
         self.assertFalse(temp_file.exists())
-        # 状态文件标记失败
-        from doc_tool.domain.output_state import read_state
+        # 上次正式状态仍与旧输出匹配；本次失败另记 attempt 状态
+        from doc_tool.domain.output_state import read_last_attempt_state, read_state
         state = read_state(str(formal))
         self.assertIsNotNone(state)
-        self.assertFalse(state.formal)
-        self.assertEqual(state.failureCode, "E2002")
+        self.assertTrue(state.formal)
+        attempt = read_last_attempt_state(str(formal))
+        self.assertIsNotNone(attempt)
+        self.assertEqual(attempt.failureCode, "E2002")
 
     def test_diagnostic_build_publishes_but_marked_non_formal(self):
         """诊断构建（skip_word_refresh=True）发布成功但标记为非正式。"""
@@ -474,7 +499,7 @@ class PipelineWordReleaseTests(unittest.TestCase):
     def test_build_failure_writes_failure_state(self):
         """构建失败时写入失败状态文件。"""
         from doc_tool.application.pipeline import run_pipeline
-        from doc_tool.domain.output_state import read_state
+        from doc_tool.domain.output_state import read_last_attempt_state, read_state
 
         manifest = self._make_manifest(self.project_root)
         paths = manifest.resolve_paths(self.project_root)
@@ -488,10 +513,10 @@ class PipelineWordReleaseTests(unittest.TestCase):
         formal = self._formal_output_path(manifest, paths)
         # 正式输出不存在（构建失败，从未发布）
         self.assertFalse(formal.exists())
-        # 但状态文件应存在，标记失败
-        state = read_state(str(formal))
+        # 未发布产物没有成功状态；失败尝试写入独立状态文件
+        self.assertIsNone(read_state(str(formal)))
+        state = read_last_attempt_state(str(formal))
         self.assertIsNotNone(state)
-        self.assertFalse(state.formal)
         self.assertNotEqual(state.failureCode, "")
 
     def test_formal_success_writes_formal_state(self):
@@ -624,6 +649,52 @@ class PipelineAtomicPublishTests(unittest.TestCase):
         # 状态文件存在
         from doc_tool.domain.output_state import state_file_for
         self.assertTrue(state_file_for(str(formal)).exists())
+
+    def test_state_write_failure_rolls_back_docx_and_state(self):
+        """DOCX 替换后状态写入失败时恢复上一版完整发布。"""
+        from doc_tool.adapters import kernel
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.domain.output_state import state_file_for
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            first = run_pipeline(manifest, paths, skip_word_refresh=True)
+        self.assertTrue(first.success)
+        formal = Path(first.output_path)
+        state_path = state_file_for(formal)
+        old_doc_hash = _sha256(str(formal))
+        old_state = state_path.read_bytes()
+        md_file = next(paths.content_dir(manifest.documentType).rglob("*.md"))
+        md_file.write_text(
+            md_file.read_text(encoding="utf-8") + "\n回滚测试新增内容。\n",
+            encoding="utf-8",
+        )
+
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            with patch(
+                "doc_tool.domain.output_state.write_state",
+                side_effect=OSError("state disk failure"),
+            ):
+                second = run_pipeline(manifest, paths, skip_word_refresh=True)
+
+        self.assertFalse(second.success)
+        self.assertEqual(_sha256(str(formal)), old_doc_hash)
+        self.assertEqual(state_path.read_bytes(), old_state)
+
+    def test_successful_pipeline_persists_last_build_version(self):
+        from doc_tool.adapters import kernel
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.domain.manifest import ProjectManifest
+        from doc_tool.domain.version import APP_VERSION
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            result = run_pipeline(manifest, paths, skip_word_refresh=True)
+        self.assertTrue(result.success)
+        loaded = ProjectManifest.load(self.project_root)
+        self.assertEqual(loaded.lastSuccessfulBuildVersion, APP_VERSION)
 
 
 # === 任务 7.6 人工操作清单 ===

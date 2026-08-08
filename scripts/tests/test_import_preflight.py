@@ -16,6 +16,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from lxml import etree
 
@@ -245,6 +246,34 @@ class PackageValidationTests(unittest.TestCase):
             preflight(path)
         self.assertIn("XML", ctx.exception.user_message)
 
+    def test_zip_uncompressed_size_limit_rejected_before_read(self):
+        path = os.path.join(self._tmp, "oversized.docx")
+        write_docx(path, build_paragraph("1", "第一章"))
+        with patch(
+            "doc_tool.adapters.preflight.MAX_TOTAL_UNCOMPRESSED_BYTES", 1
+        ):
+            with self.assertRaises(InvalidDocxError) as ctx:
+                preflight(path)
+        self.assertIn("安全上限", ctx.exception.user_message)
+
+    def test_xml_doctype_and_entity_are_rejected(self):
+        path = os.path.join(self._tmp, "doctype.docx")
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            + (" " * 5000)
+            + '<!DOCTYPE w:document [<!ENTITY x "unsafe">]>'
+            '<w:document xmlns:w="{0}"><w:body><w:p><w:r><w:t>&x;</w:t>'
+            '</w:r></w:p></w:body></w:document>'
+        ).format(W_NS).encode("utf-8")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", document_xml)
+            zf.writestr("word/styles.xml", build_styles_xml())
+            zf.writestr("word/_rels/document.xml.rels", build_rels_xml())
+        with self.assertRaises(InvalidDocxError) as ctx:
+            preflight(path)
+        self.assertIn("DTD", ctx.exception.user_message)
+
 
 class HeadingStyleTests(unittest.TestCase):
     """任务 3.3-3.4：标题样式映射和层级校验。"""
@@ -348,6 +377,27 @@ class RelationshipTests(unittest.TestCase):
             zf.writestr("word/_rels/document.xml.rels", build_rels_xml())
         with self.assertRaises(BrokenRelationshipError):
             preflight(path)
+
+    def test_external_image_uri_without_target_mode_rejected(self):
+        """缺失 TargetMode 的 file URI 图片仍按外链图片拒绝。"""
+        paras = build_paragraph("1", "第1章 概述")
+        document_xml = build_document_xml(paras, media_image_rid="rId1")
+        rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships xmlns="{0}">'
+            '<Relationship Id="rId1" Type="{0}/image" '
+            'Target="file:///C:/outside/image.png"/>'
+            '</Relationships>'
+        ).format(PR_NS).encode("utf-8")
+        path = os.path.join(self._tmp, "external-image.docx")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", document_xml)
+            zf.writestr("word/styles.xml", build_styles_xml(True))
+            zf.writestr("word/_rels/document.xml.rels", rels_xml)
+        with self.assertRaises(BrokenRelationshipError) as ctx:
+            preflight(path)
+        self.assertIn("外部链接", ctx.exception.user_message)
 
 
 class PreviewModelTests(unittest.TestCase):

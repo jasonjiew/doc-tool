@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -178,26 +180,6 @@ def acquire_lock(
     lock_file = paths.lock_file
     paths.state_dir.mkdir(parents=True, exist_ok=True)
 
-    if lock_file.exists():
-        existing = _read_lock(lock_file)
-        if existing is not None and existing.is_alive():
-            raise ProjectLockBusyError(
-                "项目正被另一个任务占用：{0}（PID {1}，任务 {2}）".format(
-                    existing.host, existing.pid, existing.task_type or "未知"
-                ),
-                suggested_action="请等待当前任务完成，或确认该进程已退出后清理锁文件。",
-                details={
-                    "lockHost": existing.host,
-                    "lockPid": str(existing.pid),
-                    "lockTask": existing.task_type,
-                    "lockStartTime": existing.start_time,
-                    "currentHost": _current_host(),
-                    "currentPid": str(os.getpid()),
-                },
-            )
-        # 陈旧锁：受控清理
-        _remove_lock(lock_file)
-
     lock = ProjectLock(
         host=_current_host(),
         pid=os.getpid(),
@@ -205,8 +187,34 @@ def acquire_lock(
         task_type=task_type,
         app_version=app_version,
     )
-    _write_lock(lock_file, lock)
-    return lock
+
+    # O_EXCL 保证全新锁只有一个创建者；操作系统级 guard 进一步串行化
+    # “读取陈旧锁 -> 删除 -> 重建”。否则两个接管者可能都读到旧内容，
+    # 后删除者会误删先接管者刚写入的新锁。
+    with _acquire_guard(lock_file):
+        try:
+            _create_lock_exclusive(lock_file, lock)
+            return lock
+        except FileExistsError:
+            existing = _read_lock(lock_file)
+            if existing is not None and existing.is_alive():
+                raise ProjectLockBusyError(
+                    "项目正被另一个任务占用：{0}（PID {1}，任务 {2}）".format(
+                        existing.host, existing.pid, existing.task_type or "未知"
+                    ),
+                    suggested_action="请等待当前任务完成，或确认该进程已退出后清理锁文件。",
+                    details={
+                        "lockHost": existing.host,
+                        "lockPid": str(existing.pid),
+                        "lockTask": existing.task_type,
+                        "lockStartTime": existing.start_time,
+                        "currentHost": _current_host(),
+                        "currentPid": str(os.getpid()),
+                    },
+                )
+            _remove_lock(lock_file)
+            _create_lock_exclusive(lock_file, lock)
+            return lock
 
 
 def release_lock(paths: ProjectPaths) -> bool:
@@ -243,33 +251,87 @@ def force_clean_stale_lock(paths: ProjectPaths) -> bool:
     用于界面「清理锁」操作。返回是否实际清理。
     """
     lock_file = paths.lock_file
-    if not lock_file.exists():
+    with _acquire_guard(lock_file):
+        if not lock_file.exists():
+            return False
+        existing = _read_lock(lock_file)
+        if existing is None:
+            _remove_lock(lock_file)
+            return True
+        if not existing.is_alive():
+            _remove_lock(lock_file)
+            return True
         return False
-    existing = _read_lock(lock_file)
-    if existing is None:
-        _remove_lock(lock_file)
-        return True
-    if not existing.is_alive():
-        _remove_lock(lock_file)
-        return True
-    return False
 
 
 # --- 锁文件读写（原子写入） ---
 
 
-def _write_lock(lock_file: Path, lock: ProjectLock) -> None:
-    """原子写入锁文件：先写临时文件再重命名，防止并发读到半写内容。"""
+@contextmanager
+def _acquire_guard(lock_file: Path):
+    """串行化锁文件的检查/接管过程，进程退出时由 OS 自动释放。"""
+    guard_file = lock_file.with_name(lock_file.name + ".guard")
+    guard_file.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(guard_file, "a+b")
+    acquired = False
+    try:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        for _ in range(40):
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError:
+                time.sleep(0.025)
+        if not acquired:
+            raise ProjectLockBusyError(
+                "项目锁正在发生并发变更，请稍后重试。",
+                suggested_action="请等待当前任务完成后重试。",
+                details={"currentPid": str(os.getpid())},
+            )
+        yield
+    finally:
+        if acquired:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        handle.close()
+
+
+def _create_lock_exclusive(lock_file: Path, lock: ProjectLock) -> None:
+    """以排他创建方式写入锁文件；文件已存在时抛 ``FileExistsError``。"""
     lock_file.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(lock.to_dict(), ensure_ascii=False)
-    tmp = lock_file.with_suffix(".lock.tmp")
-    tmp.write_text(payload, encoding="utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    fd = os.open(str(lock_file), flags, 0o600)
     try:
-        os.replace(str(tmp), str(lock_file))
-    except OSError:
-        # 跨卷回退（理论上不会发生，因 tmp 与 lock 同目录）
-        import shutil
-        shutil.move(str(tmp), str(lock_file))
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        _remove_lock(lock_file)
+        raise
 
 
 def _read_lock(lock_file: Path) -> Optional[ProjectLock]:

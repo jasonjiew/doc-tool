@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import posixpath
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -55,6 +56,14 @@ ENCRYPTED_ENTRY = "EncryptedPackage"
 
 # DOCX 包中必须存在的核心部件。
 REQUIRED_PARTS = ("word/document.xml",)
+
+# 不受信任的 DOCX 本质上是 ZIP。先检查目录元数据，再做 CRC/解压，避免压缩
+# 炸弹或异常巨大的 XML 在预检阶段耗尽内存。上限明显高于当前真实基线文档。
+MAX_PACKAGE_ENTRIES = 20_000
+MAX_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
+MAX_SINGLE_ENTRY_BYTES = 256 * 1024 * 1024
+MAX_XML_PART_BYTES = 64 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 2_000
 
 # 关系类型常量（仅取末尾片段用于分类）。
 REL_TYPE_IMAGE = "/image"
@@ -146,65 +155,66 @@ def preflight(path: Union[str, Path]) -> ImportPreview:
 
     # --- 3.1 包结构校验 ---
     _check_extension(file_name)
-    zip_handle = _open_and_check_zip(file_path)
-    _check_encryption(zip_handle)
-    parts = _read_parts(zip_handle)
-    _check_xml_wellformed(parts)
-    _check_required_parts(parts)
+    with _open_and_check_zip(file_path) as zip_handle:
+        _check_encryption(zip_handle)
+        parts = _read_parts(zip_handle)
+        _check_xml_wellformed(parts)
+        _check_required_parts(parts)
 
-    # --- 3.2 关系目标完整性 ---
-    rel_map = _parse_relationships(parts)
-    _check_relationship_targets(rel_map, zip_handle)
+        # --- 3.2 关系目标完整性 ---
+        rel_map = _parse_relationships(parts)
+        _check_relationship_targets(rel_map, zip_handle)
 
-    # --- 3.3 标题样式映射与标题树 ---
-    heading_style_map = _parse_heading_styles(parts)
-    headings = _build_heading_tree(parts, heading_style_map)
+        # --- 3.3 标题样式映射与标题树 ---
+        heading_style_map = _parse_heading_styles(parts)
+        headings = _build_heading_tree(parts, heading_style_map)
 
-    # --- 3.4 层级校验（fail-closed） ---
-    _validate_heading_hierarchy(headings)
+        # --- 3.4 层级校验（fail-closed） ---
+        _validate_heading_hierarchy(headings)
 
-    # --- 3.2 续：正文资源引用预检 ---
-    body_resource_warnings = _check_body_resource_references(parts, rel_map)
+        # --- 3.2 续：正文资源引用预检 ---
+        body_resource_warnings = _check_body_resource_references(parts, rel_map)
 
-    # --- 3.6 预览统计 ---
-    image_count = _count_images(parts)
-    table_count = _count_tables(parts)
-    all_names = zip_handle.namelist()
-    media_names = [n for n in all_names if n.startswith("word/media/")]
-    entry_count = len(all_names)
+        # --- 3.6 预览统计 ---
+        image_count = _count_images(parts)
+        table_count = _count_tables(parts)
+        all_names = zip_handle.namelist()
+        media_names = [n for n in all_names if n.startswith("word/media/")]
+        entry_count = len(all_names)
 
-    level_counts: Dict[int, int] = {}
-    for h in headings:
-        level_counts[h.level] = level_counts.get(h.level, 0) + 1
+        level_counts: Dict[int, int] = {}
+        for h in headings:
+            level_counts[h.level] = level_counts.get(h.level, 0) + 1
 
-    warnings: List[str] = []
-    if not heading_style_map:
-        warnings.append("未在 styles.xml 中找到任何 Heading 样式定义。")
-    warnings.extend(body_resource_warnings)
-    if len(media_names) == 0 and image_count > 0:
-        warnings.append("正文引用了图片但 media 目录为空。")
+        warnings: List[str] = []
+        if not heading_style_map:
+            warnings.append("未在 styles.xml 中找到任何 Heading 样式定义。")
+        warnings.extend(body_resource_warnings)
+        if len(media_names) == 0 and image_count > 0:
+            warnings.append("正文引用了图片但 media 目录为空。")
 
-    # --- 3.5 文档类型建议 ---
-    suggestion = _suggest_document_type(headings, parts)
+        # --- 3.5 文档类型建议 ---
+        suggestion = _suggest_document_type(headings, parts)
 
-    zip_handle.close()
-
-    return ImportPreview(
-        file_name=file_name,
-        file_size_bytes=file_size,
-        package_entry_count=entry_count,
-        heading_style_map=heading_style_map,
-        headings=headings,
-        heading_level_counts=level_counts,
-        first_headings=headings[:PREVIEW_HEADING_LIMIT],
-        last_headings=headings[-PREVIEW_HEADING_LIMIT:] if len(headings) > PREVIEW_HEADING_LIMIT else [],
-        image_count=image_count,
-        table_count=table_count,
-        media_count=len(media_names),
-        relationship_count=len(rel_map),
-        warnings=warnings,
-        document_type_suggestion=suggestion,
-    )
+        return ImportPreview(
+            file_name=file_name,
+            file_size_bytes=file_size,
+            package_entry_count=entry_count,
+            heading_style_map=heading_style_map,
+            headings=headings,
+            heading_level_counts=level_counts,
+            first_headings=headings[:PREVIEW_HEADING_LIMIT],
+            last_headings=(
+                headings[-PREVIEW_HEADING_LIMIT:]
+                if len(headings) > PREVIEW_HEADING_LIMIT else []
+            ),
+            image_count=image_count,
+            table_count=table_count,
+            media_count=len(media_names),
+            relationship_count=len(rel_map),
+            warnings=warnings,
+            document_type_suggestion=suggestion,
+        )
 
 
 # --- 3.1 包结构校验 ---
@@ -227,14 +237,19 @@ def _open_and_check_zip(file_path: Path) -> zipfile.ZipFile:
     """
     try:
         zf = zipfile.ZipFile(str(file_path), "r")
-    except (zipfile.BadZipFile, FileNotFoundError) as exc:
+    except (zipfile.BadZipFile, OSError) as exc:
         raise InvalidDocxError(
             "文件不是有效的 ZIP 包或不存在。",
             suggested_action="请确认选择了正确的 .docx 文件且文件未损坏。",
             details={"error": str(exc)},
         ) from exc
-    # CRC 校验：testzip() 返回第一个损坏条目名，None 表示全部通过。
-    bad = zf.testzip()
+    try:
+        _check_zip_limits(zf)
+        # CRC 校验：testzip() 返回第一个损坏条目名，None 表示全部通过。
+        bad = zf.testzip()
+    except Exception:
+        zf.close()
+        raise
     if bad is not None:
         zf.close()
         raise InvalidDocxError(
@@ -243,6 +258,34 @@ def _open_and_check_zip(file_path: Path) -> zipfile.ZipFile:
             details={"badEntry": bad},
         )
     return zf
+
+
+def _check_zip_limits(zf: zipfile.ZipFile) -> None:
+    """在解压前限制条目数、展开体积、单条目体积和压缩比。"""
+    infos = zf.infolist()
+    if len(infos) > MAX_PACKAGE_ENTRIES:
+        raise InvalidDocxError(
+            "DOCX 包含过多 ZIP 条目。",
+            details={"entryCount": str(len(infos))},
+        )
+    total = 0
+    for info in infos:
+        total += info.file_size
+        if info.file_size > MAX_SINGLE_ENTRY_BYTES:
+            raise InvalidDocxError(
+                "DOCX 包含异常大的条目：{0}".format(info.filename),
+                details={"entry": info.filename, "size": str(info.file_size)},
+            )
+        if info.compress_size > 0 and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
+            raise InvalidDocxError(
+                "DOCX 包含异常压缩比的条目：{0}".format(info.filename),
+                details={"entry": info.filename},
+            )
+    if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
+        raise InvalidDocxError(
+            "DOCX 解压后的总大小超过安全上限。",
+            details={"uncompressedBytes": str(total)},
+        )
 
 
 def _check_encryption(zf: zipfile.ZipFile) -> None:
@@ -257,12 +300,18 @@ def _check_encryption(zf: zipfile.ZipFile) -> None:
 
 
 def _read_parts(zf: zipfile.ZipFile) -> Dict[str, bytes]:
-    """读取 ZIP 中所有部件，返回名称到字节的映射。"""
+    """只读取预检需要的 XML/关系部件，避免把全部图片载入内存。"""
     parts: Dict[str, bytes] = {}
-    for name in zf.namelist():
+    for info in zf.infolist():
+        name = info.filename
         # 跳过目录条目
-        if name.endswith("/"):
+        if name.endswith("/") or not (name.endswith(".xml") or name.endswith(".rels")):
             continue
+        if info.file_size > MAX_XML_PART_BYTES:
+            raise InvalidDocxError(
+                "XML 部件超过安全上限：{0}".format(name),
+                details={"part": name, "size": str(info.file_size)},
+            )
         try:
             parts[name] = zf.read(name)
         except (zipfile.BadZipFile, RuntimeError) as exc:
@@ -279,13 +328,37 @@ def _check_xml_wellformed(parts: Dict[str, bytes]) -> None:
         if not name.endswith(".xml") and not name.endswith(".rels"):
             continue
         try:
-            etree.fromstring(data)
+            _parse_xml(data, name)
         except etree.XMLSyntaxError as exc:
             raise InvalidDocxError(
                 "XML 部件解析失败：{0}".format(name),
                 suggested_action="文件可能已损坏，请在 Word 中尝试打开并另存后重新导入。",
                 details={"part": name, "error": str(exc)},
             ) from exc
+
+
+def _parse_xml(data: bytes, part_name: str = ""):
+    """使用禁用 DTD、实体解析和网络访问的解析器读取 OOXML。"""
+    upper = data[:4096].upper()
+    if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
+        raise InvalidDocxError(
+            "XML 部件包含不允许的 DTD/实体声明：{0}".format(part_name or "unknown"),
+            details={"part": part_name or "unknown"},
+        )
+    parser = etree.XMLParser(
+        resolve_entities=False,
+        no_network=True,
+        load_dtd=False,
+        huge_tree=False,
+        recover=False,
+    )
+    root = etree.fromstring(data, parser=parser)
+    if root.getroottree().docinfo.doctype:
+        raise InvalidDocxError(
+            "XML 部件包含不允许的 DTD 声明：{0}".format(part_name or "unknown"),
+            details={"part": part_name or "unknown"},
+        )
+    return root
 
 
 def _check_required_parts(parts: Dict[str, bytes]) -> None:
@@ -307,15 +380,16 @@ def _parse_relationships(parts: Dict[str, bytes]) -> Dict[str, Dict[str, str]]:
     rels_name = "word/_rels/document.xml.rels"
     if rels_name not in parts:
         return {}
-    rels_root = etree.fromstring(parts[rels_name])
+    rels_root = _parse_xml(parts[rels_name], rels_name)
     rel_map: Dict[str, Dict[str, str]] = {}
     for rel in rels_root:
         rid = rel.get("Id")
         target = rel.get("Target")
         rtype = rel.get("Type", "")
+        target_mode = rel.get("TargetMode", "")
         if not rid or not target:
             continue
-        rel_map[rid] = {"target": target, "type": rtype}
+        rel_map[rid] = {"target": target, "type": rtype, "targetMode": target_mode}
     return rel_map
 
 
@@ -326,15 +400,14 @@ def _check_relationship_targets(
     names = set(zf.namelist())
     for rid, info in rel_map.items():
         target = info["target"]
-        rtype = info["type"]
-        # 外部链接（http/https）和外部关系不检查包内存在性。
-        if target.startswith(("http://", "https://", "mailto:")):
+        # TargetMode 是 OOXML 判断外部关系的事实来源；URL 前缀仅作兼容。
+        if _is_external_relationship(info):
             continue
         # 相对 word/ 目录的目标
         if target.startswith("/"):
             full = target.lstrip("/")
         else:
-            full = "word/" + target
+            full = posixpath.normpath("word/" + target)
         # 标准化路径分隔符
         full = full.replace("\\", "/")
         if full not in names:
@@ -342,6 +415,14 @@ def _check_relationship_targets(
                 "关系目标不存在：rId={0} target={1}".format(rid, target),
                 details={"rId": rid, "target": target, "resolved": full},
             )
+
+
+def _is_external_relationship(info: Dict[str, str]) -> bool:
+    """兼容识别显式 TargetMode 和缺失 TargetMode 的 URI 目标。"""
+    target = info.get("target", "").lstrip().lower()
+    return info.get("targetMode", "").lower() == "external" or target.startswith(
+        ("http://", "https://", "mailto:", "file:", "ftp://")
+    )
 
 
 def _check_body_resource_references(
@@ -352,7 +433,7 @@ def _check_body_resource_references(
     document_xml = parts.get("word/document.xml")
     if document_xml is None:
         return warnings
-    root = etree.fromstring(document_xml)
+    root = _parse_xml(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
     if body is None:
         return warnings
@@ -367,12 +448,25 @@ def _check_body_resource_references(
         rid = hyperlink.get(R + "id")
         if rid:
             referenced_rids.add(rid)
+    # 旧版 Word/VML 图片使用 v:imagedata r:id。
+    for node in root.iter():
+        if etree.QName(node).localname == "imagedata":
+            rid = node.get(R + "id")
+            if rid:
+                referenced_rids.add(rid)
 
     for rid in referenced_rids:
         if rid not in rel_map:
             raise BrokenRelationshipError(
                 "正文引用的关系不存在：rId={0}".format(rid),
                 suggested_action="请在 Word 中检查图片或超链接引用是否完整。",
+                details={"rId": rid},
+            )
+        info = rel_map[rid]
+        if info.get("type", "").endswith(REL_TYPE_IMAGE) and _is_external_relationship(info):
+            raise BrokenRelationshipError(
+                "正文图片使用外部链接，无法生成自包含项目：rId={0}".format(rid),
+                suggested_action="请在 Word 中把链接图片转换为嵌入图片后重新导入。",
                 details={"rId": rid},
             )
     return warnings
@@ -386,7 +480,7 @@ def _parse_heading_styles(parts: Dict[str, bytes]) -> Dict[str, int]:
     styles_xml = parts.get("word/styles.xml")
     if styles_xml is None:
         return {}
-    sroot = etree.fromstring(styles_xml)
+    sroot = _parse_xml(styles_xml, "word/styles.xml")
     heading_map: Dict[str, int] = {}
     for style in sroot.iter(_qn("style")):
         style_id = style.get(_qn("styleId"))
@@ -410,7 +504,7 @@ def _build_heading_tree(
 ) -> List[HeadingInfo]:
     """遍历 ``document.xml`` 正文段落，按样式提取标题树。"""
     document_xml = parts.get("word/document.xml", b"")
-    root = etree.fromstring(document_xml)
+    root = _parse_xml(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
     if body is None:
         return []
@@ -518,7 +612,7 @@ def _suggest_document_type(
     document_xml = parts.get("word/document.xml", b"")
     cover_text = ""
     try:
-        root = etree.fromstring(document_xml)
+        root = _parse_xml(document_xml, "word/document.xml")
         body = root.find(_qn("body"))
         if body is not None:
             for elem in list(body)[:30]:
@@ -563,7 +657,7 @@ def _count_images(parts: Dict[str, bytes]) -> int:
     document_xml = parts.get("word/document.xml", b"")
     if not document_xml:
         return 0
-    root = etree.fromstring(document_xml)
+    root = _parse_xml(document_xml, "word/document.xml")
     count = 0
     for _ in root.iter(A + "blip"):
         count += 1
@@ -577,7 +671,7 @@ def _count_tables(parts: Dict[str, bytes]) -> int:
     document_xml = parts.get("word/document.xml", b"")
     if not document_xml:
         return 0
-    root = etree.fromstring(document_xml)
+    root = _parse_xml(document_xml, "word/document.xml")
     count = 0
     body = root.find(_qn("body"))
     if body is None:

@@ -43,6 +43,7 @@ migration/legacy/binary-bat/*.bat
 # --- 编辑器与系统文件 ---
 .vscode/
 .idea/
+.learnings/
 *.swp
 *.swo
 *~

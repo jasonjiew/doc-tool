@@ -129,5 +129,57 @@ class SchemaCompatibilityTests(unittest.TestCase):
         self.assertFalse(can_read_schema(0))
 
 
+class PackageAllowlistTests(unittest.TestCase):
+    def test_strict_allowlist_rejects_unknown_file(self):
+        import importlib.util
+
+        module_path = Path(REPO_ROOT) / "packaging" / "scan_leaks.py"
+        spec = importlib.util.spec_from_file_location("doc_tool_scan_leaks", module_path)
+        scan_leaks = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scan_leaks)
+
+        with tempfile.TemporaryDirectory(prefix="doc-allowlist-") as tmp:
+            root = Path(tmp)
+            (root / "KonsungDocTool.exe").write_bytes(b"exe")
+            (root / "customer-data.txt").write_text("secret", encoding="utf-8")
+            leaks = scan_leaks.scan_allowlist(root)
+            self.assertTrue(any("customer-data.txt" in item for item in leaks))
+            self.assertFalse(any("KonsungDocTool.exe" in item for item in leaks))
+
+
+class ReleasePipelineTests(unittest.TestCase):
+    def test_hash_is_generated_after_all_signing_steps(self):
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
+        self.assertGreater(
+            package_block.rfind("Get-FileHash"),
+            package_block.rfind("signtool.Source sign"),
+        )
+        self.assertIn("signtool.Source verify", package_block)
+
+    def test_frozen_build_installs_runtime_and_build_requirements(self):
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        build_block = ci[ci.index("build-onedir:"):ci.index("package-installer:")]
+        self.assertIn("-r requirements.txt -r requirements-build.txt", build_block)
+
+    def test_install_level_smoke_runs_before_installer_signing(self):
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
+        smoke_pos = package_block.index("test_installer_smoke.ps1")
+        installer_sign_pos = package_block.index(
+            "$signtool.Source sign", package_block.index('$exe = "packaging')
+        )
+        self.assertLess(smoke_pos, installer_sign_pos)
+        self.assertTrue(
+            (Path(REPO_ROOT) / "scripts" / "tests" / "test_installer_smoke.ps1").is_file()
+        )
+
+    def test_release_requires_clean_tree_and_uses_generated_notes(self):
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        self.assertIn("git status --porcelain --untracked-files=all", ci)
+        self.assertIn('description: "packaging/Output/release-notes.md"', ci)
+        self.assertIn("CI_COMMIT_SHA", ci)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -292,7 +292,9 @@ class MainWindow:
         from doc_tool.application.word_check import check_word_available
 
         # 任务 7.1：正式合并前检查 Word 可用性，缺失时阻断并提示诊断构建
-        report = check_word_available(dispatch_check=True)
+        # 这里只做快速静态检查；实际 DispatchEx 探测由后台管线执行，避免
+        # Word 首次启动或故障超时冻结 Tk 主线程。
+        report = check_word_available(dispatch_check=False)
         if not report.available:
             reasons = "\n".join("  • {0}".format(r) for r in report.reasons) or "  • 未知原因"
             self._show_error(
@@ -345,8 +347,8 @@ class MainWindow:
     def _on_open_content(self) -> None:
         if self._project_summary:
             self._open_in_explorer(
-                self._project_summary.paths.content_dir(
-                    self._project_summary.manifest.documentType
+                self._project_summary.paths.resolve(
+                    self._project_summary.manifest.relative_content_root()
                 )
             )
 
@@ -435,10 +437,28 @@ class MainWindow:
                 self._status_var.set("任务失败（{0}）".format(code))
         else:
             # validate 返回 bool
-            if result is True:
-                self._status_var.set("校验通过")
-            elif result is False:
-                self._status_var.set("校验未通过")
+            if isinstance(result, bool):
+                from doc_tool.application.project_service import read_validation_report_summary
+
+                report_path = (
+                    self._project_summary.paths.logs_dir
+                    / (self._project_summary.manifest.documentType + "-validation.md")
+                ) if self._project_summary else None
+                report = read_validation_report_summary(report_path) if report_path else {}
+                if report.get("exists"):
+                    status = "校验通过" if result else "校验未通过"
+                    self._status_var.set(
+                        "{0}（PASS={1} FAIL={2}）".format(
+                            status, report["passCount"], report["failCount"]
+                        )
+                    )
+                    self._log("校验报告：{0}".format(report_path))
+                    for failure in report["failures"][:10]:
+                        self._log("  ✗ {0}".format(failure))
+                elif result:
+                    self._status_var.set("校验通过")
+                else:
+                    self._status_var.set("校验未通过")
             else:
                 self._status_var.set("任务完成")
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,6 +94,9 @@ def open_project(project_root: str) -> ProjectSummary:
     root = Path(project_root).resolve()
     manifest = ProjectManifest.load(root)
     paths = manifest.resolve_paths(root)
+    source_path = paths.resolve(manifest.relative_source_docx())
+    template_path = paths.resolve(manifest.relative_template_docx())
+    content_path = paths.resolve(manifest.relative_content_root())
 
     # 检查锁状态
     from doc_tool.domain.project_lock import inspect_lock
@@ -113,12 +117,41 @@ def open_project(project_root: str) -> ProjectSummary:
         paths=paths,
         project_root=root,
         is_writable=manifest.is_writable() and can_write_schema(manifest.schemaVersion),
-        source_exists=paths.source_docx.exists(),
-        template_exists=paths.template_docx.exists(),
-        content_exists=paths.content_dir(manifest.documentType).exists(),
+        source_exists=source_path.exists(),
+        template_exists=template_path.exists(),
+        content_exists=content_path.exists(),
         output_exists=paths.output_dir.exists(),
         lock_info=lock_info,
     )
+
+
+def read_validation_report_summary(report_path: Path) -> dict:
+    """读取严格校验报告的计数和失败项，供 GUI 展示。"""
+    summary = {
+        "exists": False,
+        "passCount": 0,
+        "failCount": 0,
+        "failures": [],
+        "updatedAt": "",
+    }
+    try:
+        text = Path(report_path).read_text(encoding="utf-8")
+        modified = datetime.fromtimestamp(
+            Path(report_path).stat().st_mtime, tz=timezone.utc
+        ).isoformat(timespec="seconds")
+    except (OSError, UnicodeError):
+        return summary
+    pattern = re.compile(r"^- \[(PASS|FAIL)\]\s*(.+)$", re.MULTILINE)
+    matches = pattern.findall(text)
+    failures = [detail.strip() for status, detail in matches if status == "FAIL"]
+    summary.update({
+        "exists": True,
+        "passCount": sum(1 for status, _ in matches if status == "PASS"),
+        "failCount": len(failures),
+        "failures": failures,
+        "updatedAt": modified,
+    })
+    return summary
 
 
 def load_recent_projects() -> List[RecentEntry]:

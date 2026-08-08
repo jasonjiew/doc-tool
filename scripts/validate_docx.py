@@ -272,7 +272,8 @@ class DocxPackage:
 
 def _expected_table_xml(path: str):
     try:
-        root = etree.fromstring(open(path, "rb").read())
+        with open(path, "rb") as xml_file:
+            root = etree.fromstring(xml_file.read())
     except Exception as exc:
         raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(path, exc))
     if root.tag != qn("tbl"):
@@ -301,7 +302,9 @@ def expected_markdown_events(path: str, config: Dict) -> List[Event]:
         image = parse_image_reference(stripped)
         if image is not None:
             image_path = resolve_resource(config["paths"]["asset_root"], image.relative_path, "图片")
-            events.append(Event("I", (hashlib.sha256(open(image_path, "rb").read()).hexdigest(),), source))
+            with open(image_path, "rb") as image_file:
+                image_hash = hashlib.sha256(image_file.read()).hexdigest()
+            events.append(Event("I", (image_hash,), source))
             index += 1
             continue
         if stripped.startswith("<!-- TBL:"):

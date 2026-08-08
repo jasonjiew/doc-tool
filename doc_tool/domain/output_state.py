@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,7 @@ from typing import Any, Dict, List, Optional, Union
 
 # 状态文件后缀（与输出 DOCX 同名 + .state.json）
 STATE_SUFFIX = ".state.json"
+ATTEMPT_STATE_SUFFIX = ".last-attempt.json"
 
 
 @dataclass
@@ -60,6 +62,16 @@ def state_file_for(output_path: Union[str, Path]) -> Path:
     """返回输出 DOCX 对应的状态文件路径。"""
     p = Path(output_path)
     return p.with_name(p.name + STATE_SUFFIX)
+
+
+def last_attempt_state_file_for(output_path: Union[str, Path]) -> Path:
+    """返回最近一次失败尝试的状态文件路径。
+
+    失败尝试与已发布产物状态分离，避免一次构建失败把上一份仍然有效的
+    ``formal=True`` 状态覆盖掉。
+    """
+    p = Path(output_path)
+    return p.with_name(p.name + ATTEMPT_STATE_SUFFIX)
 
 
 def compute_sha256(path: Union[str, Path]) -> str:
@@ -107,7 +119,9 @@ def write_state(
         stages=list(stages or []),
         failureCode=failure_code,
     )
-    state_path = state_file_for(p)
+    state_path = (
+        last_attempt_state_file_for(p) if failure_code else state_file_for(p)
+    )
     tmp = state_path.with_suffix(".json.tmp")
     tmp.write_text(state.to_json(), encoding="utf-8")
     try:
@@ -116,12 +130,25 @@ def write_state(
         import shutil
 
         shutil.move(str(tmp), str(state_path))
+    if not failure_code:
+        try:
+            last_attempt_state_file_for(p).unlink()
+        except FileNotFoundError:
+            pass
     return state_path
 
 
 def read_state(output_path: Union[str, Path]) -> Optional[OutputState]:
     """读取输出状态元数据，不存在或损坏时返回 ``None``。"""
-    state_path = state_file_for(output_path)
+    return _read_state_path(state_file_for(output_path))
+
+
+def read_last_attempt_state(output_path: Union[str, Path]) -> Optional[OutputState]:
+    """读取最近一次失败尝试状态，不影响已发布产物的正式状态。"""
+    return _read_state_path(last_attempt_state_file_for(output_path))
+
+
+def _read_state_path(state_path: Path) -> Optional[OutputState]:
     if not state_path.exists():
         return None
     try:
@@ -131,16 +158,28 @@ def read_state(output_path: Union[str, Path]) -> Optional[OutputState]:
     if not isinstance(data, dict):
         return None
     try:
+        formal = data.get("formal", False)
+        diagnostic = data.get("diagnostic", False)
+        stages = data.get("stages", [])
+        if type(formal) is not bool or type(diagnostic) is not bool:
+            return None
+        if not isinstance(stages, list) or not all(isinstance(item, dict) for item in stages):
+            return None
+        output_sha256 = str(data.get("outputSha256", ""))
+        if output_sha256 and re.fullmatch(r"[0-9a-fA-F]{64}", output_sha256) is None:
+            return None
+        if formal and diagnostic:
+            return None
         return OutputState(
-            formal=bool(data.get("formal", False)),
-            diagnostic=bool(data.get("diagnostic", False)),
+            formal=formal,
+            diagnostic=diagnostic,
             appVersion=str(data.get("appVersion", "")),
             commit=str(data.get("commit", "")),
             schemaVersion=int(data.get("schemaVersion", 0)),
             completedAt=str(data.get("completedAt", "")),
             outputFile=str(data.get("outputFile", "")),
-            outputSha256=str(data.get("outputSha256", "")),
-            stages=list(data.get("stages", [])),
+            outputSha256=output_sha256,
+            stages=list(stages),
             failureCode=str(data.get("failureCode", "")),
         )
     except Exception:
@@ -153,5 +192,13 @@ def is_formal_success(output_path: Union[str, Path]) -> bool:
     任务 7.4：禁止未刷新结果显示为正式成功。即使 DOCX 文件存在，
     若状态文件不存在或 ``formal=False``，也视为非正式。
     """
-    state = read_state(output_path)
-    return state is not None and state.formal
+    path = Path(output_path)
+    state = read_state(path)
+    if state is None or not state.formal or state.diagnostic or not path.is_file():
+        return False
+    if state.outputFile != path.name or not state.outputSha256:
+        return False
+    try:
+        return compute_sha256(path).lower() == state.outputSha256.lower()
+    except OSError:
+        return False

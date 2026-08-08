@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     康尚文档工具安装包构建脚本
@@ -24,12 +24,20 @@
 
 param(
     [switch]$SkipPyInstaller,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$SkipInstaller
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $Version = "1.0.0"
+
+$AppVersion = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
+$InstallerMatch = Select-String -Path "$PSScriptRoot\installer.iss" -Pattern '#define\s+MyAppVersion\s+"([^"]+)"'
+$InstallerVersion = $InstallerMatch.Matches[0].Groups[1].Value
+if ($Version -ne $AppVersion -or $Version -ne $InstallerVersion) {
+    throw "版本不一致: build=$Version app=$AppVersion installer=$InstallerVersion"
+}
 
 Write-Host "=== 康尚文档工具安装包构建 ===" -ForegroundColor Cyan
 Write-Host "版本: $Version"
@@ -66,6 +74,17 @@ if (-not $SkipPyInstaller) {
     Write-Host "[2/5] 跳过 PyInstaller 构建。" -ForegroundColor DarkGray
 }
 
+# 构建后必须扫描本次产物；只在构建前扫描旧 dist 无法阻断本次意外打包。
+Push-Location $RepoRoot
+try {
+    & python packaging\scan_leaks.py --strict --dist-dir "dist\KonsungDocTool"
+    if ($LASTEXITCODE -ne 0) {
+        throw "构建产物允许清单/泄漏扫描失败 (exit $LASTEXITCODE)"
+    }
+} finally {
+    Pop-Location
+}
+
 # --- 阶段 3：冒烟测试 ---
 if (-not $SkipTests) {
     Write-Host "[3/5] 冻结应用冒烟测试..." -ForegroundColor Yellow
@@ -88,6 +107,7 @@ Write-Host "[4/5] Inno Setup 编译安装器..." -ForegroundColor Yellow
 
 # 查找 ISCC.exe
 $IsccPaths = @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Program Files\Inno Setup 6\ISCC.exe",
     (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
@@ -100,7 +120,10 @@ foreach ($path in $IsccPaths) {
     }
 }
 
-if ($Iscc) {
+if ($SkipInstaller) {
+    Write-Host "  已显式跳过安装器编译。" -ForegroundColor DarkGray
+    $SetupExe = $null
+} elseif ($Iscc) {
     Push-Location "$RepoRoot\packaging"
     try {
         & $Iscc "installer.iss"
@@ -114,13 +137,18 @@ if ($Iscc) {
     if (Test-Path $SetupExe) {
         $Size = [math]::Round((Get-Item $SetupExe).Length / 1MB, 1)
         Write-Host "  安装器构建完成: $SetupExe ($Size MB)" -ForegroundColor Green
+        if (-not $SkipTests) {
+            & powershell -NoProfile -ExecutionPolicy Bypass -File `
+                "$RepoRoot\scripts\tests\test_installer_smoke.ps1" -InstallerPath $SetupExe
+            if ($LASTEXITCODE -ne 0) {
+                throw "安装级冒烟测试失败 (exit $LASTEXITCODE)"
+            }
+        }
     } else {
         throw "安装器未生成: $SetupExe"
     }
 } else {
-    Write-Host "  Inno Setup (ISCC.exe) 未安装，跳过安装器编译。" -ForegroundColor DarkYellow
-    Write-Host "  请从 https://jrsoftware.org/isdl.php 下载安装 Inno Setup 6。" -ForegroundColor DarkYellow
-    $SetupExe = $null
+    throw "Inno Setup (ISCC.exe) 未安装；如只需 onedir，请显式使用 -SkipInstaller。"
 }
 
 # --- 阶段 5：生成 SHA-256 和依赖清单 ---

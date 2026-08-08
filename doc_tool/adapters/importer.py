@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import os
+import posixpath
 import re
 import shutil
 import zipfile
@@ -63,7 +64,11 @@ _BAD_CHAR_MAP = {
 
 
 def _sanitize(name: str) -> str:
-    return "".join(_BAD_CHAR_MAP.get(c, c) for c in name)
+    value = "".join(_BAD_CHAR_MAP.get(c, c) for c in name)
+    value = re.sub(r"[\x00-\x1f]+", " ", value)
+    value = re.sub(r"\s+", " ", value).strip().rstrip(" .")
+    # 为中文长路径预留项目父目录空间，避免单个标题组件逼近 Windows 上限。
+    return value[:120].rstrip(" .") or "未命名章节"
 
 
 def _safe_name(txt: str) -> str:
@@ -319,6 +324,11 @@ def extract_content(
                 chapter_order.append({"chapter": txt, "file": fname})
                 cur_lines.append("# " + txt)
                 cur_lines.append("")
+                if has_img:
+                    img_counter, img_map = _emit_images(
+                        el, rel_map, media_files, images_dir,
+                        img_counter, img_map, cur_chapter, document_type, cur_lines,
+                    )
                 continue
             if cur_file is None:
                 continue  # 正文起点之前，跳过
@@ -326,7 +336,17 @@ def extract_content(
             if lvl and 2 <= lvl <= 6:
                 cur_lines.append("#" * lvl + " " + txt)
                 cur_lines.append("")
+                if has_img:
+                    img_counter, img_map = _emit_images(
+                        el, rel_map, media_files, images_dir,
+                        img_counter, img_map, cur_chapter, document_type, cur_lines,
+                    )
             elif has_img:
+                # 同一段落同时含文本和图片时，至少保留全部业务文本；图片仍按
+                # 源段落中的关系顺序紧随其后，禁止因 ``elif`` 静默丢掉文本。
+                if txt:
+                    _emit_paragraph(el, txt, cur_lines)
+                    cur_lines.append("")
                 img_counter, img_map = _emit_images(
                     el, rel_map, media_files, images_dir,
                     img_counter, img_map, cur_chapter, document_type, cur_lines,
@@ -374,8 +394,13 @@ def _parse_rel_map(rels_xml: bytes) -> Dict[str, Dict[str, str]]:
         rid = rel.get("Id")
         target = rel.get("Target")
         rtype = rel.get("Type", "")
+        target_mode = rel.get("TargetMode", "")
         if rid and target:
-            rel_map[rid] = {"target": target, "type": rtype}
+            rel_map[rid] = {
+                "target": target,
+                "type": rtype,
+                "targetMode": target_mode,
+            }
     return rel_map
 
 
@@ -426,6 +451,13 @@ def _para_image_info(p) -> List[Dict]:
             info["cx"] = int(ext.get("cx"))
             info["cy"] = int(ext.get("cy"))
         infos.append(info)
+    # 旧版 Word/VML 图片：<v:imagedata r:id="..."/>。
+    for node in p.iter():
+        if etree.QName(node).localname != "imagedata":
+            continue
+        rid = node.get(R + "id")
+        if rid:
+            infos.append({"rid": rid, "cx": None, "cy": None})
     return infos
 
 
@@ -433,20 +465,28 @@ def _emit_images(
     el, rel_map, media_files, images_dir, img_counter, img_map,
     cur_chapter, document_type, cur_lines,
 ):
-    for info in _para_image_info(el):
+    image_infos = _para_image_info(el)
+    if not image_infos:
+        raise ValueError("检测到图片节点，但没有可提取的图片关系。")
+    for info in image_infos:
         img_counter += 1
-        target = rel_map.get(info["rid"], {}).get("target")
-        if not target or target not in media_files:
-            tgt = rel_map.get(info["rid"], {}).get("target", "")
-            basename = os.path.basename(tgt)
-            match = [n for n in media_files if n.endswith(basename)]
-            if not match:
-                continue
-            media_data = media_files[match[0]]
-            ext = os.path.splitext(match[0])[1].lstrip(".") or "png"
-        else:
-            media_data = media_files[target]
-            ext = os.path.splitext(target)[1].lstrip(".") or "png"
+        relation = rel_map.get(info["rid"])
+        if relation is None:
+            raise ValueError("图片关系不存在：{0}".format(info["rid"]))
+        target = relation.get("target", "")
+        if relation.get("targetMode", "").lower() == "external" or target.lstrip().lower().startswith(
+            ("http://", "https://", "file:", "ftp://")
+        ):
+            raise ValueError("不支持外部链接图片：{0}".format(info["rid"]))
+        media_key = (
+            target.lstrip("/")
+            if target.startswith("/")
+            else posixpath.normpath("word/" + target.replace("\\", "/"))
+        )
+        if media_key not in media_files:
+            raise ValueError("图片关系目标不存在：{0}".format(info["rid"]))
+        media_data = media_files[media_key]
+        ext = os.path.splitext(media_key)[1].lstrip(".") or "png"
         img_name = "img_{0:04d}.{1}".format(img_counter, ext)
         (images_dir / img_name).write_bytes(media_data)
         w_px = round((info["cx"] or 0) / 9525) if info["cx"] else None

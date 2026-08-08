@@ -27,7 +27,7 @@ from doc_tool.domain.errors import (  # noqa: E402
     ProjectManifestError,
 )
 from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
-from doc_tool.domain.paths import ProjectPaths  # noqa: E402
+from doc_tool.domain.paths import ProjectPaths, build_output_filename  # noqa: E402
 from doc_tool.domain.version import (  # noqa: E402
     APP_VERSION,
     PROJECT_SCHEMA_VERSION,
@@ -187,6 +187,52 @@ class ProjectManifestTests(unittest.TestCase):
         loaded = ProjectManifest.load(self.root)
         self.assertEqual(loaded.schemaVersion, 2)
         self.assertFalse(loaded.is_writable())
+        with self.assertRaises(IncompatibleSchemaError):
+            loaded.save(self.root)
+
+    def test_higher_schema_unknown_document_type_still_loads_readonly(self):
+        manifest = _make_manifest(schemaVersion=2, documentType="future-type")
+        self.assertEqual(manifest.documentType, "future-type")
+        self.assertFalse(manifest.is_writable())
+        with self.assertRaises(IncompatibleSchemaError):
+            manifest.save(self.root)
+
+    def test_output_filename_replaces_windows_forbidden_characters(self):
+        manifest = _make_manifest(
+            documentNo="KF:01", documentName="..\\outside", documentVersion="1*0"
+        )
+        filename = build_output_filename(
+            manifest.documentNo, manifest.documentName, manifest.documentVersion
+        )
+        self.assertEqual(filename, "KF_01 .._outside(1_0).docx")
+        self.assertNotIn("\\", filename)
+        self.assertNotIn("/", filename)
+
+    def test_rejects_overlong_output_filename(self):
+        with self.assertRaises(ProjectManifestError):
+            _make_manifest(documentName="长" * 240)
+
+    def test_load_wraps_invalid_field_type(self):
+        import yaml
+
+        data = {
+            "schemaVersion": 1,
+            "documentType": "requirement",
+            "documentNo": "X",
+            "documentName": "Y",
+            "documentVersion": "1",
+            "refresh": {"timeoutSeconds": "not-an-int"},
+        }
+        (self.root / "project.yml").write_text(
+            yaml.safe_dump(data), encoding="utf-8"
+        )
+        with self.assertRaises(ProjectManifestError):
+            ProjectManifest.load(self.root)
+
+    def test_load_wraps_invalid_utf8(self):
+        Path(self.root, "project.yml").write_bytes(b"\xff\xfe\x00")
+        with self.assertRaises(ProjectManifestError):
+            ProjectManifest.load(self.root)
 
     def test_load_rejects_missing_schema(self):
         import yaml

@@ -39,7 +39,7 @@ from typing import Any, Dict, Optional, Union
 import yaml
 
 from doc_tool.domain.errors import IncompatibleSchemaError, ProjectManifestError
-from doc_tool.domain.paths import MANIFEST_NAME, ProjectPaths
+from doc_tool.domain.paths import MANIFEST_NAME, ProjectPaths, build_output_filename
 from doc_tool.domain.version import (
     APP_VERSION,
     PROJECT_SCHEMA_VERSION,
@@ -80,14 +80,27 @@ class ProjectManifest:
     updatedAt: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.documentType not in DOCUMENT_TYPES:
+        try:
+            self.schemaVersion = int(self.schemaVersion)
+            self.refreshTimeoutSeconds = int(self.refreshTimeoutSeconds)
+        except (TypeError, ValueError) as exc:
+            raise ProjectManifestError(
+                "schemaVersion 和刷新超时必须是整数。",
+                details={"errorType": type(exc).__name__},
+            ) from exc
+        self.documentNo = str(self.documentNo)
+        self.documentName = str(self.documentName)
+        self.documentVersion = str(self.documentVersion)
+        if self.documentType not in DOCUMENT_TYPES and can_write_schema(self.schemaVersion):
             raise ProjectManifestError(
                 "未知的文档类型：{0}。".format(self.documentType),
                 details={"documentType": self.documentType},
             )
         if not self.documentNo or not self.documentName:
             raise ProjectManifestError("文档编号和名称不能为空。")
-        if self.refreshTimeoutSeconds < 60:
+        if can_write_schema(self.schemaVersion):
+            build_output_filename(self.documentNo, self.documentName, self.documentVersion)
+        if can_write_schema(self.schemaVersion) and self.refreshTimeoutSeconds < 60:
             raise ProjectManifestError(
                 "刷新超时不能小于 60 秒。",
                 details={"timeout": str(self.refreshTimeoutSeconds)},
@@ -146,6 +159,12 @@ class ProjectManifest:
 
     def save(self, project_root: Union[str, Path], *, backup: bool = True) -> Path:
         """写入 ``project.yml``，写入前对已存在清单做时间戳备份。"""
+        if not self.is_writable():
+            raise IncompatibleSchemaError(
+                "当前应用不能写入项目模式版本 {0}。".format(self.schemaVersion),
+                suggested_action="请使用创建或升级该项目的兼容版本应用。",
+                details={"schemaVersion": str(self.schemaVersion)},
+            )
         paths = ProjectPaths(project_root)
         manifest_path = paths.manifest_file
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -167,7 +186,7 @@ class ProjectManifest:
     @staticmethod
     def _backup_manifest(manifest_path: Path) -> Path:
         backup_name = "{0}.{1}.bak".format(
-            MANIFEST_NAME, datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            MANIFEST_NAME, datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
         )
         backup_path = manifest_path.parent / ".state" / backup_name
         backup_path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,7 +208,7 @@ class ProjectManifest:
             )
         try:
             data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
+        except (yaml.YAMLError, UnicodeError, OSError) as exc:
             raise ProjectManifestError(
                 "项目清单 YAML 解析失败。",
                 details={"error": str(exc)},
@@ -203,7 +222,13 @@ class ProjectManifest:
         cls, data: Dict[str, Any], project_root: Optional[Union[str, Path]] = None
     ) -> "ProjectManifest":
         """从字典构造清单并校验字段与模式版本。"""
-        schema_version = int(data.get("schemaVersion", 0))
+        try:
+            schema_version = int(data.get("schemaVersion", 0))
+        except (TypeError, ValueError) as exc:
+            raise ProjectManifestError(
+                "项目清单 schemaVersion 必须是整数。",
+                details={"field": "schemaVersion"},
+            ) from exc
         if schema_version == 0:
             raise ProjectManifestError("项目清单缺少 schemaVersion 字段。")
         if not can_read_schema(schema_version):
@@ -213,26 +238,49 @@ class ProjectManifest:
             )
         paths_data = data.get("paths") or {}
         refresh_data = data.get("refresh") or {}
-        manifest = cls(
-            documentType=data["documentType"],
-            documentNo=data["documentNo"],
-            documentName=data["documentName"],
-            documentVersion=str(data["documentVersion"]),
-            sourceSha256=data.get("sourceSha256", ""),
-            projectId=data.get("projectId", str(uuid.uuid4())),
-            schemaVersion=schema_version,
-            paths=dict(paths_data),
-            createdWithVersion=data.get("createdWithVersion", APP_VERSION),
-            lastSuccessfulBuildVersion=data.get("lastSuccessfulBuildVersion"),
-            headingStyles={
-                int(level): str(style_id)
-                for level, style_id in (data.get("headingStyles") or {}).items()
-            },
-            bodyStyle=str(data.get("bodyStyle", "") or ""),
-            refreshTimeoutSeconds=int(refresh_data.get("timeoutSeconds", DEFAULT_REFRESH_TIMEOUT_SECONDS)),
-            createdAt=data.get("createdAt"),
-            updatedAt=data.get("updatedAt"),
-        )
+        heading_styles_data = data.get("headingStyles") or {}
+        if (
+            not isinstance(paths_data, dict)
+            or not isinstance(refresh_data, dict)
+            or not isinstance(heading_styles_data, dict)
+        ):
+            raise ProjectManifestError(
+                "项目清单 paths、refresh 和 headingStyles 字段必须是映射。",
+                details={"field": "paths/refresh/headingStyles"},
+            )
+        try:
+            manifest = cls(
+                documentType=str(data["documentType"]),
+                documentNo=str(data["documentNo"]),
+                documentName=str(data["documentName"]),
+                documentVersion=str(data["documentVersion"]),
+                sourceSha256=str(data.get("sourceSha256", "")),
+                projectId=str(data.get("projectId", str(uuid.uuid4()))),
+                schemaVersion=schema_version,
+                paths={str(key): str(value) for key, value in paths_data.items()},
+                createdWithVersion=str(data.get("createdWithVersion", APP_VERSION)),
+                lastSuccessfulBuildVersion=data.get("lastSuccessfulBuildVersion"),
+                headingStyles={
+                    int(level): str(style_id)
+                    for level, style_id in heading_styles_data.items()
+                },
+                bodyStyle=str(data.get("bodyStyle", "") or ""),
+                refreshTimeoutSeconds=int(
+                    refresh_data.get("timeoutSeconds", DEFAULT_REFRESH_TIMEOUT_SECONDS)
+                ),
+                createdAt=data.get("createdAt"),
+                updatedAt=data.get("updatedAt"),
+            )
+        except KeyError as exc:
+            raise ProjectManifestError(
+                "项目清单缺少必填字段：{0}。".format(exc.args[0]),
+                details={"field": str(exc.args[0])},
+            ) from exc
+        except (TypeError, ValueError) as exc:
+            raise ProjectManifestError(
+                "项目清单字段类型不正确。",
+                details={"errorType": type(exc).__name__},
+            ) from exc
         if project_root is not None:
             manifest.resolve_paths(project_root)
         return manifest

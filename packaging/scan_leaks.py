@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import fnmatch
 from pathlib import Path
 from typing import List, Set, Tuple
 
@@ -30,6 +31,7 @@ from typing import List, Set, Tuple
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
 DIST_DIR = REPO_ROOT / "dist" / "KonsungDocTool"
+ALLOWLIST_FILE = HERE / "allowlist.txt"
 
 # 允许的 DOCX 文件（净化模板和测试夹具）
 ALLOWED_DOCX_PATTERNS = [
@@ -86,6 +88,32 @@ def scan_forbidden_files(root: Path) -> List[str]:
     return leaks
 
 
+def load_allowlist(path: Path = ALLOWLIST_FILE) -> List[str]:
+    """加载打包文件允许模式。"""
+    patterns: List[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        value = line.strip()
+        if value and not value.startswith("#"):
+            patterns.append(value.replace("\\", "/"))
+    return patterns
+
+
+def scan_allowlist(root: Path, patterns: List[str] | None = None) -> List[str]:
+    """严格扫描 onedir 中不在允许清单内的文件。"""
+    allowed_patterns = patterns if patterns is not None else load_allowlist()
+    leaks: List[str] = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if not any(
+            fnmatch.fnmatchcase(rel.lower(), pattern.lower())
+            for pattern in allowed_patterns
+        ):
+            leaks.append("未在打包允许清单中: {0}".format(rel))
+    return leaks
+
+
 def scan_repo_for_secrets(root: Path) -> List[str]:
     """扫描 Git 已跟踪文件中的密钥文件。
 
@@ -138,6 +166,8 @@ def main() -> int:
         all_leaks.extend(scan_docx_leaks(dist_dir))
         all_leaks.extend(scan_forbidden_dirs(dist_dir))
         all_leaks.extend(scan_forbidden_files(dist_dir))
+        if strict:
+            all_leaks.extend(scan_allowlist(dist_dir))
     else:
         print("跳过 onedir 扫描（目录不存在）: {0}".format(dist_dir))
 

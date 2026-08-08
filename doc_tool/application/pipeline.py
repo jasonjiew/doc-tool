@@ -14,7 +14,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from doc_tool.domain.cancellation import CancellationToken
@@ -22,6 +24,7 @@ from doc_tool.domain.errors import (
     BuildError,
     CancelledError,
     DocToolError,
+    IncompatibleSchemaError,
     ProjectLockBusyError,
     ValidationError,
     WordNotAvailableError,
@@ -29,7 +32,7 @@ from doc_tool.domain.errors import (
     WordSaveFailedError,
 )
 from doc_tool.domain.manifest import ProjectManifest
-from doc_tool.domain.paths import ProjectPaths
+from doc_tool.domain.paths import ProjectPaths, build_output_filename
 from doc_tool.domain.project_lock import TASK_BUILD, acquire_lock, release_lock
 from doc_tool.domain.runtime_log import RuntimeLog
 
@@ -134,7 +137,24 @@ def run_pipeline(
     )
 
     result = PipelineResult(success=False)
-    log = RuntimeLog(paths, app_version=app_version)
+    from doc_tool.domain.version import APP_VERSION
+
+    effective_app_version = app_version or APP_VERSION
+    log = RuntimeLog(paths, app_version=effective_app_version)
+
+    # 高模式版本只能查看，任何构建都会写 output/、状态和清单，必须在 Word
+    # 探测及锁获取之前阻断。
+    if not manifest.is_writable():
+        err = IncompatibleSchemaError(
+            "当前应用不能写入项目模式版本 {0}。".format(manifest.schemaVersion),
+            details={"schemaVersion": str(manifest.schemaVersion)},
+        )
+        result.error_code = err.code
+        result.events.append(StageEvent(
+            STAGE_BUILD, "failed", detail=err.user_message, error_code=err.code,
+        ))
+        log.error(STAGE_BUILD, exception=err)
+        return result
 
     # --- 任务 7.1：正式模式预检 Word 可用性 ---
     if not skip_word_refresh:
@@ -168,7 +188,7 @@ def run_pipeline(
 
     # --- 获取项目锁 ---
     try:
-        acquire_lock(paths, TASK_BUILD, app_version)
+        acquire_lock(paths, TASK_BUILD, effective_app_version)
     except ProjectLockBusyError as exc:
         result.error_code = exc.code
         result.events.append(StageEvent(
@@ -190,6 +210,15 @@ def run_pipeline(
             detail=exc.user_message, error_code=exc.code,
         ))
         log.error(_current_stage(result), status="cancelled", exception=exc)
+        return result
+    except Exception as exc:
+        err = _map_exception(exc)
+        result.error_code = err.code
+        result.events.append(StageEvent(
+            _current_stage(result), "failed",
+            detail=err.user_message, error_code=err.code,
+        ))
+        log.error(_current_stage(result), exception=exc)
         return result
     finally:
         release_lock(paths)
@@ -214,13 +243,25 @@ def _run_pipeline_inner(
     通过后才原子发布到正式输出路径，并写入状态元数据。任意阶段失败都
     不修改正式输出，仅清理临时文件。
     """
-    from doc_tool.domain.output_state import write_state
-    from doc_tool.domain.version import PROJECT_SCHEMA_VERSION, get_commit_id
+    from doc_tool.domain.output_state import state_file_for, write_state as _write_state
+    from doc_tool.domain.version import get_commit_id
 
     token = cancel_token or CancellationToken()
 
+    def write_state(*args, **kwargs):
+        """成功状态写入失败需触发发布回滚；失败诊断写入失败只记日志。"""
+        try:
+            return _write_state(*args, **kwargs)
+        except Exception as exc:
+            if kwargs.get("failure_code"):
+                log.warn(STAGE_PUBLISH, "failure_state_write_failed", {
+                    "errorType": type(exc).__name__,
+                })
+                return None
+            raise
+
     # --- 计算正式输出路径与临时输出路径 ---
-    output_name = "{0} {1}({2}).docx".format(
+    output_name = build_output_filename(
         manifest.documentNo, manifest.documentName, manifest.documentVersion
     )
     formal_output = paths.output_dir / output_name
@@ -241,14 +282,27 @@ def _run_pipeline_inner(
         except OSError:
             pass
 
+    def _check_cancel() -> None:
+        """阶段边界取消，并保证任何已生成的临时 DOCX 被清理。"""
+        try:
+            token.check_cancel()
+        except CancelledError:
+            _cleanup_temp()
+            raise
+
     # --- 阶段 1：构建到临时文件 ---
-    token.check_cancel()
+    _check_cancel()
     result.events.append(StageEvent(STAGE_BUILD, "started"))
     log.info(STAGE_BUILD, "started")
     try:
         # 先删除可能残留的临时文件，避免上次失败遗留
         _cleanup_temp()
         built_path = build_with_project(manifest, paths, output_override=str(temp_output))
+        if Path(built_path).resolve() != temp_output.resolve() or not temp_output.is_file():
+            raise BuildError(
+                "构建内核未按约定生成项目临时输出。",
+                details={"returnedFile": Path(built_path).name},
+            )
         result.output_path = str(formal_output)  # 返回正式路径，而非临时
         result.events.append(StageEvent(
             STAGE_BUILD, "succeeded",
@@ -275,7 +329,7 @@ def _run_pipeline_inner(
             diagnostic=skip_word_refresh,
             app_version=log.app_version,
             commit=get_commit_id(),
-            schema_version=PROJECT_SCHEMA_VERSION,
+            schema_version=manifest.schemaVersion,
             stages=stage_summary,
             failure_code=err.code,
             compute_hash=False,
@@ -283,7 +337,7 @@ def _run_pipeline_inner(
         return result
 
     # --- 阶段 2：刷新前严格校验（临时文件） ---
-    token.check_cancel()
+    _check_cancel()
     result.events.append(StageEvent(STAGE_VALIDATE_PRE, "started"))
     log.info(STAGE_VALIDATE_PRE, "started")
     try:
@@ -306,7 +360,7 @@ def _run_pipeline_inner(
                 diagnostic=skip_word_refresh,
                 app_version=log.app_version,
                 commit=get_commit_id(),
-                schema_version=PROJECT_SCHEMA_VERSION,
+                schema_version=manifest.schemaVersion,
                 stages=stage_summary,
                 failure_code=ValidationError.code,
                 compute_hash=False,
@@ -330,7 +384,7 @@ def _run_pipeline_inner(
             diagnostic=skip_word_refresh,
             app_version=log.app_version,
             commit=get_commit_id(),
-            schema_version=PROJECT_SCHEMA_VERSION,
+            schema_version=manifest.schemaVersion,
             stages=stage_summary,
             failure_code=err.code,
             compute_hash=False,
@@ -338,7 +392,7 @@ def _run_pipeline_inner(
         return result
 
     # --- 阶段 3：Word 实机刷新（可选，临时文件） ---
-    token.check_cancel()
+    _check_cancel()
     if skip_word_refresh:
         result.events.append(StageEvent(
             STAGE_WORD_REFRESH, "skipped", detail="已显式跳过 Word 实机刷新",
@@ -379,7 +433,7 @@ def _run_pipeline_inner(
                     diagnostic=False,
                     app_version=log.app_version,
                     commit=get_commit_id(),
-                    schema_version=PROJECT_SCHEMA_VERSION,
+                    schema_version=manifest.schemaVersion,
                     stages=stage_summary,
                     failure_code=err.code,
                     compute_hash=False,
@@ -403,7 +457,7 @@ def _run_pipeline_inner(
                 diagnostic=False,
                 app_version=log.app_version,
                 commit=get_commit_id(),
-                schema_version=PROJECT_SCHEMA_VERSION,
+                schema_version=manifest.schemaVersion,
                 stages=stage_summary,
                 failure_code=err.code,
                 compute_hash=False,
@@ -421,7 +475,7 @@ def _run_pipeline_inner(
         _record_stage(STAGE_VALIDATE_POST, "skipped")
         post_ok = True
     else:
-        token.check_cancel()
+        _check_cancel()
         result.events.append(StageEvent(STAGE_VALIDATE_POST, "started"))
         log.info(STAGE_VALIDATE_POST, "started")
         try:
@@ -457,7 +511,7 @@ def _run_pipeline_inner(
                 diagnostic=False,
                 app_version=log.app_version,
                 commit=get_commit_id(),
-                schema_version=PROJECT_SCHEMA_VERSION,
+                schema_version=manifest.schemaVersion,
                 stages=stage_summary,
                 failure_code=err.code,
                 compute_hash=False,
@@ -473,19 +527,71 @@ def _run_pipeline_inner(
             diagnostic=skip_word_refresh,
             app_version=log.app_version,
             commit=get_commit_id(),
-            schema_version=PROJECT_SCHEMA_VERSION,
+            schema_version=manifest.schemaVersion,
             stages=stage_summary,
             failure_code=ValidationError.code,
             compute_hash=False,
         )
         return result
 
+    _check_cancel()
     result.events.append(StageEvent(STAGE_PUBLISH, "started"))
     log.info(STAGE_PUBLISH, "started")
+    formal_state = state_file_for(formal_output)
+    previous_output = paths.output_dir / ("." + output_name + ".previous.bak")
+    previous_state = paths.output_dir / ("." + formal_state.name + ".previous.bak")
+    had_previous_output = formal_output.exists()
+    had_previous_state = formal_state.exists()
+
+    def _cleanup_publish_backups() -> None:
+        for backup in (previous_output, previous_state):
+            try:
+                backup.unlink()
+            except FileNotFoundError:
+                pass
+
+    def _restore_previous_publish() -> None:
+        """状态写入失败时恢复发布前的 DOCX 与状态文件。"""
+        if had_previous_output and previous_output.exists():
+            os.replace(str(previous_output), str(formal_output))
+        elif not had_previous_output:
+            try:
+                formal_output.unlink()
+            except FileNotFoundError:
+                pass
+        if had_previous_state and previous_state.exists():
+            os.replace(str(previous_state), str(formal_state))
+        elif not had_previous_state:
+            try:
+                formal_state.unlink()
+            except FileNotFoundError:
+                pass
+
     try:
         with token.critical_section():
-            # os.replace 在同一卷上原子：要么完全成功，要么正式输出不变
+            _cleanup_publish_backups()
+            if had_previous_output:
+                shutil.copy2(str(formal_output), str(previous_output))
+            if had_previous_state:
+                shutil.copy2(str(formal_state), str(previous_state))
+
+            # DOCX 与状态是两个文件，不能用一次 rename 同时提交。先保留上一版
+            # 快照，任一后续步骤失败时回滚二者，避免“新 DOCX + 旧/无状态”。
             os.replace(str(temp_output), str(formal_output))
+            is_formal = not skip_word_refresh
+            write_state(
+                str(formal_output),
+                formal=is_formal,
+                diagnostic=skip_word_refresh,
+                app_version=log.app_version,
+                commit=get_commit_id(),
+                schema_version=manifest.schemaVersion,
+                stages=stage_summary + [{"stage": STAGE_PUBLISH, "status": "succeeded"}],
+                failure_code="",
+                compute_hash=True,
+            )
+
+        _cleanup_publish_backups()
         result.events.append(StageEvent(
             STAGE_PUBLISH, "succeeded",
             detail="已原子发布到：{0}".format(formal_output.name),
@@ -495,19 +601,15 @@ def _run_pipeline_inner(
         result.success = True
         result.output_path = str(formal_output)
 
-        # 任务 7.4：写入输出状态元数据
-        is_formal = not skip_word_refresh
-        write_state(
-            str(formal_output),
-            formal=is_formal,
-            diagnostic=skip_word_refresh,
-            app_version=log.app_version,
-            commit=get_commit_id(),
-            schema_version=PROJECT_SCHEMA_VERSION,
-            stages=stage_summary,
-            failure_code="",
-            compute_hash=True,
-        )
+        # 成功版本写回清单。输出与状态已经一致提交，清单备份/写入失败只记录
+        # 警告，不把有效产物误报为失败。
+        manifest.mark_successful_build(log.app_version)
+        try:
+            manifest.save(paths.root)
+        except Exception as exc:
+            log.warn(STAGE_PUBLISH, "manifest_update_failed", {
+                "errorType": type(exc).__name__,
+            })
         log.info(STAGE_PUBLISH, "state_written", {
             "formal": is_formal,
             "diagnostic": skip_word_refresh,
@@ -517,6 +619,11 @@ def _run_pipeline_inner(
         _cleanup_temp()
         raise
     except Exception as exc:
+        try:
+            with token.critical_section():
+                _restore_previous_publish()
+        except OSError as restore_exc:
+            log.error(STAGE_PUBLISH, status="rollback_failed", exception=restore_exc)
         err = _map_exception(exc)
         result.events.append(StageEvent(
             STAGE_PUBLISH, "failed", detail=err.user_message, error_code=err.code,
@@ -531,10 +638,12 @@ def _run_pipeline_inner(
             diagnostic=skip_word_refresh,
             app_version=log.app_version,
             commit=get_commit_id(),
-            schema_version=PROJECT_SCHEMA_VERSION,
+            schema_version=manifest.schemaVersion,
             stages=stage_summary,
             failure_code=err.code,
             compute_hash=False,
         )
+    finally:
+        _cleanup_publish_backups()
 
     return result

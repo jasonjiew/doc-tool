@@ -15,10 +15,12 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -48,6 +50,19 @@ from doc_tool.domain.runtime_log import RuntimeLog  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
+def _concurrent_lock_worker(root: str, gate, result_queue) -> None:
+    """Windows spawn 可序列化的锁竞争工作进程。"""
+    paths = ProjectPaths(root)
+    gate.wait()
+    try:
+        acquire_lock(paths, TASK_BUILD, "1.0.0")
+        result_queue.put("acquired")
+        time.sleep(0.6)
+        release_lock(paths)
+    except ProjectLockBusyError:
+        result_queue.put("busy")
 
 
 class ProjectLockTests(unittest.TestCase):
@@ -84,6 +99,27 @@ class ProjectLockTests(unittest.TestCase):
         self.assertIsNotNone(lock)
         self.assertEqual(lock.task_type, TASK_BUILD)
 
+    def test_simultaneous_processes_have_exactly_one_lock_owner(self):
+        context = multiprocessing.get_context("spawn")
+        gate = context.Event()
+        result_queue = context.Queue()
+        processes = [
+            context.Process(
+                target=_concurrent_lock_worker,
+                args=(self._tmp, gate, result_queue),
+            )
+            for _ in range(2)
+        ]
+        for process in processes:
+            process.start()
+        gate.set()
+        results = [result_queue.get(timeout=10) for _ in range(2)]
+        for process in processes:
+            process.join(timeout=10)
+            self.assertEqual(process.exitcode, 0)
+        self.assertEqual(results.count("acquired"), 1)
+        self.assertEqual(results.count("busy"), 1)
+
     def test_stale_lock_cleaned_on_acquire(self):
         """陈旧锁（PID 已不存在）在获取时被自动清理。"""
         # 写入一个指向不存在 PID 的锁
@@ -105,6 +141,39 @@ class ProjectLockTests(unittest.TestCase):
         lock = acquire_lock(self.paths, TASK_VALIDATE, "1.0.0")
         self.assertEqual(lock.task_type, TASK_VALIDATE)
         release_lock(self.paths)
+
+    def test_simultaneous_stale_lock_takeover_has_one_owner(self):
+        """两个进程同时接管陈旧锁时也只能产生一个锁持有者。"""
+        import socket
+
+        stale = {
+            "host": socket.gethostname(),
+            "pid": 999999,
+            "startTime": "2026-01-01T00:00:00+00:00",
+            "taskType": TASK_BUILD,
+            "appVersion": "0.9.0",
+        }
+        self.paths.lock_file.write_text(json.dumps(stale), encoding="utf-8")
+
+        context = multiprocessing.get_context("spawn")
+        gate = context.Event()
+        result_queue = context.Queue()
+        processes = [
+            context.Process(
+                target=_concurrent_lock_worker,
+                args=(self._tmp, gate, result_queue),
+            )
+            for _ in range(2)
+        ]
+        for process in processes:
+            process.start()
+        gate.set()
+        results = [result_queue.get(timeout=10) for _ in range(2)]
+        for process in processes:
+            process.join(timeout=10)
+            self.assertEqual(process.exitcode, 0)
+        self.assertEqual(results.count("acquired"), 1)
+        self.assertEqual(results.count("busy"), 1)
 
     def test_force_clean_stale_lock(self):
         """force_clean_stale_lock 仅清理陈旧锁，不清理活动锁。"""

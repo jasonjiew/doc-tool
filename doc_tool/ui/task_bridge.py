@@ -143,7 +143,22 @@ class TaskRunner:
 
             result = spec.target(*spec.args, **kwargs)
             self._result = result
-            self._event_queue.put(TaskEvent(kind="succeeded", stage=spec.name))
+            terminal = TaskEvent(kind="succeeded", stage=spec.name)
+            if result is False:
+                terminal = TaskEvent(
+                    kind="failed", stage=spec.name, detail="操作返回未通过。"
+                )
+            elif hasattr(result, "success") and not bool(result.success):
+                last = getattr(result, "last_stage", None)
+                error_code = getattr(result, "error_code", None)
+                kind = "cancelled" if error_code == "E5003" else "failed"
+                terminal = TaskEvent(
+                    kind=kind,
+                    stage=spec.name,
+                    detail=getattr(last, "detail", "") if last is not None else "",
+                    error_code=error_code,
+                )
+            self._event_queue.put(terminal)
         except CancelledError as exc:
             self._result = None
             self._event_queue.put(TaskEvent(

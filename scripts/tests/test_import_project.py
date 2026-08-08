@@ -33,6 +33,7 @@ from doc_tool.application.import_project import (  # noqa: E402
     ImportRequest,
     import_first_time,
 )
+from doc_tool.domain.cancellation import CancellationToken  # noqa: E402
 from doc_tool.domain.errors import TargetProjectExistsError  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -271,7 +272,7 @@ class ExtractionRegressionTests(unittest.TestCase):
         self.assertTrue(os.path.isdir(chapter1), "第1章应为目录")
         index_md = os.path.join(chapter1, "_index.md")
         self.assertTrue(os.path.isfile(index_md), "父正文应写入 _index.md")
-        text = open(index_md, encoding="utf-8").read()
+        text = Path(index_md).read_text(encoding="utf-8")
         self.assertIn("本章父正文", text)
         # 子章节存在
         self.assertTrue(os.path.isfile(os.path.join(chapter1, "1.1 目的.md")))
@@ -282,7 +283,7 @@ class ExtractionRegressionTests(unittest.TestCase):
         self.assertGreaterEqual(result.simple_table_count, 1)
         found = False
         for name in os.listdir(self._content):
-            text = open(os.path.join(self._content, name), encoding="utf-8").read()
+            text = Path(self._content, name).read_text(encoding="utf-8")
             if "<!-- TBL:" in text and "| 列A | 列B |" in text:
                 found = True
                 break
@@ -297,7 +298,7 @@ class ExtractionRegressionTests(unittest.TestCase):
         # Markdown 中应引用该 XML
         referenced = False
         for name in os.listdir(self._content):
-            text = open(os.path.join(self._content, name), encoding="utf-8").read()
+            text = Path(self._content, name).read_text(encoding="utf-8")
             if "<!-- TABLE:" in text and ".xml -->" in text:
                 referenced = True
                 break
@@ -309,7 +310,7 @@ class ExtractionRegressionTests(unittest.TestCase):
         self.assertEqual(result.image_count, 1)
         imgs = os.listdir(self._images)
         self.assertEqual(len(imgs), 1)
-        text = open(os.path.join(self._content, os.listdir(self._content)[0]), encoding="utf-8").read()
+        text = Path(self._content, os.listdir(self._content)[0]).read_text(encoding="utf-8")
         self.assertIn("images/", text)
         self.assertIn("=20x20", text, "应保留图片像素尺寸标注")
 
@@ -319,7 +320,7 @@ class ExtractionRegressionTests(unittest.TestCase):
         # 第1章 Markdown 中应按顺序出现：父正文 -> H2 -> 图片 -> 普通表格 -> 复杂表格
         names = sorted(os.listdir(self._content))
         chap1 = [n for n in names if n.startswith("01-")][0]
-        text = open(os.path.join(self._content, chap1), encoding="utf-8").read()
+        text = Path(self._content, chap1).read_text(encoding="utf-8")
         pos_body = text.find("本章父正文")
         pos_h2 = text.find("## 目的")
         pos_img = text.find("![")
@@ -443,11 +444,33 @@ class ImportEndToEndTests(unittest.TestCase):
         logs = [f for f in os.listdir(self._tmp) if f.startswith(".无封面项目.import-failed")]
         self.assertEqual(len(logs), 1, "应写入一份诊断日志")
         import json
-        log_data = json.loads(open(os.path.join(self._tmp, logs[0]), encoding="utf-8").read())
+        log_data = json.loads(Path(self._tmp, logs[0]).read_text(encoding="utf-8"))
         self.assertEqual(log_data["errorCode"], "E2001")
+        self.assertTrue(log_data["stagingExisted"])
+        self.assertTrue(log_data["stagingCleaned"])
         self.assertIn("trial_build", [e["stage"] for e in log_data["events"] if e["status"] == "failed"])
         # 源文档未被修改（哈希不变）
         self.assertEqual(_sha256(src), src_sha)
+
+    def test_cancelled_import_does_not_publish_project(self):
+        src = os.path.join(self._tmp, "cancel.docx")
+        write_synthetic_docx(src)
+        target = os.path.join(self._tmp, "取消项目")
+        request = ImportRequest(
+            source_docx=Path(src),
+            target_project_root=Path(target),
+            document_type="requirement",
+            document_no="KF-CANCEL",
+            document_name="取消测试",
+            document_version="1.0",
+        )
+        token = CancellationToken()
+        token.request_cancel()
+        result = import_first_time(request, cancel_token=token)
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E5003")
+        self.assertFalse(os.path.exists(target))
+        self.assertTrue(any(event.status == "cancelled" for event in result.events))
 
     def test_source_docx_not_modified(self):
         """任务 4.4：成功导入后源 DOCX 字节不变。"""
@@ -460,7 +483,7 @@ class ImportEndToEndTests(unittest.TestCase):
         src, src_sha, target, result = self._import()
         self.assertTrue(result.success)
         import yaml
-        manifest = yaml.safe_load(open(os.path.join(target, "project.yml"), encoding="utf-8"))
+        manifest = yaml.safe_load(Path(target, "project.yml").read_text(encoding="utf-8"))
         self.assertEqual(manifest["sourceSha256"], src_sha)
         self.assertEqual(manifest["documentType"], "requirement")
         for key, rel in manifest["paths"].items():
