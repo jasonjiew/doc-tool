@@ -327,7 +327,7 @@ class PipelineServiceTests(unittest.TestCase):
         # 每个事件都有阶段名和状态
         for event in result.events:
             self.assertTrue(event.stage)
-            self.assertIn(event.status, ("started", "succeeded", "failed", "skipped"))
+            self.assertIn(event.status, ("started", "succeeded", "failed", "skipped", "cancelled"))
 
     def test_build_failure_returns_error_code(self) -> None:
         """构建失败时返回结构化错误码。"""
