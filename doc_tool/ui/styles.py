@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import sys
 
+from doc_tool.resources import resource_path
+
 
 def setup_high_dpi() -> None:
     """启用 Windows 高 DPI 感知，使界面在 HiDPI 显示器上不模糊。
@@ -60,3 +62,22 @@ def apply_styles(root) -> None:
         style.configure("Status.TLabel", font=("Microsoft YaHei", 8), foreground="gray")
     except tk.TclError:
         pass
+
+
+def set_window_icon(root) -> bool:
+    """为窗口设置应用图标。
+
+    开发态从 ``doc_tool/resources/app.ico`` 读取，打包态从 PyInstaller
+    资源目录读取。图标缺失时静默跳过（不阻断启动）。
+
+    返回 True 表示图标已应用，False 表示图标不可用。
+    """
+    icon = resource_path("app.ico")
+    if not os.path.isfile(icon):
+        return False
+    try:
+        root.iconbitmap(default=icon)
+        return True
+    except Exception:
+        # 非窗口环境或 Tk 不接受图标时静默跳过
+        return False

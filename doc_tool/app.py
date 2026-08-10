@@ -21,11 +21,12 @@ def main() -> int:
         return 1
 
     from doc_tool.ui.main_window import MainWindow
-    from doc_tool.ui.styles import apply_styles, setup_high_dpi
+    from doc_tool.ui.styles import apply_styles, set_window_icon, setup_high_dpi
 
     setup_high_dpi()
     root = tk.Tk()
     apply_styles(root)
+    set_window_icon(root)
 
     window = MainWindow(root)
     root.mainloop()

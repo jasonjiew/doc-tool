@@ -17,7 +17,17 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
+
+# 进度回调类型：(stage, status, detail) -> None。后台线程内调用，
+# 实现方需自行线程安全地转发到 UI 线程（例如经队列）。可选参数：
+# 调用方不传则不产生进度事件，行为与改造前一致。
+ProgressCallback = Callable[[str, str, str], None]
+
+
+def _noop_progress(stage: str, status: str, detail: str) -> None:
+    """默认进度回调：空操作，保持改造前行为。"""
+    return None
 
 from doc_tool.domain.cancellation import CancellationToken
 from doc_tool.domain.errors import (
@@ -42,6 +52,47 @@ STAGE_VALIDATE_PRE = "validate_pre"
 STAGE_WORD_REFRESH = "word_refresh"
 STAGE_VALIDATE_POST = "validate_post"
 STAGE_PUBLISH = "publish"
+
+# 管线阶段顺序：用于把阶段名映射为确定性进度百分比。诊断模式跳过
+# word_refresh 和 validate_post，进度跨度保持一致（按 4 段计算）。
+PIPELINE_STAGE_ORDER = (
+    STAGE_BUILD,
+    STAGE_VALIDATE_PRE,
+    STAGE_WORD_REFRESH,
+    STAGE_VALIDATE_POST,
+    STAGE_PUBLISH,
+)
+
+# 阶段中文标签：用于进度文本与日志。
+PIPELINE_STAGE_LABELS = {
+    STAGE_BUILD: "构建",
+    STAGE_VALIDATE_PRE: "前校验",
+    STAGE_WORD_REFRESH: "Word 刷新",
+    STAGE_VALIDATE_POST: "后校验",
+    STAGE_PUBLISH: "发布",
+}
+
+
+def stage_percent_table() -> "Dict[str, tuple]":
+    """返回 ``{stage: (start_pct, end_pct)}``，由阶段顺序自动均匀分段。
+
+    供 UI 进度条把阶段名映射为确定性百分比。UI 不再手写百分比映射，
+    避免与 ``PIPELINE_STAGE_ORDER`` 漂移。两端各预留 5%/100% 的边距，
+    让进度条在 started 即有可见推进、在 publish 终态到达 100。
+    """
+    n = len(PIPELINE_STAGE_ORDER)
+    if n == 0:
+        return {}
+    table: "Dict[str, tuple]" = {}
+    # 进度区间 [5, 100]，每阶段占 (100-5)/n。
+    span = (100 - 5) / n
+    for idx, stage in enumerate(PIPELINE_STAGE_ORDER):
+        start = round(5 + idx * span)
+        end = round(5 + (idx + 1) * span)
+        table[stage] = (start, end)
+    # 保证最后一段收口在 100。
+    table[PIPELINE_STAGE_ORDER[-1]] = (table[PIPELINE_STAGE_ORDER[-1]][0], 100)
+    return table
 
 
 @dataclass
@@ -114,12 +165,16 @@ def run_pipeline(
     baseline: bool = False,
     cancel_token: Optional[CancellationToken] = None,
     app_version: str = "",
+    progress: Optional[ProgressCallback] = None,
 ) -> PipelineResult:
     """执行构建→前校验→Word 刷新→后校验管线，返回结构化结果。
 
     不向调用方抛出异常；所有错误被捕获并映射为 ``StageEvent``。
     Word 刷新阶段需要本机安装 Microsoft Word；无 Word 环境应传
     ``skip_word_refresh=True`` 进行诊断构建。
+
+    ``progress`` 用于把阶段状态实时回传调用方（典型：GUI 进度条）。
+    回调在后台线程内触发，实现方需自行转发到 UI 线程；不传则不发进度。
 
     任务 5.1/5.4/5.5：管线自动获取/释放项目锁，写入脱敏轮转日志，
     并在阶段边界检查取消令牌。Word 保存与构建原子写入受临界区保护。
@@ -136,6 +191,7 @@ def run_pipeline(
         validate_with_project,
     )
 
+    on_progress: ProgressCallback = progress or _noop_progress
     result = PipelineResult(success=False)
     from doc_tool.domain.version import APP_VERSION
 
@@ -201,7 +257,7 @@ def run_pipeline(
         return _run_pipeline_inner(
             manifest, paths, skip_word_refresh, baseline, cancel_token,
             result, log, build_with_project, refresh_with_project,
-            validate_with_project,
+            validate_with_project, on_progress,
         )
     except CancelledError as exc:
         result.error_code = exc.code
@@ -235,8 +291,12 @@ def _run_pipeline_inner(
     build_with_project,
     refresh_with_project,
     validate_with_project,
+    on_progress: ProgressCallback = _noop_progress,
 ) -> PipelineResult:
     """管线内部执行（锁已获取），分离以便 finally 释放锁。
+
+    ``on_progress`` 在每个阶段状态变更（started/succeeded/skipped/failed）
+    时被调用一次，把进度实时回传给调用方。
 
     任务 7.3：构建产物先写入临时文件（与正式输出同目录，保证 ``os.replace``
     原子）。前校验、Word 刷新、后校验全部在临时文件上进行。只有后校验
@@ -259,6 +319,23 @@ def _run_pipeline_inner(
                 })
                 return None
             raise
+
+    def _emit(stage: str, status: str, detail: str = "") -> None:
+        """把阶段状态实时转发给进度回调（线程安全由调用方保证）。"""
+        try:
+            on_progress(stage, status, detail)
+        except Exception:
+            # 进度回调失败不得影响管线主流程
+            pass
+
+    class _EmitList(list):
+        """``result.events`` 的发出式列表：每次 append 同步转发进度。"""
+
+        def append(self, event: StageEvent) -> None:  # type: ignore[override]
+            super().append(event)
+            _emit(event.stage, event.status, event.detail)
+
+    result.events = _EmitList()
 
     # --- 计算正式输出路径与临时输出路径 ---
     output_name = build_output_filename(

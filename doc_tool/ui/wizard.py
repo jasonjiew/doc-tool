@@ -17,7 +17,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from doc_tool.ui.task_bridge import POLL_INTERVAL_MS, TaskRunner, TaskSpec
+from doc_tool.ui.task_bridge import (
+    DEFAULT_TASK_TIMEOUT_SECONDS,
+    ERR_WATCHDOG_TIMEOUT,
+    POLL_INTERVAL_MS,
+    TaskRunner,
+    TaskSpec,
+)
+
+
+PREFLIGHT_TIMEOUT_SECONDS = 90
 
 
 def format_preview_summary(preview) -> str:
@@ -70,6 +79,9 @@ class ImportWizard:
         self._runner = TaskRunner()
         self._poll_scheduled = False
         self._project_info_error = ""
+        self._last_error_code: Optional[str] = None
+        self._active_task = ""
+        self._closing = False
 
     def run(self) -> Optional[str]:
         """运行向导，返回项目路径或 None。"""
@@ -89,6 +101,8 @@ class ImportWizard:
 
         self._build_steps()
         self._show_step()
+        self._dialog.bind("<Return>", self._on_enter)
+        self._dialog.bind("<Escape>", self._on_escape)
 
         self._dialog.wait_window()
         return self._result
@@ -235,28 +249,63 @@ class ImportWizard:
         self._cancel_btn.pack(side="right", padx=(8, 0))
 
     def _show_step(self) -> None:
-        """显示当前步骤。"""
+        """显示当前步骤，并完整重置导航按钮状态。"""
         for step_widget in (self._step0, self._step1, self._step2, self._step3, self._step4):
             step_widget.pack_forget()
 
         steps = (self._step0, self._step1, self._step2, self._step3, self._step4)
         steps[self._step].pack(fill="both", expand=True)
 
-        # 按钮状态
-        self._back_btn.configure(state="normal" if self._step > 0 else "disabled")
+        # 先恢复默认值，避免从结果页或执行页返回时遗留文本/禁用状态。
+        self._back_btn.configure(text="上一步", state="disabled")
+        self._next_btn.configure(text="下一步", state="disabled")
+        self._cancel_btn.configure(text="取消", state="normal")
+
         if self._step == 0:
-            self._next_btn.configure(text="下一步", state="normal" if self._source_path else "disabled")
+            self._next_btn.configure(
+                state="normal" if self._source_path else "disabled"
+            )
         elif self._step == 1:
-            self._next_btn.configure(text="下一步", state="normal")
+            running = self._runner.is_running
+            preview_ok = bool(
+                self._preview is not None
+                and getattr(self._preview, "has_heading1", False)
+            )
+            self._back_btn.configure(
+                state="disabled" if running else "normal"
+            )
+            self._next_btn.configure(
+                state="normal" if preview_ok and not running else "disabled"
+            )
+            self._cancel_btn.configure(
+                text=(
+                    "正在取消…"
+                    if self._closing
+                    else ("取消预检" if running else "取消")
+                ),
+                state="disabled" if self._closing else "normal",
+            )
         elif self._step == 2:
+            self._back_btn.configure(state="normal")
             self._next_btn.configure(text="开始导入", state="normal")
         elif self._step == 3:
-            self._back_btn.configure(state="disabled")
-            self._next_btn.configure(state="disabled")
+            self._cancel_btn.configure(
+                text="正在取消…" if self._closing else "取消导入",
+                state="disabled" if self._closing else "normal",
+            )
         elif self._step == 4:
-            self._back_btn.configure(state="disabled")
-            self._next_btn.configure(text="完成", state="normal")
-            self._cancel_btn.configure(text="关闭")
+            self._next_btn.configure(text="关闭", state="normal")
+            self._cancel_btn.configure(state="disabled")
+
+        try:
+            if self._step == 4:
+                self._next_btn.focus_set()
+            elif self._step == 3:
+                self._cancel_btn.focus_set()
+            elif str(self._next_btn.cget("state")) == "normal":
+                self._next_btn.focus_set()
+        except Exception:
+            pass
 
     # --- 步骤 0：选择源文件 ---
 
@@ -276,7 +325,7 @@ class ImportWizard:
                 self._doc_name_var.set(source_name)
             if not self._project_name_var.get().strip():
                 self._project_name_var.set(source_name)
-            self._next_btn.configure(state="normal")
+            self._show_step()
 
     # --- 步骤 1：预检 ---
 
@@ -373,19 +422,42 @@ class ImportWizard:
             document_name=self._doc_name_var.get().strip(),
             document_version=self._doc_version_var.get().strip(),
         )
-        self._runner.start(
-            TaskSpec(name="import", target=import_first_time, args=(request,)),
+        self._active_task = "import"
+        self._last_error_code = None
+        started = self._runner.start(
+            TaskSpec(
+                name="import",
+                target=import_first_time,
+                args=(request,),
+                timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
+            ),
+            on_event=self._on_task_event,
             on_done=lambda result: self._show_import_result(result, target_root),
         )
+        if not started:
+            self._import_progress.stop()
+            self._import_status_var.set("已有任务正在运行，请稍候。")
+            return
+        self._show_step()
         self._schedule_poll()
 
     def _show_import_result(self, result, target_root: str) -> None:
         """显示导入结果。"""
+        if self._closing or not self._dialog_exists():
+            self._destroy_dialog()
+            return
         self._import_progress.stop()
 
         if result is None:
-            self._result_label.configure(text="✗ 导入异常终止")
-            self._set_result_text("导入线程未返回结果，请查看应用日志。")
+            if self._last_error_code == ERR_WATCHDOG_TIMEOUT:
+                self._result_label.configure(text="✗ 导入超时")
+                self._set_result_text(
+                    "导入运行时间超过限制，界面已停止跟踪。\n\n"
+                    "请检查目标目录和应用日志；若后台仍占用 Word，请退出应用后重试。"
+                )
+            else:
+                self._result_label.configure(text="✗ 导入异常终止")
+                self._set_result_text("导入线程未返回结果，请查看应用日志。")
         elif result.success:
             self._result = target_root
             self._result_label.configure(text="✓ 导入成功")
@@ -423,6 +495,8 @@ class ImportWizard:
 
             self._set_result_text("\n".join(error_lines))
 
+        self._active_task = ""
+        self._last_error_code = None
         self._step = 4
         self._show_step()
 
@@ -435,11 +509,13 @@ class ImportWizard:
     # --- 导航 ---
 
     def _go_next(self) -> None:
+        if self._runner.is_running:
+            return
         if self._step == 0:
             # 进入预检
             self._step = 1
+            self._preview = None
             self._show_step()
-            self._next_btn.configure(state="disabled")
             self._dialog.after(100, self._run_preflight)
         elif self._step == 1:
             self._step = 2
@@ -458,41 +534,56 @@ class ImportWizard:
             self._show_step()
             self._do_import()
         elif self._step == 4:
-            self._dialog.destroy()
+            self._destroy_dialog()
 
     def _run_preflight(self) -> None:
         """异步执行预检。"""
-        self._back_btn.configure(state="disabled")
+        if self._closing or not self._dialog_exists():
+            return
+        self._active_task = "preflight"
+        self._last_error_code = None
         started = self._runner.start(
-            TaskSpec(name="preflight", target=self._do_preflight),
+            TaskSpec(
+                name="preflight",
+                target=self._do_preflight,
+                timeout_seconds=PREFLIGHT_TIMEOUT_SECONDS,
+            ),
+            on_event=self._on_task_event,
             on_done=self._after_preflight,
         )
         if not started:
             self._show_preview_text("预检任务仍在运行，请稍候。")
             return
+        self._show_step()
         self._schedule_poll()
 
     def _after_preflight(self, response) -> None:
+        if self._closing or not self._dialog_exists():
+            self._destroy_dialog()
+            return
         if response is None:
-            ok, preview, text = False, None, "预检异常终止。"
+            if self._last_error_code == ERR_WATCHDOG_TIMEOUT:
+                ok, preview, text = (
+                    False,
+                    None,
+                    "预检超时。\n\n建议：请确认源文件未被占用、文件可正常用 Word 打开，然后重试。",
+                )
+            else:
+                ok, preview, text = False, None, "预检异常终止。"
         else:
             ok, preview, text = response
+        self._active_task = ""
+        self._last_error_code = None
         self._preview = preview
         self._show_preview_text(text)
         if ok and preview is not None and preview.document_type_suggestion is not None:
             suggestion = preview.document_type_suggestion
             if suggestion.confidence == "high":
                 self._type_var.set(suggestion.document_type)
-        if self._step == 1:
-            self._back_btn.configure(state="normal")
-        if ok:
-            self._next_btn.configure(state="normal")
-        else:
-            # 允许返回修改
-            self._next_btn.configure(state="disabled")
+        self._show_step()
 
     def _schedule_poll(self) -> None:
-        if self._poll_scheduled:
+        if self._poll_scheduled or self._closing or not self._dialog_exists():
             return
         self._poll_scheduled = True
         self._dialog.after(POLL_INTERVAL_MS, self._poll_runner)
@@ -500,8 +591,49 @@ class ImportWizard:
     def _poll_runner(self) -> None:
         self._poll_scheduled = False
         self._runner.poll()
+        if self._closing and not self._runner.is_running:
+            self._destroy_dialog()
+            return
         if self._runner.is_running:
             self._schedule_poll()
+
+    def _on_task_event(self, event) -> None:
+        if event.kind == "failed":
+            self._last_error_code = event.error_code
+
+    def _dialog_exists(self) -> bool:
+        try:
+            return bool(self._dialog.winfo_exists())
+        except Exception:
+            return False
+
+    def _destroy_dialog(self) -> None:
+        if not self._dialog_exists():
+            return
+        try:
+            self._dialog.destroy()
+        except Exception:
+            pass
+
+    def _on_enter(self, _event=None):
+        if self._runner.is_running:
+            return "break"
+        if self._step in (0, 1, 2, 4):
+            try:
+                if str(self._next_btn.cget("state")) == "normal":
+                    self._go_next()
+            except Exception:
+                pass
+        return "break"
+
+    def _on_escape(self, _event=None):
+        if self._runner.is_running:
+            self._cancel()
+        elif self._step in (1, 2):
+            self._go_back()
+        else:
+            self._cancel()
+        return "break"
 
     def _go_back(self) -> None:
         if self._runner.is_running:
@@ -511,10 +643,14 @@ class ImportWizard:
             self._show_step()
 
     def _cancel(self) -> None:
-        if self._step == 3 and self._runner.is_running:
+        if self._runner.is_running:
+            self._closing = True
             self._runner.cancel()
-            self._import_status_var.set("正在安全取消…")
-            self._cancel_btn.configure(state="disabled")
+            if self._active_task == "import":
+                self._import_status_var.set("正在安全取消，停止后将关闭向导…")
+            elif self._step == 1:
+                self._show_preview_text("正在取消预检，停止后将关闭向导…")
+            self._show_step()
             return
         self._result = None
-        self._dialog.destroy()
+        self._destroy_dialog()

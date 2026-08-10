@@ -49,6 +49,9 @@ UninstallFilesDir={app}\uninst
 ; 输出文件名包含版本号
 OutputDir=Output
 OutputBaseFilename=KonsungDocTool-Setup-{#MyAppVersion}
+; 安装器与卸载器图标
+SetupIconFile=app.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 ; 压缩
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -75,10 +78,10 @@ Source: "..\dist\KonsungDocTool\*"; DestDir: "{app}"; Flags: ignoreversion recur
 
 [Icons]
 ; 开始菜单快捷方式
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 ; 桌面快捷方式（可选）
-Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 ; 安装完成后可选启动应用

@@ -39,6 +39,47 @@ def _recent_file() -> Path:
     return config_dir / "recent.json"
 
 
+def _config_dir() -> Path:
+    """返回用户级配置目录（与最近项目列表同目录）。"""
+    config_dir = Path.home() / ".konsung-doc-tool"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
+def load_window_geometry() -> Optional[dict]:
+    """读取持久化的窗口几何信息（geometry 字符串 + 是否最大化）。"""
+    path = _config_dir() / "geometry.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return {
+                "geometry": str(data.get("geometry", "")),
+                "maximized": bool(data.get("maximized", False)),
+            }
+    except (json.JSONDecodeError, OSError):
+        return None
+    return None
+
+
+def save_window_geometry(geometry: str, maximized: bool) -> None:
+    """原子保存窗口几何信息。空 geometry 视为无效，跳过写入。"""
+    if not geometry:
+        return
+    path = _config_dir() / "geometry.json"
+    data = {"geometry": geometry, "maximized": bool(maximized)}
+    tmp = path.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(str(tmp), str(path))
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
 @dataclass
 class RecentEntry:
     """最近项目条目。"""

@@ -89,6 +89,10 @@ license_datas = []
 if os.path.isfile(license_file):
     license_datas.append((license_file, "."))
 
+# 应用图标：EXE 图标 + 运行时窗口图标（iconbitmap）
+icon_file = str(SPEC_DIR / "app.ico")
+icon_datas = [(icon_file, "doc_tool/resources")] if os.path.isfile(icon_file) else []
+
 # 合并所有数据和隐藏导入
 all_datas = (
     lxml_datas
@@ -97,6 +101,7 @@ all_datas = (
     + template_datas
     + config_datas
     + license_datas
+    + icon_datas
     + [
         # doc_tool/resources/ 下的默认配置
         (str(REPO_ROOT / "doc_tool" / "resources" / "default_project.yml"),
@@ -158,7 +163,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon="packaging/app.ico",  # 后续添加图标
+    icon=icon_file if os.path.isfile(icon_file) else None,
 )
 
 coll = COLLECT(
