@@ -461,13 +461,14 @@ class PreviewModelTests(unittest.TestCase):
         self.assertEqual(preview.document_type_suggestion.document_type, "design")
         self.assertEqual(preview.document_type_suggestion.confidence, "high")
 
-    def test_low_confidence_suggestion_not_auto_decided(self):
-        """无关键字的文档返回低置信度建议。"""
+    def test_unclassified_document_uses_general_mode(self):
+        """无需求/设计特征的文档建议通用大文档模式。"""
         paras = build_paragraph("1", "第一章 概述")
         path = os.path.join(self._tmp, "generic.docx")
         write_docx(path, paras)
         preview = preflight(path)
-        self.assertEqual(preview.document_type_suggestion.confidence, "low")
+        self.assertEqual(preview.document_type_suggestion.document_type, "general")
+        self.assertEqual(preview.document_type_suggestion.confidence, "high")
 
 
 class RenamedAndSpecialPathTests(unittest.TestCase):

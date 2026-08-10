@@ -317,11 +317,17 @@ class ImportWizardPresentationTests(unittest.TestCase):
             image_count=4,
             table_count=5,
             warnings=[],
+            document_type_suggestion=SimpleNamespace(
+                document_type="general",
+                confidence="high",
+                reason="通用模式",
+            ),
         )
         text = format_preview_summary(preview)
         self.assertIn("Heading 1: 2", text)
         self.assertIn("Heading 2: 3", text)
         self.assertIn("图片数量：4", text)
+        self.assertIn("建议模式：通用大文档", text)
 
 
 # === 人工操作清单 ===

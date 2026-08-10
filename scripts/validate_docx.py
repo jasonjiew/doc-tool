@@ -745,8 +745,9 @@ def validate(
         if require_refreshed
         else template_preservation_errors(template, output)
     )
+    company_profile = doc_type in ("requirement", "design")
     cover_text, cover_fields = cover_values(output)
-    cover_ok = (
+    cover_ok = not company_profile or (
         cover_text.get("文件编号") == str(config["documentNo"])
         and cover_text.get("版本号") == str(config["documentVersion"])
         and "NUMPAGES" in cover_fields.get("页数", "").upper()
@@ -802,10 +803,11 @@ def validate(
     report.row_check(name="Header {0}保持模板体系".format(phase), ok=not preservation["headers"], detail="；".join(preservation["headers"]))
     report.row_check(name="Footer {0}保持模板体系".format(phase), ok=not preservation["footers"], detail="；".join(preservation["footers"]))
     report.row_check(name="settings.xml {0}保持模板体系".format(phase), ok=not preservation["settings"], detail="；".join(preservation["settings"]))
-    report.row_check(name="封面编号、版本与 NUMPAGES 字段正确", ok=cover_ok, detail=str(cover_text))
-    report.row_check(name="TOC 域存在", ok=has_toc)
+    if company_profile:
+        report.row_check(name="封面编号、版本与 NUMPAGES 字段正确", ok=cover_ok, detail=str(cover_text))
+        report.row_check(name="TOC 域存在", ok=has_toc)
 
-    if require_refreshed:
+    if require_refreshed and company_profile:
         toc_cached = output.toc_cached_paragraphs()
         toc_expected = expected_toc_labels(config, 3)
         cached_labels = [

@@ -44,7 +44,12 @@ def _sanitize_filename_part(value: str) -> str:
     return sanitized.strip().rstrip(" .")
 
 
-def build_output_filename(document_no: str, document_name: str, document_version: str) -> str:
+def build_output_filename(
+    document_no: str,
+    document_name: str,
+    document_version: str,
+    document_type: str = "",
+) -> str:
     """构造安全的项目输出文件名。
 
     输出名来自可编辑的 ``project.yml``，因此不能直接拼接到路径中。按规范
@@ -56,12 +61,18 @@ def build_output_filename(document_no: str, document_name: str, document_version
         "documentName": str(document_name),
         "documentVersion": str(document_version),
     }
+    required = {"documentName"}
+    if document_type != "general":
+        required.update(("documentNo", "documentVersion"))
     for field_name, value in values.items():
-        if not value.strip():
+        if field_name in required and not value.strip():
             raise ProjectManifestError(
                 "{0} 不能为空。".format(field_name),
                 details={"field": field_name},
             )
+        if not value.strip():
+            values[field_name] = ""
+            continue
         values[field_name] = _sanitize_filename_part(value)
         if not values[field_name]:
             raise ProjectManifestError(
@@ -70,9 +81,14 @@ def build_output_filename(document_no: str, document_name: str, document_version
                 details={"field": field_name},
             )
 
-    filename = "{0} {1}({2}).docx".format(
-        values["documentNo"], values["documentName"], values["documentVersion"]
-    )
+    if document_type == "general":
+        prefix = (values["documentNo"] + " ") if values["documentNo"] else ""
+        suffix = "({0})".format(values["documentVersion"]) if values["documentVersion"] else ""
+        filename = "{0}{1}{2}.docx".format(prefix, values["documentName"], suffix)
+    else:
+        filename = "{0} {1}({2}).docx".format(
+            values["documentNo"], values["documentName"], values["documentVersion"]
+        )
     utf16_units = len(filename.encode("utf-16-le")) // 2
     if utf16_units > _MAX_OUTPUT_FILENAME_UTF16_UNITS:
         raise ProjectManifestError(

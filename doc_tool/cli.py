@@ -15,14 +15,19 @@ from typing import Optional, Sequence
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="doc-tool",
-        description="康尚文档工具：导入、校验、合并公司 Word 文档。",
+        description="康尚文档工具：将大型 Word 拆分为 Markdown 维护并可靠合并。",
     )
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")
 
     # 委托现有管线（兼容层），保留 requirement/design/all 与 --skip-word-refresh。
     build_p = sub.add_parser("build", help="构建并校验文档（委托现有管线）")
-    build_p.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
+    build_p.add_argument(
+        "document",
+        choices=("general", "requirement", "design", "all"),
+        nargs="?",
+        default="all",
+    )
     build_p.add_argument("--skip-word-refresh", action="store_true")
     build_p.add_argument("--project", help="项目目录（使用新项目上下文）")
 
@@ -71,7 +76,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print(line)
             return 0 if result.success else 1
 
-        # 兼容层：委托现有 scripts/run_pipeline.py。
+        # 兼容层：委托现有 scripts/run_pipeline.py。通用文档只存在
+        # 于自包含项目中，没有全局 config/general.yml。
+        if args.document == "general":
+            parser.error("general 必须与 --project <项目目录> 一起使用")
         import os
         import subprocess
 

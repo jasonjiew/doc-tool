@@ -30,6 +30,7 @@ from PIL import Image
 from docx_common import (
     AutomationError,
     ImageReference,
+    discover_document_types,
     iter_chapter_entries,
     load_config,
     parse_image_reference,
@@ -745,7 +746,6 @@ def _validate_zip_xml(items: Dict[str, bytes]) -> None:
         "word/document.xml",
         "word/settings.xml",
         "word/styles.xml",
-        "word/numbering.xml",
         "word/_rels/document.xml.rels",
     )
     for name in required:
@@ -794,7 +794,10 @@ def build(
     section_properties = body.find(qn("sectPr"))
     if section_properties is None:
         raise AutomationError("模板正文末尾缺少 w:sectPr")
-    update_cover(document_root, config)
+    # 需求/详细设计预设启用康尚封面字段同步；通用大文档不得
+    # 假设存在“文件编号/版本号/页数”表格，原封面随模板保留。
+    if doc_type in ("requirement", "design"):
+        update_cover(document_root, config)
 
     relationship_root = etree.fromstring(items["word/_rels/document.xml.rels"])
     image_manager = ImageManager(items, relationship_root)
@@ -869,12 +872,17 @@ def build(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="从目录树生成公司 Word")
-    parser.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
+    available = discover_document_types()
+    if not available:
+        print("[FAIL] 未在 config/ 目录发现任何 .yml 配置", file=sys.stderr)
+        return 1
+    choices = tuple(available) + ("all",)
+    parser.add_argument("document", choices=choices, nargs="?", default="all")
     parser.add_argument("--output", help="仅单文档时覆盖输出路径（用于隔离测试）")
     args = parser.parse_args(argv)
     if args.document == "all" and args.output:
         parser.error("--output 仅可用于单文档")
-    targets = ("requirement", "design") if args.document == "all" else (args.document,)
+    targets = tuple(available) if args.document == "all" else (args.document,)
     try:
         for target in targets:
             build(target, args.output)

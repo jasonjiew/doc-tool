@@ -50,7 +50,10 @@ def config_from_project(
     """
     doc_type = manifest.documentType
     output_name = build_output_filename(
-        manifest.documentNo, manifest.documentName, manifest.documentVersion
+        manifest.documentNo,
+        manifest.documentName,
+        manifest.documentVersion,
+        manifest.documentType,
     )
     output_path = (
         Path(output_override) if output_override else paths.output_dir / output_name

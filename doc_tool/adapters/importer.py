@@ -264,7 +264,7 @@ def extract_content(
         content_dir: 暂存内容输出目录（章节 Markdown 根）。
         images_dir: 暂存图片输出目录。
         tables_dir: 暂存复杂表格 XML 输出目录。
-        document_type: 文档类型（requirement/design），用于资源映射前缀。
+        document_type: 文档类型（general/requirement/design），用于资源映射前缀。
 
     Returns:
         提取结果统计。

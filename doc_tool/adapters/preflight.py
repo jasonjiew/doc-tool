@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Word 导入预检适配器。
 
-任务 3.1-3.6：在写入正式项目前，对任意文件名的公司 DOCX 执行完整预检，
+任务 3.1-3.6：在写入正式项目前，对任意文件名的 DOCX 执行完整预检，
 任何检查失败均抛出 ``DocToolError`` 子类（fail-closed），不创建项目目录。
 
 预检内容：
@@ -9,7 +9,7 @@
 - 3.2 关系目标完整性及正文资源引用预检。
 - 3.3 ``styles.xml`` 的 styleId 到 Heading 1~6 映射和标题树解析。
 - 3.4 无 Heading 1、标题层级跳跃和无法闭合树的 fail-closed 校验。
-- 3.5 需求/详细设计类型显式选择、元数据建议和低置信度不自动决定规则。
+- 3.5 通用模式为默认，需求/详细设计只作为可选的公司文档预设。
 - 3.6 导入预览模型：标题级别计数、首尾标题、图片/表格数量和告警。
 """
 
@@ -599,7 +599,7 @@ def _validate_heading_hierarchy(headings: List[HeadingInfo]) -> None:
 def _suggest_document_type(
     headings: List[HeadingInfo], parts: Dict[str, bytes]
 ) -> DocumentTypeSuggestion:
-    """根据标题和封面关键字给出文档类型建议。
+    """根据标题和封面关键字给出文档预设建议。
 
     低置信度时返回 ``confidence="low"``，调用方不得自动决定类型。
     """
@@ -641,11 +641,11 @@ def _suggest_document_type(
             reason='标题和封面关键字倾向「需求说明书」。' if confidence == "high"
             else '封面或标题中检测到「需求」关键字，但置信度不足，请用户确认。',
         )
-    # 无法判断
+    # 不是可明确识别的公司需求/设计文档时，安全地回落到通用模式。
     return DocumentTypeSuggestion(
-        document_type="requirement",
-        confidence="low",
-        reason="未能从标题或封面中识别文档类型，请用户显式选择。",
+        document_type="general",
+        confidence="high",
+        reason="未检测到需求/详细设计特征，建议使用「通用大文档」模式。",
     )
 
 

@@ -7,7 +7,7 @@
 清单字段（v1）：
     schemaVersion: 1
     projectId: <稳定 UUID>
-    documentType: requirement | design
+    documentType: general | requirement | design
     documentNo: <公司文档编号>
     documentName: <文档名称>
     documentVersion: <版本字符串>
@@ -48,7 +48,7 @@ from doc_tool.domain.version import (
 )
 
 
-DOCUMENT_TYPES = ("requirement", "design")
+DOCUMENT_TYPES = ("general", "requirement", "design")
 
 # 默认刷新超时（秒），与现有 config 保持一致。
 DEFAULT_REFRESH_TIMEOUT_SECONDS = 900
@@ -96,10 +96,17 @@ class ProjectManifest:
                 "未知的文档类型：{0}。".format(self.documentType),
                 details={"documentType": self.documentType},
             )
-        if not self.documentNo or not self.documentName:
-            raise ProjectManifestError("文档编号和名称不能为空。")
+        if not self.documentName:
+            raise ProjectManifestError("文档名称不能为空。")
+        if self.documentType != "general" and not self.documentNo:
+            raise ProjectManifestError("需求/详细设计文档的文档编号不能为空。")
         if can_write_schema(self.schemaVersion):
-            build_output_filename(self.documentNo, self.documentName, self.documentVersion)
+            build_output_filename(
+                self.documentNo,
+                self.documentName,
+                self.documentVersion,
+                self.documentType,
+            )
         if can_write_schema(self.schemaVersion) and self.refreshTimeoutSeconds < 60:
             raise ProjectManifestError(
                 "刷新超时不能小于 60 秒。",

@@ -262,7 +262,10 @@ def _run_pipeline_inner(
 
     # --- 计算正式输出路径与临时输出路径 ---
     output_name = build_output_filename(
-        manifest.documentNo, manifest.documentName, manifest.documentVersion
+        manifest.documentNo,
+        manifest.documentName,
+        manifest.documentVersion,
+        manifest.documentType,
     )
     formal_output = paths.output_dir / output_name
     paths.output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,15 +1,19 @@
 ## ADDED Requirements
 
-### Requirement: Import accepts a company DOCX with an arbitrary filename
-系统 SHALL 允许用户选择任意合法文件名的 `.docx`，并显式选择或确认需求说明书/详细设计说明书类型，不得依赖硬编码源文件名。
+### Requirement: Import accepts a structured DOCX with an arbitrary filename
+系统 SHALL 允许用户选择任意合法文件名、具有规范 Heading 结构的 `.docx`。通用大文档 SHALL 为默认模式，需求说明书/详细设计说明书 SHALL 为可选预设，不得依赖硬编码源文件名。
 
 #### Scenario: Import a valid renamed DOCX
-- **WHEN** 用户选择一个结构合法但文件名与历史基线不同的公司 DOCX，并确认文档类型
+- **WHEN** 用户选择一个结构合法但文件名与历史基线不同的 DOCX，并确认维护模式
 - **THEN** 系统使用所选文件作为项目源文档继续预检，不因文件名不同而失败
 
 #### Scenario: Reject unsupported input
 - **WHEN** 用户选择非 DOCX、加密包或无法解析的文件
 - **THEN** 系统拒绝导入，显示稳定错误码和修复建议，且不创建项目目录
+
+#### Scenario: Import a general document without a company cover
+- **WHEN** 用户导入一份有合法 Heading 结构但没有康尚封面、TOC、文档编号或版本的 DOCX
+- **THEN** 系统以 `general` 模式创建项目，拆分到 `content/general`，并允许重建和严格校验
 
 ### Requirement: Source structure is validated before extraction
 系统 MUST 在写入正式项目之前校验 DOCX ZIP/XML、关系目标、Heading 样式映射、至少一个 Heading 1 以及可闭合的章节层级。

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+﻿﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     康尚文档工具安装包构建脚本

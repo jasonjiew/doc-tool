@@ -2,16 +2,16 @@
 # 所有路径相对项目根，复制到其他机器后无需修改。
 schemaVersion: 1
 projectId: 00000000-0000-0000-0000-000000000000
-documentType: requirement        # requirement | design
-documentNo: KF-2090-1-001
-documentName: 康尚健康云软件需求说明书
-documentVersion: "3.8"
+documentType: general            # general | requirement | design
+documentNo: ""                  # 通用文档可留空
+documentName: 示例大文档
+documentVersion: "1.0"          # 通用文档可留空
 paths:
   sourceDocx: original/source.docx
   templateDocx: template/template.docx
-  contentRoot: content/requirement
-  assetRoot: assets/requirement
-  tableRoot: assets/requirement/tables
+  contentRoot: content/general
+  assetRoot: assets/general
+  tableRoot: assets/general/tables
 sourceSha256: ""                # 导入时由源 DOCX 只读副本计算
 createdWithVersion: 0.1.0
 lastSuccessfulBuildVersion: null

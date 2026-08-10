@@ -208,6 +208,25 @@ class ProjectManifestTests(unittest.TestCase):
         self.assertNotIn("\\", filename)
         self.assertNotIn("/", filename)
 
+    def test_general_document_allows_optional_number_and_version(self):
+        manifest = _make_manifest(
+            documentType="general",
+            documentNo="",
+            documentName="运维手册",
+            documentVersion="",
+        )
+        filename = build_output_filename(
+            manifest.documentNo,
+            manifest.documentName,
+            manifest.documentVersion,
+            manifest.documentType,
+        )
+        self.assertEqual(filename, "运维手册.docx")
+
+    def test_general_document_type_is_writable(self):
+        manifest = _make_manifest(documentType="general", documentNo="")
+        self.assertTrue(manifest.is_writable())
+
     def test_rejects_overlong_output_filename(self):
         with self.assertRaises(ProjectManifestError):
             _make_manifest(documentName="长" * 240)

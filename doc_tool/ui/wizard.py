@@ -7,7 +7,7 @@
 向导流程：
 1. 选择源 DOCX 文件
 2. 执行预检，展示标题/图片/表格计数和告警
-3. 选择文档类型（需求/详细设计）、文档编号、文档名称、版本和目标父目录
+3. 选择通用模式或需求/详细设计预设，填写文档信息和目标父目录
 4. 执行事务化导入
 5. 显示导入结果（成功/失败）
 """
@@ -36,6 +36,20 @@ def format_preview_summary(preview) -> str:
         lines.extend("  ⚠ {0}".format(warning) for warning in preview.warnings)
     else:
         lines.append("无告警。")
+    suggestion = getattr(preview, "document_type_suggestion", None)
+    if suggestion is not None:
+        labels = {
+            "general": "通用大文档",
+            "requirement": "需求文档预设",
+            "design": "详细设计预设",
+        }
+        lines.extend([
+            "",
+            "建议模式：{0}".format(
+                labels.get(suggestion.document_type, suggestion.document_type)
+            ),
+            "原因：{0}".format(suggestion.reason),
+        ])
     return "\n".join(lines)
 
 
@@ -51,7 +65,7 @@ class ImportWizard:
         self._result: Optional[str] = None
         self._source_path: Optional[str] = None
         self._preview = None  # PreflightPreview
-        self._doc_type = "requirement"
+        self._doc_type = "general"
         self._target_parent: Optional[str] = None
         self._runner = TaskRunner()
         self._poll_scheduled = False
@@ -64,7 +78,7 @@ class ImportWizard:
 
         self._dialog = tk.Toplevel(self.parent)
         self._dialog.title("新建项目向导")
-        self._dialog.geometry("560x520")
+        self._dialog.geometry("680x540")
         self._dialog.minsize(480, 420)
         self._dialog.transient(self.parent)
         self._dialog.grab_set()
@@ -130,18 +144,21 @@ class ImportWizard:
 
         # 文档类型
         ttk.Label(info_grid, text="文档类型：").grid(row=0, column=0, sticky="w", pady=4)
-        self._type_var = tk.StringVar(value="requirement")
+        self._type_var = tk.StringVar(value="general")
         type_frame = ttk.Frame(info_grid)
         type_frame.grid(row=0, column=1, sticky="w", padx=(8, 0), pady=4)
         ttk.Radiobutton(
-            type_frame, text="需求文档", variable=self._type_var, value="requirement"
+            type_frame, text="通用大文档", variable=self._type_var, value="general"
         ).pack(side="left")
         ttk.Radiobutton(
-            type_frame, text="详细设计文档", variable=self._type_var, value="design"
+            type_frame, text="需求文档预设", variable=self._type_var, value="requirement"
+        ).pack(side="left", padx=(12, 0))
+        ttk.Radiobutton(
+            type_frame, text="详细设计预设", variable=self._type_var, value="design"
         ).pack(side="left", padx=(12, 0))
 
         # 文档编号
-        ttk.Label(info_grid, text="文档编号：").grid(row=1, column=0, sticky="w", pady=4)
+        ttk.Label(info_grid, text="文档编号（通用可选）：").grid(row=1, column=0, sticky="w", pady=4)
         self._doc_no_var = tk.StringVar()
         ttk.Entry(info_grid, textvariable=self._doc_no_var).grid(
             row=1, column=1, sticky="we", padx=(8, 0), pady=4
@@ -155,7 +172,7 @@ class ImportWizard:
         )
 
         # 文档版本
-        ttk.Label(info_grid, text="文档版本：").grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Label(info_grid, text="文档版本（通用可选）：").grid(row=3, column=0, sticky="w", pady=4)
         self._doc_version_var = tk.StringVar(value="1.0")
         ttk.Entry(info_grid, textvariable=self._doc_version_var).grid(
             row=3, column=1, sticky="we", padx=(8, 0), pady=4
@@ -254,6 +271,11 @@ class ImportWizard:
         if path:
             self._source_path = path
             self._source_var.set(path)
+            source_name = Path(path).stem
+            if not self._doc_name_var.get().strip():
+                self._doc_name_var.set(source_name)
+            if not self._project_name_var.get().strip():
+                self._project_name_var.set(source_name)
             self._next_btn.configure(state="normal")
 
     # --- 步骤 1：预检 ---
@@ -296,9 +318,14 @@ class ImportWizard:
     def _validate_project_info(self) -> bool:
         """验证项目信息字段。"""
         self._project_info_error = ""
-        if not self._doc_no_var.get().strip():
+        doc_type = self._type_var.get()
+        if doc_type in ("requirement", "design") and not self._doc_no_var.get().strip():
+            self._project_info_error = "需求/详细设计预设必须填写文档编号。"
             return False
         if not self._doc_name_var.get().strip():
+            return False
+        if doc_type in ("requirement", "design") and not self._doc_version_var.get().strip():
+            self._project_info_error = "需求/详细设计预设必须填写文档版本。"
             return False
         if not self._project_name_var.get().strip():
             return False
@@ -452,6 +479,10 @@ class ImportWizard:
             ok, preview, text = response
         self._preview = preview
         self._show_preview_text(text)
+        if ok and preview is not None and preview.document_type_suggestion is not None:
+            suggestion = preview.document_type_suggestion
+            if suggestion.confidence == "high":
+                self._type_var.set(suggestion.document_type)
         if self._step == 1:
             self._back_btn.configure(state="normal")
         if ok:

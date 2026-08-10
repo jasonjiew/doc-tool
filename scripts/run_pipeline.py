@@ -9,6 +9,8 @@ import subprocess
 import sys
 from typing import Optional, Sequence
 
+from docx_common import discover_document_types
+
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,14 +43,19 @@ def pipeline(document: str, skip_word_refresh: bool) -> bool:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="一键构建、严格校验、Word 刷新、二次校验")
-    parser.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
+    available = discover_document_types()
+    if not available:
+        print("[FAIL] 未在 config/ 目录发现任何 .yml 配置", file=sys.stderr)
+        return 1
+    choices = tuple(available) + ("all",)
+    parser.add_argument("document", choices=choices, nargs="?", default="all")
     parser.add_argument(
         "--skip-word-refresh",
         action="store_true",
         help="显式跳过 Word 实机刷新，仅用于无 Word 的诊断环境",
     )
     args = parser.parse_args(argv)
-    targets = ("requirement", "design") if args.document == "all" else (args.document,)
+    targets = tuple(available) if args.document == "all" else (args.document,)
     for target in targets:
         if not pipeline(target, args.skip_word_refresh):
             return 1

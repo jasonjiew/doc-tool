@@ -27,6 +27,7 @@ from doc_tool.ui.task_bridge import POLL_INTERVAL_MS, TaskEvent, TaskRunner, Tas
 
 # 文档类型中文映射
 DOC_TYPE_LABELS = {
+    "general": "通用大文档",
     "requirement": "需求文档",
     "design": "详细设计文档",
 }
@@ -195,7 +196,7 @@ class MainWindow:
         self._project_summary = summary
         m = summary.manifest
         self._summary_vars["document_name"].set(m.documentName)
-        self._summary_vars["document_no"].set(m.documentNo)
+        self._summary_vars["document_no"].set(m.documentNo or "—")
         self._summary_vars["document_type"].set(
             DOC_TYPE_LABELS.get(m.documentType, m.documentType)
         )

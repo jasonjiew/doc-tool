@@ -77,6 +77,28 @@ def _format_config_value(value, values):
     return value
 
 
+def discover_document_types(base: str = BASE) -> List[str]:
+    """扫描 ``config/`` 目录下的 ``.yml`` 文件，返回类型名（文件主名）列表。
+
+    通用大文档改造后，构建/校验/刷新 CLI 不再硬编码 ``requirement``/``design``，
+    而是根据 ``config/`` 实际存在的配置文件动态决定可选类型，新增类型只需放入
+    一个新的 ``config/<type>.yml`` 即可被识别。返回结果按文件名排序，保证 CLI
+    ``choices`` 与 ``all`` 展开顺序稳定。``config/`` 目录不存在或为空时返回空列表，
+    由调用方决定如何处理（CLI 通常会以非零退出码报错）。
+    """
+    config_dir = os.path.join(base, "config")
+    if not os.path.isdir(config_dir):
+        return []
+    names = [
+        os.path.splitext(name)[0]
+        for name in os.listdir(config_dir)
+        if name.lower().endswith(".yml")
+        and not name.startswith(".")
+        and os.path.isfile(os.path.join(config_dir, name))
+    ]
+    return sorted(names)
+
+
 def load_config(doc_type: str, base: str = BASE) -> Dict:
     config_path = os.path.join(base, "config", doc_type + ".yml")
     if not os.path.isfile(config_path):

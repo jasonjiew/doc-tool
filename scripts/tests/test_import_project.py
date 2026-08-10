@@ -393,6 +393,42 @@ class ImportEndToEndTests(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(target, "content", "design")))
         self.assertTrue(os.path.isfile(os.path.join(target, "project.yml")))
 
+    def test_general_docx_without_company_cover_full_import(self):
+        """通用大文档不要求康尚封面、文档编号或版本。"""
+        src = os.path.join(self._tmp, "运维手册.docx")
+        write_synthetic_docx(src, with_cover=False)
+        target = os.path.join(self._tmp, "通用大文档项目")
+        request = ImportRequest(
+            source_docx=Path(src),
+            target_project_root=Path(target),
+            document_type="general",
+            document_no="",
+            document_name="运维手册",
+            document_version="",
+        )
+        result = import_first_time(request)
+        self.assertTrue(result.success, "通用文档导入应成功：{0}".format(
+            [(e.stage, e.status, e.detail) for e in result.events]
+        ))
+        self.assertTrue(os.path.isdir(os.path.join(target, "content", "general")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "assets", "general")))
+        import yaml
+        manifest = yaml.safe_load(Path(target, "project.yml").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["documentType"], "general")
+        self.assertEqual(manifest["documentNo"], "")
+        from doc_tool.adapters.kernel import build_with_project, validate_with_project
+        from doc_tool.domain.manifest import ProjectManifest
+
+        loaded = ProjectManifest.load(target)
+        paths = loaded.resolve_paths(target)
+        output = build_with_project(loaded, paths)
+        self.assertEqual(Path(output).name, "运维手册.docx")
+        self.assertTrue(validate_with_project(loaded, paths))
+        self.assertTrue(
+            validate_with_project(loaded, paths, require_refreshed=True),
+            "通用模式的后校验不应强制康尚 TOC/NUMPAGES 规则",
+        )
+
     def test_renamed_docx_import(self):
         """改名公司风格 DOCX（文件名与基线不同）仍能完整导入。"""
         renamed = "公司内部文档-需求说明书(v9).docx"

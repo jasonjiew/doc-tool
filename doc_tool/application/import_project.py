@@ -76,8 +76,8 @@ class ImportRequest:
     Attributes:
         source_docx: 用户选择的源 DOCX 路径，文件名任意。
         target_project_root: 最终项目目录路径（尚不存在）。
-        document_type: 文档类型 requirement/design，由用户显式选择。
-        document_no: 公司文档编号。
+        document_type: 文档类型 general/requirement/design。
+        document_no: 文档编号（通用大文档可留空）。
         document_name: 文档名称。
         document_version: 文档版本字符串。
         refresh_timeout_seconds: Word 刷新超时，默认 900。
