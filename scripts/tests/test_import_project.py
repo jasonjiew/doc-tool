@@ -87,10 +87,21 @@ CONTENT_TYPES_XML = (
 ).format(ct=CT_NS)
 
 
-def _styles_xml() -> bytes:
+def _styles_xml(localized=False, include_character_heading_styles=False) -> bytes:
     styles = []
     for level in range(1, 7):
-        styles.append('<w:style w:type="paragraph" w:styleId="{0}"><w:name w:val="heading {0}"/></w:style>'.format(level))
+        style_name = "标题 {0}".format(level) if localized else "heading {0}".format(level)
+        styles.append(
+            '<w:style w:type="paragraph" w:styleId="{0}"><w:name w:val="{1}"/></w:style>'.format(
+                level, style_name
+            )
+        )
+        if include_character_heading_styles:
+            styles.append(
+                '<w:style w:type="character" w:styleId="{0}"><w:name w:val="标题 {1} Char"/></w:style>'.format(
+                    54 + level, level
+                )
+            )
     styles.append('<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style>')
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -223,15 +234,30 @@ def _rels_xml(with_image=True):
     ).format(pr=PR_NS, body="".join(rels)).encode("utf-8")
 
 
-def write_synthetic_docx(path, with_cover=True, with_image=True, with_tables=True):
+def write_synthetic_docx(
+    path,
+    with_cover=True,
+    with_image=True,
+    with_tables=True,
+    with_numbering=True,
+    localized_styles=False,
+    include_character_heading_styles=False,
+):
     """写入结构完整的合成 DOCX，可往返通过导入与试构建。"""
     body = _build_body_xml(with_cover=with_cover, with_image=with_image, with_tables=with_tables)
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
         zf.writestr("word/document.xml", _document_xml(body))
-        zf.writestr("word/styles.xml", _styles_xml())
+        zf.writestr(
+            "word/styles.xml",
+            _styles_xml(
+                localized=localized_styles,
+                include_character_heading_styles=include_character_heading_styles,
+            ),
+        )
         zf.writestr("word/settings.xml", _settings_xml())
-        zf.writestr("word/numbering.xml", _numbering_xml())
+        if with_numbering:
+            zf.writestr("word/numbering.xml", _numbering_xml())
         zf.writestr("word/_rels/document.xml.rels", _rels_xml(with_image=with_image))
         if with_image:
             zf.writestr("word/media/image1.png", PNG_VALID)
@@ -396,7 +422,13 @@ class ImportEndToEndTests(unittest.TestCase):
     def test_general_docx_without_company_cover_full_import(self):
         """通用大文档不要求康尚封面、文档编号或版本。"""
         src = os.path.join(self._tmp, "运维手册.docx")
-        write_synthetic_docx(src, with_cover=False)
+        write_synthetic_docx(
+            src,
+            with_cover=False,
+            with_numbering=False,
+            localized_styles=True,
+            include_character_heading_styles=True,
+        )
         target = os.path.join(self._tmp, "通用大文档项目")
         request = ImportRequest(
             source_docx=Path(src),
@@ -420,6 +452,7 @@ class ImportEndToEndTests(unittest.TestCase):
         from doc_tool.domain.manifest import ProjectManifest
 
         loaded = ProjectManifest.load(target)
+        self.assertEqual(loaded.headingStyles, {level: str(level) for level in range(1, 7)})
         paths = loaded.resolve_paths(target)
         output = build_with_project(loaded, paths)
         self.assertEqual(Path(output).name, "运维手册.docx")
@@ -428,6 +461,13 @@ class ImportEndToEndTests(unittest.TestCase):
             validate_with_project(loaded, paths, require_refreshed=True),
             "通用模式的后校验不应强制康尚 TOC/NUMPAGES 规则",
         )
+
+        # 兼容早期导入器生成的清单：55..60 是“标题 N Char”字符样式，
+        # 构建时应依据模板自动恢复为真正的 paragraph Heading 样式。
+        loaded.headingStyles = {level: str(54 + level) for level in range(1, 7)}
+        build_with_project(loaded, paths)
+        self.assertEqual(loaded.headingStyles, {level: str(level) for level in range(1, 7)})
+        self.assertTrue(validate_with_project(loaded, paths))
 
     def test_renamed_docx_import(self):
         """改名公司风格 DOCX（文件名与基线不同）仍能完整导入。"""

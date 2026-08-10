@@ -178,6 +178,8 @@ def _parse_heading_styles(styles_xml: bytes) -> Dict[str, int]:
     sroot = etree.fromstring(styles_xml)
     heading_map: Dict[str, int] = {}
     for style in sroot.iter(_qn("style")):
+        if style.get(_qn("type")) != "paragraph":
+            continue
         style_id = style.get(_qn("styleId"))
         name_elem = style.find(_qn("name"))
         if name_elem is None or not style_id:

@@ -130,7 +130,6 @@ class DocxPackage:
             "word/document.xml",
             "word/settings.xml",
             "word/styles.xml",
-            "word/numbering.xml",
             "word/_rels/document.xml.rels",
         )
         missing = [name for name in required if name not in self.items]
@@ -146,12 +145,19 @@ class DocxPackage:
     def _heading_style_map(self) -> Dict[str, int]:
         result: Dict[str, int] = {}
         for style in self.styles.iter(qn("style")):
+            if style.get(qn("type")) != "paragraph":
+                continue
             name = style.find(qn("name"))
             if name is None:
                 continue
-            match = re.match(r"(?i)heading\s*(\d+)", name.get(qn("val")) or "")
+            style_name = name.get(qn("val")) or ""
+            match = re.match(r"(?i)heading\s*(\d+)", style_name)
+            if not match:
+                match = re.match(r"标题\s*(\d+)", style_name)
             if match:
-                result[style.get(qn("styleId"))] = int(match.group(1))
+                level = int(match.group(1))
+                if 1 <= level <= 6:
+                    result[style.get(qn("styleId"))] = level
         return result
 
     def paragraph_level(self, paragraph) -> Optional[int]:
@@ -457,7 +463,9 @@ def _paragraph_style_names(package: DocxPackage) -> set:
 
 def _numbering_signature(package: DocxPackage) -> Counter:
     style_names = _style_id_names(package)
-    root = package.xml_roots["word/numbering.xml"]
+    root = package.xml_roots.get("word/numbering.xml")
+    if root is None:
+        return Counter()
     signatures = []
     for abstract in root.findall(qn("abstractNum")):
         levels = []
@@ -601,9 +609,20 @@ def word_semantic_preservation_errors(
     if not required_levels.issubset(set(output.heading_styles.values())):
         errors["styles"].append("Word 刷新后缺少配置的 Heading 样式")
     a_ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
-    template_theme = template.xml_roots["word/theme/theme1.xml"].find(a_ns + "themeElements")
-    output_theme = output.xml_roots["word/theme/theme1.xml"].find(a_ns + "themeElements")
-    if canonical_xml(template_theme) != canonical_xml(output_theme):
+    template_theme_root = template.xml_roots.get("word/theme/theme1.xml")
+    output_theme_root = output.xml_roots.get("word/theme/theme1.xml")
+    template_theme = (
+        template_theme_root.find(a_ns + "themeElements")
+        if template_theme_root is not None else None
+    )
+    output_theme = (
+        output_theme_root.find(a_ns + "themeElements")
+        if output_theme_root is not None else None
+    )
+    if (template_theme is None) != (output_theme is None) or (
+        template_theme is not None
+        and canonical_xml(template_theme) != canonical_xml(output_theme)
+    ):
         errors["styles"].append("Word 刷新后主题字体/颜色定义变化")
     # Word prunes unused duplicate abstract numbering definitions when saving.
     # Every retained definition must still be present with identical semantics.

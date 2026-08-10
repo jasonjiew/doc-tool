@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import sys
+import zipfile
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -38,6 +39,55 @@ def ensure_kernel_importable() -> None:
         sys.path.insert(0, scripts)
 
 
+def _effective_heading_styles(
+    manifest: ProjectManifest,
+    template_path: Path,
+) -> Dict[int, str]:
+    """返回可用于段落 ``pStyle`` 的 Heading 样式。
+
+    早期导入器会把“标题 1 Char”等字符样式误写进清单。这类
+    styleId 在构建后可暂时存在，但 Word 保存时会删除无效的段落样式
+    引用，导致标题和 TOC 全部丢失。构建时从项目模板发现真正的
+    paragraph Heading 样式，仅对明确非段落/缺失的旧值自动修复。
+    """
+    from doc_tool.adapters.importer import _parse_heading_styles
+
+    try:
+        with zipfile.ZipFile(str(template_path), "r") as package:
+            styles_xml = package.read("word/styles.xml")
+    except (OSError, KeyError, zipfile.BadZipFile):
+        return dict(manifest.headingStyles)
+
+    style_to_level = _parse_heading_styles(styles_xml)
+    discovered = {level: style_id for style_id, level in style_to_level.items()}
+    effective: Dict[int, str] = {}
+    changed = False
+    for level, configured_style in manifest.headingStyles.items():
+        level = int(level)
+        configured_style = str(configured_style)
+        if style_to_level.get(configured_style) == level:
+            effective[level] = configured_style
+            continue
+        replacement = discovered.get(level)
+        if replacement:
+            effective[level] = replacement
+            changed = True
+        else:
+            effective[level] = configured_style
+
+    # 旧清单可能缺少模板中已定义的层级，一并补全。
+    for level, style_id in discovered.items():
+        if level not in effective:
+            effective[level] = style_id
+            changed = True
+
+    if changed:
+        # 同一 Pipeline 成功发布后会保存 manifest，从而完成旧项目
+        # 的无损自修复；发布失败时不会写回 project.yml。
+        manifest.headingStyles = dict(sorted(effective.items()))
+    return dict(sorted(effective.items()))
+
+
 def config_from_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
@@ -49,6 +99,8 @@ def config_from_project(
     ``build_docx.build(config=...)`` 和 ``validate_docx.validate(config=...)``。
     """
     doc_type = manifest.documentType
+    template_path = paths.resolve(manifest.relative_template_docx())
+    heading_styles = _effective_heading_styles(manifest, template_path)
     output_name = build_output_filename(
         manifest.documentNo,
         manifest.documentName,
@@ -71,13 +123,13 @@ def config_from_project(
         "documentName": manifest.documentName,
         "documentVersion": str(manifest.documentVersion),
         "paths": {
-            "template": str(paths.resolve(manifest.relative_template_docx())),
+            "template": str(template_path),
             "content_root": str(paths.resolve(manifest.relative_content_root())),
             "asset_root": str(paths.resolve(manifest.relative_asset_root())),
             "table_root": str(paths.resolve(manifest.relative_table_root())),
             "output": str(output_path),
         },
-        "headingStyles": dict(manifest.headingStyles),
+        "headingStyles": heading_styles,
         "bodyStyle": manifest.bodyStyle,
         "_base": str(paths.root),
         "_config_path": str(paths.manifest_file),
