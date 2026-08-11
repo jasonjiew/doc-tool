@@ -19,4 +19,4 @@
 ## 3. 文档与提交
 
 - [x] 3.1 README 增补「首次运行会自动引导安装 PySide6」说明
-- [ ] 3.2 提交变更（含 openspec 变更目录），commit message 遵循既有 `fix(launcher):` 前缀
+- [x] 3.2 提交变更（含 openspec 变更目录），commit message 遵循既有 `fix(launcher):` 前缀
