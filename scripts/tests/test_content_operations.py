@@ -1241,5 +1241,40 @@ class ChangeManifestSerializationTests(unittest.TestCase):
         )
 
 
+class ManifestStatusMapTests(unittest.TestCase):
+    """徽标状态推导：优先级与 rename/create+edit 映射。"""
+
+    def test_status_precedence_and_mapping(self):
+        from doc_tool.application.content.writer import (
+            ChangeEntry,
+            OP_CREATE,
+            OP_DELETE,
+            OP_EDIT,
+            OP_RENAME,
+            manifest_status_map,
+        )
+
+        entries = [
+            ChangeEntry(operation=OP_EDIT, rel_path="a.md", backup_path="x"),
+            ChangeEntry(operation=OP_CREATE, rel_path="b.md"),
+            ChangeEntry(operation=OP_DELETE, rel_path="c.md", trash_path="t/c.md"),
+            ChangeEntry(operation=OP_RENAME, rel_path="d.md", original_path="e.md"),
+            # 先 create 后 edit 同一文件 → 仍为 added
+            ChangeEntry(operation=OP_CREATE, rel_path="f.md"),
+            ChangeEntry(operation=OP_EDIT, rel_path="f.md", backup_path="y"),
+            # 先 edit 后 delete 同一文件 → 覆盖为 deleted
+            ChangeEntry(operation=OP_EDIT, rel_path="g.md", backup_path="z"),
+            ChangeEntry(operation=OP_DELETE, rel_path="g.md", trash_path="t/g.md"),
+        ]
+        status = manifest_status_map(entries)
+        self.assertEqual(status["a.md"], "modified")
+        self.assertEqual(status["b.md"], "added")
+        self.assertEqual(status["c.md"], "deleted")
+        self.assertEqual(status["d.md"], "modified")
+        self.assertNotIn("e.md", status)  # rename 旧路径不标（文件已不存在）
+        self.assertEqual(status["f.md"], "added")
+        self.assertEqual(status["g.md"], "deleted")
+
+
 if __name__ == "__main__":
     unittest.main()
