@@ -1,4 +1,4 @@
-﻿﻿# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     康尚文档工具安装包构建脚本
@@ -29,6 +29,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Python test subprocesses emit UTF-8 paths and markers; avoid the Windows GBK
+# fallback corrupting captured output in PowerShell-driven release builds.
+$env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $Version = "1.0.0"
 

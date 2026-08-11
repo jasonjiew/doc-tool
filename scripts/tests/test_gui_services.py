@@ -548,6 +548,76 @@ class MainWindowInteractionTests(unittest.TestCase):
             self.assertEqual(running._ops_menu.states[4], "disabled")
             self.assertEqual(running._tools_menu.states[8], "normal")
 
+    def test_empty_and_workbench_views_switch_in_one_content_host(self):
+        from doc_tool.ui.main_window import MainWindow
+
+        class Frame:
+            def __init__(self):
+                self.visible = False
+                self.pack_calls = []
+
+            def pack_forget(self):
+                self.visible = False
+
+            def pack(self, **kwargs):
+                self.visible = True
+                self.pack_calls.append(kwargs)
+
+        window = MainWindow.__new__(MainWindow)
+        window._empty_frame = Frame()
+        window._workbench_scroll = Frame()
+
+        window._switch_content_view("empty")
+        self.assertTrue(window._empty_frame.visible)
+        self.assertFalse(window._workbench_scroll.visible)
+
+        window._switch_content_view("workbench")
+        self.assertFalse(window._empty_frame.visible)
+        self.assertTrue(window._workbench_scroll.visible)
+        self.assertEqual(
+            window._workbench_scroll.pack_calls[-1],
+            {"fill": "both", "expand": True},
+        )
+
+    def test_recent_project_button_uses_existing_open_command(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        created = []
+
+        class Frame:
+            def winfo_children(self):
+                return []
+
+        class Button:
+            def __init__(self, _parent, **kwargs):
+                self.command = kwargs["command"]
+                self.state = "normal"
+                created.append(self)
+
+            def pack(self, **_kwargs):
+                pass
+
+            def configure(self, **kwargs):
+                self.state = kwargs.get("state", self.state)
+
+        window = MainWindow.__new__(MainWindow)
+        window._empty_recent_frame = Frame()
+        window.runner = SimpleNamespace(is_running=False)
+        window._open_project_path = Mock()
+        entry = SimpleNamespace(
+            path="C:/valid-project", name="project", document_name="文档"
+        )
+
+        with patch("tkinter.ttk.Button", Button):
+            window._render_empty_recent_projects([entry])
+
+        self.assertEqual(len(created), 1)
+        created[0].command()
+        window._open_project_path.assert_called_once_with("C:/valid-project")
+        self.assertEqual(created[0].state, "normal")
+
     def test_scroll_log_to_bottom_clears_unread_count(self):
         from doc_tool.ui.main_window import MainWindow
 
@@ -565,6 +635,358 @@ class MainWindowInteractionTests(unittest.TestCase):
         self.assertTrue(window._log_at_bottom)
         self.assertEqual(window._log_pending, 0)
         self.assertEqual(window._log_pending_var.value, "")
+
+    def test_log_events_accumulate_while_collapsed(self):
+        from doc_tool.ui.main_window import MainWindow
+
+        class Text:
+            def __init__(self):
+                self.lines = []
+                self.seen = []
+
+            def configure(self, **_kwargs):
+                pass
+
+            def insert(self, _where, text):
+                self.lines.append(text)
+
+            def see(self, where):
+                self.seen.append(where)
+
+        window = MainWindow.__new__(MainWindow)
+        window._log_text = Text()
+        window._log_pending_var = self.Var("")
+        window._log_summary_var = self.Var("日志已折叠")
+        window._log_expanded = False
+        window._log_at_bottom = True
+        window._log_pending = 0
+
+        window._log("后台事件")
+
+        self.assertEqual(window._log_pending, 1)
+        self.assertIn("待读 1 条", window._log_pending_var.value)
+        self.assertIn("1 条待读", window._log_summary_var.value)
+        self.assertEqual(window._log_text.seen, [])
+        self.assertIn("后台事件", window._log_text.lines[0])
+
+    def test_workbench_state_covers_word_and_missing_artifacts(self):
+        from doc_tool.ui.workbench_state import derive_workbench_state
+
+        state = derive_workbench_state(
+            SimpleNamespace(is_writable=True, output_exists=False),
+            running=False,
+            word_available=False,
+        )
+
+        self.assertFalse(state.actions["merge"].enabled)
+        self.assertTrue(state.actions["diag_build"].enabled)
+        self.assertFalse(state.actions["output"].enabled)
+        self.assertFalse(state.actions["report"].enabled)
+        self.assertIn("Microsoft Word", state.readiness_text)
+        self.assertTrue(any("输出目录" in reason for reason in state.reasons))
+
+    def test_failure_event_is_rendered_as_persistent_safe_result(self):
+        from unittest.mock import Mock
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.task_bridge import TaskEvent
+
+        class Progress:
+            def stop(self):
+                pass
+
+            def configure(self, **_kwargs):
+                pass
+
+        window = MainWindow.__new__(MainWindow)
+        window._current_task = "merge"
+        window._last_error_code = None
+        window._last_error_stage = ""
+        window._last_error_detail = ""
+        window._task_terminal_kind = ""
+        window._stage_progress_enabled = False
+        window._close_after_task = False
+        window._project_summary = SimpleNamespace(project_root=Path("C:/project"))
+        window._progress = Progress()
+        window._cancel_btn = SimpleNamespace(configure=Mock())
+        window._task_name_var = self.Var()
+        window._status_var = self.Var()
+        window._drain_stage_progress = Mock()
+        window._stop_elapsed_update = Mock()
+        window._refresh_recent_menu = Mock()
+        window._refresh_interaction_state = Mock()
+        window._render_result_state = Mock()
+        window._current_log_path = lambda: Path("C:/project/logs/runtime.log")
+        window._log = Mock()
+
+        window._on_task_event(
+            TaskEvent(
+                kind="failed",
+                stage="merge",
+                detail="Word 保存失败",
+                error_code="E3003",
+            )
+        )
+        window._on_task_done(None)
+
+        self.assertEqual(window._result_state.status, "failure")
+        self.assertEqual(window._result_state.error_code, "E3003")
+        self.assertIn("Word 保存失败", window._result_state.summary)
+        self.assertTrue(window._result_state.advice)
+        window._render_result_state.assert_called_once()
+
+    def test_validation_success_result_exposes_report_only(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "validation.md"
+            report_path.write_text("ok", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window._current_task = "validate"
+            window._last_error_code = None
+            window._last_error_stage = ""
+            window._last_error_detail = ""
+            window._project_summary = SimpleNamespace(project_root=Path(tmp))
+            window._status_var = self.Var()
+            window._validation_report_path = lambda: report_path
+            window._current_log_path = lambda: Path(tmp) / "runtime.log"
+            window._log = Mock()
+            window._render_result_state = Mock()
+            summary = {
+                "exists": True,
+                "passCount": 5,
+                "failCount": 0,
+                "failures": [],
+            }
+            with patch(
+                "doc_tool.application.project_service.read_validation_report_summary",
+                return_value=summary,
+            ):
+                window._handle_validation_result(True)
+
+            self.assertEqual(window._result_state.status, "success")
+            self.assertEqual(window._result_state.report_path, report_path)
+            self.assertIsNone(window._result_state.output_path)
+
+    def test_stage_progress_heartbeat_and_safe_cancel_feedback(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        class Progress:
+            def __init__(self):
+                self.options = {}
+                self.started = []
+
+            def configure(self, **kwargs):
+                self.options.update(kwargs)
+
+            def start(self, interval):
+                self.started.append(interval)
+
+            def stop(self):
+                pass
+
+        window = MainWindow.__new__(MainWindow)
+        window._progress = Progress()
+        window._task_name_var = self.Var()
+        window._current_task = "merge"
+        window._progress_recent_stage = ""
+        window._log = Mock()
+
+        with patch(
+            "doc_tool.ui.main_window._pipeline_stage_percent",
+            return_value={"build": (5, 30)},
+        ), patch(
+            "doc_tool.ui.main_window._pipeline_stage_labels",
+            return_value={"build": "构建"},
+        ):
+            window._apply_stage_progress("build", "started", "")
+            self.assertEqual(window._progress.options["value"], 5)
+            self.assertIn("构建", window._task_name_var.value)
+            window._apply_stage_progress("build", "succeeded", "")
+            self.assertEqual(window._progress.options["value"], 30)
+
+        runner = SimpleNamespace(is_running=True, cancel=Mock())
+        window.runner = runner
+        window._cancel_btn = SimpleNamespace(configure=Mock())
+        window._status_var = self.Var()
+        window._progress_recent_stage = "build"
+        with patch(
+            "doc_tool.ui.main_window._pipeline_stage_labels",
+            return_value={"build": "构建"},
+        ):
+            window._on_cancel()
+        self.assertIn("等待安全停止点", window._status_var.value)
+        window._cancel_btn.configure.assert_called_once_with(state="disabled")
+        runner.cancel.assert_called_once()
+
+    def test_start_task_uses_indeterminate_heartbeat_and_rolls_back_rejection(self):
+        from unittest.mock import Mock
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.task_bridge import TaskSpec
+
+        class Progress:
+            def __init__(self):
+                self.options = {}
+                self.started = []
+                self.stopped = 0
+
+            def configure(self, **kwargs):
+                self.options.update(kwargs)
+
+            def start(self, interval):
+                self.started.append(interval)
+
+            def stop(self):
+                self.stopped += 1
+
+        window = MainWindow.__new__(MainWindow)
+        window._project_summary = SimpleNamespace(project_root=Path("C:/project"))
+        window._stage_progress_enabled = False
+        window._progress = Progress()
+        window._cancel_btn = SimpleNamespace(configure=Mock())
+        window._elapsed_var = self.Var()
+        window._task_name_var = self.Var()
+        window._status_var = self.Var()
+        window._render_result_state = Mock()
+        window._refresh_interaction_state = Mock()
+        window.runner = SimpleNamespace(start=Mock(return_value=False))
+
+        window._start_task(TaskSpec(name="validate", target=lambda: True))
+
+        self.assertEqual(window._progress.options["mode"], "indeterminate")
+        self.assertEqual(window._progress.started, [15])
+        self.assertEqual(window._progress.stopped, 1)
+        self.assertEqual(window._current_task, "")
+        self.assertEqual(window._result_state.title, "任务未启动")
+        self.assertIn("已有任务", window._status_var.value)
+
+    def test_pipeline_success_and_stale_result_actions(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "output.docx"
+            output.write_bytes(b"docx")
+            report = root / "validation.md"
+            report.write_text("ok", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window._project_summary = SimpleNamespace(project_root=root)
+            window._current_task = "merge"
+            window._last_error_code = None
+            window._last_error_stage = ""
+            window._last_error_detail = ""
+            window._task_terminal_kind = "succeeded"
+            window._status_var = self.Var()
+            window._summary_vars = {"last_build": self.Var()}
+            window._validation_report_path = lambda: report
+            window._current_log_path = lambda: root / "runtime.log"
+            window._log = Mock()
+            window._render_result_state = Mock()
+            result = SimpleNamespace(
+                success=True, output_path=str(output), error_code=None
+            )
+
+            with patch(
+                "doc_tool.domain.output_state.is_formal_success", return_value=True
+            ):
+                window._handle_pipeline_result(result)
+
+            self.assertEqual(window._result_state.status, "success")
+            self.assertEqual(window._result_state.output_path, output)
+            self.assertEqual(window._result_state.report_path, report)
+            self.assertIn("正式合并成功", window._result_state.title)
+
+            output.unlink()
+            window._open_file = Mock(return_value=False)
+            window._show_error = Mock()
+            window._render_result_state.reset_mock()
+            window._open_result_file(output)
+            window._show_error.assert_called_once()
+            window._render_result_state.assert_called_once()
+
+    def test_project_switch_resets_persistent_result(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.workbench_state import ResultState
+
+        root = Path("C:/new-project")
+        manifest = SimpleNamespace(
+            documentName="新文档",
+            documentNo="NO-1",
+            documentType="general",
+            documentVersion="1.0",
+            sourceSha256="abc123",
+            lastSuccessfulBuildVersion=None,
+        )
+        summary = SimpleNamespace(
+            project_root=root,
+            manifest=manifest,
+            lock_info=None,
+            is_writable=True,
+        )
+        window = MainWindow.__new__(MainWindow)
+        window._result_state = ResultState(
+            status="success", project_root=Path("C:/old-project")
+        )
+        window._summary_vars = {
+            key: self.Var()
+            for key in (
+                "document_name",
+                "document_no",
+                "document_type",
+                "document_version",
+                "source_hash",
+                "last_build",
+                "project_path",
+            )
+        }
+        window._lock_status_var = self.Var()
+        window._status_var = self.Var()
+        window._render_result_state = Mock()
+        window._refresh_recent_menu = Mock()
+        window._refresh_interaction_state = Mock()
+
+        with patch(
+            "doc_tool.application.project_service.add_recent_project"
+        ) as add_recent:
+            window.show_project(summary)
+
+        self.assertEqual(window._result_state.status, "idle")
+        self.assertEqual(window._result_state.project_root, root)
+        add_recent.assert_called_once()
+        window._render_result_state.assert_called_once()
+
+    def test_technical_details_use_only_sanitized_result_fields(self):
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.workbench_state import ResultState
+
+        window = MainWindow.__new__(MainWindow)
+        window.root = object()
+        window._result_state = ResultState(
+            status="failure",
+            error_code="E3003",
+            stage="word_save",
+            exception_summary="Word 保存失败",
+            log_path=Path("C:/project/logs/runtime.log"),
+        )
+        with patch("tkinter.messagebox.showinfo") as showinfo:
+            window._show_result_technical_details()
+
+        details = showinfo.call_args.args[1]
+        self.assertIn("E3003", details)
+        self.assertIn("word_save", details)
+        self.assertIn("Word 保存失败", details)
+        self.assertIn("runtime.log", details)
 
     def test_file_and_directory_opening_keep_distinct_semantics(self):
         from unittest.mock import patch
@@ -602,6 +1024,9 @@ class MainWindowInteractionTests(unittest.TestCase):
             window = MainWindow.__new__(MainWindow)
             window._current_task = task
             window._last_error_code = None
+            window._last_error_stage = ""
+            window._last_error_detail = ""
+            window._task_terminal_kind = ""
             window._stage_progress_enabled = False
             window._close_after_task = False
             window._progress = Progress()
@@ -609,6 +1034,7 @@ class MainWindowInteractionTests(unittest.TestCase):
             window._task_name_var = self.Var()
             window._status_var = self.Var()
             window._drain_stage_progress = Mock()
+            window._stop_elapsed_update = Mock()
             window._refresh_recent_menu = Mock()
             window._refresh_interaction_state = Mock()
             window._handle_pipeline_result = Mock()
@@ -754,6 +1180,93 @@ class PresentationHelpersTests(unittest.TestCase):
         self.assertIn("- 未安装 Word", text)
 
 
+class ContentOperationsStateTests(unittest.TestCase):
+    """任务 10.4：内容操作状态矩阵（菜单可用性随项目/只读/索引就绪变化）。"""
+
+    def _make_window(self, *, project, index_ready=False, workspace=None):
+        from unittest.mock import Mock
+
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow.__new__(MainWindow)
+        window._content_menu = Mock()
+        window._content_entry_indexes = {
+            "search": 0,
+            "references": 1,
+            "lint": 2,
+            "replace": 3,
+            "refactor": 4,
+            "open_external": 5,
+        }
+        window._project_summary = project
+        window._content_workspace = workspace
+        window._content_index_ready = index_ready
+        window._set_menu_entries = Mock()
+        return window
+
+    def _menu_states(self, window):
+        """从 _set_menu_entries 调用中提取 {key: enabled}。"""
+        states = {}
+        for call in window._set_menu_entries.call_args_list:
+            args = call[0] if call[0] else call[1]
+            keys = args[2]
+            enabled = args[3]
+            for key in keys:
+                states[key] = enabled
+        return states
+
+    def test_writable_project_index_ready_enables_all(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._menu_states(window)
+        self.assertTrue(states["search"])
+        self.assertTrue(states["references"])
+        self.assertTrue(states["lint"])
+        self.assertTrue(states["replace"])
+        self.assertTrue(states["refactor"])
+        self.assertTrue(states["open_external"])
+
+    def test_readonly_project_disables_write_actions(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=False),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._menu_states(window)
+        self.assertTrue(states["search"])
+        self.assertFalse(states["replace"])
+        self.assertFalse(states["refactor"])
+
+    def test_index_not_ready_disables_read_actions(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=False,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._menu_states(window)
+        self.assertFalse(states["search"])
+        self.assertFalse(states["replace"])
+        # open_external 仅依赖 workspace 存在
+        self.assertTrue(states["open_external"])
+
+    def test_task_running_disables_content_menu(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=True)
+        states = self._menu_states(window)
+        self.assertFalse(states["search"])
+        self.assertFalse(states["replace"])
+
+
 # === 人工操作清单 ===
 # 以下操作需要在 Windows 桌面环境中手动执行，无法自动化测试：
 #
@@ -795,6 +1308,65 @@ class PresentationHelpersTests(unittest.TestCase):
 # 10. 关于/环境诊断：
 #     - 帮助 → 关于
 #     - 预期：显示版本、提交、Python、平台信息和 Word 可用性
+#
+# --- 内容操作（任务 10.5） ---
+#
+# 11. 内容工作区与索引：
+#     - 打开项目 → 下方出现「内容操作」区，状态栏显示"内容索引就绪：N 个文件"
+#     - 预期：章节树按 类型/第X章/X.Y/X.Y.Z 层级渲染，节点可点击展开
+#
+# 12. 章节树打开与定位：
+#     - 点击章节树文件节点 → 右侧编辑器打开该文件，预览同步刷新
+#     - 搜索/检查结果点击 → 编辑器打开并高亮命中行，章节树同步选中并展开父级
+#
+# 13. 全文搜索：
+#     - 内容 → 全文搜索（Ctrl+F）→ 输入关键字
+#     - 预期：后台搜索，结果表显示 文件/行/预览，点击定位；正则/大小写/整词/类型过滤生效
+#
+# 14. 编辑器与预览：
+#     - 编辑器修改 → 侧边预览去抖刷新；Ctrl+S 保存（生成 .md.bak）
+#     - 保存后内容 → 章节树/搜索反映最新内容（索引刷新）
+#     - 「在外部编辑器打开」用系统程序打开；外部修改后回到工具提示刷新
+#
+# 15. 全局替换：
+#     - 内容 → 全局替换 → 查找 → 逐项「替换此项/跳过」；「全部替换」先弹确认
+#     - 预期：每文件 .md.bak，替换后自动跑校验；「回滚本次替换」恢复
+#
+# 16. 重命名/重编号联动：
+#     - 内容 → 章节重命名/重编号 → 选择文件、填新文件名 → 预览影响 → 确认执行
+#     - 预期：dry-run 列出受影响引用（旧→新），执行后引用更新、文件重命名、自动校验
+#
+# 17. 引用分析：
+#     - 内容 → 引用分析 → 显示当前文件被哪些文件引用 + 全项目悬空引用
+#     - 预期：悬空引用区分「确定/疑似」，点击可定位
+#
+# 18. 术语/一致性检查：
+#     - 内容 → 术语/一致性检查 → 运行检查
+#     - 预期：重复标题/术语大小写/TODO 残留列出，点击定位；术语清单增删后立即重跑
+#
+# 19. 只读项目：
+#     - 打开模式版本不兼容的项目
+#     - 预期：搜索/树可用，编辑器只读，替换/重命名不可用（内容菜单灰置）
+#
+# --- UI 优化（后续批次） ---
+#
+# 20. 章节树工具栏与右键菜单：
+#     - 章节树上方「展开全部/折叠全部/刷新」
+#     - 预期：展开/折叠全树；刷新后新增/删除/外部修改的文件反映到树
+#     - 右键文件节点 → 打开 / 复制相对路径
+#
+# 21. 编辑器状态反馈：
+#     - 修改未保存时工具栏显示「● 未保存」，保存/回滚后消失
+#     - 打开文件后状态栏显示结构摘要（标题/段落/表格/图片计数）
+#
+# 22. 快捷键：
+#     - Ctrl+F 聚焦搜索输入框并选中已有文本
+#     - Ctrl+1..5 切换内容工作区标签页（章节树/搜索/替换/重命名/检查）
+#
+# 23. 主页面滚动与摘要折叠：
+#     - 缩小窗口高度后，工作台右侧出现垂直滚动条，可滚动触达全部功能
+#     - 「项目与就绪状态」右上角「收起/展开」折叠摘要区，为内容工作区腾空间
+#     - 折叠后内容工作区占据窗口主要高度，无需全屏即可使用
 
 
 if __name__ == "__main__":

@@ -29,6 +29,11 @@ from doc_tool.ui.task_bridge import (
     TaskRunner,
     TaskSpec,
 )
+from doc_tool.ui.workbench_state import (
+    ResultState,
+    derive_workbench_state,
+    error_presentation,
+)
 
 
 # 文档类型中文映射
@@ -109,8 +114,19 @@ class MainWindow:
         self._progress_recent_stage = ""
         # 最近一次任务错误码（看门狗/校验失败等），完成后清理。
         self._last_error_code: Optional[str] = None
+        self._last_error_stage = ""
+        self._last_error_detail = ""
+        self._task_terminal_kind = ""
         # 用户在任务运行中确认退出后，等待任务安全结束再销毁窗口。
         self._close_after_task = False
+        # Word availability is intentionally unknown until an explicit merge
+        # attempt performs the existing non-blocking preflight check.
+        self._word_available: Optional[bool] = None
+        self._workbench_state = derive_workbench_state(None, running=False)
+        self._result_state = ResultState()
+        self._log_expanded = False
+        self._task_started_at = None
+        self._elapsed_timer = None
 
         self._build_ui()
         self._build_menu()
@@ -147,78 +163,7 @@ class MainWindow:
             except Exception:
                 pass
 
-        # --- 项目摘要面板 ---
-        summary_frame = ttk.LabelFrame(self.root, text="项目摘要", padding=12)
-        summary_frame.pack(fill="x", padx=8, pady=(8, 4))
-
-        self._summary_vars = {}
-        # 需要自动换行的长字段：项目路径、文档名称等可能超出窗口宽度。
-        wrap_keys = {"project_path", "document_name"}
-        for i, key in enumerate(
-            ("document_name", "document_no", "document_type",
-             "document_version", "source_hash", "last_build", "project_path")
-        ):
-            ttk.Label(summary_frame, text=self._summary_label(key) + "：").grid(
-                row=i, column=0, sticky="w", pady=2
-            )
-            var = tk.StringVar(value="—")
-            self._summary_vars[key] = var
-            if key in wrap_keys:
-                ttk.Label(summary_frame, textvariable=var, wraplength=560).grid(
-                    row=i, column=1, sticky="we", padx=(8, 0), pady=2
-                )
-            else:
-                ttk.Label(summary_frame, textvariable=var).grid(
-                    row=i, column=1, sticky="w", padx=(8, 0), pady=2
-                )
-        summary_frame.columnconfigure(1, weight=1)
-
-        # --- 任务进度面板 ---
-        progress_frame = ttk.LabelFrame(self.root, text="任务进度", padding=8)
-        progress_frame.pack(fill="x", padx=8, pady=4)
-
-        self._task_name_var = tk.StringVar(value="无任务运行")
-        ttk.Label(progress_frame, textvariable=self._task_name_var).pack(anchor="w")
-
-        self._progress = ttk.Progressbar(
-            progress_frame, mode="determinate", length=400, maximum=100
-        )
-        self._progress.pack(fill="x", pady=(4, 2))
-
-        self._cancel_btn = ttk.Button(
-            progress_frame, text="取消", command=self._on_cancel, state="disabled"
-        )
-        self._cancel_btn.pack(side="right", pady=(4, 0))
-
-        # --- 事件日志面板 ---
-        log_frame = ttk.LabelFrame(self.root, text="事件日志", padding=4)
-        log_frame.pack(fill="both", expand=True, padx=8, pady=4)
-
-        self._log_text = tk.Text(
-            log_frame, height=10, state="disabled", wrap="word",
-            font=("Consolas", 9),
-        )
-        log_scroll = ttk.Scrollbar(log_frame, command=self._log_text.yview)
-        self._log_text.configure(yscrollcommand=log_scroll.set)
-        # 待读提示放在右上角（默认空，不占视觉空间）。
-        self._log_pending_var = tk.StringVar(value="")
-        self._log_pending_label = ttk.Label(
-            log_frame, textvariable=self._log_pending_var,
-            style="Status.TLabel", foreground="#b00", cursor="hand2",
-        )
-        self._log_pending_label.pack(side="top", anchor="ne")
-        self._log_pending_label.bind("<Button-1>", self._scroll_log_to_bottom)
-        self._log_text.pack(side="left", fill="both", expand=True)
-        log_scroll.pack(side="right", fill="y")
-        # 智能自动滚动：记录用户是否停在底部；离开底部时不再强制滚到底，
-        # 同时在日志框右上角提示待读条数。
-        self._log_at_bottom = True
-        self._log_pending = 0
-        self._log_text.bind("<ButtonRelease-1>", self._on_log_scroll_check)
-        self._log_text.bind("<KeyRelease>", self._on_log_scroll_check)
-        log_scroll.bind("<B1-Motion>", lambda _e: self._on_log_scroll_check())
-
-        # --- 状态栏 ---
+        # --- Stable status bar; only the content container switches views. ---
         status_bar = ttk.Frame(self.root, relief="sunken", padding=(8, 2))
         status_bar.pack(fill="x", side="bottom")
         self._status_var = tk.StringVar(value="就绪")
@@ -229,6 +174,246 @@ class MainWindow:
         ttk.Label(
             status_bar, textvariable=self._lock_status_var, style="Status.TLabel"
         ).pack(side="right")
+
+        self._content_host = ttk.Frame(self.root, padding=8)
+        self._content_host.pack(fill="both", expand=True)
+
+        # --- No-project empty state ---
+        self._empty_frame = ttk.Frame(self._content_host, padding=(32, 36))
+        ttk.Label(
+            self._empty_frame, text="康尚文档工作台", style="Title.TLabel"
+        ).pack(anchor="center")
+        ttk.Label(
+            self._empty_frame,
+            text="新建或打开项目后，可在首屏完成校验、构建、合并和产物查看。",
+            wraplength=620,
+        ).pack(anchor="center", pady=(8, 20))
+        empty_actions = ttk.Frame(self._empty_frame)
+        empty_actions.pack(anchor="center")
+        ttk.Button(
+            empty_actions,
+            text="新建项目…",
+            command=self._on_new_project,
+            style="Primary.TButton",
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            empty_actions,
+            text="打开项目…",
+            command=self._on_open_project,
+            style="Secondary.TButton",
+        ).pack(side="left", padx=6)
+        ttk.Label(
+            self._empty_frame, text="最近项目", style="Heading.TLabel"
+        ).pack(anchor="w", pady=(28, 8))
+        self._empty_recent_frame = ttk.Frame(self._empty_frame)
+        self._empty_recent_frame.pack(fill="x")
+
+        # --- Open-project workbench (scrollable: 窗口过小时可滚动触达全部功能) ---
+        from doc_tool.ui.scrollable import ScrollableFrame
+
+        self._workbench_scroll = ScrollableFrame(self._content_host)
+        self._workbench_frame = self._workbench_scroll.inner
+
+        # 摘要区可折叠：默认展开，窗口偏矮时可收起以腾出内容工作区空间。
+        self._summary_collapsed = False
+        summary_frame = ttk.LabelFrame(
+            self._workbench_frame, text="项目与就绪状态", padding=8
+        )
+        summary_frame.pack(fill="x", pady=(0, 6))
+        summary_header = ttk.Frame(summary_frame)
+        summary_header.pack(fill="x")
+        self._summary_toggle_btn = ttk.Button(
+            summary_header,
+            text="收起",
+            command=self._toggle_summary,
+            style="Compact.TButton",
+        )
+        self._summary_toggle_btn.pack(side="right")
+        self._summary_body = ttk.Frame(summary_frame)
+        self._summary_body.pack(fill="x", pady=(4, 0))
+
+        self._summary_vars = {}
+        wrap_keys = {"project_path", "document_name"}
+        for i, key in enumerate(
+            ("document_name", "document_no", "document_type",
+             "document_version", "source_hash", "last_build", "project_path")
+        ):
+            ttk.Label(self._summary_body, text=self._summary_label(key) + "：").grid(
+                row=i, column=0, sticky="w", pady=2
+            )
+            var = tk.StringVar(value="—")
+            self._summary_vars[key] = var
+            ttk.Label(
+                self._summary_body,
+                textvariable=var,
+                wraplength=620 if key in wrap_keys else 0,
+            ).grid(row=i, column=1, sticky="we", padx=(8, 0), pady=2)
+        self._summary_body.columnconfigure(1, weight=1)
+        self._readiness_var = tk.StringVar(value="请选择或新建项目")
+        self._readiness_label = ttk.Label(
+            self._summary_body,
+            textvariable=self._readiness_var,
+            style="Neutral.TLabel",
+            wraplength=700,
+        )
+        self._readiness_label.grid(
+            row=0, column=2, rowspan=3, sticky="nw", padx=(20, 0)
+        )
+        self._disabled_reasons_var = tk.StringVar(value="")
+        ttk.Label(
+            self._summary_body,
+            textvariable=self._disabled_reasons_var,
+            style="Status.TLabel",
+            wraplength=300,
+            justify="left",
+        ).grid(row=3, column=2, rowspan=4, sticky="nw", padx=(20, 0))
+
+        action_frame = ttk.LabelFrame(
+            self._workbench_frame, text="常用操作", padding=12
+        )
+        action_frame.pack(fill="x", pady=6)
+        self._action_buttons = {}
+        action_specs = (
+            ("merge", "正式合并", self._on_merge, "Primary.TButton"),
+            ("diag_build", "诊断构建", self._on_diag_build, "Secondary.TButton"),
+            ("validate", "项目校验", self._on_validate, "Secondary.TButton"),
+            ("content", "打开内容目录", self._on_open_content, "Secondary.TButton"),
+            ("output", "打开输出位置", self._on_open_output, "Secondary.TButton"),
+            ("report", "打开校验报告", self._on_open_validation_report, "Secondary.TButton"),
+        )
+        for column, (key, label, command, style_name) in enumerate(action_specs):
+            button = ttk.Button(
+                action_frame, text=label, command=command, style=style_name
+            )
+            button.grid(row=0, column=column, padx=4, pady=2, sticky="ew")
+            action_frame.columnconfigure(column, weight=1)
+            self._action_buttons[key] = button
+
+        progress_frame = ttk.LabelFrame(
+            self._workbench_frame, text="任务进度", padding=8
+        )
+        progress_frame.pack(fill="x", pady=6)
+        self._task_name_var = tk.StringVar(value="无任务运行")
+        ttk.Label(progress_frame, textvariable=self._task_name_var).pack(anchor="w")
+        self._elapsed_var = tk.StringVar(value="")
+        ttk.Label(
+            progress_frame, textvariable=self._elapsed_var, style="Status.TLabel"
+        ).pack(anchor="w")
+        self._progress = ttk.Progressbar(
+            progress_frame, mode="determinate", length=400, maximum=100
+        )
+        self._progress.pack(fill="x", pady=(4, 2))
+        self._cancel_btn = ttk.Button(
+            progress_frame, text="取消", command=self._on_cancel, state="disabled"
+        )
+        self._cancel_btn.pack(side="right", pady=(4, 0))
+
+        self._result_frame = ttk.LabelFrame(
+            self._workbench_frame,
+            text="最近任务结果",
+            padding=10,
+            style="Result.TLabelframe",
+        )
+        self._result_frame.pack(fill="x", pady=6)
+        self._result_title_var = tk.StringVar(value=self._result_state.title)
+        self._result_summary_var = tk.StringVar(value=self._result_state.summary)
+        self._result_advice_var = tk.StringVar(value="")
+        ttk.Label(
+            self._result_frame,
+            textvariable=self._result_title_var,
+            style="Neutral.TLabel",
+        ).pack(anchor="w")
+        ttk.Label(
+            self._result_frame,
+            textvariable=self._result_summary_var,
+            wraplength=760,
+        ).pack(anchor="w", pady=(3, 0))
+        ttk.Label(
+            self._result_frame,
+            textvariable=self._result_advice_var,
+            style="Status.TLabel",
+            wraplength=760,
+        ).pack(anchor="w")
+        self._result_actions = ttk.Frame(self._result_frame)
+        self._result_actions.pack(fill="x", pady=(6, 0))
+
+        # --- Compact event log; the text keeps receiving events while hidden. ---
+        self._log_frame = ttk.LabelFrame(
+            self._workbench_frame, text="事件日志", padding=4
+        )
+        self._log_frame.pack(fill="x", pady=(6, 0))
+        log_header = ttk.Frame(self._log_frame)
+        log_header.pack(fill="x")
+        self._log_summary_var = tk.StringVar(value="日志已折叠")
+        ttk.Label(
+            log_header, textvariable=self._log_summary_var, style="Status.TLabel"
+        ).pack(side="left")
+        self._log_pending_var = tk.StringVar(value="")
+        self._log_pending_label = ttk.Label(
+            log_header,
+            textvariable=self._log_pending_var,
+            style="Warning.TLabel",
+            cursor="hand2",
+        )
+        self._log_pending_label.pack(side="left", padx=(8, 0))
+        self._log_pending_label.bind("<Button-1>", self._expand_log_and_scroll)
+        self._log_toggle_btn = ttk.Button(
+            log_header,
+            text="展开",
+            command=self._toggle_log,
+            style="Compact.TButton",
+        )
+        self._log_toggle_btn.pack(side="right")
+        self._log_body = ttk.Frame(self._log_frame)
+        self._log_text = tk.Text(
+            self._log_body,
+            height=8,
+            state="disabled",
+            wrap="word",
+            font=("Consolas", 9),
+        )
+        log_scroll = ttk.Scrollbar(self._log_body, command=self._log_text.yview)
+        self._log_text.configure(yscrollcommand=log_scroll.set)
+        log_controls = ttk.Frame(self._log_body)
+        log_controls.pack(fill="x", side="bottom", pady=(4, 0))
+        ttk.Button(
+            log_controls,
+            text="复制日志",
+            command=self._copy_log,
+            style="Compact.TButton",
+        ).pack(side="left")
+        ttk.Button(
+            log_controls,
+            text="打开日志目录",
+            command=self._on_open_logs,
+            style="Compact.TButton",
+        ).pack(side="left", padx=(6, 0))
+        self._log_text.pack(side="left", fill="both", expand=True)
+        log_scroll.pack(side="right", fill="y")
+        self._log_at_bottom = True
+        self._log_pending = 0
+        self._log_text.bind("<ButtonRelease-1>", self._on_log_scroll_check)
+        self._log_text.bind("<KeyRelease>", self._on_log_scroll_check)
+        log_scroll.bind("<B1-Motion>", lambda _e: self._on_log_scroll_check())
+
+        # --- 内容操作工作区（打开项目后填充） ---
+        self._content_host_frame = ttk.LabelFrame(
+            self._workbench_frame, text="内容操作", padding=6
+        )
+        # 固定最小高度：外层可滚动时内容工作区也不会被压缩到不可用。
+        self._content_host_frame.pack_propagate(False)
+        self._content_host_frame.configure(height=420)
+        self._content_host_frame.pack(fill="both", expand=True, pady=(6, 0))
+        self._content_workspace = None
+        self._content_placeholder = ttk.Label(
+            self._content_host_frame,
+            text="打开项目后，可在左侧章节树浏览，并支持全文搜索、编辑预览、"
+            "全局替换、章节重命名/重编号联动与术语检查。",
+            padding=24,
+            wraplength=760,
+            justify="left",
+        )
+        self._content_placeholder.pack(fill="both", expand=True)
 
     def _build_menu(self) -> None:
         import tkinter as tk
@@ -282,6 +467,51 @@ class MainWindow:
         )
         menubar.add_cascade(label="操作", menu=self._ops_menu)
 
+        # 内容菜单
+        self._content_menu = tk.Menu(menubar, tearoff=False)
+        self._content_entry_indexes = {}
+        self._content_menu.add_command(
+            label="全文搜索",
+            accelerator="Ctrl+F",
+            command=self._on_content_search,
+        )
+        self._content_entry_indexes["search"] = int(self._content_menu.index("end"))
+        self._content_menu.add_command(
+            label="引用分析…",
+            command=self._on_content_references,
+        )
+        self._content_entry_indexes["references"] = int(
+            self._content_menu.index("end")
+        )
+        self._content_menu.add_command(
+            label="全局替换…",
+            command=self._on_content_replace,
+        )
+        self._content_entry_indexes["replace"] = int(
+            self._content_menu.index("end")
+        )
+        self._content_menu.add_command(
+            label="章节重命名/重编号…",
+            command=self._on_content_refactor,
+        )
+        self._content_entry_indexes["refactor"] = int(
+            self._content_menu.index("end")
+        )
+        self._content_menu.add_command(
+            label="术语/一致性检查",
+            command=self._on_content_lint,
+        )
+        self._content_entry_indexes["lint"] = int(self._content_menu.index("end"))
+        self._content_menu.add_separator()
+        self._content_menu.add_command(
+            label="在外部编辑器打开当前文件",
+            command=self._on_content_open_external,
+        )
+        self._content_entry_indexes["open_external"] = int(
+            self._content_menu.index("end")
+        )
+        menubar.add_cascade(label="内容", menu=self._content_menu)
+
         # 工具菜单
         self._tools_menu = tk.Menu(menubar, tearoff=False)
         self._tools_entry_indexes = {}
@@ -308,6 +538,20 @@ class MainWindow:
         self.root.bind("<F5>", lambda _e: self._on_validate())
         self.root.bind("<Control-Shift-B>", lambda _e: self._on_diag_build())
         self.root.bind("<Control-l>", self._scroll_log_to_bottom)
+        self.root.bind("<Control-f>", lambda _e: self._on_content_search())
+        # 内容工作区标签页快捷键 Ctrl+1..5
+        content_tabs = (
+            "章节树 / 编辑器",
+            "搜索",
+            "替换",
+            "重命名/重编号",
+            "检查",
+        )
+        for index, tab_text in enumerate(content_tabs, start=1):
+            self.root.bind(
+                "<Control-{0}>".format(index),
+                lambda _e, t=tab_text: self._select_content_tab(t),
+            )
         self.root.bind("<F1>", lambda _e: self._on_about())
 
     # --- 状态管理 ---
@@ -318,6 +562,77 @@ class MainWindow:
             self._summary_vars[key].set("—")
         self._refresh_recent_menu()
         self._refresh_interaction_state()
+
+    @staticmethod
+    def _set_widget_enabled(widget, enabled: bool) -> None:
+        try:
+            widget.configure(state="normal" if enabled else "disabled")
+        except Exception:
+            pass
+
+    def _switch_content_view(self, view: str) -> None:
+        """Switch the single content host without changing window lifecycle."""
+        empty = getattr(self, "_empty_frame", None)
+        workbench = getattr(self, "_workbench_scroll", None)
+        if empty is None or workbench is None:
+            return
+        try:
+            empty.pack_forget()
+            workbench.pack_forget()
+            target = empty if view == "empty" else workbench
+            target.pack(fill="both", expand=True)
+        except Exception:
+            pass
+
+    def _render_empty_recent_projects(self, entries) -> None:
+        frame = getattr(self, "_empty_recent_frame", None)
+        if frame is None:
+            return
+        try:
+            for child in frame.winfo_children():
+                child.destroy()
+        except Exception:
+            return
+        from tkinter import ttk
+
+        if not entries:
+            ttk.Label(
+                frame,
+                text="暂无有效最近项目，可从上方新建或打开。",
+                style="Status.TLabel",
+            ).pack(anchor="w")
+            return
+        for entry in entries[:5]:
+            label = entry.document_name or entry.name
+            button = ttk.Button(
+                frame,
+                text="{0}\n{1}".format(label, entry.path),
+                command=lambda p=entry.path: self._open_project_path(p),
+                style="Secondary.TButton",
+            )
+            button.pack(fill="x", pady=2)
+            self._set_widget_enabled(button, not bool(self.runner.is_running))
+
+    def _apply_workbench_state(self, state) -> None:
+        """Render a pure state snapshot into both menu and workbench controls."""
+        self._switch_content_view(state.view)
+        if hasattr(self, "_readiness_var"):
+            self._readiness_var.set(state.readiness_text)
+        if hasattr(self, "_readiness_label"):
+            try:
+                self._readiness_label.configure(
+                    style="{0}.TLabel".format(state.status_tone.capitalize())
+                )
+            except Exception:
+                pass
+        if hasattr(self, "_disabled_reasons_var"):
+            self._disabled_reasons_var.set(
+                "\n".join("• {0}".format(reason) for reason in state.reasons)
+            )
+        buttons = getattr(self, "_action_buttons", {})
+        for key, action in state.actions.items():
+            if key in buttons:
+                self._set_widget_enabled(buttons[key], action.enabled)
 
     @staticmethod
     def _set_menu_entries(menu, indexes, keys, enabled: bool) -> None:
@@ -331,12 +646,17 @@ class MainWindow:
                     pass
 
     def _refresh_interaction_state(self) -> None:
-        """根据项目、只读和任务状态统一刷新所有关键操作。"""
-        has_project = self._project_summary is not None
-        writable = bool(
-            has_project and getattr(self._project_summary, "is_writable", False)
-        )
+        """根据项目、只读、任务、Word 和产物状态统一刷新操作。"""
         running = bool(self.runner.is_running)
+        report_path = self._validation_report_path()
+        state = derive_workbench_state(
+            self._project_summary,
+            running=running,
+            task_label=self._task_label(getattr(self, "_current_task", "")),
+            word_available=getattr(self, "_word_available", None),
+            report_path=report_path,
+        )
+        self._workbench_state = state
 
         self._set_menu_entries(
             self._file_menu,
@@ -344,24 +664,49 @@ class MainWindow:
             ("new", "open", "recent"),
             not running,
         )
-        self._set_menu_entries(
-            self._ops_menu,
-            self._ops_entry_indexes,
-            ("validate", "merge", "diag_build"),
-            writable and not running,
-        )
-        self._set_menu_entries(
-            self._tools_menu,
-            self._tools_entry_indexes,
-            ("content", "output", "logs"),
-            has_project,
-        )
-        path = self._validation_report_path()
+        for key in ("validate", "merge", "diag_build"):
+            action = state.actions[key]
+            self._set_menu_entries(
+                self._ops_menu, self._ops_entry_indexes, (key,), action.enabled
+            )
+        for key in ("content", "output", "logs"):
+            action = state.actions[key]
+            self._set_menu_entries(
+                self._tools_menu, self._tools_entry_indexes, (key,), action.enabled
+            )
         self._set_menu_entries(
             self._ops_menu,
             self._ops_entry_indexes,
             ("validation_report",),
-            bool(has_project and path and path.exists()),
+            state.actions["report"].enabled,
+        )
+        self._refresh_content_menu_state(running)
+        self._apply_workbench_state(state)
+
+    def _refresh_content_menu_state(self, running: bool) -> None:
+        """内容菜单可用性：读操作需项目打开且索引就绪；写操作额外需可写。"""
+        if not hasattr(self, "_content_menu"):
+            return
+        workspace_ready = self._content_workspace_available() and not running
+        summary = self._project_summary
+        writable = bool(summary and summary.is_writable)
+        self._set_menu_entries(
+            self._content_menu,
+            self._content_entry_indexes,
+            ("search", "references", "lint"),
+            workspace_ready,
+        )
+        self._set_menu_entries(
+            self._content_menu,
+            self._content_entry_indexes,
+            ("replace", "refactor"),
+            workspace_ready and writable,
+        )
+        self._set_menu_entries(
+            self._content_menu,
+            self._content_entry_indexes,
+            ("open_external",),
+            bool(getattr(self, "_content_workspace", None)),
         )
 
     def _set_ops_enabled(self, enabled: bool) -> None:
@@ -378,6 +723,7 @@ class MainWindow:
 
         self._recent_menu.delete(0, "end")
         entries = load_recent_projects()
+        self._render_empty_recent_projects(entries)
         running = bool(self.runner.is_running)
         if not entries:
             self._recent_menu.add_command(label="（无）", state="disabled")
@@ -397,6 +743,9 @@ class MainWindow:
         from doc_tool.application.project_service import add_recent_project
 
         self._project_summary = summary
+        self._word_available = None
+        self._result_state = ResultState(project_root=summary.project_root)
+        self._render_result_state()
         m = summary.manifest
         self._summary_vars["document_name"].set(m.documentName)
         self._summary_vars["document_no"].set(m.documentNo or "—")
@@ -432,7 +781,288 @@ class MainWindow:
         # 加入最近项目
         add_recent_project(str(summary.project_root), m)
         self._refresh_recent_menu()
+        self._init_content_workspace(summary)
         self._refresh_interaction_state()
+
+    # --- 内容操作工作区 ---
+
+    def _init_content_workspace(self, summary) -> None:
+        """打开项目后创建/重建内容工作区。"""
+        # 测试用 mock root 可能未运行 _build_ui，此时无内容宿主框架，跳过。
+        if not hasattr(self, "_content_host_frame"):
+            return
+        self._content_index_ready = False
+        self._content_current_file: Optional[str] = None
+        for child in self._content_host_frame.winfo_children():
+            child.destroy()
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        self._content_workspace = ContentWorkspace(
+            self._content_host_frame,
+            summary.paths.content_root,
+            state_dir=summary.paths.state_dir,
+            assets_root=summary.paths.assets_root,
+            writable=summary.is_writable,
+            on_status=lambda msg: self._status_var.set(msg),
+            on_open_file=self._on_content_open_file,
+            on_request_validate=self._on_content_request_validate,
+            on_index_ready=self._on_content_index_ready,
+        )
+        self._content_workspace.pack(fill="both", expand=True)
+
+    def _on_content_index_ready(self) -> None:
+        self._content_index_ready = True
+        self._refresh_interaction_state()
+
+    def _on_content_open_file(self, rel_path: str) -> None:
+        self._content_current_file = rel_path
+        self._refresh_interaction_state()
+
+    def _on_content_request_validate(self) -> None:
+        """替换/重命名写回后自动跑校验管线（复用现有校验任务）。"""
+        self._log("内容写回完成，自动执行校验以检查悬空引用…")
+        self._on_validate()
+
+    def _content_workspace_available(self) -> bool:
+        return bool(
+            getattr(self, "_content_workspace", None)
+            and getattr(self, "_content_index_ready", False)
+        )
+
+    def _select_content_tab(self, tab_text: str) -> None:
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return
+        notebook = getattr(workspace, "_notebook", None)
+        if notebook is None:
+            return
+        for tab_id in notebook.tabs():
+            if notebook.tab(tab_id, "text") == tab_text:
+                notebook.select(tab_id)
+                return
+
+    def _on_content_search(self) -> None:
+        if not self._content_workspace_available():
+            return
+        self._select_content_tab("搜索")
+        panel = getattr(self._content_workspace, "_search_panel", None)
+        if panel is not None:
+            panel.focus_query()
+
+    def _on_content_replace(self) -> None:
+        if not self._content_workspace_available():
+            return
+        summary = self._project_summary
+        if summary and not summary.is_writable:
+            return
+        self._select_content_tab("替换")
+
+    def _on_content_refactor(self) -> None:
+        if not self._content_workspace_available():
+            return
+        summary = self._project_summary
+        if summary and not summary.is_writable:
+            return
+        self._select_content_tab("重命名/重编号")
+        workspace = self._content_workspace
+        panel = getattr(workspace, "_refactor_panel", None)
+        current = getattr(self, "_content_current_file", None)
+        if panel is not None and current:
+            panel.set_target(current)
+
+    def _on_content_lint(self) -> None:
+        if not self._content_workspace_available():
+            return
+        self._select_content_tab("检查")
+        panel = getattr(self._content_workspace, "_lint_panel", None)
+        if panel is not None:
+            panel.run_check()
+
+    def _on_content_open_external(self) -> None:
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return
+        editor = getattr(workspace, "_editor", None)
+        if editor is not None:
+            editor.open_external()
+
+    def _on_content_references(self) -> None:
+        """引用分析：当前文件的被引用情况 + 全项目悬空引用。"""
+        workspace = getattr(self, "_content_workspace", None)
+        index = getattr(workspace, "_index", None)
+        if index is None:
+            return
+        current = getattr(self, "_content_current_file", None)
+        from doc_tool.ui.content.references_dialog import show_references_dialog
+
+        show_references_dialog(
+            self.root,
+            index,
+            current_file=current,
+            on_open=self._on_content_open_from_dialog,
+        )
+
+    def _on_content_open_from_dialog(self, rel_path: str, line_no: int) -> None:
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is not None:
+            workspace.open_file(rel_path, line_no)
+
+    # --- 内容菜单状态 ---
+
+    def _render_result_state(self) -> None:
+        """Render persistent task result and only actions whose paths still exist."""
+        state = getattr(self, "_result_state", ResultState())
+        if hasattr(self, "_result_title_var"):
+            self._result_title_var.set(state.title)
+            self._result_summary_var.set(state.summary)
+            self._result_advice_var.set(
+                "建议：{0}".format(state.advice) if state.advice else ""
+            )
+        frame = getattr(self, "_result_actions", None)
+        if frame is None:
+            return
+        try:
+            for child in frame.winfo_children():
+                child.destroy()
+        except Exception:
+            return
+        from tkinter import ttk
+
+        project = getattr(self, "_project_summary", None)
+        project_root = getattr(project, "project_root", None)
+        if state.project_root and project_root:
+            try:
+                if Path(state.project_root).resolve() != Path(project_root).resolve():
+                    return
+            except OSError:
+                return
+
+        def add(label, command):
+            ttk.Button(
+                frame, text=label, command=command, style="Compact.TButton"
+            ).pack(side="left", padx=(0, 6))
+
+        if state.output_path and Path(state.output_path).is_file():
+            add("打开产物", lambda p=state.output_path: self._open_result_file(p))
+            add("打开所在目录", lambda p=Path(state.output_path).parent: self._open_result_directory(p))
+        if state.report_path and Path(state.report_path).is_file():
+            add("查看校验报告", self._on_open_validation_report)
+        if state.status == "failure" and (
+            state.error_code or state.stage or state.exception_summary or state.log_path
+        ):
+            add("技术详情…", self._show_result_technical_details)
+
+    def _open_result_file(self, path: Path) -> None:
+        if not self._open_file(Path(path)):
+            self._show_error(
+                "结果已不可用",
+                "该任务产物已被移动或删除：{0}".format(path),
+                "请重新执行任务，或打开当前项目输出目录查找仍存在的产物。",
+            )
+            self._render_result_state()
+
+    def _open_result_directory(self, path: Path) -> None:
+        if not self._open_directory(Path(path)):
+            self._show_error("结果目录已不可用", "无法打开目录：{0}".format(path))
+            self._render_result_state()
+
+    def _show_result_technical_details(self) -> None:
+        from tkinter import messagebox
+
+        state = self._result_state
+        details = [
+            "错误码：{0}".format(state.error_code or "未知"),
+            "失败阶段：{0}".format(state.stage or "未知"),
+            "异常摘要：{0}".format(state.exception_summary or "无"),
+            "日志路径：{0}".format(state.log_path or "未生成"),
+        ]
+        messagebox.showinfo("技术详情", "\n".join(details), parent=self.root)
+
+    def _toggle_summary(self) -> None:
+        """折叠/展开项目摘要区，为内容工作区腾出垂直空间。"""
+        self._summary_collapsed = not getattr(self, "_summary_collapsed", False)
+        body = getattr(self, "_summary_body", None)
+        button = getattr(self, "_summary_toggle_btn", None)
+        if body is None or button is None:
+            return
+        try:
+            if self._summary_collapsed:
+                body.pack_forget()
+                button.configure(text="展开")
+            else:
+                body.pack(fill="x", pady=(4, 0))
+                button.configure(text="收起")
+        except Exception:
+            pass
+
+    def _toggle_log(self) -> None:
+        self._log_expanded = not getattr(self, "_log_expanded", False)
+        if self._log_expanded:
+            self._log_body.pack(fill="both", expand=True, pady=(4, 0))
+            self._log_frame.pack_configure(fill="both", expand=True)
+            self._log_toggle_btn.configure(text="折叠")
+            self._log_summary_var.set("日志已展开")
+            self._scroll_log_to_bottom()
+        else:
+            self._log_body.pack_forget()
+            self._log_frame.pack_configure(fill="x", expand=False)
+            self._log_toggle_btn.configure(text="展开")
+            self._log_summary_var.set("日志已折叠")
+
+    def _expand_log_and_scroll(self, _event=None):
+        if not getattr(self, "_log_expanded", False):
+            self._toggle_log()
+        return self._scroll_log_to_bottom()
+
+    def _copy_log(self) -> None:
+        try:
+            content = self._log_text.get("1.0", "end-1c")
+            self.root.clipboard_clear()
+            self.root.clipboard_append(content)
+            self.root.update_idletasks()
+            self._status_var.set("日志内容已复制")
+        except Exception:
+            self._show_error("复制失败", "无法复制日志内容。")
+
+    def _schedule_elapsed_update(self) -> None:
+        if not self.runner.is_running or self._task_started_at is None:
+            return
+        from time import monotonic
+
+        elapsed = max(0, int(monotonic() - self._task_started_at))
+        if hasattr(self, "_elapsed_var"):
+            self._elapsed_var.set("已用时间：{0:02d}:{1:02d}".format(elapsed // 60, elapsed % 60))
+        self._elapsed_timer = self.root.after(1000, self._schedule_elapsed_update)
+
+    def _stop_elapsed_update(self) -> None:
+        """Stop the elapsed timer while preserving the final displayed duration."""
+        timer = getattr(self, "_elapsed_timer", None)
+        root = getattr(self, "root", None)
+        if timer is not None and root is not None:
+            try:
+                root.after_cancel(timer)
+            except Exception:
+                pass
+        self._elapsed_timer = None
+        started_at = getattr(self, "_task_started_at", None)
+        if started_at is not None and hasattr(self, "_elapsed_var"):
+            from time import monotonic
+
+            elapsed = max(0, int(monotonic() - started_at))
+            self._elapsed_var.set(
+                "已用时间：{0:02d}:{1:02d}".format(elapsed // 60, elapsed % 60)
+            )
+        self._task_started_at = None
+
+    def _current_log_path(self):
+        project = getattr(self, "_project_summary", None)
+        paths = getattr(project, "paths", None)
+        if paths is None:
+            return None
+        try:
+            return paths.logs_dir / "runtime.log"
+        except Exception:
+            return None
 
     # --- 菜单回调 ---
 
@@ -506,6 +1136,8 @@ class MainWindow:
         # 这里只做快速静态检查；实际 DispatchEx 探测由后台管线执行，避免
         # Word 首次启动或故障超时冻结 Tk 主线程。
         report = check_word_available(dispatch_check=False)
+        self._word_available = bool(report.available)
+        self._refresh_interaction_state()
         if not report.available:
             reasons = "\n".join("  • {0}".format(r) for r in report.reasons) or "  • 未知原因"
             self._show_error(
@@ -721,9 +1353,25 @@ class MainWindow:
     # --- 任务执行 ---
 
     def _start_task(self, spec: TaskSpec) -> None:
+        from time import monotonic
+
         self._current_task = spec.name
+        self._task_started_at = monotonic()
+        if hasattr(self, "_elapsed_var"):
+            self._elapsed_var.set("已用时间：00:00")
+        self._result_state = ResultState(
+            status="running",
+            task=spec.name,
+            title="任务运行中：{0}".format(self._task_label(spec.name)),
+            summary="任务完成后将在这里保留结果和适用的后续操作。",
+            project_root=getattr(self._project_summary, "project_root", None),
+        )
+        self._render_result_state()
         self._progress_recent_stage = ""
         self._last_error_code = None
+        self._last_error_stage = ""
+        self._last_error_detail = ""
+        self._task_terminal_kind = ""
         self._cancel_btn.configure(state="normal")
         if self._stage_progress_enabled:
             self._progress.configure(mode="determinate")
@@ -739,11 +1387,26 @@ class MainWindow:
             spec, on_event=self._on_task_event, on_done=self._on_task_done
         )
         if not started:
+            self._progress.stop()
             self._cancel_btn.configure(state="disabled")
+            self._task_started_at = None
+            self._current_task = ""
+            self._result_state = ResultState(
+                title="任务未启动",
+                summary="已有任务正在运行，本次请求未启动。",
+                advice="请等待当前任务完成后重试。",
+                project_root=getattr(
+                    getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+            self._render_result_state()
+            self._task_name_var.set("无任务运行")
             self._status_var.set("已有任务正在运行")
+            self._refresh_interaction_state()
             return
         self._refresh_recent_menu()
         self._refresh_interaction_state()
+        self._schedule_elapsed_update()
         self._schedule_poll()
 
     def _schedule_poll(self) -> None:
@@ -799,14 +1462,19 @@ class MainWindow:
 
     def _on_task_event(self, event: TaskEvent) -> None:
         """处理任务事件（由 poll 调用）。"""
-        if event.kind == "failed":
+        if event.kind in ("failed", "cancelled"):
             self._last_error_code = event.error_code
+            self._last_error_stage = event.stage or self._progress_recent_stage
+            self._last_error_detail = (event.detail or "")[:200]
+            self._task_terminal_kind = event.kind
+        if event.kind == "failed":
             self._log("✗ {0} 失败：{1}（{2}）".format(
                 self._task_label(event.stage), event.detail, event.error_code or "?"
             ))
         elif event.kind == "started":
             self._log("▶ {0} 开始".format(self._task_label(event.stage)))
         elif event.kind == "succeeded":
+            self._task_terminal_kind = "succeeded"
             self._log("✓ {0} 完成".format(self._task_label(event.stage)))
         elif event.kind == "cancelled":
             self._log("⊘ {0} 已取消".format(self._task_label(event.stage)))
@@ -815,6 +1483,7 @@ class MainWindow:
         """按当前任务的明确结果语义更新界面并统一收尾。"""
         current_task = self._current_task
         result_type = TASK_UI.get(current_task, {}).get("result_type", "unknown")
+        self._stop_elapsed_update()
         self._progress.stop()
         self._cancel_btn.configure(state="disabled")
         self._task_name_var.set("无任务运行")
@@ -827,63 +1496,179 @@ class MainWindow:
         ):
             self._progress.configure(value=100)
         self._stage_progress_enabled = False
-        self._refresh_recent_menu()
-        self._refresh_interaction_state()
 
         if result is None:
             from doc_tool.ui.task_bridge import ERR_WATCHDOG_TIMEOUT
 
-            if self._last_error_code == ERR_WATCHDOG_TIMEOUT:
-                self._status_var.set("任务运行超时，已强制结束")
-            else:
-                self._status_var.set("任务未成功完成")
+            code = self._last_error_code or "E9000"
+            reason, advice = error_presentation(code, self._last_error_detail)
+            cancelled = self._task_terminal_kind == "cancelled" or code == "E5003"
+            timed_out = code == ERR_WATCHDOG_TIMEOUT
+            status = "cancelled" if cancelled else "failure"
+            title = "任务已取消" if cancelled else "任务失败"
+            if timed_out:
+                title = "任务运行超时"
+            self._result_state = ResultState(
+                status=status,
+                task=current_task,
+                title=title,
+                summary=reason,
+                advice=advice,
+                error_code=code,
+                stage=self._last_error_stage or current_task,
+                exception_summary=self._last_error_detail,
+                log_path=self._current_log_path(),
+                project_root=getattr(
+                    getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+            self._render_result_state()
+            self._status_var.set(title)
         elif result_type == "pipeline":
             self._handle_pipeline_result(result)
         elif result_type == "validation":
             self._handle_validation_result(bool(result))
         else:
+            self._result_state = ResultState(
+                status="success",
+                task=current_task,
+                title="任务完成",
+                summary="任务已成功完成。",
+                project_root=getattr(
+                    getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+            self._render_result_state()
             self._status_var.set("任务完成")
 
+        self._refresh_recent_menu()
+        self._refresh_interaction_state()
         self._last_error_code = None
+        self._last_error_stage = ""
+        self._last_error_detail = ""
+        self._task_terminal_kind = ""
         self._current_task = ""
         if self._close_after_task:
             self._finish_close()
 
     def _handle_pipeline_result(self, result) -> None:
+        project = getattr(self, "_project_summary", None)
+        project_root = getattr(project, "project_root", None)
+        report_path = self._validation_report_path()
+        report_path = report_path if report_path and Path(report_path).is_file() else None
+        output_path = Path(result.output_path) if result.output_path else None
+        output_path = output_path if output_path and output_path.is_file() else None
         if result.success:
             from doc_tool.domain.output_state import is_formal_success
 
-            if result.output_path:
-                formal = is_formal_success(result.output_path)
+            formal = bool(output_path and is_formal_success(str(output_path)))
+            if output_path:
                 if formal:
+                    title = "正式合并成功"
+                    summary = "Word 字段已刷新并完成正式输出：{0}".format(output_path)
                     self._status_var.set("正式合并成功（Word 已刷新，字段已校验）")
-                    self._log("✓ 正式输出：{0}".format(result.output_path))
+                    self._log("✓ 正式输出：{0}".format(output_path))
                 else:
+                    title = "诊断构建完成"
+                    summary = "已生成非正式诊断输出：{0}".format(output_path)
                     self._status_var.set("诊断构建完成（非正式，字段未实机刷新）")
-                    self._log("△ 诊断输出：{0}".format(result.output_path))
+                    self._log("△ 诊断输出：{0}".format(output_path))
                 self._summary_vars["last_build"].set(APP_VERSION)
             else:
-                self._status_var.set("任务成功完成")
+                title = "任务成功完成"
+                summary = "任务已完成，但没有返回新的文档产物。"
+                self._status_var.set(title)
+            self._result_state = ResultState(
+                status="success",
+                task=self._current_task,
+                title=title,
+                summary=summary,
+                output_path=output_path,
+                report_path=report_path,
+                log_path=self._current_log_path(),
+                project_root=project_root,
+            )
         else:
-            self._status_var.set("任务失败（{0}）".format(result.error_code or "未知"))
+            last_stage = getattr(result, "last_stage", None)
+            code = result.error_code or self._last_error_code or "E9000"
+            detail = getattr(last_stage, "detail", "") or self._last_error_detail
+            reason, advice = error_presentation(code, detail)
+            old_output_exists = bool(
+                project
+                and getattr(project, "paths", None)
+                and project.paths.output_dir.is_dir()
+            )
+            if old_output_exists:
+                reason += " 本次任务未生成新的正式产物；项目中原有输出未被覆盖。"
+            cancelled = code == "E5003" or self._task_terminal_kind == "cancelled"
+            self._result_state = ResultState(
+                status="cancelled" if cancelled else "failure",
+                task=self._current_task,
+                title="任务已取消" if cancelled else "任务失败",
+                summary=reason,
+                advice=advice,
+                error_code=code,
+                stage=getattr(last_stage, "stage", "") or self._last_error_stage,
+                exception_summary=(detail or "")[:200],
+                log_path=self._current_log_path(),
+                project_root=project_root,
+            )
+            self._status_var.set(
+                "任务已取消" if cancelled else "任务失败（{0}）".format(code)
+            )
+        self._render_result_state()
 
     def _handle_validation_result(self, passed: bool) -> None:
         from doc_tool.application.project_service import read_validation_report_summary
 
         report_path = self._validation_report_path()
         report = read_validation_report_summary(report_path) if report_path else {}
+        existing_report = report_path if report.get("exists") else None
         if report.get("exists"):
             status = "校验通过" if passed else "校验未通过"
-            self._status_var.set(
-                "{0}（PASS={1} FAIL={2}）".format(
-                    status, report["passCount"], report["failCount"]
-                )
+            summary = "{0}（PASS={1} FAIL={2}）".format(
+                status, report["passCount"], report["failCount"]
             )
+            self._status_var.set(summary)
             self._log("校验报告：{0}".format(report_path))
             for failure in report["failures"][:10]:
                 self._log("  ✗ {0}".format(failure))
         else:
-            self._status_var.set("校验通过" if passed else "校验未通过")
+            status = "校验通过" if passed else "校验未通过"
+            summary = status
+            self._status_var.set(status)
+
+        if passed:
+            self._result_state = ResultState(
+                status="success",
+                task=self._current_task,
+                title="项目校验通过",
+                summary=summary,
+                report_path=existing_report,
+                log_path=self._current_log_path(),
+                project_root=getattr(
+                    getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+        else:
+            code = self._last_error_code or "E2002"
+            reason, advice = error_presentation(code, self._last_error_detail)
+            self._result_state = ResultState(
+                status="failure",
+                task=self._current_task,
+                title="项目校验未通过",
+                summary=reason,
+                advice=advice,
+                error_code=code,
+                stage=self._last_error_stage or "validate",
+                exception_summary=self._last_error_detail,
+                report_path=existing_report,
+                log_path=self._current_log_path(),
+                project_root=getattr(
+                    getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+        self._render_result_state()
 
     # --- 辅助 ---
 
@@ -930,6 +1715,8 @@ class MainWindow:
         self._log_at_bottom = True
         self._log_pending = 0
         self._log_pending_var.set("")
+        if getattr(self, "_log_expanded", False) and hasattr(self, "_log_summary_var"):
+            self._log_summary_var.set("日志已展开")
         return "break"
 
     def _log_is_at_bottom(self) -> bool:
@@ -947,14 +1734,18 @@ class MainWindow:
         timestamp = datetime.now().strftime("%H:%M:%S")
         self._log_text.configure(state="normal")
         self._log_text.insert("end", "[{0}] {1}\n".format(timestamp, message))
-        if self._log_at_bottom:
+        if getattr(self, "_log_expanded", False) and self._log_at_bottom:
             self._log_text.see("end")
             self._log_pending = 0
             self._log_pending_var.set("")
         else:
-            # 用户离开底部：累计待读，提示条数。
+            # 折叠或用户离开底部时继续接收事件，并累计待读提示。
             self._log_pending += 1
             self._log_pending_var.set("待读 {0} 条新日志…".format(self._log_pending))
+            if hasattr(self, "_log_summary_var"):
+                self._log_summary_var.set(
+                    "日志已折叠 · {0} 条待读".format(self._log_pending)
+                )
         self._log_text.configure(state="disabled")
 
     def _show_error(self, title: str, message: str, suggestion: str = "") -> None:

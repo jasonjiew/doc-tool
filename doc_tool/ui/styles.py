@@ -12,6 +12,28 @@ import sys
 from doc_tool.resources import resource_path
 
 
+# Restrained visual hierarchy shared by the main window and dialogs.  Spacing is
+# expressed in Tk logical pixels so Windows display scaling can apply normally.
+FONT_FAMILY = "Microsoft YaHei UI"
+FONT_BODY = (FONT_FAMILY, 9)
+FONT_SMALL = (FONT_FAMILY, 8)
+FONT_HEADING = (FONT_FAMILY, 12, "bold")
+FONT_TITLE = (FONT_FAMILY, 17, "bold")
+FONT_MONO = ("Consolas", 9)
+SPACE_XS = 4
+SPACE_SM = 8
+SPACE_MD = 12
+SPACE_LG = 20
+
+# Colours are auxiliary only; every semantic style is paired with explicit text.
+SEMANTIC_COLORS = {
+    "neutral": "#4b5563",
+    "success": "#176b3a",
+    "warning": "#8a5a00",
+    "failure": "#a12622",
+}
+
+
 def setup_high_dpi() -> None:
     """启用 Windows 高 DPI 感知，使界面在 HiDPI 显示器上不模糊。
 
@@ -50,17 +72,35 @@ def apply_styles(root) -> None:
                 pass
             break
 
-    # 统一字体
-    default_font = ("Microsoft YaHei", 9)
-    heading_font = ("Microsoft YaHei", 12, "bold")
-    title_font = ("Microsoft YaHei", 16, "bold")
-
+    # Native themes remain the first choice.  The explicit styles below only
+    # add hierarchy and conservative foreground colours that remain readable
+    # when a theme ignores custom backgrounds.
     try:
-        style.configure(".", font=default_font)
-        style.configure("Heading.TLabel", font=heading_font)
-        style.configure("Title.TLabel", font=title_font)
-        style.configure("Status.TLabel", font=("Microsoft YaHei", 8), foreground="gray")
+        style.configure(".", font=FONT_BODY)
+        style.configure("Heading.TLabel", font=FONT_HEADING)
+        style.configure("Title.TLabel", font=FONT_TITLE)
+        style.configure(
+            "Status.TLabel", font=FONT_SMALL, foreground=SEMANTIC_COLORS["neutral"]
+        )
+        style.configure("Primary.TButton", font=(FONT_FAMILY, 9, "bold"), padding=(16, 8))
+        style.configure("Secondary.TButton", padding=(12, 6))
+        style.configure("Compact.TButton", padding=(8, 3))
+        for tone, color in SEMANTIC_COLORS.items():
+            style.configure(
+                "{0}.TLabel".format(tone.capitalize()),
+                foreground=color,
+            )
+        style.configure(
+            "Result.TLabelframe",
+            padding=SPACE_MD,
+        )
+        style.configure(
+            "Result.TLabelframe.Label",
+            font=(FONT_FAMILY, 10, "bold"),
+        )
     except tk.TclError:
+        # Some native/high-contrast themes reject individual options.  Widgets
+        # still retain their explicit Chinese status text and default theme.
         pass
 
 
