@@ -1596,5 +1596,113 @@ class ChapterTreeStatusTests(unittest.TestCase):
         self.assertTrue(tree._tree.isExpanded(dir_index))
 
 
+class TreeRenameTests(unittest.TestCase):
+    """章节树右键「重命名…」端到端（_on_rename_file 联动引用与树刷新）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        vendor = Path(REPO_ROOT) / ".vendor" / "site-packages"
+        if vendor.is_dir():
+            sys.path.insert(0, str(vendor))
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            cls._app = QApplication.instance() or QApplication([])
+            cls._qt_available = True
+        except Exception:
+            cls._qt_available = False
+
+    def setUp(self) -> None:
+        if not getattr(self, "_qt_available", False):
+            self.skipTest("PySide6 不可用")
+        self.content_root = make_project(
+            {
+                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md": (
+                    "# 3.7.10 设备管理\n正文。\n"
+                ),
+                "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md": (
+                    "# 3.7.9 相关章节\n"
+                    "见 3.7.10 设备管理。\n"
+                    "链接 [设备管理](3.7.10 设备管理.md)。\n"
+                ),
+            }
+        )
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _build_index(self):
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.references import ReferenceScanner
+
+        index = ContentIndexService(self.content_root).build()
+        ReferenceScanner(index).scan_all()
+        return index
+
+    def _read(self, rel):
+        return (self.content_root / rel).read_text(encoding="utf-8")
+
+    def test_on_rename_file_renames_updates_refs_and_rebuilds_tree(self):
+        """重命名：磁盘新名、引用文本联动、树重建含新路径、徽标 modified。"""
+        from unittest import mock
+
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        new = "requirement/第3章/3.7 KSOA/3.7.11 设备管理.md"
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        with mock.patch.object(
+            QInputDialog, "getText", return_value=("3.7.11 设备管理.md", True)
+        ), mock.patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ), mock.patch.object(QMessageBox, "warning"):
+            ws._on_rename_file(old)
+
+        self.assertFalse((self.content_root / old).exists())
+        self.assertTrue((self.content_root / new).exists())
+        ref_text = self._read(
+            "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md"
+        )
+        self.assertIn("见 3.7.11 设备管理", ref_text)
+        self.assertIn("[设备管理](3.7.11 设备管理.md)", ref_text)
+        item_ids = [i.node_id for i in ws._tree._model.all_items()]
+        self.assertIn(new, item_ids)
+        self.assertNotIn(old, item_ids)
+        # rename 条目映射到新路径 → modified 徽标
+        ws._writer.manifest.load()
+        status = ws._tree._model._status
+        self.assertEqual(status.get(new), "modified")
+
+    def test_on_rename_file_same_name_is_noop(self):
+        """输入名与当前名相同 → 不执行任何写操作。"""
+        from unittest import mock
+
+        from PySide6.QtWidgets import QInputDialog
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        with mock.patch.object(
+            QInputDialog, "getText",
+            return_value=("3.7.10 设备管理.md", True),
+        ):
+            ws._on_rename_file(old)
+        self.assertTrue((self.content_root / old).exists())
+        # 未产生改动清单条目
+        ws._writer.manifest.load()
+        self.assertTrue(ws._writer.manifest.empty)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -193,6 +193,7 @@ class ChapterTree(QWidget):
         on_refresh: Optional[Callable[[], None]] = None,
         on_create_file: Optional[Callable[[str], None]] = None,
         on_delete_file: Optional[Callable[[str], None]] = None,
+        on_rename_file: Optional[Callable[[str], None]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
@@ -202,6 +203,7 @@ class ChapterTree(QWidget):
         self._on_refresh = on_refresh
         self._on_create_file = on_create_file
         self._on_delete_file = on_delete_file
+        self._on_rename_file = on_rename_file
         self._on_clear_markers = on_clear_markers
         self._writable = writable
         self._current: Optional[str] = None
@@ -404,6 +406,11 @@ class ChapterTree(QWidget):
             menu.addAction(copy_action)
             if self._writable:
                 menu.addSeparator()
+                rename_action = QAction("重命名…", menu)
+                rename_action.triggered.connect(
+                    lambda: self._on_rename_file and self._on_rename_file(rel_path)
+                )
+                menu.addAction(rename_action)
                 delete_action = QAction("删除", menu)
                 delete_action.triggered.connect(
                     lambda: self._on_delete_file and self._on_delete_file(rel_path)

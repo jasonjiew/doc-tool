@@ -98,6 +98,7 @@ class ContentWorkspace(QWidget):
             on_refresh=self._rebuild_index,
             on_create_file=self._on_create_file,
             on_delete_file=self._on_delete_file,
+            on_rename_file=self._on_rename_file,
             on_clear_markers=self._on_clear_markers,
             writable=self._writable,
         )
@@ -384,6 +385,61 @@ class ContentWorkspace(QWidget):
         items = build_tree(self._index.all_files())
         self._tree.set_items(items)
         self._apply_status_map()
+
+    def _on_rename_file(self, rel_path: str) -> None:
+        """内联重命名文件并联动更新引用（复用 RefactorService）。"""
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from doc_tool.application.content.refactor import RefactorService
+
+        if self._index is None:
+            return
+        new_name, ok = QInputDialog.getText(
+            self,
+            "重命名文件",
+            "新文件名：",
+            text=Path(rel_path).name,
+        )
+        if not ok or not new_name.strip():
+            return
+        new_name = new_name.strip()
+        if new_name == Path(rel_path).name:
+            return  # 未修改，无操作
+        service = RefactorService(self._index)
+        plan = service.compute_rename_plan(rel_path, new_name)
+        if plan is None:
+            QMessageBox.warning(
+                self, "重命名失败", "目标文件不在内容索引中"
+            )
+            return
+        if plan.new_rel_path in self._index.all_files():
+            QMessageBox.warning(
+                self,
+                "重命名失败",
+                "目标文件已存在：{0}".format(plan.new_rel_path),
+            )
+            return
+        if plan.total > 0:
+            answer = QMessageBox.question(
+                self,
+                "确认重命名",
+                "将同步更新 {0} 处引用（{1} 个文件），并重命名文件为：\n{2}\n\n确认？".format(
+                    plan.total, len(plan.affected_files), plan.new_rel_path
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        results = service.apply_rename_plan(plan, self._writer)
+        if not all(r.written for r in results):
+            QMessageBox.warning(
+                self, "重命名失败", "部分写回失败，请查看备份"
+            )
+            return
+        self.tabs_host.close_file(rel_path)
+        self._after_write()
 
     def _on_clear_markers(self) -> None:
         """清除全部会话改动标记（同时失去本次回滚能力）。"""
