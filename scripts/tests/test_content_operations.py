@@ -1222,5 +1222,24 @@ class LintTests(unittest.TestCase):
         self.assertEqual(self.store.load(), [])
 
 
+class ChangeManifestSerializationTests(unittest.TestCase):
+    """改动清单条目 JSON 往返（新增 trash_path 字段必须持久化）。"""
+
+    def test_entry_roundtrip_preserves_trash_path(self):
+        from doc_tool.application.content.writer import ChangeEntry, OP_DELETE
+
+        entry = ChangeEntry(
+            operation=OP_DELETE,
+            rel_path="requirement/第1章/1.1 目的.md",
+            trash_path="C:/proj/.state/trash/requirement/第1章/1.1 目的.md",
+        )
+        restored = ChangeEntry.from_dict(entry.to_dict())
+        self.assertEqual(restored.operation, OP_DELETE)
+        self.assertEqual(
+            restored.trash_path,
+            "C:/proj/.state/trash/requirement/第1章/1.1 目的.md",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

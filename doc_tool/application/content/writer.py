@@ -31,6 +31,13 @@ CHANGE_MANIFEST_NAME = "content_changes.json"
 OP_EDIT = "edit"
 OP_RENAME = "rename"
 
+# 改动操作类型（create 为新增文件；delete 为移入回收站的软删除）。
+OP_CREATE = "create"
+OP_DELETE = "delete"
+
+# 回收站目录名（相对项目 .state/ 目录）。
+TRASH_DIR_NAME = "trash"
+
 
 class PathOutsideContentError(ValueError):
     """目标路径越出 contentRoot。"""
@@ -68,10 +75,11 @@ def atomic_write(file_path: Path, text: str) -> None:
 class ChangeEntry:
     """改动清单条目。"""
 
-    operation: str  # OP_EDIT | OP_RENAME
-    rel_path: str  # 目标文件（edit 为改动文件；rename 为新路径）
+    operation: str  # OP_EDIT | OP_RENAME | OP_CREATE | OP_DELETE
+    rel_path: str  # edit 为改动文件；rename 为新路径；delete 为原路径
     backup_path: Optional[str] = None  # .bak 绝对路径（edit 必填，rename 可选）
     original_path: Optional[str] = None  # 原名（仅 rename）
+    trash_path: Optional[str] = None  # 回收站内绝对路径（仅 delete）
 
     def to_dict(self) -> dict:
         return {
@@ -79,6 +87,7 @@ class ChangeEntry:
             "relPath": self.rel_path,
             "backupPath": self.backup_path,
             "originalPath": self.original_path,
+            "trashPath": self.trash_path,
         }
 
     @classmethod
@@ -88,6 +97,7 @@ class ChangeEntry:
             rel_path=str(data.get("relPath", "")),
             backup_path=data.get("backupPath"),
             original_path=data.get("originalPath"),
+            trash_path=data.get("trashPath"),
         )
 
 
