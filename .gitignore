@@ -28,6 +28,7 @@ dist/
 .venv/
 venv/
 env/
+.vendor/
 
 # --- 密钥与本地配置 ---
 .env

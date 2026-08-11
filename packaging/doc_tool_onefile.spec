@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec：将康尚文档工具打包为 Windows onedir 应用（PySide6）。
+"""PyInstaller spec：将康尚文档工具打包为 Windows onefile 应用（PySide6）。
 
 任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets，排除未用的
 QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积。
@@ -179,8 +179,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries,
+    exclude_binaries=False,
     name="KonsungDocTool",
     debug=False,
     bootloader_ignore_signals=False,
@@ -195,13 +195,5 @@ exe = EXE(
     icon=icon_file if os.path.isfile(icon_file) else None,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="KonsungDocTool",
-)
+# onefile：无 COLLECT，全部打包进单个 exe
+

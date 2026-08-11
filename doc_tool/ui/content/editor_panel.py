@@ -1,28 +1,48 @@
 # -*- coding: utf-8 -*-
-"""内置 .md 编辑器 + 侧边预览。
+"""内置 .md 编辑器 + 侧边预览（PySide6）。
 
-UTF-8 纯文本编辑，保存经 ``ContentWriter``（备份 + 原子写）。
-侧边预览由 ``render_preview_blocks`` 渲染近似结构，编辑去抖刷新，
-标注"近似结构预览"。提供"在外部编辑器打开"兜底与外部修改检测。
+UTF-8 纯文本编辑，保存经 ``ContentWriter``（备份 + 原子写）。侧边预览由
+``render_preview_blocks`` 渲染近似结构，编辑去抖刷新，标注"近似结构预览"。
+提供"在外部编辑器打开"兜底与外部修改检测。
 """
 
 from __future__ import annotations
 
 import os
 import time
-from tkinter import ttk
 from typing import Callable, Optional
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
 
 from doc_tool.application.content.preview import (
     preview_summary,
     render_preview_blocks,
 )
-from doc_tool.ui.styles import FONT_MONO
+from doc_tool.ui.styles import FONT_FAMILY
 
 _PREVIEW_DEBOUNCE_MS = 300
 
 
-class EditorPanel(ttk.Frame):
+def _heading_format(level: int) -> QTextCharFormat:
+    fmt = QTextCharFormat()
+    font = QFont(FONT_FAMILY)
+    font.setPointSizeF(max(9.0, 14.0 - (level - 1) * 1.2))
+    font.setBold(True)
+    fmt.setFont(font)
+    return fmt
+
+
+class EditorPanel(QWidget):
     """单文件 .md 编辑器。
 
     ``writer``：``ContentWriter``（写入安全）。
@@ -32,113 +52,94 @@ class EditorPanel(ttk.Frame):
 
     def __init__(
         self,
-        master,
         writer,
         *,
         on_saved: Optional[Callable[[str], None]] = None,
         writable: bool = True,
+        parent: Optional[QWidget] = None,
     ) -> None:
-        super().__init__(master)
+        super().__init__(parent)
         self._writer = writer
         self._on_saved = on_saved
         self._writable = writable
         self._rel_path: Optional[str] = None
         self._mtime: Optional[float] = None
         self._dirty = False
-        self._preview_job: Optional[str] = None
+        self._preview_timer: Optional[QTimer] = None
 
         self._build_toolbar()
         self._build_panes()
-        self._editor.bind("<Control-s>", lambda _e: self.save())
 
     # --- 构建 ---
 
     def _build_toolbar(self) -> None:
-        bar = ttk.Frame(self, padding=(0, 0, 0, 4))
-        bar.pack(fill="x")
+        bar = QWidget(self)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(0, 0, 0, 4)
+        layout.setSpacing(8)
 
-        self._file_var = tk_string_var("未打开文件")
-        ttk.Label(bar, textvariable=self._file_var).pack(side="left")
+        self._file_label = QLabel("未打开文件", bar)
+        layout.addWidget(self._file_label)
 
-        self._dirty_var = tk_string_var("")
-        ttk.Label(
-            bar, textvariable=self._dirty_var, style="Warning.TLabel"
-        ).pack(side="left", padx=(8, 0))
+        self._dirty_label = QLabel("", bar)
+        self._dirty_label.setProperty("statusTone", "warning")
+        layout.addWidget(self._dirty_label)
 
-        self._status_var = tk_string_var("")
-        ttk.Label(
-            bar, textvariable=self._status_var, style="Status.TLabel"
-        ).pack(side="left", padx=(8, 0))
+        self._status_label = QLabel("", bar)
+        self._status_label.setObjectName("statusMuted")
+        layout.addWidget(self._status_label)
+        layout.addStretch(1)
 
-        self._save_btn = ttk.Button(
-            bar,
-            text="保存 (Ctrl+S)",
-            command=self.save,
-            state="disabled",
-            style="Compact.TButton",
-        )
-        self._save_btn.pack(side="right", padx=(4, 0))
+        self._rollback_btn = QPushButton("回滚上次保存", bar)
+        self._rollback_btn.setProperty("btnRole", "compact")
+        self._rollback_btn.clicked.connect(self.rollback_last)
+        layout.addWidget(self._rollback_btn)
 
-        self._ext_btn = ttk.Button(
-            bar,
-            text="在外部编辑器打开",
-            command=self.open_external,
-            state="disabled",
-            style="Compact.TButton",
-        )
-        self._ext_btn.pack(side="right", padx=(4, 0))
+        self._ext_btn = QPushButton("在外部编辑器打开", bar)
+        self._ext_btn.setProperty("btnRole", "compact")
+        self._ext_btn.clicked.connect(self.open_external)
+        layout.addWidget(self._ext_btn)
 
-        self._rollback_btn = ttk.Button(
-            bar,
-            text="回滚上次保存",
-            command=self.rollback_last,
-            state="disabled",
-            style="Compact.TButton",
-        )
-        self._rollback_btn.pack(side="right", padx=(4, 0))
+        self._save_btn = QPushButton("保存 (Ctrl+S)", bar)
+        self._save_btn.setProperty("btnRole", "primary")
+        self._save_btn.clicked.connect(self.save)
+        layout.addWidget(self._save_btn)
+
+        self._toolbar = bar
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        outer.addWidget(bar)
+        self._body_host = QWidget(self)
+        outer.addWidget(self._body_host, 1)
 
     def _build_panes(self) -> None:
-        paned = ttk.PanedWindow(self, orient="horizontal")
-        paned.pack(fill="both", expand=True)
+        splitter = QSplitter(Qt.Orientation.Horizontal, self._body_host)
+        body = QVBoxLayout(self._body_host)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.addWidget(splitter)
 
-        # 编辑区
-        edit_frame = ttk.Frame(paned)
-        self._editor = _make_text(edit_frame, readonly=False)
-        esb = ttk.Scrollbar(
-            edit_frame, orient="vertical", command=self._editor.yview
-        )
-        self._editor.configure(yscrollcommand=esb.set)
-        self._editor.pack(side="left", fill="both", expand=True)
-        esb.pack(side="right", fill="y")
-        self._editor.bind("<KeyRelease>", self._on_edit)
+        edit_frame = QWidget(splitter)
+        edit_layout = QVBoxLayout(edit_frame)
+        edit_layout.setContentsMargins(0, 0, 0, 0)
+        self._editor = QPlainTextEdit(edit_frame)
+        self._editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self._editor.textChanged.connect(self._on_edit)
+        edit_layout.addWidget(self._editor)
+        splitter.addWidget(edit_frame)
 
-        # 预览区
-        preview_frame = ttk.Frame(paned)
-        self._preview = _make_text(preview_frame, readonly=True)
-        psb = ttk.Scrollbar(
-            preview_frame, orient="vertical", command=self._preview.yview
-        )
-        self._preview.configure(yscrollcommand=psb.set)
-        self._preview.pack(side="left", fill="both", expand=True)
-        psb.pack(side="right", fill="y")
+        preview_frame = QWidget(splitter)
+        preview_layout = QVBoxLayout(preview_frame)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        self._preview = QPlainTextEdit(preview_frame)
+        self._preview.setReadOnly(True)
+        self._preview.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        preview_layout.addWidget(self._preview)
+        splitter.addWidget(preview_frame)
 
-        paned.add(edit_frame, weight=3)
-        paned.add(preview_frame, weight=2)
+        splitter.setSizes([600, 400])
+        self._splitter = splitter
 
-        self._editor.tag_configure("h1", font=("Microsoft YaHei UI", 14, "bold"))
-        self._editor.tag_configure("h2", font=("Microsoft YaHei UI", 12, "bold"))
-        self._editor.tag_configure("h3", font=("Microsoft YaHei UI", 11, "bold"))
-        self._editor.tag_configure("h4", font=("Microsoft YaHei UI", 10, "bold"))
-        self._preview.tag_configure("h1", font=("Microsoft YaHei UI", 14, "bold"))
-        self._preview.tag_configure("h2", font=("Microsoft YaHei UI", 12, "bold"))
-        self._preview.tag_configure("h3", font=("Microsoft YaHei UI", 11, "bold"))
-        self._preview.tag_configure("h4", font=("Microsoft YaHei UI", 10, "bold"))
-        self._preview.tag_configure(
-            "table", font=FONT_MONO, foreground="#333333"
-        )
-        self._preview.tag_configure(
-            "image", foreground="#8a5a00"
-        )
+        self._apply_edit_state()
 
     # --- 加载 / 保存 ---
 
@@ -146,13 +147,10 @@ class EditorPanel(ttk.Frame):
         """加载文件内容到编辑器并刷新预览。"""
         self._rel_path = rel_path
         self._mtime = self._file_mtime(rel_path)
-        self._editor.configure(state="normal")
-        self._editor.delete("1.0", "end")
-        self._editor.insert("1.0", text)
-        self._apply_edit_state()
+        self._editor.setPlainText(text)
         self._dirty = False
-        self._file_var.set(rel_path)
-        self._status_var.set("已加载 · " + preview_summary(text))
+        self._file_label.setText(rel_path)
+        self._status_label.setText("已加载 · " + preview_summary(text))
         self._refresh_preview(text)
         self._update_dirty()
         self._update_save_state()
@@ -161,16 +159,16 @@ class EditorPanel(ttk.Frame):
         """保存当前内容（备份 + 原子写）。成功返回 True。"""
         if not self._writable or self._rel_path is None:
             return False
-        text = self._editor.get("1.0", "end-1c")
+        text = self._editor.toPlainText()
         result = self._writer.write_text(self._rel_path, text)
         if not result.written:
-            self._status_var.set("保存失败：{0}".format(result.error))
+            self._status_label.setText("保存失败：{0}".format(result.error))
             return False
         self._mtime = self._file_mtime(self._rel_path)
         self._dirty = False
-        self._status_var.set("已保存" + (
-            "" if result.backup_path else "（备份不可用）"
-        ))
+        self._status_label.setText(
+            "已保存" + ("" if result.backup_path else "（备份不可用）")
+        )
         if self._on_saved is not None:
             self._on_saved(self._rel_path)
         self._update_dirty()
@@ -186,14 +184,14 @@ class EditorPanel(ttk.Frame):
         target = self._writer_abs(self._rel_path)
         backup = _backup_path_for(target)
         if not backup.exists():
-            self._status_var.set("无可用备份")
+            self._status_label.setText("无可用备份")
             return False
         import shutil
 
         shutil.copy2(str(backup), str(target))
         self._mtime = self._file_mtime(self._rel_path)
         self._dirty = False
-        self._status_var.set("已回滚到备份")
+        self._status_label.setText("已回滚到备份")
         if self._on_saved is not None:
             self._on_saved(self._rel_path)
         self._update_dirty()
@@ -206,7 +204,7 @@ class EditorPanel(ttk.Frame):
             return False
         target = self._writer_abs(self._rel_path)
         if not target.exists():
-            self._status_var.set("文件不存在")
+            self._status_label.setText("文件不存在")
             return False
         try:
             if os.name == "nt":
@@ -215,10 +213,10 @@ class EditorPanel(ttk.Frame):
                 import subprocess
 
                 subprocess.Popen(["xdg-open", str(target)])
-            self._status_var.set("已在外部编辑器打开（请记得回工具刷新）")
+            self._status_label.setText("已在外部编辑器打开（请记得回工具刷新）")
             return True
         except OSError as exc:
-            self._status_var.set("打开外部编辑器失败：{0}".format(exc))
+            self._status_label.setText("打开外部编辑器失败：{0}".format(exc))
             return False
 
     def check_external_change(self) -> bool:
@@ -232,27 +230,21 @@ class EditorPanel(ttk.Frame):
             except (OSError, UnicodeError):
                 return False
             self.load(self._rel_path, text)
-            self._status_var.set("检测到外部修改，已刷新")
+            self._status_label.setText("检测到外部修改，已刷新")
             return True
         return False
 
     def highlight_line(self, line_no: int) -> None:
         """高亮并滚动到指定行（用于搜索结果/检查结果定位）。"""
-        self._editor.tag_remove("highlight", "1.0", "end")
-        self._editor.tag_configure(
-            "highlight", background="#fff3cd"
-        )
-        start = "{0}.0".format(line_no)
-        end = "{0}.0".format(line_no + 1)
-        try:
-            self._editor.tag_add("highlight", start, end)
-            self._editor.see(start)
-            self._editor.mark_set("insert", start)
-        except Exception:
-            pass
+        cursor = self._editor.textCursor()
+        block = self._editor.document().findBlockByNumber(max(0, line_no - 1))
+        if block.isValid():
+            cursor.setPosition(block.position())
+            self._editor.setTextCursor(cursor)
+            self._editor.centerCursor()
+            self._editor.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def set_writable(self, writable: bool) -> None:
-        """切换只读/可写。"""
         self._writable = writable
         self._apply_edit_state()
         self._update_save_state()
@@ -268,63 +260,69 @@ class EditorPanel(ttk.Frame):
 
     # --- 内部 ---
 
-    def _on_edit(self, _event=None) -> None:
+    def _on_edit(self) -> None:
         self._dirty = True
         self._update_dirty()
         self._update_save_state()
-        if self._preview_job is not None:
-            try:
-                self.after_cancel(self._preview_job)
-            except Exception:
-                pass
-        self._preview_job = self.after(_PREVIEW_DEBOUNCE_MS, self._schedule_preview)
+        if self._preview_timer is not None:
+            self._preview_timer.stop()
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._schedule_preview)
+        self._preview_timer.start(_PREVIEW_DEBOUNCE_MS)
 
     def _update_dirty(self) -> None:
-        """未保存修改指示（工具栏 ● 标记）。"""
-        self._dirty_var.set("● 未保存" if self._dirty else "")
+        self._dirty_label.setText("● 未保存" if self._dirty else "")
 
     def _schedule_preview(self) -> None:
-        self._preview_job = None
-        self._refresh_preview(self._editor.get("1.0", "end-1c"))
+        self._refresh_preview(self._editor.toPlainText())
 
     def _refresh_preview(self, text: str) -> None:
-        self._preview.configure(state="normal")
-        self._preview.delete("1.0", "end")
+        self._preview.clear()
+        cursor = self._preview.textCursor()
         for block in render_preview_blocks(text):
             if block.kind == "heading":
-                tag = "h{0}".format(min(block.level, 4))
-                self._preview.insert("end", block.text + "\n", (tag,))
+                cursor.setCharFormat(_heading_format(block.level))
+                cursor.insertText(block.text + "\n")
             elif block.kind == "table":
+                fmt = QTextCharFormat()
+                font = QFont("Consolas")
+                font.setPointSizeF(9)
+                fmt.setFont(font)
+                cursor.setCharFormat(fmt)
                 for row in block.rows[:20]:
                     cells = " | ".join(row)
-                    self._preview.insert("end", cells + "\n", ("table",))
+                    cursor.insertText(cells + "\n")
                 if len(block.rows) > 20:
-                    self._preview.insert("end", "…（表格省略）\n", ("table",))
-                self._preview.insert("end", "\n")
+                    cursor.insertText("…（表格省略）\n")
+                cursor.insertText("\n")
             elif block.kind == "image":
                 label = "📷 {0}".format(block.image_path)
                 if block.image_size:
                     label += " ({0})".format(block.image_size)
-                self._preview.insert("end", label + "\n", ("image",))
+                cursor.insertText(label + "\n")
             elif block.kind == "paragraph":
-                self._preview.insert("end", block.text + "\n")
+                cursor.setCharFormat(QTextCharFormat())
+                cursor.insertText(block.text + "\n")
             else:
-                self._preview.insert("end", "\n")
-        self._preview.insert(
-            "end",
-            "\n—— 近似结构预览，以 Word 输出为准 ——\n",
-            ("image",),
-        )
-        self._preview.configure(state="disabled")
+                cursor.setCharFormat(QTextCharFormat())
+                cursor.insertText("\n")
+        marker = QTextCharFormat()
+        font = QFont(FONT_FAMILY)
+        font.setItalic(True)
+        marker.setFont(font)
+        cursor.setCharFormat(marker)
+        cursor.insertText("\n—— 近似结构预览，以 Word 输出为准 ——\n")
+        self._preview.moveCursor(QTextCursor.MoveOperation.Start)
 
     def _apply_edit_state(self) -> None:
-        self._editor.configure(state="normal" if self._writable else "disabled")
+        self._editor.setReadOnly(not self._writable)
 
     def _update_save_state(self) -> None:
         can = self._writable and self._rel_path is not None
-        self._save_btn.configure(state="normal" if (can and self._dirty) else "disabled")
-        self._rollback_btn.configure(state="normal" if can else "disabled")
-        self._ext_btn.configure(state="normal" if self._rel_path is not None else "disabled")
+        self._save_btn.setEnabled(can and self._dirty)
+        self._rollback_btn.setEnabled(can)
+        self._ext_btn.setEnabled(self._rel_path is not None)
 
     def _file_mtime(self, rel_path: str) -> Optional[float]:
         target = self._writer_abs(rel_path)
@@ -335,24 +333,3 @@ class EditorPanel(ttk.Frame):
 
     def _writer_abs(self, rel_path: str):
         return self._writer.resolve(rel_path)
-
-
-def _make_text(master, *, readonly: bool):
-    import tkinter as tk
-
-    text = tk.Text(
-        master,
-        wrap="word",
-        undo=True,
-        font=FONT_MONO,
-        state="disabled" if readonly else "normal",
-        padx=6,
-        pady=6,
-    )
-    return text
-
-
-def tk_string_var(value: str = ""):
-    import tkinter as tk
-
-    return tk.StringVar(value=value)

@@ -6,6 +6,11 @@
 # -r requirements.txt          # 运行依赖（构建前必须先安装）
 pyinstaller==6.14.0
 
+# 桌面 UI（PySide6 / Qt Widgets）。迁移后不再依赖 tkinter 运行时。
+# 运行时也需安装（requirements.txt 以可选方式注释，见下），冻结打包时
+# 仅引入 QtCore/QtGui/QtWidgets，排除 QtWebEngine/QtNetwork 等未用大件。
+PySide6==6.8.3
+
 # Inno Setup 不通过 pip 安装，需单独下载：
 # https://jrsoftware.org/isdl.php
 # 安装后确保 ISCC.exe 在 PATH 中，或在 packaging/build.ps1 中指定路径。

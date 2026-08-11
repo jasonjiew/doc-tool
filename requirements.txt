@@ -15,3 +15,6 @@ pillow==12.3.0
 # Windows COM 支持：Microsoft Word 自动化刷新 TOC/NUMPAGES
 # 仅 Windows 平台需要；PyInstaller 会自动收集 pywin32 DLL
 pywin32==312
+
+# 桌面 UI（PySide6 / Qt Widgets）。迁移后不再依赖 tkinter 运行时。
+PySide6==6.8.3

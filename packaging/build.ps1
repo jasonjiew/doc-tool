@@ -185,6 +185,7 @@ PyYAML 6.0.3        MIT License
 lxml 6.1.1          BSD License
 Pillow 12.3.0       MIT-CMU License
 pywin32 312         PSF-2.0 License
+PySide6 6.8.3       LGPL-3.0 / GPL-3.0 License
 Python 3.13         PSF-2.0 License
 
 构建依赖（不打包）
@@ -207,6 +208,7 @@ _internal/lxml/     libxml2/libxslt XML 解析
 _internal/PIL/      Pillow 图片处理
 _internal/yaml/     PyYAML YAML 解析
 _internal/win32/    pywin32 COM 自动化
+_internal/PySide6/  Qt Widgets 桌面 UI（仅 QtCore/QtGui/QtWidgets）
 "@
 $SbomContent | Out-File -FilePath $SbomFile -Encoding utf8
 Write-Host "  依赖清单: $SbomFile" -ForegroundColor Green

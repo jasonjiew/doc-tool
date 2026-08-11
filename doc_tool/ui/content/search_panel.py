@@ -1,15 +1,28 @@
 # -*- coding: utf-8 -*-
-"""全文搜索面板。
+"""全文搜索面板（底部工具面板）。
 
 输入去抖自动搜索；结果以"文件 + 行号 + 上下文预览"表格展示，点击定位。
 支持正则/大小写/整词开关与文档类型范围过滤；超阈值显示"显示更多"。
+复用 ``SearchService``；搜索在后台线程执行，UI 经 ``TaskRunner`` 轮询。
 """
 
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
 from typing import Callable, List, Optional
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from doc_tool.application.content.search import (
     DEFAULT_LIMIT,
@@ -17,7 +30,6 @@ from doc_tool.application.content.search import (
     SearchResult,
     SearchService,
 )
-from doc_tool.ui.styles import FONT_MONO
 
 # 文档类型过滤下拉：显示名 -> 过滤值。
 _TYPE_FILTERS = (
@@ -30,32 +42,33 @@ _TYPE_FILTERS = (
 _DEBOUNCE_MS = 350
 
 
-class SearchPanel(ttk.Frame):
+class SearchPanel(QWidget):
     """全文搜索面板。
 
-    ``on_open(rel_path, line_no)``：结果项被点击时回调，用于在内容面板
-    打开文件并定位到命中行。
-    ``writable`` 不影响搜索（搜索是只读操作），保留参数以便界面统一。
+    ``on_open(rel_path, line_no)``：结果项被点击时回调，用于在编辑器打开
+    文件并定位到命中行。
     """
 
     def __init__(
         self,
-        master,
         service: SearchService,
         *,
         on_open: Optional[Callable[[str, int], None]] = None,
-        writable: bool = True,
+        parent: Optional[QWidget] = None,
     ) -> None:
-        super().__init__(master)
+        super().__init__(parent)
         self._service = service
         self._on_open = on_open
-        self._writable = writable
-        self._debounce_job: Optional[str] = None
+        self._debounce_timer: Optional[QTimer] = None
         self._limit = DEFAULT_LIMIT
         self._last_result: Optional[SearchResult] = None
+
         from doc_tool.ui.task_bridge import TaskRunner
 
         self._runner = TaskRunner()
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(100)
+        self._poll_timer.timeout.connect(self._poll)
 
         self._build_controls()
         self._build_results()
@@ -63,105 +76,83 @@ class SearchPanel(ttk.Frame):
     # --- 构建 ---
 
     def _build_controls(self) -> None:
-        controls = ttk.Frame(self, padding=(0, 0, 0, 4))
-        controls.pack(fill="x")
+        controls = QWidget(self)
+        layout = QHBoxLayout(controls)
+        layout.setContentsMargins(0, 0, 0, 4)
+        layout.setSpacing(6)
 
-        self._query_var = tk.StringVar()
-        entry = ttk.Entry(controls, textvariable=self._query_var)
-        entry.pack(side="left", fill="x", expand=True)
-        entry.bind("<Return>", lambda _e: self.search_now())
-        entry.bind("<KeyRelease>", self._schedule)
-        self._query_entry = entry
+        self._query_entry = QLineEdit(controls)
+        self._query_entry.setPlaceholderText("全文搜索…")
+        self._query_entry.returnPressed.connect(self.search_now)
+        self._query_entry.textEdited.connect(self._schedule)
+        layout.addWidget(self._query_entry, 1)
 
-        self._search_btn = ttk.Button(
-            controls, text="搜索", command=self.search_now, style="Compact.TButton"
-        )
-        self._search_btn.pack(side="left", padx=(4, 0))
+        self._search_btn = QPushButton("搜索", controls)
+        self._search_btn.setProperty("btnRole", "secondary")
+        self._search_btn.clicked.connect(self.search_now)
+        layout.addWidget(self._search_btn)
 
-        # 文档类型过滤
-        self._type_var = tk.StringVar(value=_TYPE_FILTERS[0][0])
-        type_box = ttk.Combobox(
-            controls,
-            textvariable=self._type_var,
-            values=[label for label, _ in _TYPE_FILTERS],
-            width=10,
-            state="readonly",
-        )
-        type_box.pack(side="left", padx=(6, 0))
-        type_box.bind("<<ComboboxSelected>>", lambda _e: self.search_now())
+        self._type_box = QComboBox(controls)
+        self._type_box.addItems([label for label, _ in _TYPE_FILTERS])
+        self._type_box.currentIndexChanged.connect(lambda _i: self.search_now())
+        layout.addWidget(self._type_box)
 
-        # 选项开关
-        self._regex_var = tk.BooleanVar(value=False)
-        self._case_var = tk.BooleanVar(value=False)
-        self._word_var = tk.BooleanVar(value=False)
-        for var, label in (
-            (self._regex_var, "正则"),
-            (self._case_var, "区分大小写"),
-            (self._word_var, "整词"),
-        ):
-            cb = ttk.Checkbutton(
-                controls, text=label, variable=var, command=self.search_now
-            )
-            cb.pack(side="left", padx=(6, 0))
+        self._regex_cb = QCheckBox("正则", controls)
+        self._regex_cb.stateChanged.connect(lambda _s: self.search_now())
+        layout.addWidget(self._regex_cb)
+        self._case_cb = QCheckBox("区分大小写", controls)
+        self._case_cb.stateChanged.connect(lambda _s: self.search_now())
+        layout.addWidget(self._case_cb)
+        self._word_cb = QCheckBox("整词", controls)
+        self._word_cb.stateChanged.connect(lambda _s: self.search_now())
+        layout.addWidget(self._word_cb)
 
-        self._summary_var = tk.StringVar(value="")
-        ttk.Label(controls, textvariable=self._summary_var).pack(
-            side="right", padx=(8, 0)
-        )
+        self._summary_label = QLabel("", controls)
+        self._summary_label.setObjectName("statusMuted")
+        layout.addWidget(self._summary_label)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        outer.addWidget(controls)
 
     def _build_results(self) -> None:
-        frame = ttk.Frame(self)
-        frame.pack(fill="both", expand=True)
+        self._tree = QTreeWidget(self)
+        self._tree.setColumnCount(3)
+        self._tree.setHeaderLabels(["文件", "行", "内容预览"])
+        self._tree.setColumnWidth(0, 300)
+        self._tree.setColumnWidth(1, 48)
+        self._tree.setRootIsDecorated(False)
+        self._tree.setUniformRowHeights(True)
+        self._tree.itemActivated.connect(self._on_activate)
+        self._tree.itemClicked.connect(self._on_activate)
 
-        columns = ("rel_path", "line", "preview")
-        self._tree = ttk.Treeview(
-            frame, columns=columns, show="headings", selectmode="browse"
-        )
-        self._tree.heading("rel_path", text="文件")
-        self._tree.heading("line", text="行")
-        self._tree.heading("preview", text="内容预览")
-        self._tree.column("rel_path", width=300, anchor="w")
-        self._tree.column("line", width=48, anchor="e", stretch=False)
-        self._tree.column("preview", width=420, anchor="w")
-        ysb = ttk.Scrollbar(frame, orient="vertical", command=self._tree.yview)
-        self._tree.configure(yscrollcommand=ysb.set)
-        self._tree.pack(side="left", fill="both", expand=True)
-        ysb.pack(side="right", fill="y")
-        self._tree.bind("<<TreeviewSelect>>", self._on_select)
+        self._more_btn = QPushButton("显示更多…", self)
+        self._more_btn.setProperty("btnRole", "compact")
+        self._more_btn.clicked.connect(self._show_more)
+        self._more_btn.hide()
 
-        self._more_var = tk.StringVar(value="")
-        self._more_btn = ttk.Button(
-            frame,
-            textvariable=self._more_var,
-            command=self._show_more,
-            style="Compact.TButton",
-        )
-        # 放底部工具栏而非结果区内
-        self._more_btn.pack(side="bottom", pady=(2, 0))
-        self._more_var.set("")
+        outer = QVBoxLayout(self)
+        outer.addWidget(self._tree, 1)
+        outer.addWidget(self._more_btn)
 
     # --- 行为 ---
 
-    def _schedule(self, _event=None) -> None:
-        if self._debounce_job is not None:
-            try:
-                self.after_cancel(self._debounce_job)
-            except Exception:
-                pass
-        self._debounce_job = self.after(_DEBOUNCE_MS, self.search_now)
+    def _schedule(self) -> None:
+        if self._debounce_timer is not None:
+            self._debounce_timer.stop()
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.timeout.connect(self.search_now)
+        self._debounce_timer.start(_DEBOUNCE_MS)
 
     def search_now(self) -> None:
-        if self._debounce_job is not None:
-            try:
-                self.after_cancel(self._debounce_job)
-            except Exception:
-                pass
-            self._debounce_job = None
+        if self._debounce_timer is not None:
+            self._debounce_timer.stop()
+            self._debounce_timer = None
         options = self._current_options()
         if not options.query.strip():
             self._render(SearchResult(query=""))
             return
-        # UI 线程预校验查询模式（便宜），避免后台任务报泛化失败
         from doc_tool.application.content.search import compile_pattern
 
         try:
@@ -172,72 +163,64 @@ class SearchPanel(ttk.Frame):
                 whole_word=options.whole_word,
             )
         except ValueError as exc:
-            self._summary_var.set("查询无效：{0}".format(exc))
+            self._summary_label.setText("查询无效：{0}".format(exc))
             return
-        self._summary_var.set("搜索中…")
-        # 取消上一次仍在运行的搜索，再启动新搜索
+        self._summary_label.setText("搜索中…")
         if self._runner.is_running:
             self._runner.cancel()
         from doc_tool.application.content.search import run_search
         from doc_tool.ui.task_bridge import TaskSpec
 
         self._runner.start(
-            TaskSpec(name="search", target=run_search, kwargs={
-                "service": self._service,
-                "options": options,
-            }),
-            on_done=lambda result: self._on_search_done(result),
+            TaskSpec(
+                name="search",
+                target=run_search,
+                kwargs={"service": self._service, "options": options},
+            ),
+            on_done=self._on_search_done,
         )
-        self._poll()
+        self._poll_timer.start()
 
     def _poll(self) -> None:
-        """UI 线程轮询后台搜索事件队列。"""
-        if not self._runner.is_running:
-            return
         self._runner.poll()
-        if self._runner.is_running:
-            try:
-                self.after(100, self._poll)
-            except Exception:
-                pass
+        if not self._runner.is_running:
+            self._poll_timer.stop()
 
     def _on_search_done(self, result) -> None:
         if result is None:
             if self._runner.is_cancelled:
-                self._summary_var.set("搜索被取消")
+                self._summary_label.setText("搜索被取消")
             else:
-                self._summary_var.set("搜索失败，请检查查询条件")
+                self._summary_label.setText("搜索失败，请检查查询条件")
             return
         self._last_result = result
         self._render(result)
 
     def _current_options(self) -> SearchOptions:
-        selected_label = self._type_var.get()
+        selected_label = self._type_box.currentText()
         doc_types = next(
             (value for label, value in _TYPE_FILTERS if label == selected_label),
             None,
         )
         return SearchOptions(
-            query=self._query_var.get(),
-            regex=self._regex_var.get(),
-            case_sensitive=self._case_var.get(),
-            whole_word=self._word_var.get(),
+            query=self._query_entry.text(),
+            regex=self._regex_cb.isChecked(),
+            case_sensitive=self._case_cb.isChecked(),
+            whole_word=self._word_cb.isChecked(),
             document_types=([doc_types] if doc_types else None),
             limit=self._limit,
         )
 
     def _render(self, result: SearchResult) -> None:
-        self._tree.delete(*self._tree.get_children())
+        self._tree.clear()
         for hit in result.hits:
             preview = hit.text.strip()
             if len(preview) > 200:
                 preview = preview[:200] + "…"
-            self._tree.insert(
-                "",
-                "end",
-                iid="hit-{0}".format(len(self._tree.get_children())),
-                values=(hit.rel_path, hit.line_no, preview),
+            item = QTreeWidgetItem(
+                [hit.rel_path, str(hit.line_no), preview]
             )
+            self._tree.addTopLevelItem(item)
         if result.total == 0:
             summary = "无匹配内容" if result.query else "请输入关键字"
         elif result.truncated:
@@ -248,36 +231,29 @@ class SearchPanel(ttk.Frame):
             summary = "共 {0} 处（{1} 个文件）".format(
                 result.total, result.file_count
             )
-        self._summary_var.set(summary)
-        self._more_var.set("显示更多…" if result.truncated else "")
+        self._summary_label.setText(summary)
+        self._more_btn.setVisible(result.truncated)
 
     def _show_more(self) -> None:
         self._limit += DEFAULT_LIMIT
         self.search_now()
 
-    def _on_select(self, _event=None) -> None:
-        selection = self._tree.selection()
-        if not selection or self._on_open is None:
+    def _on_activate(self, item: QTreeWidgetItem, _column: int = 0) -> None:
+        if item is None or self._on_open is None:
             return
-        values = self._tree.item(selection[0], "values")
-        if not values:
-            return
+        rel_path = item.text(0)
         try:
-            line_no = int(values[1])
-        except (TypeError, ValueError):
+            line_no = int(item.text(1))
+        except ValueError:
             line_no = 1
-        self._on_open(values[0], line_no)
+        self._on_open(rel_path, line_no)
 
     # --- 外部控制 ---
 
-    def set_writable(self, writable: bool) -> None:
-        """搜索是只读操作，始终可用；保留接口以便状态统一。"""
-        self._writable = writable
-
     def focus_query(self) -> None:
         """聚焦搜索输入框并选中已有文本（Ctrl+F 定位用）。"""
-        try:
-            self._query_entry.focus_set()
-            self._query_entry.select_range(0, "end")
-        except Exception:
-            pass
+        self._query_entry.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._query_entry.selectAll()
+
+    def set_writable(self, writable: bool) -> None:
+        """搜索是只读操作，始终可用；保留接口以便状态统一。"""

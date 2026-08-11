@@ -1,16 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Pure presentation state for the internal desktop workbench.
+"""Pure presentation state for the PySide6 desktop workbench.
 
-The objects in this module contain no tkinter widgets.  They translate existing
-project, task, Word and filesystem facts into labels and action availability so
-menu entries and first-screen buttons cannot drift apart.
+The objects in this module contain no Qt widgets.  They translate existing
+project, task, Word, filesystem and pipeline-stage facts into labels, action
+availability and step-checklist states so the menu bar, project bar and the
+right task/result dock cannot drift apart.
+
+The module stays importable in pure-service tests (no QApplication required);
+heavy Qt imports are deferred to the widget layer.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
+
+
+class WorkView(str, Enum):
+    """Main-content view states: empty / idle / running / result."""
+
+    EMPTY = "empty"
+    IDLE = "idle"
+    RUNNING = "running"
+    RESULT = "result"
+
+
+# Step statuses mirror the pipeline stage/status vocabulary.
+STEP_STATUS_PENDING = "pending"
+STEP_STATUS_RUNNING = "running"
+STEP_STATUS_SUCCESS = "success"
+STEP_STATUS_SKIPPED = "skipped"
+STEP_STATUS_FAILED = "failed"
+STEP_STATUS_CANCELLED = "cancelled"
 
 
 @dataclass(frozen=True)
@@ -53,6 +76,30 @@ class ResultState:
     log_path: Optional[Path] = None
     project_root: Optional[Path] = None
 
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in ("success", "failure", "cancelled")
+
+
+@dataclass(frozen=True)
+class StepItem:
+    """One row of the step checklist (derived from pipeline stage events)."""
+
+    stage: str
+    label: str
+    status: str = STEP_STATUS_PENDING
+    detail: str = ""
+    error_code: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class DetailState:
+    """Log/result detail pane state kept testable without widgets."""
+
+    expanded: bool = False
+    pending_unread: int = 0
+    log_path: Optional[Path] = None
+
 
 def derive_workbench_state(
     project,
@@ -61,12 +108,13 @@ def derive_workbench_state(
     task_label: str = "",
     word_available: Optional[bool] = None,
     report_path: Optional[Path] = None,
+    result_available: bool = False,
 ) -> WorkbenchState:
     """Derive all high-frequency action states from existing application facts."""
     if project is None:
         disabled = ActionState(False, "请先打开项目")
         return WorkbenchState(
-            view="empty",
+            view=WorkView.EMPTY,
             actions={
                 "validate": disabled,
                 "merge": disabled,
@@ -148,11 +196,20 @@ def derive_workbench_state(
         readiness = "正式合并将在启动时检查 Microsoft Word"
         tone = "neutral"
 
+    # Four-view mapping: running drives the "running" view; a persistent result
+    # of the current project drives the "result" view; otherwise the IDE idles.
+    if running:
+        view = WorkView.RUNNING
+    elif result_available:
+        view = WorkView.RESULT
+    else:
+        view = WorkView.IDLE
+
     document_name = getattr(manifest, "documentName", "") if manifest else ""
     document_type = getattr(manifest, "documentType", "") if manifest else ""
     root_name = getattr(project_root, "name", "") if project_root else ""
     return WorkbenchState(
-        view="workbench",
+        view=view,
         project_name=document_name or root_name,
         project_path=str(project_root or ""),
         document_type=document_type,
@@ -162,6 +219,94 @@ def derive_workbench_state(
         reasons=tuple(reasons),
         actions=actions,
     )
+
+
+def derive_step_list(
+    events: Sequence[Tuple[str, str, str, Optional[str]]],
+    *,
+    fallback_label: str = "",
+) -> List[StepItem]:
+    """Derive the step checklist from ordered stage events.
+
+    ``events`` is a sequence of ``(stage, status, detail, error_code)`` tuples in
+    the order they were received.  The step order comes from the pipeline stage
+    table (single data source), so UI cannot drift from the pipeline.  A
+    heartbeat-only task (no pipeline stage referenced) collapses into a single
+    running step labelled ``fallback_label``; it never fabricates a percentage.
+
+    Status derivation is last-write-wins per stage: ``started`` -> running,
+    ``succeeded`` -> success, ``skipped`` -> skipped, ``failed`` -> failed,
+    ``cancelled`` -> cancelled.  Steps never started stay pending.
+    """
+    if not events:
+        return []
+
+    from doc_tool.application.pipeline import (
+        PIPELINE_STAGE_LABELS,
+        PIPELINE_STAGE_ORDER,
+        stage_percent_table,
+    )
+
+    percent = stage_percent_table()
+    ordered = sorted(
+        PIPELINE_STAGE_ORDER,
+        key=lambda stage: percent.get(stage, (9999, 9999))[0],
+    )
+    involved = [stage for stage in ordered if any(ev[0] == stage for ev in events)]
+    if not involved:
+        # Heartbeat-only task: a single in-progress step, no fake percentage.
+        return [
+            StepItem(
+                stage="",
+                label=fallback_label or "处理中",
+                status=STEP_STATUS_RUNNING,
+            )
+        ]
+
+    # 全量管线步骤：未收到事件的阶段保持待处理（“未执行保持待处理”），
+    # 使总体进度 = 完成数/全管线步骤数，阶段顺序单一来自 stage_percent_table。
+    steps: Dict[str, StepItem] = {
+        stage: StepItem(
+            stage=stage,
+            label=PIPELINE_STAGE_LABELS.get(stage, stage),
+            status=STEP_STATUS_PENDING,
+        )
+        for stage in ordered
+    }
+    for ev in events:
+        stage = ev[0]
+        if stage not in steps:
+            continue
+        status = ev[1] if len(ev) > 1 else ""
+        detail = ev[2] if len(ev) > 2 else ""
+        error_code = ev[3] if len(ev) > 3 else None
+        current = steps[stage]
+        if status == "started":
+            steps[stage] = StepItem(
+                stage=stage, label=current.label, status=STEP_STATUS_RUNNING
+            )
+        elif status == "succeeded":
+            steps[stage] = StepItem(
+                stage=stage, label=current.label, status=STEP_STATUS_SUCCESS,
+                detail=detail,
+            )
+        elif status == "skipped":
+            steps[stage] = StepItem(
+                stage=stage, label=current.label, status=STEP_STATUS_SKIPPED,
+                detail=detail,
+            )
+        elif status == "failed":
+            steps[stage] = StepItem(
+                stage=stage, label=current.label, status=STEP_STATUS_FAILED,
+                detail=detail, error_code=error_code,
+            )
+        elif status == "cancelled":
+            steps[stage] = StepItem(
+                stage=stage, label=current.label, status=STEP_STATUS_CANCELLED,
+                detail=detail,
+            )
+
+    return [steps[stage] for stage in ordered]
 
 
 def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:

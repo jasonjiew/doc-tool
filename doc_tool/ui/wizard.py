@@ -1,21 +1,40 @@
 # -*- coding: utf-8 -*-
-"""新建项目向导：导入源 DOCX 为项目。
-
-任务 6.2：选择源 Word、文档类型、项目名称和目标父目录。
-任务 6.3：导入预览与确认页面，展示标题/资源计数和阻断告警。
+"""新建项目向导（PySide6 QWizard）。
 
 向导流程：
 1. 选择源 DOCX 文件
-2. 执行预检，展示标题/图片/表格计数和告警
+2. 执行预检，展示标题/图片/表格计数和告警（阻断告警时不可继续）
 3. 选择通用模式或需求/详细设计预设，填写文档信息和目标父目录
 4. 执行事务化导入
 5. 显示导入结果（成功/失败）
+
+业务步骤与规则与 Tk 版一致，仅替换组件为 ``QWizard``。预检与导入均在
+后台线程执行（``TaskRunner``），支持安全取消（阶段边界生效）。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialogButtonBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QRadioButton,
+    QVBoxLayout,
+    QWidget,
+    QWizard,
+    QWizardPage,
+)
 
 from doc_tool.ui.task_bridge import (
     DEFAULT_TASK_TIMEOUT_SECONDS,
@@ -25,8 +44,14 @@ from doc_tool.ui.task_bridge import (
     TaskSpec,
 )
 
-
 PREFLIGHT_TIMEOUT_SECONDS = 90
+
+# 文档类型预设标签。
+_DOC_TYPE_LABELS = {
+    "general": "通用大文档",
+    "requirement": "需求文档预设",
+    "design": "详细设计预设",
+}
 
 
 def format_preview_summary(preview) -> str:
@@ -47,420 +72,277 @@ def format_preview_summary(preview) -> str:
         lines.append("无告警。")
     suggestion = getattr(preview, "document_type_suggestion", None)
     if suggestion is not None:
-        labels = {
-            "general": "通用大文档",
-            "requirement": "需求文档预设",
-            "design": "详细设计预设",
-        }
         lines.extend([
             "",
             "建议模式：{0}".format(
-                labels.get(suggestion.document_type, suggestion.document_type)
+                _DOC_TYPE_LABELS.get(
+                    suggestion.document_type, suggestion.document_type
+                )
             ),
             "原因：{0}".format(suggestion.reason),
         ])
     return "\n".join(lines)
 
 
-class ImportWizard:
-    """新建项目向导。
+class _SourcePage(QWizardPage):
+    """步骤 1：选择源 Word 文档。"""
 
-    使用 ``tk.Toplevel`` 模态对话框实现多步骤向导。
-    返回项目目录路径（成功）或 None（取消）。
-    """
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 1/5：选择源 Word 文档")
+        layout = QVBoxLayout(self)
+        hint = QLabel(
+            "选择要导入的 .docx 文件。文件将被只读复制到项目中，源文件不会被修改。",
+            self,
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
 
-    def __init__(self, parent) -> None:
-        self.parent = parent
-        self._result: Optional[str] = None
+        file_row = QHBoxLayout()
+        self._source_entry = QLineEdit(self)
+        self._source_entry.setReadOnly(True)
+        file_row.addWidget(self._source_entry, 1)
+        browse_btn = QPushButton("浏览…", self)
+        browse_btn.clicked.connect(self._browse)
+        file_row.addWidget(browse_btn)
+        layout.addLayout(file_row)
+
         self._source_path: Optional[str] = None
-        self._preview = None  # PreflightPreview
-        self._doc_type = "general"
-        self._target_parent: Optional[str] = None
-        self._runner = TaskRunner()
-        self._poll_scheduled = False
-        self._project_info_error = ""
-        self._last_error_code: Optional[str] = None
-        self._active_task = ""
-        self._closing = False
 
-    def run(self) -> Optional[str]:
-        """运行向导，返回项目路径或 None。"""
-        import tkinter as tk
-        from tkinter import ttk
-
-        self._dialog = tk.Toplevel(self.parent)
-        self._dialog.title("新建项目向导")
-        self._dialog.geometry("680x540")
-        self._dialog.minsize(480, 420)
-        self._dialog.transient(self.parent)
-        self._dialog.grab_set()
-        self._dialog.protocol("WM_DELETE_WINDOW", self._cancel)
-
-        # 步骤变量
-        self._step = 0  # 0=选择源, 1=预检预览, 2=项目信息, 3=执行中, 4=结果
-
-        self._build_steps()
-        self._show_step()
-        self._dialog.bind("<Return>", self._on_enter)
-        self._dialog.bind("<Escape>", self._on_escape)
-
-        self._dialog.wait_window()
-        return self._result
-
-    def _build_steps(self) -> None:
-        """构建所有步骤面板。"""
-        import tkinter as tk
-        from tkinter import ttk
-
-        # --- 步骤 0：选择源 DOCX ---
-        self._step0 = ttk.Frame(self._dialog, padding=16)
-
-        ttk.Label(self._step0, text="步骤 1/4：选择源 Word 文档", style="Heading.TLabel").pack(
-            anchor="w", pady=(0, 12)
-        )
-        ttk.Label(
-            self._step0,
-            text="选择要导入的 .docx 文件。文件将被只读复制到项目中，源文件不会被修改。",
-            wraplength=480,
-        ).pack(anchor="w", pady=(0, 12))
-
-        file_frame = ttk.Frame(self._step0)
-        file_frame.pack(fill="x", pady=8)
-        self._source_var = tk.StringVar()
-        ttk.Entry(file_frame, textvariable=self._source_var, state="readonly").pack(
-            side="left", fill="x", expand=True
-        )
-        ttk.Button(file_frame, text="浏览…", command=self._browse_source).pack(
-            side="right", padx=(8, 0)
-        )
-
-        # --- 步骤 1：预检预览 ---
-        self._step1 = ttk.Frame(self._dialog, padding=16)
-
-        ttk.Label(self._step1, text="步骤 2/4：导入预检", style="Heading.TLabel").pack(
-            anchor="w", pady=(0, 12)
-        )
-        self._preview_text = tk.Text(
-            self._step1, height=14, wrap="word", state="disabled",
-            font=("Microsoft YaHei", 9),
-        )
-        self._preview_text.pack(fill="both", expand=True)
-
-        # --- 步骤 2：项目信息 ---
-        self._step2 = ttk.Frame(self._dialog, padding=16)
-
-        ttk.Label(self._step2, text="步骤 3/4：项目信息", style="Heading.TLabel").pack(
-            anchor="w", pady=(0, 12)
-        )
-
-        info_grid = ttk.Frame(self._step2)
-        info_grid.pack(fill="x", pady=4)
-
-        # 文档类型
-        ttk.Label(info_grid, text="文档类型：").grid(row=0, column=0, sticky="w", pady=4)
-        self._type_var = tk.StringVar(value="general")
-        type_frame = ttk.Frame(info_grid)
-        type_frame.grid(row=0, column=1, sticky="w", padx=(8, 0), pady=4)
-        ttk.Radiobutton(
-            type_frame, text="通用大文档", variable=self._type_var, value="general"
-        ).pack(side="left")
-        ttk.Radiobutton(
-            type_frame, text="需求文档预设", variable=self._type_var, value="requirement"
-        ).pack(side="left", padx=(12, 0))
-        ttk.Radiobutton(
-            type_frame, text="详细设计预设", variable=self._type_var, value="design"
-        ).pack(side="left", padx=(12, 0))
-
-        # 文档编号
-        ttk.Label(info_grid, text="文档编号（通用可选）：").grid(row=1, column=0, sticky="w", pady=4)
-        self._doc_no_var = tk.StringVar()
-        ttk.Entry(info_grid, textvariable=self._doc_no_var).grid(
-            row=1, column=1, sticky="we", padx=(8, 0), pady=4
-        )
-
-        # 文档名称
-        ttk.Label(info_grid, text="文档名称：").grid(row=2, column=0, sticky="w", pady=4)
-        self._doc_name_var = tk.StringVar()
-        ttk.Entry(info_grid, textvariable=self._doc_name_var).grid(
-            row=2, column=1, sticky="we", padx=(8, 0), pady=4
-        )
-
-        # 文档版本
-        ttk.Label(info_grid, text="文档版本（通用可选）：").grid(row=3, column=0, sticky="w", pady=4)
-        self._doc_version_var = tk.StringVar(value="1.0")
-        ttk.Entry(info_grid, textvariable=self._doc_version_var).grid(
-            row=3, column=1, sticky="we", padx=(8, 0), pady=4
-        )
-
-        # 项目名称（目录名）
-        ttk.Label(info_grid, text="项目目录名：").grid(row=4, column=0, sticky="w", pady=4)
-        self._project_name_var = tk.StringVar()
-        ttk.Entry(info_grid, textvariable=self._project_name_var).grid(
-            row=4, column=1, sticky="we", padx=(8, 0), pady=4
-        )
-
-        # 目标父目录
-        ttk.Label(info_grid, text="目标父目录：").grid(row=5, column=0, sticky="w", pady=4)
-        target_frame = ttk.Frame(info_grid)
-        target_frame.grid(row=5, column=1, sticky="we", padx=(8, 0), pady=4)
-        self._target_var = tk.StringVar()
-        ttk.Entry(target_frame, textvariable=self._target_var).pack(
-            side="left", fill="x", expand=True
-        )
-        ttk.Button(target_frame, text="浏览…", command=self._browse_target).pack(
-            side="right", padx=(8, 0)
-        )
-
-        info_grid.columnconfigure(1, weight=1)
-
-        # --- 步骤 3：执行中 ---
-        self._step3 = ttk.Frame(self._dialog, padding=16)
-        ttk.Label(self._step3, text="正在导入…", style="Heading.TLabel").pack(anchor="w")
-        self._import_progress = ttk.Progressbar(
-            self._step3, mode="indeterminate", length=400
-        )
-        self._import_progress.pack(pady=20)
-        self._import_status_var = tk.StringVar(value="准备中…")
-        ttk.Label(self._step3, textvariable=self._import_status_var).pack()
-
-        # --- 步骤 4：结果 ---
-        self._step4 = ttk.Frame(self._dialog, padding=16)
-        self._result_label = ttk.Label(self._step4, style="Heading.TLabel")
-        self._result_label.pack(anchor="w", pady=(0, 8))
-        self._result_detail = tk.Text(
-            self._step4, height=10, wrap="word", state="disabled",
-            font=("Microsoft YaHei", 9),
-        )
-        self._result_detail.pack(fill="both", expand=True)
-
-        # --- 导航按钮 ---
-        self._nav_frame = ttk.Frame(self._dialog, padding=(16, 0, 16, 16))
-        self._nav_frame.pack(fill="x", side="bottom")
-
-        self._back_btn = ttk.Button(self._nav_frame, text="上一步", command=self._go_back)
-        self._back_btn.pack(side="left")
-
-        self._next_btn = ttk.Button(self._nav_frame, text="下一步", command=self._go_next)
-        self._next_btn.pack(side="right")
-
-        self._cancel_btn = ttk.Button(
-            self._nav_frame, text="取消", command=self._cancel
-        )
-        self._cancel_btn.pack(side="right", padx=(8, 0))
-
-    def _show_step(self) -> None:
-        """显示当前步骤，并完整重置导航按钮状态。"""
-        for step_widget in (self._step0, self._step1, self._step2, self._step3, self._step4):
-            step_widget.pack_forget()
-
-        steps = (self._step0, self._step1, self._step2, self._step3, self._step4)
-        steps[self._step].pack(fill="both", expand=True)
-
-        # 先恢复默认值，避免从结果页或执行页返回时遗留文本/禁用状态。
-        self._back_btn.configure(text="上一步", state="disabled")
-        self._next_btn.configure(text="下一步", state="disabled")
-        self._cancel_btn.configure(text="取消", state="normal")
-
-        if self._step == 0:
-            self._next_btn.configure(
-                state="normal" if self._source_path else "disabled"
-            )
-        elif self._step == 1:
-            running = self._runner.is_running
-            preview_ok = bool(
-                self._preview is not None
-                and getattr(self._preview, "has_heading1", False)
-            )
-            self._back_btn.configure(
-                state="disabled" if running else "normal"
-            )
-            self._next_btn.configure(
-                state="normal" if preview_ok and not running else "disabled"
-            )
-            self._cancel_btn.configure(
-                text=(
-                    "正在取消…"
-                    if self._closing
-                    else ("取消预检" if running else "取消")
-                ),
-                state="disabled" if self._closing else "normal",
-            )
-        elif self._step == 2:
-            self._back_btn.configure(state="normal")
-            self._next_btn.configure(text="开始导入", state="normal")
-        elif self._step == 3:
-            self._cancel_btn.configure(
-                text="正在取消…" if self._closing else "取消导入",
-                state="disabled" if self._closing else "normal",
-            )
-        elif self._step == 4:
-            self._next_btn.configure(text="关闭", state="normal")
-            self._cancel_btn.configure(state="disabled")
-
-        try:
-            if self._step == 4:
-                self._next_btn.focus_set()
-            elif self._step == 3:
-                self._cancel_btn.focus_set()
-            elif str(self._next_btn.cget("state")) == "normal":
-                self._next_btn.focus_set()
-        except Exception:
-            pass
-
-    # --- 步骤 0：选择源文件 ---
-
-    def _browse_source(self) -> None:
-        from tkinter import filedialog
-
-        path = filedialog.askopenfilename(
-            title="选择源 Word 文档",
-            filetypes=[("Word 文档", "*.docx"), ("所有文件", "*.*")],
-            parent=self._dialog,
-        )
+    def _browse(self) -> None:
+        path = QFileDialog.getOpenFileName(
+            self, "选择源 Word 文档", "", "Word 文档 (*.docx);;所有文件 (*.*)"
+        )[0]
         if path:
             self._source_path = path
-            self._source_var.set(path)
+            self._source_entry.setText(path)
+            wizard = self.wizard()
             source_name = Path(path).stem
-            if not self._doc_name_var.get().strip():
-                self._doc_name_var.set(source_name)
-            if not self._project_name_var.get().strip():
-                self._project_name_var.set(source_name)
-            self._show_step()
+            if not getattr(wizard, "_doc_name", "").strip():
+                wizard._doc_name = source_name
+            if not getattr(wizard, "_project_name", "").strip():
+                wizard._project_name = source_name
+            self.completeChanged.emit()
 
-    # --- 步骤 1：预检 ---
+    def isComplete(self) -> bool:
+        return bool(self._source_path)
 
-    def _do_preflight(self):
-        """后台执行预检，只返回数据，不访问任何 Tk 控件。"""
-        from doc_tool.adapters.preflight import preflight
-        from doc_tool.domain.errors import DocToolError
+    def source_path(self) -> Optional[str]:
+        return self._source_path
 
-        try:
-            preview = preflight(self._source_path)
-        except DocToolError as exc:
-            return (
-                False,
-                None,
-                "预检失败：{0}\n\n建议：{1}".format(
-                    exc.user_message, exc.suggested_action
-                ),
-            )
-        except Exception as exc:
-            return False, None, "预检失败：{0}".format(str(exc)[:200])
 
-        text = format_preview_summary(preview)
-        if not preview.has_heading1:
-            text += (
-                "\n\n阻断：未检测到 Heading 1 标题样式，无法导入。\n"
-                "请在 Word 中为一级标题应用「标题 1」样式后重新导入。"
-            )
-            return False, preview, text
-        return True, preview, text
+class _PreflightPage(QWizardPage):
+    """步骤 2：导入预检（异步执行并展示结果）。"""
 
-    def _show_preview_text(self, text: str) -> None:
-        self._preview_text.configure(state="normal")
-        self._preview_text.delete("1.0", "end")
-        self._preview_text.insert("1.0", text)
-        self._preview_text.configure(state="disabled")
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 2/5：导入预检")
+        layout = QVBoxLayout(self)
+        self._status_label = QLabel("准备中…", self)
+        layout.addWidget(self._status_label)
+        self._progress = QProgressBar(self)
+        self._progress.setRange(0, 0)  # indeterminate
+        self._progress.hide()
+        layout.addWidget(self._progress)
+        self._preview_text = QPlainTextEdit(self)
+        self._preview_text.setReadOnly(True)
+        layout.addWidget(self._preview_text, 1)
+        self._preview_ok = False
 
-    # --- 步骤 2：项目信息 ---
+    def initializePage(self) -> None:
+        wizard = self.wizard()
+        self._preview_ok = False
+        self._preview_text.clear()
+        self._progress.hide()
+        self._status_label.setText("正在预检…")
+        wizard._start_preflight(on_done=self._on_preflight_done)
 
-    def _validate_project_info(self) -> bool:
-        """验证项目信息字段。"""
-        self._project_info_error = ""
-        doc_type = self._type_var.get()
-        if doc_type in ("requirement", "design") and not self._doc_no_var.get().strip():
-            self._project_info_error = "需求/详细设计预设必须填写文档编号。"
-            return False
-        if not self._doc_name_var.get().strip():
-            return False
-        if doc_type in ("requirement", "design") and not self._doc_version_var.get().strip():
-            self._project_info_error = "需求/详细设计预设必须填写文档版本。"
-            return False
-        if not self._project_name_var.get().strip():
-            return False
-        if not self._target_var.get().strip():
-            return False
-        project_name = self._project_name_var.get().strip()
-        if (
-            project_name in (".", "..")
-            or Path(project_name).name != project_name
-            or any(c in project_name for c in '<>:"/\\|?*')
-            or any(ord(c) < 32 for c in project_name)
-            or project_name.rstrip(" .") != project_name
-        ):
-            self._project_info_error = "项目目录名包含 Windows 不允许的字符或路径片段。"
+    def _on_preflight_done(self, response) -> None:
+        wizard = self.wizard()
+        if response is None:
+            if wizard._last_error_code == ERR_WATCHDOG_TIMEOUT:
+                text = (
+                    "预检超时。\n\n建议：请确认源文件未被占用、文件可正常用 Word 打开，然后重试。"
+                )
+            else:
+                text = "预检异常终止。"
+            self._preview_ok = False
+            self._set_text(text)
+        else:
+            ok, preview, text = response
+            self._preview_ok = bool(ok)
+            self._set_text(text)
+            wizard._preview = preview
+            if ok and preview is not None and preview.document_type_suggestion is not None:
+                suggestion = preview.document_type_suggestion
+                if suggestion.confidence == "high":
+                    wizard._doc_type = suggestion.document_type
+        self._status_label.setText("预检完成" if self._preview_ok else "预检未通过")
+        self.completeChanged.emit()
+
+    def _set_text(self, text: str) -> None:
+        self._preview_text.setPlainText(text)
+
+    def isComplete(self) -> bool:
+        return self._preview_ok
+
+
+class _ProjectInfoPage(QWizardPage):
+    """步骤 3：项目信息。"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 3/5：项目信息")
+        self.setCommitPage(True)
+        layout = QVBoxLayout(self)
+        form = QHBoxLayout()
+        left = QVBoxLayout()
+
+        self._type_radios: dict = {}
+        type_label = QLabel("文档类型：", self)
+        left.addWidget(type_label)
+        for value, text in _DOC_TYPE_LABELS.items():
+            radio = QRadioButton(text, self)
+            radio.setProperty("docType", value)
+            left.addWidget(radio)
+            self._type_radios[value] = radio
+        self._type_radios["general"].setChecked(True)
+
+        self._doc_no_entry = self._field_row(left, "文档编号（通用可选）：")
+        self._doc_name_entry = self._field_row(left, "文档名称：")
+        self._doc_version_entry = self._field_row(left, "文档版本（通用可选）：")
+        self._project_name_entry = self._field_row(left, "项目目录名：")
+
+        target_row = QHBoxLayout()
+        target_row.addWidget(QLabel("目标父目录：", self))
+        self._target_entry = QLineEdit(self)
+        target_row.addWidget(self._target_entry, 1)
+        browse_btn = QPushButton("浏览…", self)
+        browse_btn.clicked.connect(self._browse_target)
+        target_row.addWidget(browse_btn)
+        left.addLayout(target_row)
+        form.addLayout(left)
+        layout.addLayout(form)
+        layout.addStretch(1)
+
+    def _field_row(self, layout, text: str) -> QLineEdit:
+        layout.addWidget(QLabel(text, self))
+        entry = QLineEdit(self)
+        layout.addWidget(entry)
+        return entry
+
+    def _browse_target(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "选择目标父目录")
+        if path:
+            self._target_entry.setText(path)
+            wizard = self.wizard()
+            if not wizard._project_name.strip():
+                source_name = Path(wizard._source_path).stem
+                wizard._project_name = source_name
+                self._project_name_entry.setText(source_name)
+
+    def initializePage(self) -> None:
+        wizard = self.wizard()
+        self._type_radios.get(wizard._doc_type, self._type_radios["general"]).setChecked(True)
+        self._doc_no_entry.setText(wizard._doc_no)
+        self._doc_name_entry.setText(wizard._doc_name)
+        self._doc_version_entry.setText(wizard._doc_version)
+        self._project_name_entry.setText(wizard._project_name)
+        self._target_entry.setText(wizard._target_parent)
+        wizard.button(QWizard.WizardButton.NextButton).setText("开始导入")
+
+    def validatePage(self) -> bool:
+        wizard = self.wizard()
+        wizard._doc_type = next(
+            (v for v, r in self._type_radios.items() if r.isChecked()), "general"
+        )
+        wizard._doc_no = self._doc_no_entry.text().strip()
+        wizard._doc_name = self._doc_name_entry.text().strip()
+        wizard._doc_version = self._doc_version_entry.text().strip()
+        wizard._project_name = self._project_name_entry.text().strip()
+        wizard._target_parent = self._target_entry.text().strip()
+        error = wizard._validate_project_info()
+        if error:
+            QMessageBox.warning(self, "项目信息无效", error)
             return False
         return True
 
-    def _browse_target(self) -> None:
-        from tkinter import filedialog
 
-        path = filedialog.askdirectory(
-            title="选择目标父目录", mustexist=True, parent=self._dialog
-        )
-        if path:
-            self._target_var.set(path)
-            # 自动填充项目名（如果为空）
-            if not self._project_name_var.get():
-                source_name = Path(self._source_path).stem
-                self._project_name_var.set(source_name)
+class _ExecutingPage(QWizardPage):
+    """步骤 4：执行导入。"""
 
-    # --- 步骤 3：执行导入 ---
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 4/5：正在导入…")
+        layout = QVBoxLayout(self)
+        self._status_label = QLabel("准备中…", self)
+        layout.addWidget(self._status_label)
+        self._progress = QProgressBar(self)
+        self._progress.setRange(0, 0)
+        layout.addWidget(self._progress)
+        self._detail = QLabel("", self)
+        self._detail.setObjectName("statusMuted")
+        self._detail.setWordWrap(True)
+        layout.addWidget(self._detail)
+        layout.addStretch(1)
+        self._started = False
 
-    def _do_import(self) -> None:
-        """执行事务化导入。"""
-        self._import_progress.start(15)
-        self._import_status_var.set("正在导入…")
-        from doc_tool.application.import_project import ImportRequest, import_first_time
+    def initializePage(self) -> None:
+        wizard = self.wizard()
+        self._status_label.setText("正在导入…")
+        wizard._do_import(on_done=self._on_done)
+        self._started = True
 
-        target_root = str(Path(self._target_var.get()) / self._project_name_var.get())
-        request = ImportRequest(
-            source_docx=Path(self._source_path),
-            target_project_root=Path(target_root),
-            document_type=self._type_var.get(),
-            document_no=self._doc_no_var.get().strip(),
-            document_name=self._doc_name_var.get().strip(),
-            document_version=self._doc_version_var.get().strip(),
-        )
-        self._active_task = "import"
-        self._last_error_code = None
-        started = self._runner.start(
-            TaskSpec(
-                name="import",
-                target=import_first_time,
-                args=(request,),
-                timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
-            ),
-            on_event=self._on_task_event,
-            on_done=lambda result: self._show_import_result(result, target_root),
-        )
-        if not started:
-            self._import_progress.stop()
-            self._import_status_var.set("已有任务正在运行，请稍候。")
+    def _on_done(self, result, target_root: str) -> None:
+        wizard = self.wizard()
+        if wizard._closing:
+            wizard.reject()
             return
-        self._show_step()
-        self._schedule_poll()
+        wizard._import_result = result
+        wizard._target_root = target_root
+        wizard._step4_done = True
+        wizard.next()
 
-    def _show_import_result(self, result, target_root: str) -> None:
-        """显示导入结果。"""
-        if self._closing or not self._dialog_exists():
-            self._destroy_dialog()
-            return
-        self._import_progress.stop()
+    def cleanupPage(self) -> None:
+        self._started = False
 
+
+class _ResultPage(QWizardPage):
+    """步骤 5：导入结果。"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 5/5：导入结果")
+        layout = QVBoxLayout(self)
+        self._result_label = QLabel(self)
+        self._result_label.setObjectName("resultTitle")
+        layout.addWidget(self._result_label)
+        self._result_detail = QPlainTextEdit(self)
+        self._result_detail.setReadOnly(True)
+        layout.addWidget(self._result_detail, 1)
+
+    def initializePage(self) -> None:
+        wizard = self.wizard()
+        self._render(wizard._import_result, wizard._target_root)
+        wizard.button(QWizard.WizardButton.NextButton).setText("关闭")
+        wizard.button(QWizard.WizardButton.BackButton).setEnabled(False)
+
+    def _render(self, result, target_root: str) -> None:
         if result is None:
-            if self._last_error_code == ERR_WATCHDOG_TIMEOUT:
-                self._result_label.configure(text="✗ 导入超时")
-                self._set_result_text(
+            if self.wizard()._last_error_code == ERR_WATCHDOG_TIMEOUT:
+                self._result_label.setText("✗ 导入超时")
+                self._result_label.setProperty("statusTone", "failure")
+                self._result_detail.setPlainText(
                     "导入运行时间超过限制，界面已停止跟踪。\n\n"
                     "请检查目标目录和应用日志；若后台仍占用 Word，请退出应用后重试。"
                 )
             else:
-                self._result_label.configure(text="✗ 导入异常终止")
-                self._set_result_text("导入线程未返回结果，请查看应用日志。")
+                self._result_label.setText("✗ 导入异常终止")
+                self._result_label.setProperty("statusTone", "failure")
+                self._result_detail.setPlainText("导入线程未返回结果，请查看应用日志。")
         elif result.success:
-            self._result = target_root
-            self._result_label.configure(text="✓ 导入成功")
+            self._result_label.setText("✓ 导入成功")
+            self._result_label.setProperty("statusTone", "success")
             detail_lines = [
                 "项目目录：{0}".format(target_root),
                 "源文件指纹：{0}".format(
@@ -471,10 +353,14 @@ class ImportWizard:
             ]
             for event in result.events:
                 detail_lines.append("  {0}: {1}".format(event.stage, event.status))
-            self._set_result_text("\n".join(detail_lines))
+            self._result_detail.setPlainText("\n".join(detail_lines))
         else:
-            self._result_label.configure(
-                text="⊘ 导入已取消" if result.error_code == "E5003" else "✗ 导入失败"
+            cancelled = result.error_code == "E5003"
+            self._result_label.setText(
+                "⊘ 导入已取消" if cancelled else "✗ 导入失败"
+            )
+            self._result_label.setProperty(
+                "statusTone", "warning" if cancelled else "failure"
             )
             error_lines = [
                 "错误码：{0}".format(result.error_code or "未知"),
@@ -488,169 +374,210 @@ class ImportWizard:
                 if "errorCode" in event.metrics:
                     line += "（{0}）".format(event.metrics["errorCode"])
                 error_lines.append(line)
-
             if result.diagnostic_log:
                 error_lines.append("")
                 error_lines.append("诊断日志：{0}".format(result.diagnostic_log))
+            self._result_detail.setPlainText("\n".join(error_lines))
 
-            self._set_result_text("\n".join(error_lines))
 
-        self._active_task = ""
+class ImportWizard(QWizard):
+    """新建项目向导（QWizard）。
+
+    返回项目目录路径（成功）或 None（取消）。
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("新建项目向导")
+        self.resize(680, 540)
+        self.setMinimumSize(520, 440)
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
+
+        # 共享状态
+        self._source_path: Optional[str] = None
+        self._preview = None
+        self._doc_type = "general"
+        self._doc_no = ""
+        self._doc_name = ""
+        self._doc_version = "1.0"
+        self._project_name = ""
+        self._target_parent = ""
+        self._last_error_code: Optional[str] = None
+        self._closing = False
+        self._import_result = None
+        self._target_root = ""
+        self._step4_done = False
+
+        self._runner = TaskRunner()
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(POLL_INTERVAL_MS)
+        self._poll_timer.timeout.connect(self._poll_runner)
+
+        self._source_page = _SourcePage(self)
+        self._preflight_page = _PreflightPage(self)
+        self._info_page = _ProjectInfoPage(self)
+        self._executing_page = _ExecutingPage(self)
+        self._result_page = _ResultPage(self)
+        self.addPage(self._source_page)
+        self.addPage(self._preflight_page)
+        self.addPage(self._info_page)
+        self.addPage(self._executing_page)
+        self.addPage(self._result_page)
+
+        self.currentIdChanged.connect(self._on_page_changed)
+        self.button(QWizard.WizardButton.CancelButton).clicked.connect(
+            self._on_cancel_clicked
+        )
+
+    def run(self) -> Optional[str]:
+        """运行向导，返回项目路径或 None。"""
+        if self.exec() == QDialogButtonBox.DialogCode.Accepted:
+            return self._target_root
+        return None
+
+    # --- 页面切换 ---
+
+    def _on_page_changed(self, _page_id: int) -> None:
+        self.button(QWizard.WizardButton.NextButton).setEnabled(
+            self.currentPage().isComplete()
+        )
+        self.button(QWizard.WizardButton.BackButton).setEnabled(
+            self.currentPage().isComplete()
+            and self.currentId() not in (0, 3)
+        )
+
+    # --- 预检 ---
+
+    def _start_preflight(self, on_done) -> None:
+        """后台执行预检，只返回数据，不访问任何 Qt 控件。"""
         self._last_error_code = None
-        self._step = 4
-        self._show_step()
 
-    def _set_result_text(self, text: str) -> None:
-        self._result_detail.configure(state="normal")
-        self._result_detail.delete("1.0", "end")
-        self._result_detail.insert("1.0", text)
-        self._result_detail.configure(state="disabled")
+        def run_preflight():
+            from doc_tool.adapters.preflight import preflight
+            from doc_tool.domain.errors import DocToolError
 
-    # --- 导航 ---
-
-    def _go_next(self) -> None:
-        if self._runner.is_running:
-            return
-        if self._step == 0:
-            # 进入预检
-            self._step = 1
-            self._preview = None
-            self._show_step()
-            self._dialog.after(100, self._run_preflight)
-        elif self._step == 1:
-            self._step = 2
-            self._show_step()
-        elif self._step == 2:
-            if not self._validate_project_info():
-                from tkinter import messagebox
-
-                messagebox.showwarning(
-                    "项目信息无效",
-                    self._project_info_error or "请填写所有必填字段。",
-                    parent=self._dialog,
+            try:
+                preview = preflight(self._source_page.source_path())
+            except DocToolError as exc:
+                return (
+                    False,
+                    None,
+                    "预检失败：{0}\n\n建议：{1}".format(
+                        exc.user_message, exc.suggested_action
+                    ),
                 )
-                return
-            self._step = 3
-            self._show_step()
-            self._do_import()
-        elif self._step == 4:
-            self._destroy_dialog()
+            except Exception as exc:  # noqa: BLE001
+                return False, None, "预检失败：{0}".format(str(exc)[:200])
 
-    def _run_preflight(self) -> None:
-        """异步执行预检。"""
-        if self._closing or not self._dialog_exists():
-            return
-        self._active_task = "preflight"
-        self._last_error_code = None
+            text = format_preview_summary(preview)
+            if not preview.has_heading1:
+                text += (
+                    "\n\n阻断：未检测到 Heading 1 标题样式，无法导入。\n"
+                    "请在 Word 中为一级标题应用「标题 1」样式后重新导入。"
+                )
+                return False, preview, text
+            return True, preview, text
+
         started = self._runner.start(
             TaskSpec(
                 name="preflight",
-                target=self._do_preflight,
+                target=run_preflight,
                 timeout_seconds=PREFLIGHT_TIMEOUT_SECONDS,
             ),
             on_event=self._on_task_event,
-            on_done=self._after_preflight,
+            on_done=on_done,
         )
-        if not started:
-            self._show_preview_text("预检任务仍在运行，请稍候。")
-            return
-        self._show_step()
-        self._schedule_poll()
-
-    def _after_preflight(self, response) -> None:
-        if self._closing or not self._dialog_exists():
-            self._destroy_dialog()
-            return
-        if response is None:
-            if self._last_error_code == ERR_WATCHDOG_TIMEOUT:
-                ok, preview, text = (
-                    False,
-                    None,
-                    "预检超时。\n\n建议：请确认源文件未被占用、文件可正常用 Word 打开，然后重试。",
-                )
-            else:
-                ok, preview, text = False, None, "预检异常终止。"
+        if started:
+            self._poll_timer.start()
         else:
-            ok, preview, text = response
-        self._active_task = ""
+            on_done((False, None, "预检任务仍在运行，请稍候。"))
+
+    # --- 导入 ---
+
+    def _do_import(self, on_done) -> None:
+        """执行事务化导入。"""
+        from doc_tool.application.import_project import ImportRequest, import_first_time
+
         self._last_error_code = None
-        self._preview = preview
-        self._show_preview_text(text)
-        if ok and preview is not None and preview.document_type_suggestion is not None:
-            suggestion = preview.document_type_suggestion
-            if suggestion.confidence == "high":
-                self._type_var.set(suggestion.document_type)
-        self._show_step()
-
-    def _schedule_poll(self) -> None:
-        if self._poll_scheduled or self._closing or not self._dialog_exists():
-            return
-        self._poll_scheduled = True
-        self._dialog.after(POLL_INTERVAL_MS, self._poll_runner)
-
-    def _poll_runner(self) -> None:
-        self._poll_scheduled = False
-        self._runner.poll()
-        if self._closing and not self._runner.is_running:
-            self._destroy_dialog()
-            return
-        if self._runner.is_running:
-            self._schedule_poll()
+        target_root = str(
+            Path(self._target_parent) / self._project_name
+        )
+        request = ImportRequest(
+            source_docx=Path(self._source_page.source_path()),
+            target_project_root=Path(target_root),
+            document_type=self._doc_type,
+            document_no=self._doc_no,
+            document_name=self._doc_name,
+            document_version=self._doc_version,
+        )
+        started = self._runner.start(
+            TaskSpec(
+                name="import",
+                target=import_first_time,
+                args=(request,),
+                timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
+            ),
+            on_event=self._on_task_event,
+            on_done=lambda result: on_done(result, target_root),
+        )
+        if started:
+            self._poll_timer.start()
 
     def _on_task_event(self, event) -> None:
         if event.kind == "failed":
             self._last_error_code = event.error_code
 
-    def _dialog_exists(self) -> bool:
-        try:
-            return bool(self._dialog.winfo_exists())
-        except Exception:
-            return False
-
-    def _destroy_dialog(self) -> None:
-        if not self._dialog_exists():
+    def _poll_runner(self) -> None:
+        self._runner.poll()
+        if self._closing and not self._runner.is_running:
+            self._poll_timer.stop()
+            self.reject()
             return
-        try:
-            self._dialog.destroy()
-        except Exception:
-            pass
+        if not self._runner.is_running:
+            self._poll_timer.stop()
 
-    def _on_enter(self, _event=None):
-        if self._runner.is_running:
-            return "break"
-        if self._step in (0, 1, 2, 4):
-            try:
-                if str(self._next_btn.cget("state")) == "normal":
-                    self._go_next()
-            except Exception:
-                pass
-        return "break"
+    # --- 校验 ---
 
-    def _on_escape(self, _event=None):
-        if self._runner.is_running:
-            self._cancel()
-        elif self._step in (1, 2):
-            self._go_back()
-        else:
-            self._cancel()
-        return "break"
+    def _validate_project_info(self) -> str:
+        """验证项目信息字段；返回错误文本（空串表示通过）。"""
+        if self._doc_type in ("requirement", "design") and not self._doc_no:
+            return "需求/详细设计预设必须填写文档编号。"
+        if not self._doc_name:
+            return "请填写文档名称。"
+        if self._doc_type in ("requirement", "design") and not self._doc_version:
+            return "需求/详细设计预设必须填写文档版本。"
+        if not self._project_name:
+            return "请填写项目目录名。"
+        if not self._target_parent:
+            return "请选择目标父目录。"
+        project_name = self._project_name
+        if (
+            project_name in (".", "..")
+            or Path(project_name).name != project_name
+            or any(c in project_name for c in '<>:"/\\|?*')
+            or any(ord(c) < 32 for c in project_name)
+            or project_name.rstrip(" .") != project_name
+        ):
+            return "项目目录名包含 Windows 不允许的字符或路径片段。"
+        return ""
 
-    def _go_back(self) -> None:
-        if self._runner.is_running:
-            return
-        if self._step > 0 and self._step != 3:  # 执行中不可返回
-            self._step -= 1
-            self._show_step()
+    # --- 取消 ---
 
-    def _cancel(self) -> None:
+    def _on_cancel_clicked(self) -> None:
+        """取消/关闭：任务运行中先请求安全取消，停止后再关闭。"""
         if self._runner.is_running:
             self._closing = True
             self._runner.cancel()
-            if self._active_task == "import":
-                self._import_status_var.set("正在安全取消，停止后将关闭向导…")
-            elif self._step == 1:
-                self._show_preview_text("正在取消预检，停止后将关闭向导…")
-            self._show_step()
+            self.button(QWizard.WizardButton.CancelButton).setEnabled(False)
+        else:
+            self.reject()
+
+    def reject(self) -> None:
+        """防止运行中直接关闭（安全取消语义）。"""
+        if self._runner.is_running and not self._closing:
+            self._closing = True
+            self._runner.cancel()
+            self.button(QWizard.WizardButton.CancelButton).setEnabled(False)
             return
-        self._result = None
-        self._destroy_dialog()
+        super().reject()

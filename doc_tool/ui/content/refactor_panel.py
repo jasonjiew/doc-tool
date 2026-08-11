@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""章节重命名/重编号联动面板。
+"""章节重命名/重编号联动面板（底部工具面板）。
 
 选择文件 + 输入新文件名 -> "预览影响"生成 dry-run 清单（文件内位置 ×
 旧→新）-> 确认后批量更新引用并重命名文件。写回经 ``ContentWriter``
@@ -8,14 +8,28 @@
 
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import messagebox, ttk
+from pathlib import Path
 from typing import Callable, List, Optional
 
-from doc_tool.application.content.refactor import EditOp, RefactorService, RenamePlan
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from doc_tool.application.content.refactor import RefactorService
 
 
-class RefactorPanel(ttk.Frame):
+class RefactorPanel(QWidget):
     """重命名/重编号联动面板。
 
     ``writer``：``ContentWriter``；``on_applied``：执行成功后回调。
@@ -24,19 +38,19 @@ class RefactorPanel(ttk.Frame):
 
     def __init__(
         self,
-        master,
         service: RefactorService,
         writer,
         *,
         on_applied: Optional[Callable[[], None]] = None,
         writable: bool = True,
+        parent: Optional[QWidget] = None,
     ) -> None:
-        super().__init__(master)
+        super().__init__(parent)
         self._service = service
         self._writer = writer
         self._on_applied = on_applied
         self._writable = writable
-        self._plan: Optional[RenamePlan] = None
+        self._plan = None
         self._all_files: List[str] = []
 
         self._build_inputs()
@@ -45,83 +59,80 @@ class RefactorPanel(ttk.Frame):
     # --- 构建 ---
 
     def _build_inputs(self) -> None:
-        inputs = ttk.LabelFrame(self, text="重命名 / 重编号", padding=8)
-        inputs.pack(fill="x")
+        inputs = QFrame(self)
+        inputs.setProperty("card", True)
+        layout = QVBoxLayout(inputs)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
 
-        row1 = ttk.Frame(inputs)
-        row1.pack(fill="x", pady=2)
-        ttk.Label(row1, text="章节文件：").pack(side="left")
-        self._file_var = tk.StringVar()
-        self._file_box = ttk.Combobox(
-            row1,
-            textvariable=self._file_var,
-            width=60,
-        )
-        self._file_box.pack(side="left", fill="x", expand=True)
+        row1 = QHBoxLayout()
+        row1.setContentsMargins(0, 0, 0, 0)
+        row1.addWidget(QLabel("章节文件：", inputs))
+        self._file_box = QComboBox(inputs)
+        self._file_box.setEditable(True)
+        row1.addWidget(self._file_box, 1)
+        layout.addLayout(row1)
 
-        row2 = ttk.Frame(inputs)
-        row2.pack(fill="x", pady=2)
-        ttk.Label(row2, text="新文件名：").pack(side="left")
-        self._new_name_var = tk.StringVar()
-        ttk.Entry(row2, textvariable=self._new_name_var).pack(
-            side="left", fill="x", expand=True, padx=(0, 6)
-        )
-        self._preview_btn = ttk.Button(
-            row2, text="预览影响", command=self.preview, style="Compact.TButton"
-        )
-        self._preview_btn.pack(side="left")
-        self._status_var = tk.StringVar(value="")
-        ttk.Label(
-            row2, textvariable=self._status_var, style="Status.TLabel"
-        ).pack(side="right", padx=(8, 0))
+        row2 = QHBoxLayout()
+        row2.setContentsMargins(0, 0, 0, 0)
+        row2.addWidget(QLabel("新文件名：", inputs))
+        self._new_name_entry = QLineEdit(inputs)
+        row2.addWidget(self._new_name_entry, 1)
+        self._preview_btn = QPushButton("预览影响", inputs)
+        self._preview_btn.setProperty("btnRole", "secondary")
+        self._preview_btn.clicked.connect(self.preview)
+        row2.addWidget(self._preview_btn)
+        layout.addLayout(row2)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        outer.setSpacing(4)
+        outer.addWidget(inputs)
 
     def _build_results(self) -> None:
-        frame = ttk.Frame(self)
-        frame.pack(fill="both", expand=True)
-        columns = ("file", "line", "old", "new")
-        self._tree = ttk.Treeview(frame, columns=columns, show="headings")
-        self._tree.heading("file", text="文件")
-        self._tree.heading("line", text="行")
-        self._tree.heading("old", text="旧文本")
-        self._tree.heading("new", text="新文本")
-        self._tree.column("file", width=220, anchor="w")
-        self._tree.column("line", width=48, anchor="e", stretch=False)
-        self._tree.column("old", width=220, anchor="w")
-        self._tree.column("new", width=220, anchor="w")
-        ysb = ttk.Scrollbar(frame, orient="vertical", command=self._tree.yview)
-        self._tree.configure(yscrollcommand=ysb.set)
-        self._tree.pack(side="left", fill="both", expand=True)
-        ysb.pack(side="right", fill="y")
+        self._tree = QTreeWidget(self)
+        self._tree.setColumnCount(4)
+        self._tree.setHeaderLabels(["文件", "行", "旧文本", "新文本"])
+        self._tree.setColumnWidth(0, 220)
+        self._tree.setColumnWidth(1, 48)
+        self._tree.setColumnWidth(2, 220)
+        self._tree.setColumnWidth(3, 220)
+        self._tree.setRootIsDecorated(False)
+        self._tree.setUniformRowHeights(True)
 
-        actions = ttk.Frame(self)
-        actions.pack(fill="x", pady=(4, 0))
-        self._apply_btn = ttk.Button(
-            actions,
-            text="确认并执行",
-            command=self.apply_plan,
-            state="disabled",
-            style="Primary.TButton",
-        )
-        self._apply_btn.pack(side="left", padx=4)
-        self._rollback_btn = ttk.Button(
-            actions, text="回滚本次联动", command=self.rollback, style="Compact.TButton"
-        )
-        self._rollback_btn.pack(side="left", padx=4)
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        self._apply_btn = QPushButton("确认并执行", self)
+        self._apply_btn.setProperty("btnRole", "primary")
+        self._apply_btn.clicked.connect(self.apply_plan)
+        actions.addWidget(self._apply_btn)
+        self._rollback_btn = QPushButton("回滚本次联动", self)
+        self._rollback_btn.setProperty("btnRole", "compact")
+        self._rollback_btn.clicked.connect(self.rollback)
+        actions.addWidget(self._rollback_btn)
+        actions.addStretch(1)
+        self._status_label = QLabel("", self)
+        self._status_label.setObjectName("statusMuted")
+        self._status_label.setWordWrap(True)
+        actions.addWidget(self._status_label)
+
+        outer = QVBoxLayout(self)
+        outer.addWidget(self._tree, 1)
+        outer.addLayout(actions)
+        self._update_action_state()
 
     # --- 数据 ---
 
     def set_files(self, files: List[str]) -> None:
         """设置可选择的文件列表。"""
         self._all_files = list(files)
-        self._file_box.configure(values=self._all_files)
+        self._file_box.clear()
+        self._file_box.addItems(self._all_files)
 
     def set_target(self, rel_path: str) -> None:
         """预填目标文件（由章节树/编辑器选中触发）。"""
-        self._file_var.set(rel_path)
-        self._file_box.configure(values=self._all_files)
-        from pathlib import Path
-
-        self._new_name_var.set(Path(rel_path).name)
+        self._file_box.setCurrentText(rel_path)
+        self._new_name_entry.setText(Path(rel_path).name)
         self.clear()
 
     def set_writable(self, writable: bool) -> None:
@@ -131,33 +142,35 @@ class RefactorPanel(ttk.Frame):
     # --- 行为 ---
 
     def preview(self) -> None:
-        """计算并展示 dry-run 清单。"""
-        rel_path = self._file_var.get().strip()
-        new_name = self._new_name_var.get().strip()
+        rel_path = self._file_box.currentText().strip()
+        new_name = self._new_name_entry.text().strip()
         if not rel_path or not new_name:
-            self._status_var.set("请选择文件并填写新文件名")
+            self._set_status("请选择文件并填写新文件名")
             return
         try:
             plan = self._service.compute_rename_plan(rel_path, new_name)
         except Exception as exc:  # noqa: BLE001
-            self._status_var.set("计算失败：{0}".format(exc))
+            self._set_status("计算失败：{0}".format(exc))
             return
         if plan is None:
-            self._status_var.set("目标文件不在内容索引中")
+            self._set_status("目标文件不在内容索引中")
             return
         self._plan = plan
-        self._tree.delete(*self._tree.get_children())
+        self._tree.clear()
         for i, edit in enumerate(plan.edits):
-            self._tree.insert(
-                "",
-                "end",
-                iid="r-{0}".format(i),
-                values=(edit.rel_path, edit.line_no, edit.old_substr, edit.new_substr),
+            item = QTreeWidgetItem(
+                [
+                    edit.rel_path,
+                    str(edit.line_no),
+                    edit.old_substr,
+                    edit.new_substr,
+                ]
             )
+            self._tree.addTopLevelItem(item)
         if plan.total == 0:
-            self._status_var.set("无受影响引用（仅重命名文件本身）")
+            self._set_status("无受影响引用（仅重命名文件本身）")
         else:
-            self._status_var.set(
+            self._set_status(
                 "受影响引用 {0} 处（{1} 个文件）+ 重命名文件本身".format(
                     plan.total, len(plan.affected_files)
                 )
@@ -165,48 +178,44 @@ class RefactorPanel(ttk.Frame):
         self._update_action_state()
 
     def apply_plan(self) -> None:
-        """确认 dry-run 清单并执行。"""
         if self._plan is None:
             return
         plan = self._plan
-        confirmed = messagebox.askyesno(
+        confirmed = QMessageBox.question(
+            self,
             "确认执行",
             "将更新 {0} 处引用，并把文件重命名为：\n{1}\n"
             "每文件保留 .md.bak 备份，可回滚。确认执行？".format(
                 plan.total, plan.new_rel_path
             ),
         )
-        if not confirmed:
+        if confirmed != QMessageBox.StandardButton.Yes:
             return
-        results = self._service.apply_rename_plan(plan, self._writer)
-        self._status_var.set(
-            "已执行：{0} 处引用更新 + 文件重命名".format(plan.total)
-        )
+        self._service.apply_rename_plan(plan, self._writer)
+        self._set_status("已执行：{0} 处引用更新 + 文件重命名".format(plan.total))
         self._plan = None
-        self._tree.delete(*self._tree.get_children())
+        self._tree.clear()
         if self._on_applied is not None:
             self._on_applied()
         self._update_action_state()
 
     def rollback(self) -> None:
-        """回滚最近一次联动（按改动清单）。"""
         failures = self._writer.manifest.rollback()
         if failures:
-            self._status_var.set("回滚失败：{0}".format(", ".join(failures)))
+            self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:
-            self._status_var.set("已回滚本次联动")
+            self._set_status("已回滚本次联动")
             if self._on_applied is not None:
                 self._on_applied()
 
     def clear(self) -> None:
         self._plan = None
-        self._tree.delete(*self._tree.get_children())
+        self._tree.clear()
         self._update_action_state()
 
     def _update_action_state(self) -> None:
-        self._apply_btn.configure(
-            state="normal" if (self._writable and self._plan is not None) else "disabled"
-        )
-        self._rollback_btn.configure(
-            state="normal" if self._writable else "disabled"
-        )
+        self._apply_btn.setEnabled(self._writable and self._plan is not None)
+        self._rollback_btn.setEnabled(self._writable)
+
+    def _set_status(self, text: str) -> None:
+        self._status_label.setText(text)
