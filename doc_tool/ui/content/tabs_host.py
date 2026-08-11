@@ -122,6 +122,10 @@ class TabsHost(QWidget):
         for rel_path in list(self._editors.keys()):
             self._close_tab_by_path(rel_path)
 
+    def close_file(self, rel_path: str) -> None:
+        """关闭指定文件的标签（删除文件时清理已打开标签）。"""
+        self._close_tab_by_path(rel_path)
+
     # --- 内部 ---
 
     def _close_tab(self, index: int) -> None:

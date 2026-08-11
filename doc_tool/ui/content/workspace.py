@@ -96,6 +96,9 @@ class ContentWorkspace(QWidget):
         self._tree = ChapterTree(
             on_open=self._on_tree_open,
             on_refresh=self._rebuild_index,
+            on_create_file=self._on_create_file,
+            on_delete_file=self._on_delete_file,
+            on_clear_markers=self._on_clear_markers,
             writable=self._writable,
         )
         tree_layout = QVBoxLayout(self.tree_host)
@@ -167,6 +170,7 @@ class ContentWorkspace(QWidget):
         assert self._index is not None
         items = build_tree(self._index.all_files())
         self._tree.set_items(items)
+        self._apply_status_map()
 
         search = SearchPanel(
             SearchService(self._index),
@@ -279,6 +283,15 @@ class ContentWorkspace(QWidget):
 
     # --- 写后联动 ---
 
+    def _apply_status_map(self) -> None:
+        """从改动清单重推会话状态并应用到章节树徽标。"""
+        from doc_tool.application.content.writer import manifest_status_map
+
+        self._writer.manifest.load()
+        self._tree.set_status_map(
+            manifest_status_map(self._writer.manifest.entries)
+        )
+
     def _rebuild_index(self) -> None:
         """手动刷新：非破坏性重扫索引 + 重扫引用 + 重绘树。"""
         if self._index is None:
@@ -289,6 +302,7 @@ class ContentWorkspace(QWidget):
             ReferenceScanner(self._index, assets_root=self._assets_root).scan_all()
             items = build_tree(self._index.all_files())
             self._tree.set_items(items)
+            self._apply_status_map()
             if hasattr(self, "_refactor_panel"):
                 self._refactor_panel.set_files(self._index.all_files())
             if self._on_status is not None:
@@ -305,10 +319,84 @@ class ContentWorkspace(QWidget):
             return
         self._index.invalidate(rel_path)
         self._index_service.rebuild_file(self._index, rel_path)
+        self._apply_status_map()
 
     def _on_current_file_changed(self, rel_path: Optional[str]) -> None:
         if rel_path is not None and self._on_open_file is not None:
             self._on_open_file(rel_path)
+
+    # --- 新增/删除/清除标记 ---
+
+    def _on_create_file(self, dir_rel_path: str) -> None:
+        """在指定目录自动编号新建章节文件并定位到编辑器。"""
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        if self._index is None:
+            return
+        title, ok = QInputDialog.getText(self, "新增章节/文件", "章节标题：")
+        if not ok or not title.strip():
+            return
+        title = title.strip()
+        rel_path = next_chapter_rel_path(
+            dir_rel_path, self._index.all_files(), title
+        )
+        result = self._writer.create_file(rel_path, "# {0}\n".format(title))
+        if not result.written:
+            QMessageBox.warning(
+                self, "新增失败", result.error or "写入失败"
+            )
+            return
+        self._index_service.rebuild_file(self._index, rel_path)
+        items = build_tree(self._index.all_files())
+        self._tree.set_items(items)
+        self._apply_status_map()
+        self.open_file(rel_path)
+
+    def _on_delete_file(self, rel_path: str) -> None:
+        """确认后把文件移入回收站并刷新树与索引。"""
+        from PySide6.QtWidgets import QMessageBox
+
+        if self._index is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "删除文件",
+            "将删除并移入回收站（可回滚）：\n{0}\n\n确认？".format(rel_path),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        result = self._writer.delete_file(rel_path)
+        if not result.written:
+            QMessageBox.warning(
+                self, "删除失败", result.error or "删除失败"
+            )
+            return
+        self.tabs_host.close_file(rel_path)
+        self._index_service.rebuild_file(self._index, rel_path)
+        items = build_tree(self._index.all_files())
+        self._tree.set_items(items)
+        self._apply_status_map()
+
+    def _on_clear_markers(self) -> None:
+        """清除全部会话改动标记（同时失去本次回滚能力）。"""
+        from PySide6.QtWidgets import QMessageBox
+
+        self._writer.manifest.load()
+        if self._writer.manifest.empty:
+            return
+        answer = QMessageBox.question(
+            self,
+            "清除标记",
+            "清除全部会话改动标记？\n（同时失去本次回滚能力，改动内容保留）",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._writer.manifest.clear()
+        self._apply_status_map()
 
     def _after_write(self) -> None:
         """替换/重命名写回后：刷新索引并请求校验管线。"""
@@ -316,6 +404,7 @@ class ContentWorkspace(QWidget):
             self._index_service.refresh_dirty(self._index)
             items = build_tree(self._index.all_files())
             self._tree.set_items(items)
+            self._apply_status_map()
             if hasattr(self, "_refactor_panel"):
                 self._refactor_panel.set_files(self._index.all_files())
         if self._on_request_validate is not None:
