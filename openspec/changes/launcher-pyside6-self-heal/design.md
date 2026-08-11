@@ -22,9 +22,9 @@
 ## Decisions
 
 ### D1. 探测方式：`python -c "import PySide6"` 而非仅查目录
-- **选择**：先按现状设置 vendor `PYTHONPATH`，再 `python -c "import PySide6" >nul 2>&1` 探测；`errorlevel` 非 0 才进入引导分支。
-- **理由**：只看 `.vendor` 目录会误判「pip 已装但无 vendor」的机器（非 DLP 机器会被不必要地打扰）。`import` 探测对两种安装来源都正确，且探不到即真缺失。
-- **备选**：仅 `if exist ".vendor\site-packages\PySide6"` —— 判定不准，否决。
+- **选择**：先按现状设置 vendor `PYTHONPATH`，再 `python -c "from PySide6.QtWidgets import QApplication" >nul 2>&1` 探测；`errorlevel` 非 0 才进入引导分支。
+- **理由**：只看 `.vendor` 目录会误判「pip 已装但无 vendor」的机器（非 DLP 机器会被不必要地打扰）。且 `import PySide6` 过弱——pip 部分安装残留可让顶层包可导入而 `QtWidgets` 缺失；探测镜像应用首个真实依赖 `QtWidgets.QApplication`，探不到即真缺 GUI 库。
+- **备选**：仅 `if exist ".vendor\site-packages\PySide6"`（误判 pip 已装的机器）、`import PySide6`（pip 半装时误判可启动）——均否决。
 
 ### D2. 引导交互：`set /p` 确认，默认拒绝
 - **选择**：提示 `PySide6 not found. Install now (~200 MB, one-time)? [Y/N]`，输入 `Y/y` 才安装；回车或其它输入均视为拒绝，打印手动指引退出。

@@ -7,7 +7,7 @@
 ## ADDED Requirements
 
 ### Requirement: Launcher probes PySide6 and stays silent when present
-启动脚本 SHALL 在启动应用前以 `python -c "import PySide6"` 探测依赖（若 `.vendor\site-packages\PySide6` 存在，SHALL 先将该目录加入 `PYTHONPATH` 再探测）。探测成功时 SHALL 直接启动应用，不显示任何安装提示。
+启动脚本 SHALL 在启动应用前以 `python -c "from PySide6.QtWidgets import QApplication"` 探测依赖（若 `.vendor\site-packages\PySide6` 存在，SHALL 先将该目录加入 `PYTHONPATH` 再探测）。探测成功时 SHALL 直接启动应用，不显示任何安装提示。
 
 #### Scenario: PySide6 provided by .vendor
 - **WHEN** `.vendor\site-packages\PySide6` 存在且探测通过

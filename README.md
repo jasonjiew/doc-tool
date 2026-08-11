@@ -173,6 +173,10 @@ python -m pip install -r requirements.txt
 > Python 安装目录受 DLP/安全软件保护导致 pip 无法原子重命名，可改用
 > 仓库 `.vendor/site-packages`（解压 PySide6 wheel）并通过
 > `PYTHONPATH=.vendor/site-packages` 启动。
+>
+> 「启动康尚文档工具.cmd」会在启动前自动探测 PySide6；缺失时（例如重新下载
+> 项目后）会提示并自动运行 `python scripts\setup_pyside6.py`（约 200MB，仅首次），
+> 安装完成后自动继续启动，无需手工步骤。
 
 Word 刷新使用 `DispatchEx` 启动本次专用隐藏进程，不复用、关闭或杀死用户已经打开的 Word。超时值来自配置 `refresh.timeoutSeconds`；超时只终止本次工作进程并返回失败。刷新完成后还会只读复打开一次，以确认 Word 不需要修复文档。
 
