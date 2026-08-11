@@ -253,7 +253,7 @@ class ReplacePanel(QWidget):
         self._after_applied(results)
 
     def rollback(self) -> None:
-        failures = self._writer.manifest.rollback()
+        failures = self._writer.rollback()
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:
