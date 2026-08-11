@@ -646,6 +646,59 @@ class ChapterTreeModelTests(unittest.TestCase):
             sum(1 for i in items if i.is_file), 2
         )
 
+    def test_qt_model_parent_invariant_and_full_hierarchy(self):
+        """Qt ChapterTreeModel 的 parent() 保持模型不变式，且层级完整。
+
+        回归：此前 parent() 对「父节点为顶层类型节点」的章节错误返回根，
+        违反 QAbstractItemModel 不变式（parent(index(r,c,p)) == p），
+        会导致 QTreeView 展开/层级显示异常。
+        """
+        from doc_tool.application.content.tree import build_tree
+        from doc_tool.ui.content.tree_panel import ChapterTreeModel
+
+        items = build_tree(self.FILES)
+        model = ChapterTreeModel(items)
+
+        def same(a, b):
+            if a.isValid() != b.isValid():
+                return False
+            if not a.isValid():
+                return True
+            return (
+                a.row() == b.row()
+                and a.column() == b.column()
+                and a.internalPointer() == b.internalPointer()
+            )
+
+        mismatch = 0
+        checked = 0
+        stack = [model.index(0, 0).parent()]  # 根（invalid）
+        while stack:
+            par = stack.pop()
+            for row in range(model.rowCount(par)):
+                idx = model.index(row, 0, par)
+                if model.hasChildren(idx):
+                    stack.append(idx)
+                checked += 1
+                if not same(model.parent(idx), par):
+                    mismatch += 1
+        self.assertEqual(mismatch, 0)
+        self.assertGreater(checked, 4)
+
+        # 顶层类型节点下应能看到章节
+        req_row = next(
+            row
+            for row in range(model.rowCount())
+            if model.data(model.index(row, 0)) == "需求文档"
+        )
+        req_idx = model.index(req_row, 0)
+        chapters = [
+            model.data(model.index(r, 0, req_idx))
+            for r in range(model.rowCount(req_idx))
+        ]
+        self.assertIn("第1章 引言", chapters)
+        self.assertIn("第3章 功能需求", chapters)
+
 
 class SearchServiceTests(unittest.TestCase):
     """任务 5.x：全文搜索服务。"""

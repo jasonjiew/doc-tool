@@ -74,8 +74,9 @@ class ChapterTreeModel(QAbstractItemModel):
             return QModelIndex()
         parent_id = item.parent_id
         parent_item = self._by_id.get(parent_id)
-        if parent_item is None or parent_item.parent_id is None:
+        if parent_item is None:
             return QModelIndex()
+        # 父节点为顶层类型节点（其 parent_id 为 None）时，其所在行位于根下。
         grand_id = parent_item.parent_id or self._ROOT
         siblings = self._children.get(grand_id, [])
         try:
@@ -185,14 +186,12 @@ class ChapterTree(QWidget):
     # --- 数据 ---
 
     def set_items(self, items: List[TreeItem]) -> None:
-        """重建树内容。"""
+        """重建树内容，并展开全部目录节点，打开即可看到完整章节层级。"""
         self._items = list(items)
         self._model.set_items(items)
-        # 展开顶层类型节点
         for item in items:
-            if not item.is_file and item.parent_id is None:
-                node_id = item.node_id
-                index = self._index_for(node_id)
+            if not item.is_file:
+                index = self._index_for(item.node_id)
                 if index.isValid():
                     self._tree.expand(index)
 
