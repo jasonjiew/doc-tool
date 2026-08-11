@@ -319,7 +319,12 @@ class ContentWorkspace(QWidget):
             return
         self._index.invalidate(rel_path)
         self._index_service.rebuild_file(self._index, rel_path)
-        self._apply_status_map()
+        from doc_tool.application.content.writer import manifest_status_map
+
+        self._writer.manifest.load()
+        self._tree.set_status(
+            manifest_status_map(self._writer.manifest.entries)
+        )
 
     def _on_current_file_changed(self, rel_path: Optional[str]) -> None:
         if rel_path is not None and self._on_open_file is not None:
@@ -401,7 +406,7 @@ class ContentWorkspace(QWidget):
     def _after_write(self) -> None:
         """替换/重命名写回后：刷新索引并请求校验管线。"""
         if self._index is not None:
-            self._index_service.refresh_dirty(self._index)
+            self._index_service.refresh(self._index)
             items = build_tree(self._index.all_files())
             self._tree.set_items(items)
             self._apply_status_map()

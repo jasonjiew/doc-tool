@@ -1425,6 +1425,35 @@ class CreateDeleteTests(unittest.TestCase):
             (self.content_root / "requirement/第1章 引言/1.1 新增.md").exists()
         )
 
+    def test_refresh_after_rollback_reincludes_restored_file(self):
+        """回滚恢复删除文件后：增量 refresh_dirty 发现不了，全量 refresh 重新收录。
+
+        回归：此前 workspace._after_write 用 refresh_dirty，回滚（rollback 恢复/
+        移除文件但不标记失效）后树与磁盘不同步 —— 恢复的删除文件从树中消失。
+        """
+        from doc_tool.application.content.index import ContentIndexService
+
+        service = ContentIndexService(self.content_root)
+        index = service.build()
+        writer = self._writer()
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        self.assertIn(rel, index.files)
+
+        # 删除 → 索引条目被移除（workspace._on_delete_file 的路径）
+        writer.delete_file(rel)
+        service.rebuild_file(index, rel)
+        self.assertNotIn(rel, index.files)
+
+        # 回滚恢复磁盘文件；增量刷新发现不了（文件从未被标记失效）
+        writer.rollback()
+        self.assertTrue((self.content_root / rel).exists())
+        service.refresh_dirty(index)
+        self.assertNotIn(rel, index.files)
+
+        # 全量 refresh 重新收录恢复的文件
+        service.refresh(index)
+        self.assertIn(rel, index.files)
+
 
 class ChapterTreeStatusTests(unittest.TestCase):
     """章节树状态徽标渲染（需 PySide6；无显示环境用 offscreen）。"""
@@ -1495,6 +1524,76 @@ class ChapterTreeStatusTests(unittest.TestCase):
         dir_index = model.index_for_id("requirement/第3章/3.7 KSOA")
         self.assertTrue(dir_index.isValid())
         self.assertIsNone(model.data(dir_index, Qt.ItemDataRole.DecorationRole))
+
+    def test_clear_button_visibility_follows_writable(self):
+        """只读项目构造时即隐藏「清除标记」按钮（验收：只读工具栏无该按钮）。"""
+        from doc_tool.ui.content.tree_panel import ChapterTree
+
+        ro_tree = ChapterTree(writable=False)
+        rw_tree = ChapterTree(writable=True)
+        ro_tree.show()
+        rw_tree.show()
+        self.assertFalse(ro_tree._clear_btn.isVisible())
+        self.assertTrue(rw_tree._clear_btn.isVisible())
+
+    def test_set_status_incremental_does_not_reset_model(self):
+        """增量 set_status 不触发 modelReset，原索引仍有效且徽标更新。"""
+        from PySide6.QtCore import Qt
+
+        model = self._model()
+        resets = []
+        model.modelReset.connect(lambda: resets.append(True))
+
+        target = model.index_for_id(
+            "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md"
+        )
+        self.assertTrue(target.isValid())
+        self.assertIsNone(model.data(target, Qt.ItemDataRole.DecorationRole))
+
+        model.set_status(
+            {
+                "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md": "added",
+                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "modified",
+            }
+        )
+        self.assertEqual(resets, [])  # 未重建模型
+        self.assertTrue(target.isValid())
+        self.assertFalse(
+            model.data(target, Qt.ItemDataRole.DecorationRole).isNull()
+        )
+
+    def test_tree_set_status_preserves_collapse_state(self):
+        """tree.set_status 增量刷新后目录折叠/展开状态保留。"""
+        from doc_tool.application.content.tree import build_tree
+        from doc_tool.ui.content.tree_panel import ChapterTree
+
+        tree = ChapterTree()
+        tree.set_items(
+            build_tree(
+                [
+                    "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
+                    "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
+                ]
+            )
+        )
+        dir_index = tree._model.index_for_id("requirement/第3章/3.7 KSOA")
+        self.assertTrue(dir_index.isValid())
+        # set_items 默认展开全部目录，先折叠验证状态保留
+        tree._tree.collapse(dir_index)
+        self.assertFalse(tree._tree.isExpanded(dir_index))
+
+        tree.set_status(
+            {"requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "added"}
+        )
+        self.assertTrue(dir_index.isValid())
+        self.assertFalse(tree._tree.isExpanded(dir_index))
+
+        # 展开后再次增量刷新，展开状态也保留
+        tree._tree.expand(dir_index)
+        tree.set_status(
+            {"requirement/第3章/3.7 KSOA/3.7.2 产品管理.md": "modified"}
+        )
+        self.assertTrue(tree._tree.isExpanded(dir_index))
 
 
 if __name__ == "__main__":

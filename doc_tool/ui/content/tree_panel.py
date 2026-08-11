@@ -230,6 +230,7 @@ class ChapterTree(QWidget):
         self._clear_btn.clicked.connect(
             lambda: self._on_clear_markers and self._on_clear_markers()
         )
+        self._clear_btn.setVisible(self._writable)
         toolbar.addWidget(self._clear_btn)
         self._refresh_btn = QPushButton("刷新", self)
         self._refresh_btn.setProperty("btnRole", "compact")
@@ -276,6 +277,11 @@ class ChapterTree(QWidget):
         """设置徽标状态映射并重建可见节点（配合 set_items 使用）。"""
         self._status_map = dict(status_map)
         self._apply_filter(self._filter_entry.text())
+
+    def set_status(self, status: Dict[str, str]) -> None:
+        """增量更新徽标状态（不重建模型/不折叠展开），仅重绘受影响节点。"""
+        self._status_map = dict(status)
+        self._model.set_status(status)
 
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
