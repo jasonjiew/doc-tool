@@ -18,6 +18,7 @@ from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
+    QLineEdit,
     QMenu,
     QPushButton,
     QTreeView,
@@ -25,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from doc_tool.application.content.tree import TreeItem
+from doc_tool.application.content.tree import TreeItem, filter_tree_items
 
 
 class ChapterTreeModel(QAbstractItemModel):
@@ -148,6 +149,7 @@ class ChapterTree(QWidget):
         self._writable = writable
         self._current: Optional[str] = None
         self._items: List[TreeItem] = []
+        self._visible_items: List[TreeItem] = []
         self._model = ChapterTreeModel([], self)
 
         layout = QVBoxLayout(self)
@@ -171,6 +173,12 @@ class ChapterTree(QWidget):
         toolbar.addWidget(self._refresh_btn)
         layout.addLayout(toolbar)
 
+        self._filter_entry = QLineEdit(self)
+        self._filter_entry.setPlaceholderText("筛选章节或文件名…")
+        self._filter_entry.setClearButtonEnabled(True)
+        self._filter_entry.textChanged.connect(self._apply_filter)
+        layout.addWidget(self._filter_entry)
+
         self._tree = QTreeView(self)
         self._tree.setModel(self._model)
         self._tree.setHeaderHidden(True)
@@ -188,8 +196,13 @@ class ChapterTree(QWidget):
     def set_items(self, items: List[TreeItem]) -> None:
         """重建树内容，并展开全部目录节点，打开即可看到完整章节层级。"""
         self._items = list(items)
-        self._model.set_items(items)
-        for item in items:
+        self._apply_filter(self._filter_entry.text())
+
+    def _apply_filter(self, query: str) -> None:
+        """根据输入重建可见节点，并展开匹配结果的完整层级。"""
+        self._visible_items = filter_tree_items(self._items, query)
+        self._model.set_items(self._visible_items)
+        for item in self._visible_items:
             if not item.is_file:
                 index = self._index_for(item.node_id)
                 if index.isValid():
@@ -203,7 +216,7 @@ class ChapterTree(QWidget):
 
     def expand_all(self) -> None:
         """展开全部目录节点。"""
-        for item in self._items:
+        for item in self._visible_items:
             if not item.is_file:
                 index = self._index_for(item.node_id)
                 if index.isValid():
@@ -211,7 +224,7 @@ class ChapterTree(QWidget):
 
     def collapse_all(self) -> None:
         """折叠全部目录节点（保留顶层类型节点展开）。"""
-        for item in self._items:
+        for item in self._visible_items:
             if not item.is_file and item.parent_id is not None:
                 index = self._index_for(item.node_id)
                 if index.isValid():
@@ -219,6 +232,8 @@ class ChapterTree(QWidget):
 
     def select_file(self, rel_path: str) -> bool:
         """定位到某文件节点：展开祖先并选中；文件不在树中返回 False。"""
+        if self._model.item_for(rel_path) is None and self._filter_entry.text():
+            self._filter_entry.clear()
         item = self._model.item_for(rel_path)
         if item is None or not item.is_file:
             return False

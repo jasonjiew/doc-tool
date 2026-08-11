@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""内置 .md 编辑器 + 侧边预览（PySide6）。
+"""内置 .md 编辑器 + Markdown 阅读预览（PySide6）。
 
-UTF-8 纯文本编辑，保存经 ``ContentWriter``（备份 + 原子写）。侧边预览由
-``render_preview_blocks`` 渲染近似结构，编辑去抖刷新，标注"近似结构预览"。
-提供"在外部编辑器打开"兜底与外部修改检测。
+UTF-8 纯文本编辑，保存经 ``ContentWriter``（备份 + 原子写）。右侧使用 Qt
+原生 Markdown 文档渲染器，编辑去抖后即时更新；项目自定义图片尺寸后缀会在
+预览前转换为标准 Markdown。提供"在外部编辑器打开"兜底与外部修改检测。
 """
 
 from __future__ import annotations
@@ -12,34 +12,25 @@ import os
 import time
 from typing import Callable, Optional
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
     QPushButton,
     QSplitter,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
 from doc_tool.application.content.preview import (
     preview_summary,
-    render_preview_blocks,
+    render_markdown_html,
 )
-from doc_tool.ui.styles import FONT_FAMILY
 
 _PREVIEW_DEBOUNCE_MS = 300
-
-
-def _heading_format(level: int) -> QTextCharFormat:
-    fmt = QTextCharFormat()
-    font = QFont(FONT_FAMILY)
-    font.setPointSizeF(max(9.0, 14.0 - (level - 1) * 1.2))
-    font.setBold(True)
-    fmt.setFont(font)
-    return fmt
 
 
 class EditorPanel(QWidget):
@@ -55,12 +46,14 @@ class EditorPanel(QWidget):
         writer,
         *,
         on_saved: Optional[Callable[[str], None]] = None,
+        assets_root=None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._writer = writer
         self._on_saved = on_saved
+        self._assets_root = assets_root
         self._writable = writable
         self._rel_path: Optional[str] = None
         self._mtime: Optional[float] = None
@@ -130,9 +123,9 @@ class EditorPanel(QWidget):
         preview_frame = QWidget(splitter)
         preview_layout = QVBoxLayout(preview_frame)
         preview_layout.setContentsMargins(0, 0, 0, 0)
-        self._preview = QPlainTextEdit(preview_frame)
+        self._preview = QTextBrowser(preview_frame)
         self._preview.setReadOnly(True)
-        self._preview.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self._preview.setOpenExternalLinks(True)
         preview_layout.addWidget(self._preview)
         splitter.addWidget(preview_frame)
 
@@ -278,42 +271,21 @@ class EditorPanel(QWidget):
         self._refresh_preview(self._editor.toPlainText())
 
     def _refresh_preview(self, text: str) -> None:
-        self._preview.clear()
-        cursor = self._preview.textCursor()
-        for block in render_preview_blocks(text):
-            if block.kind == "heading":
-                cursor.setCharFormat(_heading_format(block.level))
-                cursor.insertText(block.text + "\n")
-            elif block.kind == "table":
-                fmt = QTextCharFormat()
-                font = QFont("Consolas")
-                font.setPointSizeF(9)
-                fmt.setFont(font)
-                cursor.setCharFormat(fmt)
-                for row in block.rows[:20]:
-                    cells = " | ".join(row)
-                    cursor.insertText(cells + "\n")
-                if len(block.rows) > 20:
-                    cursor.insertText("…（表格省略）\n")
-                cursor.insertText("\n")
-            elif block.kind == "image":
-                label = "📷 {0}".format(block.image_path)
-                if block.image_size:
-                    label += " ({0})".format(block.image_size)
-                cursor.insertText(label + "\n")
-            elif block.kind == "paragraph":
-                cursor.setCharFormat(QTextCharFormat())
-                cursor.insertText(block.text + "\n")
-            else:
-                cursor.setCharFormat(QTextCharFormat())
-                cursor.insertText("\n")
-        marker = QTextCharFormat()
-        font = QFont(FONT_FAMILY)
-        font.setItalic(True)
-        marker.setFont(font)
-        cursor.setCharFormat(marker)
-        cursor.insertText("\n—— 近似结构预览，以 Word 输出为准 ——\n")
+        document = self._preview.document()
+        document.setBaseUrl(self._preview_base_url())
+        document.setHtml(render_markdown_html(text))
         self._preview.moveCursor(QTextCursor.MoveOperation.Start)
+
+    def _preview_base_url(self) -> QUrl:
+        """返回当前文档图片等相对资源的解析目录。"""
+        if self._rel_path is not None and self._assets_root is not None:
+            document_type = self._rel_path.replace("\\", "/").split("/", 1)[0]
+            base = self._assets_root / document_type
+        elif self._rel_path is not None:
+            base = self._writer_abs(self._rel_path).parent
+        else:
+            base = self._writer.resolve(".")
+        return QUrl.fromLocalFile(str(base) + os.sep)
 
     def _apply_edit_state(self) -> None:
         self._editor.setReadOnly(not self._writable)

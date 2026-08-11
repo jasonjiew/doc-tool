@@ -627,6 +627,44 @@ class ChapterTreeModelTests(unittest.TestCase):
         dir_ids = [i.node_id for i in items if not i.is_file]
         self.assertEqual(len(dir_ids), len(set(dir_ids)))
 
+    def test_natural_sort_orders_numeric_sections(self):
+        """章节和文件名按数字段排序，不能把 3.7.10 排在 3.7.2 前。"""
+        from doc_tool.application.content.tree import build_tree
+
+        items = build_tree(
+            [
+                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md",
+                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
+                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
+            ]
+        )
+        files = [item.text for item in items if item.is_file]
+        self.assertEqual(
+            files,
+            ["3.7.1 租户管理.md", "3.7.2 产品管理.md", "3.7.10 设备管理.md"],
+        )
+
+    def test_filter_keeps_file_ancestors_and_directory_subtree(self):
+        """搜索文件时保留定位路径，搜索目录时保留完整模块。"""
+        from doc_tool.application.content.tree import build_tree, filter_tree_items
+
+        items = build_tree(
+            [
+                "requirement/第3章/KSOA/3.7.1 租户管理.md",
+                "requirement/第3章/KSOA/3.7.2 产品管理.md",
+                "requirement/第3章/KSHC/3.1.1 居民信息.md",
+            ]
+        )
+        tenant = filter_tree_items(items, "租户")
+        self.assertEqual(
+            [item.text for item in tenant if item.is_file], ["3.7.1 租户管理.md"]
+        )
+        module = filter_tree_items(items, "ksoa")
+        self.assertEqual(
+            [item.text for item in module if item.is_file],
+            ["3.7.1 租户管理.md", "3.7.2 产品管理.md"],
+        )
+
     def test_integration_with_index(self):
         """与 ContentIndex 集成：从真实索引推导树。"""
         from doc_tool.application.content.index import ContentIndexService
@@ -887,6 +925,32 @@ class PreviewRendererTests(unittest.TestCase):
         self.assertIn("段落 1", summary)
         self.assertIn("表格 1", summary)
         self.assertIn("图片 1", summary)
+
+    def test_normalize_preview_converts_custom_image_size(self):
+        """Qt 预览应能读取构建链路使用的图片尺寸扩展语法。"""
+        from doc_tool.application.content.preview import normalize_markdown_for_preview
+
+        rendered = normalize_markdown_for_preview(
+            "![业务图](images/img_0001.png =642x269)\n<EMPTY_PAR/>\n正文\n"
+        )
+        self.assertEqual(rendered, "![业务图](images/img_0001.png)\n正文")
+
+    def test_html_preview_renders_markdown_constructs(self):
+        """HTML 预览保留项目常用 Markdown 格式，并转义原始 HTML。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        rendered = render_markdown_html(
+            "# 标题\n\n**加粗** 和 *斜体*\n\n- 条目\n\n"
+            "| 名称 | 说明 |\n| --- | --- |\n| A | `代码` |\n"
+            "\n![图](images/a.png =1x1)\n\n<script>alert(1)</script>\n"
+        )
+        self.assertIn("<h1>标题</h1>", rendered)
+        self.assertIn("<b>加粗</b>", rendered)
+        self.assertIn("<i>斜体</i>", rendered)
+        self.assertIn("<ul><li>条目</li></ul>", rendered)
+        self.assertIn("<table", rendered)
+        self.assertIn('<img src="images/a.png" alt="图"/>', rendered)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", rendered)
 
 
 class ReplaceServiceTests(unittest.TestCase):

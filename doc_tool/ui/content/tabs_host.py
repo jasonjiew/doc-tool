@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """中心多标签编辑器：每个打开的章节一个标签页。
 
-标签页为 ``EditorPanel``（QPlainTextEdit 编辑 + 轻量 Markdown 预览），可同时
+标签页为 ``EditorPanel``（QPlainTextEdit 编辑 + Qt Markdown 预览），可同时
 打开多个文件并切换编辑。保存经 ``ContentWriter``（备份 + 原子写），写回后
 经 ``on_saved`` 回调由上层失效重建索引并刷新预览。标签切换时检测外部修改。
 """
@@ -24,6 +24,7 @@ class TabsHost(QWidget):
         *,
         on_saved: Optional[Callable[[str], None]] = None,
         on_current_changed: Optional[Callable[[Optional[str]], None]] = None,
+        assets_root=None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -31,6 +32,7 @@ class TabsHost(QWidget):
         self._writer = writer
         self._on_saved = on_saved
         self._on_current_changed = on_current_changed
+        self._assets_root = assets_root
         self._writable = writable
 
         self._tabs = QTabWidget(self)
@@ -74,6 +76,7 @@ class TabsHost(QWidget):
         editor = EditorPanel(
             self._writer,
             on_saved=self._on_saved,
+            assets_root=self._assets_root,
             writable=self._writable,
         )
         editor.load(rel_path, text)

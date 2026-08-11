@@ -106,6 +106,7 @@ class ContentWorkspace(QWidget):
             self._writer,
             on_saved=self._on_file_saved,
             on_current_changed=self._on_current_file_changed,
+            assets_root=self._assets_root,
             writable=self._writable,
         )
 

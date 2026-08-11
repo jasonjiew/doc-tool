@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -15,6 +16,20 @@ DEFAULT_TYPE_LABELS = {
     "requirement": "需求文档",
     "design": "详细设计文档",
 }
+
+_NATURAL_PART_RE = re.compile(r"(\d+)")
+
+
+def natural_sort_key(value: str) -> tuple:
+    """返回章节/文件名的自然排序键，如 ``3.7.2`` 排在 ``3.7.10`` 前。"""
+    return tuple(
+        int(part) if part.isdigit() else part.casefold()
+        for part in _NATURAL_PART_RE.split(value)
+    )
+
+
+def _path_sort_key(rel_path: str) -> tuple:
+    return tuple(natural_sort_key(part) for part in rel_path.split("/"))
 
 
 @dataclass
@@ -62,7 +77,7 @@ def build_tree(
             )
         )
         seen_dir_ids.add(type_id)
-        for rel in sorted(by_type[document_type]):
+        for rel in sorted(by_type[document_type], key=_path_sort_key):
             parts = rel.split("/")
             dirs = parts[1:-1]
             file_name = parts[-1]
@@ -91,6 +106,41 @@ def build_tree(
                 )
             )
     return items
+
+
+def filter_tree_items(items: List[TreeItem], query: str) -> List[TreeItem]:
+    """筛选章节树，保留命中文件及其父级目录。
+
+    目录自身命中时保留其完整子树，便于按模块名（如 ``KSOA``）浏览；文件命中时
+    仅显示该文件和从文档类型到章节的祖先路径。
+    """
+    needle = query.strip().casefold()
+    if not needle:
+        return list(items)
+
+    included: set = set()
+    by_id = {item.node_id: item for item in items}
+
+    def include_with_ancestors(node_id: str) -> None:
+        current = by_id.get(node_id)
+        while current is not None:
+            included.add(current.node_id)
+            current = by_id.get(current.parent_id) if current.parent_id else None
+
+    for item in items:
+        haystack = "{0}\n{1}".format(item.text, item.rel_path or item.node_id).casefold()
+        if needle not in haystack:
+            continue
+        include_with_ancestors(item.node_id)
+        if not item.is_file:
+            prefix = item.node_id + "/"
+            included.update(
+                descendant.node_id
+                for descendant in items
+                if descendant.node_id.startswith(prefix)
+            )
+
+    return [item for item in items if item.node_id in included]
 
 
 def ancestors(node_id: str, items: List[TreeItem]) -> List[str]:
