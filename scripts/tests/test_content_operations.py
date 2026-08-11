@@ -1426,5 +1426,76 @@ class CreateDeleteTests(unittest.TestCase):
         )
 
 
+class ChapterTreeStatusTests(unittest.TestCase):
+    """章节树状态徽标渲染（需 PySide6；无显示环境用 offscreen）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        # 自包含：脱离 launcher 环境也能找到 .vendor 里的 PySide6
+        vendor = Path(REPO_ROOT) / ".vendor" / "site-packages"
+        if vendor.is_dir():
+            sys.path.insert(0, str(vendor))
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            cls._app = QApplication.instance() or QApplication([])
+            cls._qt_available = True
+        except Exception:
+            cls._qt_available = False
+
+    def setUp(self) -> None:
+        if not getattr(self, "_qt_available", False):
+            self.skipTest("PySide6 不可用")
+
+    def _model(self):
+        from doc_tool.application.content.tree import build_tree
+        from doc_tool.ui.content.tree_panel import ChapterTreeModel
+
+        items = build_tree(
+            [
+                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",  # added
+                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",  # modified
+                "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md",  # 未标记
+            ]
+        )
+        return ChapterTreeModel(
+            items,
+            status={
+                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "added",
+                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md": "modified",
+            },
+        )
+
+    def test_decoration_shows_dot_for_marked_files_only(self):
+        from PySide6.QtCore import Qt
+
+        model = self._model()
+        added = model.index_for_id(
+            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md"
+        )
+        modified = model.index_for_id(
+            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md"
+        )
+        unmarked = model.index_for_id(
+            "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md"
+        )
+        self.assertFalse(model.data(added, Qt.ItemDataRole.DecorationRole).isNull())
+        self.assertFalse(
+            model.data(modified, Qt.ItemDataRole.DecorationRole).isNull()
+        )
+        self.assertIsNone(
+            model.data(unmarked, Qt.ItemDataRole.DecorationRole)
+        )
+
+    def test_directory_nodes_have_no_badge(self):
+        from PySide6.QtCore import Qt
+
+        model = self._model()
+        dir_index = model.index_for_id("requirement/第3章/3.7 KSOA")
+        self.assertTrue(dir_index.isValid())
+        self.assertIsNone(model.data(dir_index, Qt.ItemDataRole.DecorationRole))
+
+
 if __name__ == "__main__":
     unittest.main()

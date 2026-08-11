@@ -11,10 +11,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
-from PySide6.QtGui import QAction, QCursor
+from PySide6.QtGui import QAction, QCursor, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -29,6 +30,23 @@ from PySide6.QtWidgets import (
 from doc_tool.application.content.tree import TreeItem, filter_tree_items
 
 
+_STATUS_COLORS = {"added": "#1a9c5b", "modified": "#c98a12"}
+
+
+@lru_cache(maxsize=None)
+def status_icon(status: str) -> QIcon:
+    """生成指定状态的彩色圆点图标（运行时绘制，不依赖资源文件）。"""
+    pix = QPixmap(12, 12)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(_STATUS_COLORS[status]))
+    painter.drawEllipse(2, 2, 8, 8)
+    painter.end()
+    return QIcon(pix)
+
+
 class ChapterTreeModel(QAbstractItemModel):
     """基于 ``TreeItem`` 扁平列表的只读树模型。
 
@@ -38,13 +56,14 @@ class ChapterTreeModel(QAbstractItemModel):
 
     _ROOT = ""
 
-    def __init__(self, items: List[TreeItem], parent=None) -> None:
+    def __init__(self, items, parent=None, *, status=None) -> None:
         super().__init__(parent)
-        self.set_items(items)
+        self.set_items(items, status)
 
-    def set_items(self, items: List[TreeItem]) -> None:
+    def set_items(self, items: List[TreeItem], status: Optional[Dict[str, str]] = None) -> None:
         self.beginResetModel()
         self._items = list(items)
+        self._status = dict(status) if status else {}
         self._by_id: Dict[str, TreeItem] = {
             item.node_id: item for item in self._items
         }
@@ -105,6 +124,10 @@ class ChapterTreeModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.UserRole:
             return item.rel_path if item.is_file else None
         if role == Qt.ItemDataRole.DecorationRole:
+            if item.is_file:
+                state = self._status.get(item.rel_path)
+                if state in ("added", "modified"):
+                    return status_icon(state)
             return None
         return None
 
@@ -125,6 +148,34 @@ class ChapterTreeModel(QAbstractItemModel):
 
     def all_items(self) -> List[TreeItem]:
         return list(self._items)
+
+    def index_for_id(self, node_id: str) -> QModelIndex:
+        """按 node_id 深度优先构造模型索引；不存在返回无效索引。"""
+        return self._find_index(QModelIndex(), node_id)
+
+    def _find_index(self, parent: QModelIndex, node_id: str) -> QModelIndex:
+        parent_id = self._node_id(parent)
+        for row, child_id in enumerate(self._children.get(parent_id, [])):
+            index = self.createIndex(row, 0, child_id)
+            if child_id == node_id:
+                return index
+            if self.rowCount(index) > 0:
+                found = self._find_index(index, node_id)
+                if found.isValid():
+                    return found
+        return QModelIndex()
+
+    def set_status(self, status: Dict[str, str]) -> None:
+        """更新徽标状态并重绘受影响文件节点（不重置模型/不折叠展开）。"""
+        self._status = dict(status)
+        for item in self._items:
+            if not item.is_file:
+                continue
+            index = self.index_for_id(item.node_id)
+            if index.isValid():
+                self.dataChanged.emit(
+                    index, index, [Qt.ItemDataRole.DecorationRole]
+                )
 
 
 class ChapterTree(QWidget):
@@ -150,6 +201,7 @@ class ChapterTree(QWidget):
         self._current: Optional[str] = None
         self._items: List[TreeItem] = []
         self._visible_items: List[TreeItem] = []
+        self._status_map: Dict[str, str] = {}
         self._model = ChapterTreeModel([], self)
 
         layout = QVBoxLayout(self)
@@ -201,12 +253,17 @@ class ChapterTree(QWidget):
     def _apply_filter(self, query: str) -> None:
         """根据输入重建可见节点，并展开匹配结果的完整层级。"""
         self._visible_items = filter_tree_items(self._items, query)
-        self._model.set_items(self._visible_items)
+        self._model.set_items(self._visible_items, status=self._status_map)
         for item in self._visible_items:
             if not item.is_file:
                 index = self._index_for(item.node_id)
                 if index.isValid():
                     self._tree.expand(index)
+
+    def set_status_map(self, status_map: Dict[str, str]) -> None:
+        """设置徽标状态映射并重建可见节点（配合 set_items 使用）。"""
+        self._status_map = dict(status_map)
+        self._apply_filter(self._filter_entry.text())
 
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
