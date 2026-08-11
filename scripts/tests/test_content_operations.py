@@ -92,6 +92,37 @@ class ContentIndexTests(unittest.TestCase):
         )
         self.assertEqual(index.document_types, {"requirement", "design"})
 
+    def test_build_indexes_type_dir_layout(self):
+        """布局 B：content_root 本身是文档类型目录（content/requirement 直接含章节）。
+
+        真实项目 `contentRoot: content/requirement` 时，章节目录直接挂在 content_root
+        下（无类型子目录），索引必须能直接递归收录，并按目录名推断文档类型。
+        """
+        from doc_tool.application.content.index import ContentIndexService
+
+        project_root = Path(tempfile.mkdtemp(prefix="doc-tool-content-b-"))
+        self.addCleanup(shutil.rmtree, project_root, ignore_errors=True)
+        content_root = project_root / "content" / "requirement"
+        files = {
+            "第1章 引言/1.1 目的.md": "# 1.1 目的\n正文。\n",
+            "第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": "# 3.1.4 居民信息\n正文。\n",
+        }
+        for rel, text in files.items():
+            path = content_root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+        service = ContentIndexService(content_root)
+        index = service.build()
+        self.assertEqual(len(index.files), 2)
+        self.assertIn("第1章 引言/1.1 目的.md", index.files)
+        # 布局 B 下文档类型由 content_root 目录名推断
+        self.assertEqual(
+            index.files["第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"].document_type,
+            "requirement",
+        )
+        self.assertEqual(index.document_types, {"requirement"})
+
     def test_build_indexes_lines(self):
         """行索引保留原始行文本。"""
         index = self._build()

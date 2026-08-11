@@ -21,12 +21,13 @@ from pathlib import Path
 from doc_tool.resources import resource_path
 
 # --- 字体层级（微软雅黑中文字体栈，等宽回退 Consolas） ---
+# 注意：QSS 的 px 是物理像素、不随系统显示缩放；用 pt（点）才会按 DPI 缩放。
 FONT_FAMILY = "Microsoft YaHei UI"
 FONT_FAMILY_MONO = "Consolas"
-FONT_BODY = 9
-FONT_SMALL = 8
-FONT_HEADING = 11
-FONT_TITLE = 15
+FONT_BODY = 10
+FONT_SMALL = 9
+FONT_HEADING = 12
+FONT_TITLE = 16
 
 # --- 标准间距（逻辑像素） ---
 SPACE_XS = 4
@@ -89,9 +90,10 @@ _DARK = {
 }
 
 
-def _font_rule(px: int, bold: bool = False) -> str:
+def _font_rule(pt: int, bold: bool = False) -> str:
+    # 用 pt 而非 px：px 是物理像素不随 DPI 缩放，pt 会随系统显示缩放。
     return 'font-family: "{0}", "Microsoft YaHei", "PingFang SC", sans-serif;' \
-        ' font-size: {1}px;'.format(FONT_FAMILY, px) + (
+        ' font-size: {1}pt;'.format(FONT_FAMILY, pt) + (
             " font-weight: 600;" if bold else ""
         )
 
@@ -169,7 +171,7 @@ QListWidget#stepList::item {{ {font_body} padding: 5px 8px; border-bottom: 1px s
 QListWidget#stepList::item[stepRunning="true"] {{ background: {running_hl}; border-left: 3px solid {accent}; }}
 
 /* --- 日志 / 结果卡片 --- */
-QPlainTextEdit#logView {{ font-family: "{mono}"; font-size: {font_small}px; background: {input_bg}; }}
+QPlainTextEdit#logView {{ font-family: "{mono}"; font-size: {font_small_pt}pt; background: {input_bg}; }}
 QFrame[cardClass="result"] {{ background: {panel}; border: 1px solid {border}; border-radius: 6px; }}
 QFrame[cardClass="resultSuccess"] {{ background: {panel}; border: 1px solid {success}; border-radius: 6px; }}
 QFrame[cardClass="resultFailure"] {{ background: {panel}; border: 1px solid {failure}; border-radius: 6px; }}
@@ -201,11 +203,19 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal, QScrollBar::ad
 QSplitter::handle {{ background: {border}; }}
 QToolTip {{ {font_body} background: {panel}; color: {text}; border: 1px solid {border}; padding: 4px 6px; }}
 
+/* --- 命名标题/语义标签（字体层级 + 辅助色） --- */
+QLabel#welcomeTitle {{ {title} color: {text}; }}
+QLabel#barTitle, QLabel#dockTitle, QLabel#sectionTitle {{ {font_heading} color: {text}; }}
+QLabel#resultTitle, QLabel#recentTitle {{ {font_heading} color: {text}; }}
+QLabel#statusMuted, QLabel#techDetail {{ {font_small} color: {text_muted}; }}
+QLabel#statusWarning {{ {font_small} color: {warning}; }}
+
 /* --- 语义色标签 --- */
 {tone_rules}
 """.format(
         font_body=_font_rule(FONT_BODY),
         font_small=_font_rule(FONT_SMALL),
+        font_small_pt=FONT_SMALL,
         font_heading=_font_rule(FONT_HEADING, bold=True),
         title=_font_rule(FONT_TITLE, bold=True),
         mono=FONT_FAMILY_MONO,
@@ -227,6 +237,8 @@ QToolTip {{ {font_body} background: {panel}; color: {text}; border: 1px solid {b
         running_hl=running_hl,
         success=sem["success"],
         failure=sem["failure"],
+        warning=sem["warning"],
+        neutral=sem["neutral"],
     )
 
 

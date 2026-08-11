@@ -61,6 +61,13 @@ class ContentIndexService:
 
     def __init__(self, content_root: Path) -> None:
         self._content_root: Path = Path(content_root).resolve()
+        # 布局 B（content_root 本身就是文档类型目录，如 content/requirement）时，
+        # 用目录名作为默认文档类型；布局 A（父目录含类型子目录）由首段推断。
+        self._default_doc_type = (
+            self._content_root.name
+            if self._content_root.name in KNOWN_DOCUMENT_TYPES
+            else "general"
+        )
 
     @property
     def content_root(self) -> Path:
@@ -71,23 +78,36 @@ class ContentIndexService:
     def discover_files(self) -> List[Tuple[str, Path]]:
         """返回 [(rel_path, absolute_path)]，稳定排序。
 
-        仅收录 contentRoot 下文档类型子目录（requirement/design/general）
-        内的 .md，避免 assets 或其他非内容目录误入内容索引。
+        兼容两种内容布局：
+        - A：contentRoot 下是文档类型子目录（content/ 含 requirement/design/general），
+          仅收录类型子目录内的 .md，避免 assets 等非内容目录误入。
+        - B：contentRoot 本身就是文档类型目录（content/requirement 直接含章节），
+          直接递归收录其下所有 .md（章节目录自然形成树层级）。
         """
         result: List[Tuple[str, Path]] = []
         if not self._content_root.exists():
             return result
-        for document_dir in sorted(
+        type_dirs = sorted(
             child
             for child in self._content_root.iterdir()
             if child.is_dir() and child.name in KNOWN_DOCUMENT_TYPES
-        ):
+        )
+        # 布局 A 以类型子目录为根；布局 B 以 content_root 自身为根。
+        roots = type_dirs if type_dirs else [self._content_root]
+        for base in roots:
             for suffix in MD_SUFFIXES:
-                for file_path in document_dir.rglob("*" + suffix):
+                for file_path in base.rglob("*" + suffix):
                     rel = file_path.relative_to(self._content_root).as_posix()
                     result.append((rel, file_path))
         result.sort(key=lambda item: item[0])
         return result
+
+    def _doc_type_of(self, rel_path: str) -> str:
+        """推断文档类型：优先取 rel_path 首段（布局 A），否则用类型目录名（布局 B）。"""
+        first = rel_path.split("/", 1)[0]
+        if first in KNOWN_DOCUMENT_TYPES:
+            return first
+        return self._default_doc_type
 
     def read_lines(self, file_path: Path) -> List[str]:
         """读取 .md 为行列表；读取失败视为空（由调用方决定是否保留索引）。"""
@@ -107,7 +127,7 @@ class ContentIndexService:
                 cancel_token.check_cancel()
             self._index_file(index, rel_path, file_path)
         index.document_types = {
-            infer_document_type(rel) for rel in index.files.keys()
+            self._doc_type_of(rel) for rel in index.files.keys()
         }
         return index
 
@@ -144,7 +164,7 @@ class ContentIndexService:
         self.refresh_dirty(index)
         # refresh_dirty 已移除消失文件条目并刷新 document_types 无需额外处理
         index.document_types = {
-            infer_document_type(rel) for rel in index.files.keys()
+            self._doc_type_of(rel) for rel in index.files.keys()
         }
         return len(index.files)
 
@@ -162,7 +182,7 @@ class ContentIndexService:
         lines = self.read_lines(file_path)
         entry = FileEntry(
             rel_path=rel_path,
-            document_type=infer_document_type(rel_path),
+            document_type=self._doc_type_of(rel_path),
             line_count=len(lines),
         )
         headings: List[HeadingEntry] = []
