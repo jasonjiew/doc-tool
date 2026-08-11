@@ -771,6 +771,102 @@ class MainWindowInteractionTests(unittest.TestCase):
         window.runner = SimpleNamespace(is_running=False, cancel=Mock())
         window.close()
 
+    def test_search_panel_results_tree_is_layout_managed(self):
+        """搜索面板结果树由唯一外层布局管理（回归：二次 QVBoxLayout 不可见）。"""
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+        # 旧缺陷根因：第二次 QVBoxLayout(self) 不会被安装，子控件脱离布局。
+        host = QWidget()
+        first = QVBoxLayout(host)
+        first.addWidget(QWidget())
+        second = QVBoxLayout(host)
+        second.addWidget(QWidget())
+        self.assertIs(host.layout(), first)
+        self.assertIsNone(second.parentWidget())
+
+        from doc_tool.application.content.search import SearchResult
+        from doc_tool.ui.content.search_panel import SearchPanel
+
+        class _FakeService:
+            def search(self, options, cancel_token=None):
+                return SearchResult(
+                    query=options.query,
+                    total=2,
+                    hits=[
+                        SimpleNamespace(rel_path="a.md", line_no=1, text="hello world"),
+                        SimpleNamespace(rel_path="a.md", line_no=2, text="nothing here"),
+                    ],
+                    file_count=1,
+                )
+
+        app = _ensure_qapp()
+        panel = SearchPanel(_FakeService())
+        panel.resize(600, 400)
+        panel.show()
+        panel._query_entry.setText("hello")
+        panel.search_now()
+        for _ in range(200):
+            panel._runner.poll()
+            app.processEvents()
+            if not panel._runner.is_running:
+                break
+            time.sleep(0.01)
+        app.processEvents()
+        self.assertGreater(panel._tree.topLevelItemCount(), 0)
+        self.assertGreater(panel._tree.height(), 200)
+        panel.close()
+
+    def test_closed_content_docks_reopen_via_view_menu_and_search(self):
+        """关闭章节树/工具面板 Dock 后可从「视图」菜单或 Ctrl+F 重新打开。"""
+        from unittest.mock import Mock
+
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QDockWidget
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.workbench_state import derive_workbench_state
+
+        _ensure_qapp()
+        win = MainWindow()
+        win.show()
+        # 模拟项目打开后由 _init_content_workspace 创建的章节树/工具面板 Dock。
+        win._tree_dock = QDockWidget("章节树", win)
+        win._tree_dock.setObjectName("chapterTreeDock")
+        win.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, win._tree_dock)
+        win._panels_dock = QDockWidget("工具面板", win)
+        win._panels_dock.setObjectName("panelsDock")
+        win.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, win._panels_dock)
+        win._rebuild_view_menu()
+
+        # 离开空状态进入 IDE 视图后，右侧任务/结果 Dock 必须重新显示。
+        state = derive_workbench_state(
+            SimpleNamespace(is_writable=True, output_exists=False), running=False
+        )
+        win._apply_workbench_state(state)
+        self.assertTrue(win._task_dock_widget.isVisible())
+
+        # 「视图」菜单为每个 Dock 提供显隐开关。
+        labels = [a.text() for a in win._view_menu.actions()]
+        for expected in ("章节树", "工具面板", "任务 / 结果"):
+            self.assertIn(expected, labels)
+
+        # 关闭两个内容 Dock 后，Ctrl+F 必须重新显示底部工具面板。
+        win._content_workspace = SimpleNamespace(focus_search=Mock())
+        win._content_index_ready = True
+        win._tree_dock.close()
+        win._panels_dock.close()
+        win._on_content_search()
+        self.assertTrue(win._panels_dock.isVisible())
+
+        # 再次关闭后，「视图」菜单的 toggle 项也能重新打开。
+        win._panels_dock.close()
+        panels_action = next(
+            a for a in win._view_menu.actions() if a.text() == "工具面板"
+        )
+        panels_action.trigger()
+        self.assertTrue(win._panels_dock.isVisible())
+        win.close()
+
 
 class WizardInteractionTests(unittest.TestCase):
     def test_preflight_constant_and_page_structure(self):

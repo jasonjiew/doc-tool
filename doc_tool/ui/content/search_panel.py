@@ -70,6 +70,10 @@ class SearchPanel(QWidget):
         self._poll_timer.setInterval(100)
         self._poll_timer.timeout.connect(self._poll)
 
+        # 唯一外层布局：控件行 + 结果表 + “显示更多”。原先各 _build_* 各自
+        # 创建 QVBoxLayout(self)，只有第一个会被安装，结果表因此不可见。
+        self._outer = QVBoxLayout(self)
+        self._outer.setContentsMargins(4, 4, 4, 4)
         self._build_controls()
         self._build_results()
 
@@ -111,9 +115,7 @@ class SearchPanel(QWidget):
         self._summary_label.setObjectName("statusMuted")
         layout.addWidget(self._summary_label)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(4, 4, 4, 4)
-        outer.addWidget(controls)
+        self._outer.addWidget(controls)
 
     def _build_results(self) -> None:
         self._tree = QTreeWidget(self)
@@ -131,9 +133,8 @@ class SearchPanel(QWidget):
         self._more_btn.clicked.connect(self._show_more)
         self._more_btn.hide()
 
-        outer = QVBoxLayout(self)
-        outer.addWidget(self._tree, 1)
-        outer.addWidget(self._more_btn)
+        self._outer.addWidget(self._tree, 1)
+        self._outer.addWidget(self._more_btn)
 
     # --- 行为 ---
 

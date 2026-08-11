@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -276,6 +277,12 @@ class MainWindow(QMainWindow):
         self._open_external_action.triggered.connect(self._on_content_open_external)
         content_menu.addAction(self._open_external_action)
 
+        # 视图：Dock 显隐开关。QDockWidget 关闭后仅保留标题栏上的 X，必须
+        # 通过 toggleViewAction 重新打开——这里为每个 Dock 提供菜单项。
+        self._view_menu = QMenu("视图", self)
+        menubar.insertMenu(content_menu.menuAction(), self._view_menu)
+        self._rebuild_view_menu()
+
         # 工具
         tools_menu = menubar.addMenu("工具")
         self._content_action = QAction("打开 Markdown 目录", self)
@@ -315,6 +322,41 @@ class MainWindow(QMainWindow):
         self._task_dock.set_dark(self._dark)
         self._theme_action.setText("切换浅色主题" if self._dark else "切换深色主题")
 
+    # --- 视图菜单（Dock 显隐） ---
+
+    def _rebuild_view_menu(self) -> None:
+        """重建「视图」菜单：为当前存在的每个 Dock 提供显隐开关。
+
+        章节树/工具面板 Dock 在项目打开时才创建，因此每次打开项目都要
+        重建；右键侧任务 Dock 始终存在。QDockWidget 被用户关闭后，唯一
+        的恢复途径就是这里的 ``toggleViewAction()``。
+        """
+        self._view_menu.clear()
+        entries = []
+        task = getattr(self, "_task_dock_widget", None)
+        if task is not None:
+            entries.append(("任务 / 结果", task))
+        tree = getattr(self, "_tree_dock", None)
+        if tree is not None:
+            entries.append(("章节树", tree))
+        panels = getattr(self, "_panels_dock", None)
+        if panels is not None:
+            entries.append(("工具面板", panels))
+        if not entries:
+            placeholder = self._view_menu.addAction("（无可切换面板）")
+            placeholder.setEnabled(False)
+            return
+        for label, dock in entries:
+            action = dock.toggleViewAction()
+            action.setText(label)
+            self._view_menu.addAction(action)
+
+    def _show_panels_dock(self) -> None:
+        """内容操作入口被触发时确保底部工具面板可见（用户可能已关闭它）。"""
+        dock = getattr(self, "_panels_dock", None)
+        if dock is not None:
+            dock.show()
+
     # --- 视图状态 ---
 
     def _apply_workbench_state(self, state) -> None:
@@ -326,6 +368,8 @@ class MainWindow(QMainWindow):
             self._project_bar.reset()
         else:
             self._stack.setCurrentWidget(self._ide_page)
+            # 离开空状态后重新显示右侧任务/结果 Dock（空状态会隐藏它）。
+            self._task_dock_widget.show()
             self._project_bar.render(self._project_summary, state)
             # 右侧 Dock 内容由任务生命周期驱动，不在此覆盖 running/result
             if state.view == WorkView.IDLE and not self.runner.is_running:
@@ -499,6 +543,8 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._panels_dock)
         self._panels_dock.setMinimumHeight(180)
 
+        self._rebuild_view_menu()
+
     def _remove_content_docks(self) -> None:
         for name in ("chapterTreeDock", "panelsDock"):
             dock = self.findChild(QDockWidget, name)
@@ -539,13 +585,14 @@ class MainWindow(QMainWindow):
         )
 
     def _select_content_tab(self, index: int) -> None:
-        """Ctrl+1..5：底部面板标签切换。"""
+        """Ctrl+1..5：底部面板标签切换（面板 Dock 关闭时先重新显示）。"""
         workspace = self._content_workspace
         if workspace is None:
             return
         panels = getattr(workspace, "_panels", None)
         if panels is None:
             return
+        self._show_panels_dock()
         # index 1..5：1=搜索,2=替换,3=重命名,4=检查
         names = ["搜索", "替换", "重命名/重编号", "检查"]
         if 1 <= index <= len(names):
@@ -560,6 +607,7 @@ class MainWindow(QMainWindow):
     def _on_content_search(self) -> None:
         if not self._content_workspace_available():
             return
+        self._show_panels_dock()
         self._content_workspace.focus_search()
 
     def _on_content_replace(self) -> None:
@@ -568,6 +616,7 @@ class MainWindow(QMainWindow):
         summary = self._project_summary
         if summary and not summary.is_writable:
             return
+        self._show_panels_dock()
         self._content_workspace.show_replace()
 
     def _on_content_refactor(self) -> None:
@@ -576,11 +625,13 @@ class MainWindow(QMainWindow):
         summary = self._project_summary
         if summary and not summary.is_writable:
             return
+        self._show_panels_dock()
         self._content_workspace.show_refactor(self._content_current_file)
 
     def _on_content_lint(self) -> None:
         if not self._content_workspace_available():
             return
+        self._show_panels_dock()
         self._content_workspace.run_lint()
 
     def _on_content_open_external(self) -> None:

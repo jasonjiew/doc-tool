@@ -69,6 +69,12 @@ class ReplacePanel(QWidget):
         self._matches: List[ReplaceMatch] = []
         self._preview: Optional[ReplacePreview] = None
 
+        # 唯一外层布局：输入卡片 + diff 卡片 + 命中表 + 操作行。原先各
+        # _build_* 各自创建 QVBoxLayout(self)，只有第一个会被安装，diff
+        # 预览与命中表因此不可见。
+        self._outer = QVBoxLayout(self)
+        self._outer.setContentsMargins(4, 4, 4, 4)
+        self._outer.setSpacing(4)
         self._build_inputs()
         self._build_diff()
         self._build_results()
@@ -110,10 +116,7 @@ class ReplacePanel(QWidget):
         row2.addWidget(self._find_btn)
         layout.addLayout(row2)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(4, 4, 4, 4)
-        outer.setSpacing(4)
-        outer.addWidget(inputs)
+        self._outer.addWidget(inputs)
 
     def _build_diff(self) -> None:
         diff_frame = QFrame(self)
@@ -129,8 +132,7 @@ class ReplacePanel(QWidget):
         self._after_text = self._make_readonly()
         layout.addWidget(self._after_text)
 
-        outer = QVBoxLayout(self)
-        outer.addWidget(diff_frame)
+        self._outer.addWidget(diff_frame)
 
     def _build_results(self) -> None:
         self._tree = QTreeWidget(self)
@@ -166,9 +168,8 @@ class ReplacePanel(QWidget):
         self._clear_btn.clicked.connect(self.clear)
         actions.addWidget(self._clear_btn)
 
-        outer = QVBoxLayout(self)
-        outer.addWidget(self._tree, 1)
-        outer.addLayout(actions)
+        self._outer.addWidget(self._tree, 1)
+        self._outer.addLayout(actions)
         self._update_action_state()
 
     @staticmethod

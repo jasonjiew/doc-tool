@@ -55,6 +55,11 @@ class LintPanel(QWidget):
         self._on_open = on_open
         self._writable = writable
 
+        # 唯一外层布局：术语卡片 + 结果表 + 状态行。原先各 _build_*
+        # 各自创建 QVBoxLayout(self)，只有第一个会被安装，结果表因此不可见。
+        self._outer = QVBoxLayout(self)
+        self._outer.setContentsMargins(4, 4, 4, 4)
+        self._outer.setSpacing(4)
         self._build_terms()
         self._build_results()
 
@@ -93,10 +98,7 @@ class LintPanel(QWidget):
         self._run_btn.clicked.connect(self.run_check)
         layout.addWidget(self._run_btn)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(4, 4, 4, 4)
-        outer.setSpacing(4)
-        outer.addWidget(terms_frame)
+        self._outer.addWidget(terms_frame)
         self._load_terms()
 
     def _build_results(self) -> None:
@@ -114,9 +116,8 @@ class LintPanel(QWidget):
         self._status_label = QLabel("", self)
         self._status_label.setObjectName("statusMuted")
 
-        outer = QVBoxLayout(self)
-        outer.addWidget(self._tree, 1)
-        outer.addWidget(self._status_label)
+        self._outer.addWidget(self._tree, 1)
+        self._outer.addWidget(self._status_label)
 
     # --- 行为 ---
 

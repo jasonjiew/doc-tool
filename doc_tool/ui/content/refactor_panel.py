@@ -53,6 +53,11 @@ class RefactorPanel(QWidget):
         self._plan = None
         self._all_files: List[str] = []
 
+        # 唯一外层布局：输入卡片 + 影响清单 + 操作行。原先各 _build_*
+        # 各自创建 QVBoxLayout(self)，只有第一个会被安装，影响清单因此不可见。
+        self._outer = QVBoxLayout(self)
+        self._outer.setContentsMargins(4, 4, 4, 4)
+        self._outer.setSpacing(4)
         self._build_inputs()
         self._build_results()
 
@@ -84,10 +89,7 @@ class RefactorPanel(QWidget):
         row2.addWidget(self._preview_btn)
         layout.addLayout(row2)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(4, 4, 4, 4)
-        outer.setSpacing(4)
-        outer.addWidget(inputs)
+        self._outer.addWidget(inputs)
 
     def _build_results(self) -> None:
         self._tree = QTreeWidget(self)
@@ -116,9 +118,8 @@ class RefactorPanel(QWidget):
         self._status_label.setWordWrap(True)
         actions.addWidget(self._status_label)
 
-        outer = QVBoxLayout(self)
-        outer.addWidget(self._tree, 1)
-        outer.addLayout(actions)
+        self._outer.addWidget(self._tree, 1)
+        self._outer.addLayout(actions)
         self._update_action_state()
 
     # --- 数据 ---
