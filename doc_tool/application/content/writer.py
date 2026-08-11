@@ -184,6 +184,7 @@ class ContentWriter:
     def __init__(self, content_root: Path, state_dir: Path) -> None:
         self._content_root: Path = Path(content_root).resolve()
         self._manifest = ChangeManifest(state_dir)
+        self._trash_dir: Path = Path(state_dir).resolve() / TRASH_DIR_NAME
 
     @property
     def manifest(self) -> ChangeManifest:
@@ -287,6 +288,90 @@ class ContentWriter:
             path=str(target),
         )
 
+    def create_file(self, rel_path: str, text: str) -> WriteResult:
+        """新建内容文件（越界/已存在检查 → 原子写 → 记 create 条目）。"""
+        try:
+            target = _resolve_inside(self._content_root, rel_path)
+        except PathOutsideContentError as exc:
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error=str(exc),
+            )
+        if target.exists():
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error="目标已存在：{0}".format(rel_path),
+            )
+        try:
+            atomic_write(target, text)
+        except OSError as exc:
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error=str(exc),
+            )
+        self._manifest.record(
+            ChangeEntry(operation=OP_CREATE, rel_path=rel_path)
+        )
+        return WriteResult(
+            rel_path=rel_path,
+            backup_path=None,
+            written=True,
+            path=str(target),
+        )
+
+    def delete_file(self, rel_path: str) -> WriteResult:
+        """软删除：移动文件到 <state_dir>/trash/<rel_path> 并记 delete 条目。
+
+        回收站镜像相对结构防同名冲突；文件移出 contentRoot 后构建/校验
+        天然跳过。回滚经 trash_path 恢复。
+        """
+        try:
+            source = _resolve_inside(self._content_root, rel_path)
+        except PathOutsideContentError as exc:
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error=str(exc),
+            )
+        if not source.exists():
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error="源文件不存在：{0}".format(rel_path),
+            )
+        trash_target = self._trash_dir / rel_path
+        try:
+            trash_target.parent.mkdir(parents=True, exist_ok=True)
+            source.rename(trash_target)
+        except OSError as exc:
+            return WriteResult(
+                rel_path=rel_path,
+                backup_path=None,
+                written=False,
+                error=str(exc),
+            )
+        self._manifest.record(
+            ChangeEntry(
+                operation=OP_DELETE,
+                rel_path=rel_path,
+                trash_path=str(trash_target),
+            )
+        )
+        return WriteResult(
+            rel_path=rel_path,
+            backup_path=None,
+            written=True,
+            path=str(trash_target),
+        )
+
     # --- 回滚 ---
 
     def rollback(self) -> List[str]:
@@ -315,6 +400,15 @@ class ContentWriter:
             target = _resolve_inside(self._content_root, entry.rel_path)
             if entry.backup_path and Path(entry.backup_path).exists():
                 shutil.copy2(entry.backup_path, str(target))
+        elif entry.operation == OP_CREATE:
+            target = _resolve_inside(self._content_root, entry.rel_path)
+            if target.exists():
+                target.unlink()
+        elif entry.operation == OP_DELETE:
+            target = _resolve_inside(self._content_root, entry.rel_path)
+            if entry.trash_path and Path(entry.trash_path).exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                Path(entry.trash_path).rename(target)
 
 
 def manifest_status_map(entries: List[ChangeEntry]) -> Dict[str, str]:

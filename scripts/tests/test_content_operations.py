@@ -1276,5 +1276,117 @@ class ManifestStatusMapTests(unittest.TestCase):
         self.assertEqual(status["g.md"], "deleted")
 
 
+class CreateDeleteTests(unittest.TestCase):
+    """任务：新增/删除章节文件 + 回滚恢复。"""
+
+    def setUp(self) -> None:
+        self.content_root = make_project(
+            {"requirement/第1章 引言/1.1 目的.md": "# 1.1 目的\n原始正文\n"}
+        )
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _writer(self):
+        from doc_tool.application.content.writer import ContentWriter
+
+        return ContentWriter(
+            content_root=self.content_root,
+            state_dir=self.project_root / ".state",
+        )
+
+    def _read(self, rel):
+        return (self.content_root / rel).read_text(encoding="utf-8")
+
+    def test_create_file_writes_and_records(self):
+        writer = self._writer()
+        result = writer.create_file(
+            "requirement/第1章 引言/1.1 新增.md", "# 1.1 新增\n"
+        )
+        self.assertTrue(result.written)
+        self.assertEqual(
+            self._read("requirement/第1章 引言/1.1 新增.md"), "# 1.1 新增\n"
+        )
+        writer.manifest.load()
+        entry = writer.manifest.entries[-1]
+        self.assertEqual(entry.operation, "create")
+        self.assertEqual(entry.rel_path, "requirement/第1章 引言/1.1 新增.md")
+
+    def test_create_existing_rejected(self):
+        writer = self._writer()
+        result = writer.create_file("requirement/第1章 引言/1.1 目的.md", "x")
+        self.assertFalse(result.written)
+        self.assertIsNotNone(result.error)
+
+    def test_create_escape_path_rejected(self):
+        writer = self._writer()
+        result = writer.create_file("../../evil.md", "x")
+        self.assertFalse(result.written)
+        self.assertIsNotNone(result.error)
+
+    def test_delete_moves_to_trash_and_records(self):
+        from pathlib import Path
+
+        writer = self._writer()
+        result = writer.delete_file("requirement/第1章 引言/1.1 目的.md")
+        self.assertTrue(result.written)
+        self.assertFalse(
+            (self.content_root / "requirement/第1章 引言/1.1 目的.md").exists()
+        )
+        writer.manifest.load()
+        entry = writer.manifest.entries[-1]
+        self.assertEqual(entry.operation, "delete")
+        self.assertIsNotNone(entry.trash_path)
+        self.assertTrue(Path(entry.trash_path).exists())
+        self.assertTrue(
+            Path(entry.trash_path).as_posix().endswith(
+                ".state/trash/requirement/第1章 引言/1.1 目的.md"
+            )
+        )
+
+    def test_delete_missing_rejected(self):
+        writer = self._writer()
+        result = writer.delete_file("requirement/第1章 引言/不存在.md")
+        self.assertFalse(result.written)
+        self.assertIsNotNone(result.error)
+
+    def test_rollback_removes_created_file(self):
+        writer = self._writer()
+        writer.create_file(
+            "requirement/第1章 引言/1.1 新增.md", "# 1.1 新增\n"
+        )
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertFalse(
+            (self.content_root / "requirement/第1章 引言/1.1 新增.md").exists()
+        )
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+    def test_rollback_restores_deleted_file(self):
+        writer = self._writer()
+        writer.delete_file("requirement/第1章 引言/1.1 目的.md")
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            self._read("requirement/第1章 引言/1.1 目的.md"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+    def test_rollback_after_create_then_delete(self):
+        """新建→删除同一文件后回滚：文件被恢复为最初不存在状态。"""
+        writer = self._writer()
+        writer.create_file(
+            "requirement/第1章 引言/1.1 新增.md", "# 1.1 新增\n"
+        )
+        writer.delete_file("requirement/第1章 引言/1.1 新增.md")
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertFalse(
+            (self.content_root / "requirement/第1章 引言/1.1 新增.md").exists()
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
