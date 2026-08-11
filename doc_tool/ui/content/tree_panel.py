@@ -191,12 +191,18 @@ class ChapterTree(QWidget):
         *,
         on_open: Optional[Callable[[str], None]] = None,
         on_refresh: Optional[Callable[[], None]] = None,
+        on_create_file: Optional[Callable[[str], None]] = None,
+        on_delete_file: Optional[Callable[[str], None]] = None,
+        on_clear_markers: Optional[Callable[[], None]] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._on_open = on_open
         self._on_refresh = on_refresh
+        self._on_create_file = on_create_file
+        self._on_delete_file = on_delete_file
+        self._on_clear_markers = on_clear_markers
         self._writable = writable
         self._current: Optional[str] = None
         self._items: List[TreeItem] = []
@@ -219,6 +225,12 @@ class ChapterTree(QWidget):
         collapse_btn.clicked.connect(self.collapse_all)
         toolbar.addWidget(collapse_btn)
         toolbar.addStretch(1)
+        self._clear_btn = QPushButton("清除标记", self)
+        self._clear_btn.setProperty("btnRole", "compact")
+        self._clear_btn.clicked.connect(
+            lambda: self._on_clear_markers and self._on_clear_markers()
+        )
+        toolbar.addWidget(self._clear_btn)
         self._refresh_btn = QPushButton("刷新", self)
         self._refresh_btn.setProperty("btnRole", "compact")
         self._refresh_btn.clicked.connect(self._on_refresh_click)
@@ -267,6 +279,7 @@ class ChapterTree(QWidget):
 
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
+        self._clear_btn.setVisible(writable)
 
     def is_writable(self) -> bool:
         return self._writable
@@ -366,18 +379,35 @@ class ChapterTree(QWidget):
         index = self._tree.indexAt(pos)
         if not index.isValid():
             return
-        rel_path = self._model.data(index, Qt.ItemDataRole.UserRole)
-        if not rel_path:
+        node_id = index.internalPointer()
+        item = self._model.item_for(node_id)
+        if item is None:
             return
         menu = QMenu(self)
-        open_action = QAction("打开", menu)
-        open_action.triggered.connect(
-            lambda: self._on_open and self._on_open(rel_path)
-        )
-        menu.addAction(open_action)
-        copy_action = QAction("复制相对路径", menu)
-        copy_action.triggered.connect(
-            lambda: QApplication.clipboard().setText(rel_path)
-        )
-        menu.addAction(copy_action)
+        if item.is_file:
+            rel_path = item.rel_path
+            open_action = QAction("打开", menu)
+            open_action.triggered.connect(
+                lambda: self._on_open and self._on_open(rel_path)
+            )
+            menu.addAction(open_action)
+            copy_action = QAction("复制相对路径", menu)
+            copy_action.triggered.connect(
+                lambda: QApplication.clipboard().setText(rel_path)
+            )
+            menu.addAction(copy_action)
+            if self._writable:
+                menu.addSeparator()
+                delete_action = QAction("删除", menu)
+                delete_action.triggered.connect(
+                    lambda: self._on_delete_file and self._on_delete_file(rel_path)
+                )
+                menu.addAction(delete_action)
+        elif self._writable and item.parent_id is not None:
+            # 目录节点（非类型根）→ 新增章节/文件
+            create_action = QAction("新增章节/文件…", menu)
+            create_action.triggered.connect(
+                lambda: self._on_create_file and self._on_create_file(item.node_id)
+            )
+            menu.addAction(create_action)
         menu.exec(QCursor.pos())
