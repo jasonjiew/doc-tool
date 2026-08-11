@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -152,3 +153,47 @@ def ancestors(node_id: str, items: List[TreeItem]) -> List[str]:
         chain.append(current.parent_id)
         current = by_id.get(current.parent_id)
     return list(reversed(chain))
+
+
+_NUM_PREFIX_RE = re.compile(r"^(\d+(?:\.\d+)*)")
+
+
+def _numeric_prefix(name: str) -> Optional[tuple]:
+    """提取文件名/目录名开头的数字段（如 3.7.10 → (3, 7, 10)），无则 None。"""
+    match = _NUM_PREFIX_RE.match(name)
+    if match is None:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> str:
+    """返回新章节文件 rel_path：递增最大兄弟编号；无编号从目录编号 .1 起；兜底标题。
+
+    1) 只统计 dir 下的直接子文件，取数字前缀最大者的最后一段 +1（3.7.2→3.7.3）。
+    2) 无编号兄弟时，用目录名数字段起 .1（3.7 KSOA → 3.7.1）。
+    3) 目录名也无数字段时，直接用标题做文件名。
+    """
+    prefix = dir_rel_path + "/"
+    max_num: Optional[tuple] = None
+    for rel in files:
+        if not rel.startswith(prefix):
+            continue
+        rest = rel[len(prefix):]
+        if "/" in rest:
+            continue  # 只考虑直接子文件，忽略更深层
+        num = _numeric_prefix(Path(rest).stem)
+        if num is not None and (max_num is None or num > max_num):
+            max_num = num
+    if max_num is not None:
+        base = list(max_num)
+        base[-1] += 1
+        number = ".".join(str(part) for part in base)
+    else:
+        dir_num = _numeric_prefix(dir_rel_path.rsplit("/", 1)[-1])
+        number = (
+            ".".join(str(part) for part in dir_num) + ".1"
+            if dir_num is not None
+            else ""
+        )
+    head = number + " " if number else ""
+    return prefix + head + title + ".md"

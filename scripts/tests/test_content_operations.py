@@ -684,6 +684,44 @@ class ChapterTreeModelTests(unittest.TestCase):
             sum(1 for i in items if i.is_file), 2
         )
 
+    def test_next_number_increments_sibling_max(self):
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
+            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
+            "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md",
+        ]
+        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        self.assertEqual(
+            result, "requirement/第3章/3.7 KSOA/3.7.11 权限管理.md"
+        )
+
+    def test_next_from_dir_number_when_no_numeric_siblings(self):
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        files = ["requirement/第3章/3.7 KSOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        self.assertEqual(
+            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+        )
+
+    def test_next_fallback_title_when_dir_unnumbered(self):
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        files = ["requirement/第3章/KSOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/KSOA", files, "权限管理")
+        self.assertEqual(result, "requirement/第3章/KSOA/权限管理.md")
+
+    def test_next_ignores_subdirectory_files_as_siblings(self):
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        files = ["requirement/第3章/3.7 KSOA/3.7.1 租户管理/3.7.1.1 详情.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        self.assertEqual(
+            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+        )
+
     def test_qt_model_parent_invariant_and_full_hierarchy(self):
         """Qt ChapterTreeModel 的 parent() 保持模型不变式，且层级完整。
 
