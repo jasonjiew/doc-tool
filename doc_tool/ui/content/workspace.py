@@ -126,6 +126,9 @@ class ContentWorkspace(QWidget):
             on_delete_file=self._on_delete_file,
             on_rename_file=self._on_rename_file,
             on_clear_markers=self._on_clear_markers,
+            on_open_external=self._on_open_external,
+            on_open_directory=self._on_open_directory,
+            content_root=self._content_root,
             writable=self._writable,
         )
         tree_layout = QVBoxLayout(self.tree_host)
@@ -454,10 +457,46 @@ class ContentWorkspace(QWidget):
             )
             return
         self.tabs_host.close_file(rel_path)
-        self._index_service.rebuild_file(self._index, rel_path)
-        items = build_tree(self._index.all_files())
-        self._tree.set_items(items)
-        self._apply_status_map()
+        if self._maybe_renumber_after_delete(rel_path):
+            # 级联重编号改变了多个文件路径 → 全量刷新并自动校验
+            self._after_write()
+        else:
+            self._index_service.rebuild_file(self._index, rel_path)
+            items = build_tree(self._index.all_files())
+            self._tree.set_items(items)
+            self._apply_status_map()
+
+    def _maybe_renumber_after_delete(self, rel_path: str) -> bool:
+        """删除中间编号后询问并执行后续同级重编号；返回是否执行了重编号。"""
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.application.content.refactor import RefactorService
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        if self._index is None:
+            return False
+        renames = renumber_plan_after_delete(rel_path, self._index.all_files())
+        if not renames:
+            return False
+        preview = "\n".join(
+            "  {0} → {1}".format(old, new) for old, new in renames
+        )
+        answer = QMessageBox.question(
+            self,
+            "重新编号后续章节",
+            "已删除中间编号章节。检测到 {0} 个后续同级章节需重新编号：\n{1}\n\n"
+            "将自动重命名并联动更新引用与标题。确认？".format(len(renames), preview),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return False
+        service = RefactorService(self._index)
+        for old, new in renames:
+            plan = service.compute_rename_plan(old, Path(new).name)
+            if plan is not None:
+                service.apply_rename_plan(plan, self._writer)
+        return True
 
     def _on_rename_file(self, rel_path: str) -> None:
         """内联重命名文件并联动更新引用（复用 RefactorService）。"""
@@ -535,6 +574,40 @@ class ContentWorkspace(QWidget):
         )
         self._snapshot.save()
         self._apply_status_map()
+
+    def _on_open_external(self, rel_path: str) -> None:
+        """用系统默认程序在外部编辑器打开树中某文件。"""
+        import os
+
+        from PySide6.QtWidgets import QMessageBox
+
+        target = self._writer.resolve(rel_path)
+        if not target.exists():
+            QMessageBox.warning(
+                self, "无法打开", "文件不存在：{0}".format(rel_path)
+            )
+            return
+        try:
+            os.startfile(str(target))  # type: ignore[attr-defined]  # noqa: S606
+        except OSError as exc:
+            QMessageBox.warning(self, "无法打开", "打开失败：{0}".format(exc))
+
+    def _on_open_directory(self, dir_rel_path: str) -> None:
+        """在文件管理器打开树中某目录。"""
+        import os
+
+        from PySide6.QtWidgets import QMessageBox
+
+        target = self._writer.resolve(dir_rel_path)
+        if not target.is_dir():
+            QMessageBox.warning(
+                self, "无法打开", "目录不存在：{0}".format(dir_rel_path)
+            )
+            return
+        try:
+            os.startfile(str(target))  # type: ignore[attr-defined]  # noqa: S606
+        except OSError as exc:
+            QMessageBox.warning(self, "无法打开", "打开失败：{0}".format(exc))
 
     def _after_write(self) -> None:
         """替换/重命名写回后：刷新索引并请求校验管线。"""

@@ -1275,6 +1275,128 @@ class EditorRollbackCleanupTests(unittest.TestCase):
 # 25. 调整窗口尺寸/位置或最大化后退出 → 下次启动恢复相同几何与状态
 
 
+class ChapterTreeInteractionTests(unittest.TestCase):
+    """章节树键盘操作与右键菜单（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self):
+        from doc_tool.application.content.tree import build_tree
+
+        self.content_root = Path(tempfile.mkdtemp(prefix="doc-tool-tree-"))
+        self.rel = "requirement/第3章/3.7 KSOA/3.7.1 设备管理.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 3.7.1 设备管理\n", encoding="utf-8")
+        self.items = build_tree([self.rel])
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _make_tree(self, writable=True):
+        from doc_tool.ui.content.tree_panel import ChapterTree
+
+        self.opened = []
+        self.renamed = []
+        self.deleted = []
+        self.external = []
+        self.dirs_opened = []
+        tree = ChapterTree(
+            on_open=self.opened.append,
+            on_rename_file=self.renamed.append,
+            on_delete_file=self.deleted.append,
+            on_open_external=self.external.append,
+            on_open_directory=self.dirs_opened.append,
+            content_root=self.content_root,
+            writable=writable,
+        )
+        tree.set_items(self.items)
+        return tree
+
+    def _select_file(self, tree):
+        index = tree._model.index_for_id(self.rel)
+        tree._tree.setCurrentIndex(index)
+        tree._tree.scrollTo(index)
+        tree._tree.setFocus()
+
+    def test_enter_opens_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)  # 选中即打开一次（currentChanged → on_open）
+        self.assertEqual(self.opened, [self.rel])
+        QTest.keyClick(tree._tree, Qt.Key.Key_Return)
+        QTest.qWait(10)
+        # Enter 再次打开当前选中文件
+        self.assertEqual(self.opened, [self.rel, self.rel])
+        tree.close()
+
+    def test_f2_renames_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_F2)
+        QTest.qWait(10)
+        self.assertEqual(self.renamed, [self.rel])
+        tree.close()
+
+    def test_delete_key_deletes_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_Delete)
+        QTest.qWait(10)
+        self.assertEqual(self.deleted, [self.rel])
+        tree.close()
+
+    def test_readonly_ignores_write_keys(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree(writable=False)
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_F2)
+        QTest.keyClick(tree._tree, Qt.Key.Key_Delete)
+        QTest.qWait(10)
+        self.assertEqual(self.renamed, [])
+        self.assertEqual(self.deleted, [])
+        tree.close()
+
+    def test_context_menu_actions_and_copy_markdown_link(self):
+        from PySide6.QtWidgets import QApplication
+
+        tree = self._make_tree()
+        index = tree._model.index_for_id(self.rel)
+        menu = tree._context_menu(index)
+        labels = [a.text() for a in menu.actions()]
+        for expected in (
+            "打开",
+            "在外部编辑器打开",
+            "复制相对路径",
+            "复制绝对路径",
+            "复制 Markdown 引用",
+        ):
+            self.assertIn(expected, labels)
+        action = next(
+            a for a in menu.actions() if a.text() == "复制 Markdown 引用"
+        )
+        QApplication.clipboard().setText("")
+        action.trigger()
+        self.assertEqual(
+            QApplication.clipboard().text(), "[设备管理]({0})".format(self.rel)
+        )
+        tree.close()
+
+
 class ChangesPanelTests(unittest.TestCase):
     """改动面板：列出改动、选中显示 diff、恢复按钮接线（离屏渲染）。"""
 

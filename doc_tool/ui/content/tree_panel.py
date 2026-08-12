@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from functools import lru_cache
+from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
@@ -27,7 +28,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from doc_tool.application.content.tree import TreeItem, filter_tree_items
+from doc_tool.application.content.tree import (
+    TreeItem,
+    filter_tree_items,
+    strip_number_prefix,
+)
 
 
 _STATUS_COLORS = {"added": "#1a9c5b", "modified": "#c98a12"}
@@ -178,6 +183,20 @@ class ChapterTreeModel(QAbstractItemModel):
                 )
 
 
+class _ChapterTreeView(QTreeView):
+    """支持键盘操作的章节树视图：按键委托给面板的 _handle_tree_key。"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._on_key: Optional[Callable[[int], bool]] = None
+
+    def keyPressEvent(self, event) -> None:
+        if self._on_key is not None and self._on_key(event.key()):
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class ChapterTree(QWidget):
     """章节树面板。
 
@@ -195,6 +214,9 @@ class ChapterTree(QWidget):
         on_delete_file: Optional[Callable[[str], None]] = None,
         on_rename_file: Optional[Callable[[str], None]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
+        on_open_external: Optional[Callable[[str], None]] = None,
+        on_open_directory: Optional[Callable[[str], None]] = None,
+        content_root: Optional[Path] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -205,6 +227,9 @@ class ChapterTree(QWidget):
         self._on_delete_file = on_delete_file
         self._on_rename_file = on_rename_file
         self._on_clear_markers = on_clear_markers
+        self._on_open_external = on_open_external
+        self._on_open_directory = on_open_directory
+        self._content_root = Path(content_root) if content_root else None
         self._writable = writable
         self._current: Optional[str] = None
         self._items: List[TreeItem] = []
@@ -246,7 +271,8 @@ class ChapterTree(QWidget):
         self._filter_entry.textChanged.connect(self._apply_filter)
         layout.addWidget(self._filter_entry)
 
-        self._tree = QTreeView(self)
+        self._tree = _ChapterTreeView(self)
+        self._tree._on_key = self._handle_tree_key
         self._tree.setModel(self._model)
         self._tree.setHeaderHidden(True)
         self._tree.setSelectionMode(QTreeView.SelectionMode.SingleSelection)
@@ -381,17 +407,33 @@ class ChapterTree(QWidget):
         if self._on_refresh is not None:
             self._on_refresh()
 
+    def _handle_tree_key(self, key: int) -> bool:
+        """Enter 打开 / F2 重命名 / Del 删除（仅文件节点；写操作需可写）。"""
+        rel = self._selected_file()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if rel and self._on_open is not None:
+                self._on_open(rel)
+                return True
+        elif key == Qt.Key.Key_F2:
+            if rel and self._writable and self._on_rename_file is not None:
+                self._on_rename_file(rel)
+                return True
+        elif key == Qt.Key.Key_Delete:
+            if rel and self._writable and self._on_delete_file is not None:
+                self._on_delete_file(rel)
+                return True
+        return False
+
     # --- 右键菜单 ---
 
-    def _show_context_menu(self, pos) -> None:
-        index = self._tree.indexAt(pos)
-        if not index.isValid():
-            return
-        node_id = index.internalPointer()
-        item = self._model.item_for(node_id)
-        if item is None:
-            return
+    def _context_menu(self, index: QModelIndex) -> QMenu:
+        """构建指定节点的右键菜单（不 exec，便于测试）。"""
         menu = QMenu(self)
+        if not index.isValid():
+            return menu
+        item = self._model.item_for(str(index.internalPointer()))
+        if item is None:
+            return menu
         if item.is_file:
             rel_path = item.rel_path
             open_action = QAction("打开", menu)
@@ -399,28 +441,72 @@ class ChapterTree(QWidget):
                 lambda: self._on_open and self._on_open(rel_path)
             )
             menu.addAction(open_action)
-            copy_action = QAction("复制相对路径", menu)
-            copy_action.triggered.connect(
+            ext_action = QAction("在外部编辑器打开", menu)
+            ext_action.triggered.connect(
+                lambda: self._on_open_external
+                and self._on_open_external(rel_path)
+            )
+            menu.addAction(ext_action)
+            menu.addSeparator()
+            copy_rel = QAction("复制相对路径", menu)
+            copy_rel.triggered.connect(
                 lambda: QApplication.clipboard().setText(rel_path)
             )
-            menu.addAction(copy_action)
+            menu.addAction(copy_rel)
+            if self._content_root is not None:
+                copy_abs = QAction("复制绝对路径", menu)
+                copy_abs.triggered.connect(
+                    lambda: QApplication.clipboard().setText(
+                        str(self._content_root / rel_path)
+                    )
+                )
+                menu.addAction(copy_abs)
+            copy_link = QAction("复制 Markdown 引用", menu)
+            copy_link.triggered.connect(
+                lambda: QApplication.clipboard().setText(
+                    self._markdown_link(rel_path)
+                )
+            )
+            menu.addAction(copy_link)
             if self._writable:
                 menu.addSeparator()
                 rename_action = QAction("重命名…", menu)
                 rename_action.triggered.connect(
-                    lambda: self._on_rename_file and self._on_rename_file(rel_path)
+                    lambda: self._on_rename_file
+                    and self._on_rename_file(rel_path)
                 )
                 menu.addAction(rename_action)
                 delete_action = QAction("删除", menu)
                 delete_action.triggered.connect(
-                    lambda: self._on_delete_file and self._on_delete_file(rel_path)
+                    lambda: self._on_delete_file
+                    and self._on_delete_file(rel_path)
                 )
                 menu.addAction(delete_action)
-        elif self._writable and item.parent_id is not None:
-            # 目录节点（非类型根）→ 新增章节/文件
-            create_action = QAction("新增章节/文件…", menu)
-            create_action.triggered.connect(
-                lambda: self._on_create_file and self._on_create_file(item.node_id)
+        elif item.parent_id is not None:
+            # 目录节点（非类型根）→ 新增章节/文件 + 在文件管理器打开
+            if self._writable:
+                create_action = QAction("新增章节/文件…", menu)
+                create_action.triggered.connect(
+                    lambda: self._on_create_file
+                    and self._on_create_file(item.node_id)
+                )
+                menu.addAction(create_action)
+            open_dir = QAction("在文件管理器打开", menu)
+            open_dir.triggered.connect(
+                lambda: self._on_open_directory
+                and self._on_open_directory(item.node_id)
             )
-            menu.addAction(create_action)
-        menu.exec(QCursor.pos())
+            menu.addAction(open_dir)
+        return menu
+
+    def _show_context_menu(self, pos) -> None:
+        index = self._tree.indexAt(pos)
+        if not index.isValid():
+            return
+        self._context_menu(index).exec(QCursor.pos())
+
+    def _markdown_link(self, rel_path: str) -> str:
+        """生成章节引用链接：[标题](相对路径)。"""
+        stem = Path(rel_path).stem
+        title = strip_number_prefix(stem) or stem
+        return "[{0}]({1})".format(title, rel_path)

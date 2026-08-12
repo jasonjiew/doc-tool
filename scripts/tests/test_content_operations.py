@@ -2151,5 +2151,196 @@ class RestoreFileTests(unittest.TestCase):
         self.assertIsNotNone(result.error)
 
 
+class TreeInteractionPureTests(unittest.TestCase):
+    """树交互纯函数：标题去编号 + 删除后重编号计划。"""
+
+    def test_strip_number_prefix(self):
+        from doc_tool.application.content.tree import strip_number_prefix
+
+        self.assertEqual(strip_number_prefix("3.7.5 设备管理"), "设备管理")
+        self.assertEqual(strip_number_prefix("设备管理"), "设备管理")
+        self.assertEqual(strip_number_prefix("3.7.5"), "")
+
+    def test_renumber_plan_mid_delete_ascending(self):
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.4 甲.md",
+            "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
+            "requirement/第3章/3.7 KSOA/3.7.7 丙.md",
+        ]
+        plan = renumber_plan_after_delete(
+            "requirement/第3章/3.7 KSOA/3.7.5 待删.md", files
+        )
+        self.assertEqual(
+            plan,
+            [
+                (
+                    "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
+                    "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+                ),
+                (
+                    "requirement/第3章/3.7 KSOA/3.7.7 丙.md",
+                    "requirement/第3章/3.7 KSOA/3.7.6 丙.md",
+                ),
+            ],
+        )
+
+    def test_renumber_plan_last_delete_empty(self):
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.4 甲.md",
+            "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+        ]
+        plan = renumber_plan_after_delete(
+            "requirement/第3章/3.7 KSOA/3.7.5 乙.md", files
+        )
+        self.assertEqual(plan, [])
+
+    def test_renumber_plan_unnumbered_empty(self):
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        files = ["requirement/第3章/3.7 KSOA/概述.md"]
+        plan = renumber_plan_after_delete(
+            "requirement/第3章/3.7 KSOA/概述.md", files
+        )
+        self.assertEqual(plan, [])
+
+    def test_renumber_plan_ignores_deeper_files(self):
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
+            "requirement/第3章/3.7 KSOA/3.7.6 乙/3.7.6.1 子.md",
+        ]
+        plan = renumber_plan_after_delete(
+            "requirement/第3章/3.7 KSOA/3.7.5 待删.md", files
+        )
+        self.assertEqual(
+            plan,
+            [
+                (
+                    "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
+                    "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+                )
+            ],
+        )
+
+
+class DeleteRenumberTests(unittest.TestCase):
+    """删除中间编号后自动重编号后续同级章节（联动引用与标题）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        vendor = Path(REPO_ROOT) / ".vendor" / "site-packages"
+        if vendor.is_dir():
+            sys.path.insert(0, str(vendor))
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            cls._app = QApplication.instance() or QApplication([])
+            cls._qt_available = True
+        except Exception:
+            cls._qt_available = False
+
+    def setUp(self) -> None:
+        if not getattr(self, "_qt_available", False):
+            self.skipTest("PySide6 不可用")
+        self.content_root = make_project(
+            {
+                "requirement/第3章/3.7 KSOA/3.7.4 甲.md": "# 3.7.4 甲\n",
+                "requirement/第3章/3.7 KSOA/3.7.5 乙.md": "# 3.7.5 乙\n",
+                "requirement/第3章/3.7 KSOA/3.7.6 丙.md": (
+                    "# 3.7.6 丙\n"
+                    "见 3.7.5 乙。\n"
+                    "链接 [乙](3.7.5 乙.md)。\n"
+                ),
+                "requirement/第3章/3.7 KSOA/3.7.7 丁.md": "# 3.7.7 丁\n",
+            }
+        )
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _build_index(self):
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.references import ReferenceScanner
+
+        index = ContentIndexService(self.content_root).build()
+        ReferenceScanner(index).scan_all()
+        return index
+
+    def test_delete_mid_renumbers_following(self):
+        from unittest import mock
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        mid = "requirement/第3章/3.7 KSOA/3.7.5 乙.md"
+        with mock.patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            ws._on_delete_file(mid)
+
+        # 被删文件消失，后续同级重编号：3.7.6 丙→3.7.5 丙，3.7.7 丁→3.7.6 丁
+        self.assertFalse((self.content_root / mid).exists())
+        new_c = "requirement/第3章/3.7 KSOA/3.7.5 丙.md"
+        new_d = "requirement/第3章/3.7 KSOA/3.7.6 丁.md"
+        self.assertTrue((self.content_root / new_c).exists())
+        self.assertTrue((self.content_root / new_d).exists())
+        self.assertFalse(
+            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.6 丙.md").exists()
+        )
+        self.assertFalse(
+            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.7 丁.md").exists()
+        )
+        # 标题行联动更新
+        self.assertIn(
+            "# 3.7.5 丙", (self.content_root / new_c).read_text(encoding="utf-8")
+        )
+        self.assertIn(
+            "# 3.7.6 丁", (self.content_root / new_d).read_text(encoding="utf-8")
+        )
+        # 改动清单含 delete + rename 条目（可回滚）
+        ws._writer.manifest.load()
+        ops = [e.operation for e in ws._writer.manifest.entries]
+        self.assertIn("delete", ops)
+        self.assertIn("rename", ops)
+
+    def test_delete_last_no_renumber_prompt(self):
+        """删除末尾编号：不弹重编号确认，仅删文件。"""
+        from unittest import mock
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        last = "requirement/第3章/3.7 KSOA/3.7.7 丁.md"
+        with mock.patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            ws._on_delete_file(last)
+        # 删除最后一个：其余文件不改名
+        self.assertFalse((self.content_root / last).exists())
+        self.assertTrue(
+            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.5 乙.md").exists()
+        )
+        self.assertTrue(
+            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.6 丙.md").exists()
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

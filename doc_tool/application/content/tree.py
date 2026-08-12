@@ -166,6 +166,57 @@ def _numeric_prefix(name: str) -> Optional[tuple]:
     return tuple(int(part) for part in match.group(1).split("."))
 
 
+def strip_number_prefix(name: str) -> str:
+    """去掉开头的编号段与随后的空格（3.7.5 设备管理 → 设备管理）。"""
+    match = _NUM_PREFIX_RE.match(name)
+    if match is None:
+        return name
+    return name[match.end():].lstrip(" ")
+
+
+def _format_num(num_tuple) -> str:
+    return ".".join(str(part) for part in num_tuple)
+
+
+def renumber_plan_after_delete(
+    deleted_rel_path: str, files: List[str]
+) -> List[tuple]:
+    """删除中间编号后，返回把后续同级直接子文件递减重编号的 (旧, 新) 列表。
+
+    按新编号升序排列：每步的目标号正好是上一步让出的槽位（或已删除的空槽），
+    避免目标冲突。无编号 / 末尾删除 / 深层子文件均不产生重编号。
+    """
+    prefix = str(Path(deleted_rel_path).parent.as_posix()) + "/"
+    deleted_num = _numeric_prefix(Path(deleted_rel_path).stem)
+    if deleted_num is None:
+        return []
+    parent_segments = deleted_num[:-1]
+    deleted_last = deleted_num[-1]
+    renames: List[tuple] = []
+    for rel in files:
+        if not rel.startswith(prefix) or rel == deleted_rel_path:
+            continue
+        rest = rel[len(prefix):]
+        if "/" in rest:
+            continue  # 只考虑直接子文件
+        num = _numeric_prefix(Path(rest).stem)
+        if (
+            num is None
+            or num[: len(parent_segments)] != parent_segments
+            or num[-1] <= deleted_last
+        ):
+            continue
+        new_num = tuple(list(num[:-1]) + [num[-1] - 1])
+        new_stem = (
+            _format_num(new_num)
+            + " "
+            + strip_number_prefix(Path(rest).stem)
+        )
+        renames.append((rel, prefix + new_stem + ".md"))
+    renames.sort(key=lambda pair: _numeric_prefix(Path(pair[1]).stem))
+    return renames
+
+
 def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> str:
     """返回新章节文件 rel_path：递增最大兄弟编号；无编号从目录编号 .1 起；兜底标题。
 
