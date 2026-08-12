@@ -574,6 +574,26 @@ class MainWindowInteractionTests(unittest.TestCase):
         )
         self.assertTrue(dock.has_result())
 
+    def test_result_card_action_buttons_keep_captured_paths(self):
+        """clicked(bool) 不能覆盖结果卡片中捕获的产物路径。"""
+        from doc_tool.ui.work_detail_pane import ResultCard
+        from doc_tool.ui.workbench_state import ResultState
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output.docx"
+            output.write_bytes(b"docx")
+            opened = []
+            card = ResultCard(
+                on_open_output=opened.append,
+                on_open_directory=opened.append,
+            )
+            card.render(ResultState(status="success", output_path=output))
+
+            for button in card._action_buttons:
+                button.click()
+
+            self.assertEqual(opened, [str(output), str(output.parent)])
+
     def test_log_stream_pending_unread_while_collapsed(self):
         from doc_tool.ui.work_detail_pane import LogStream
 
@@ -1013,6 +1033,61 @@ class ContentOperationsStateTests(unittest.TestCase):
         self.assertFalse(states["search"])
         self.assertFalse(states["replace"])
         window.close()
+
+
+class EditorRollbackCleanupTests(unittest.TestCase):
+    """编辑器「回滚上次保存」：恢复内容并清理 .bak 与改动清单条目。
+
+    回归：此前 rollback_last 只把 .bak 复制回文件、不删除 .bak，也不移除
+    改动清单 edit 条目——遗留备份会触发构建前检查失败，徽标仍显示已修改。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self) -> None:
+        self.project_root = Path(tempfile.mkdtemp(prefix="doc-tool-editor-"))
+        self.content_root = self.project_root / "content"
+        self.rel = "requirement/第1章 引言/1.1 目的.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原始正文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, self.project_root, ignore_errors=True)
+
+    def _make_panel(self):
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        writer = ContentWriter(
+            content_root=self.content_root,
+            state_dir=self.project_root / ".state",
+        )
+        return writer, EditorPanel(writer=writer, writable=True)
+
+    def test_rollback_last_restores_cleans_backup_and_drops_entry(self):
+        writer, panel = self._make_panel()
+        panel.load(self.rel, "# 1.1 目的\n原始正文\n")
+        panel._editor.setPlainText("# 1.1 目的\n被改\n")
+        self.assertTrue(panel.save())
+
+        bak = self.content_root / (self.rel + ".bak")
+        self.assertTrue(bak.exists())
+        writer.manifest.load()
+        self.assertEqual(len(writer.manifest.entries), 1)
+
+        self.assertTrue(panel.rollback_last())
+        # 内容恢复到保存前
+        self.assertEqual(
+            (self.content_root / self.rel).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        # .bak 被清理，改动清单条目被移除
+        self.assertFalse(bak.exists())
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+
 # === 人工验收清单（PySide6 IDE 工作台，任务 8.3/8.4） ===
 # 以下操作需要在 Windows 桌面环境中手动执行，无法自动化测试：
 #

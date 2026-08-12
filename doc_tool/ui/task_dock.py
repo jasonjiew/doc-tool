@@ -79,7 +79,10 @@ class _IdleCard(QFrame):
         self._clear_actions()
         output = result.output_path
         if output and Path(output).is_file():
-            self._add_action("打开产物", lambda p=str(output): self._open_output(p))
+            self._add_action(
+                "打开产物",
+                lambda _checked=False, p=str(output): self._open_output(p),
+            )
         report = result.report_path
         if report and Path(report).is_file():
             self._add_action("查看校验报告", lambda: self._open_report())

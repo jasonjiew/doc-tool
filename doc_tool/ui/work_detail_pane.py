@@ -273,10 +273,13 @@ class ResultCard(QFrame):
         output = result.output_path
         output_exists = bool(output and Path(output).is_file())
         if output_exists:
-            self._add_action("打开产物", lambda p=str(output): self._open_output(p))
+            self._add_action(
+                "打开产物",
+                lambda _checked=False, p=str(output): self._open_output(p),
+            )
             self._add_action(
                 "打开所在目录",
-                lambda p=str(Path(output).parent): self._open_directory(p),
+                lambda _checked=False, p=str(Path(output).parent): self._open_directory(p),
             )
         report = result.report_path
         if report and Path(report).is_file():
