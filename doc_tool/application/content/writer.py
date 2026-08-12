@@ -164,6 +164,17 @@ class ChangeManifest:
         self._entries.append(entry)
         self.save()
 
+    def drop(self, operation: str, rel_path: str) -> None:
+        """移除与 operation + rel_path 匹配的条目（单文件回滚后取消改动标记）。"""
+        kept = [
+            item
+            for item in self._entries
+            if not (item.operation == operation and item.rel_path == rel_path)
+        ]
+        if len(kept) != len(self._entries):
+            self._entries = kept
+            self.save()
+
     def clear(self) -> None:
         """清空清单（回滚成功后调用）。"""
         self._entries = []
@@ -378,6 +389,7 @@ class ContentWriter:
         """按改动清单反向恢复；返回操作失败的 rel_path 列表。
 
         成功后清空清单。edit 用备份恢复内容；rename 移回原名并恢复内容。
+        回滚后丢弃对应 .bak，避免备份文件残留在 contentRoot 阻断构建。
         """
         self._manifest.load()
         failures: List[str] = []
@@ -389,6 +401,16 @@ class ContentWriter:
         self._manifest.clear()
         return failures
 
+    @staticmethod
+    def _discard_backup(backup_path: Optional[str]) -> None:
+        """回滚后丢弃备份文件（尽力而为，删除失败不阻断回滚）。"""
+        if not backup_path:
+            return
+        try:
+            Path(backup_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
     def _rollback_entry(self, entry: ChangeEntry) -> None:
         if entry.operation == OP_RENAME:
             current = _resolve_inside(self._content_root, entry.rel_path)
@@ -396,10 +418,12 @@ class ContentWriter:
             if current.exists():
                 original.parent.mkdir(parents=True, exist_ok=True)
                 current.rename(original)
+            self._discard_backup(entry.backup_path)
         elif entry.operation == OP_EDIT:
             target = _resolve_inside(self._content_root, entry.rel_path)
             if entry.backup_path and Path(entry.backup_path).exists():
                 shutil.copy2(entry.backup_path, str(target))
+            self._discard_backup(entry.backup_path)
         elif entry.operation == OP_CREATE:
             target = _resolve_inside(self._content_root, entry.rel_path)
             if target.exists():

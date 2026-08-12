@@ -150,6 +150,9 @@ def scan_entries(directory: str, depth: int) -> List[ChapterEntry]:
     for name in os.listdir(directory):
         if name.startswith(".") or name.startswith("_"):
             continue
+        if name.endswith(".bak") or name.endswith(".tmp"):
+            # 工具备份/临时文件（编辑器写前 .md.bak、原子写 .tmp），非内容，跳过。
+            continue
         path = os.path.join(directory, name)
         if os.path.isdir(path):
             stem = name

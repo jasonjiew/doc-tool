@@ -172,7 +172,10 @@ class EditorPanel(QWidget):
         """回滚本文件最近一次保存（用 .bak 恢复）。"""
         if not self._writable or self._rel_path is None:
             return False
-        from doc_tool.application.content.writer import _backup_path_for
+        from doc_tool.application.content.writer import (
+            OP_EDIT,
+            _backup_path_for,
+        )
 
         target = self._writer_abs(self._rel_path)
         backup = _backup_path_for(target)
@@ -182,6 +185,19 @@ class EditorPanel(QWidget):
         import shutil
 
         shutil.copy2(str(backup), str(target))
+        # 已恢复到保存前状态：丢弃备份，并从改动清单移除该文件 edit 条目，
+        # 避免 .bak 残留在 contentRoot 阻断构建、徽标仍显示"已修改"。
+        try:
+            backup.unlink()
+        except OSError:
+            pass
+        try:
+            self._writer.manifest.load()
+            self._writer.manifest.drop(
+                OP_EDIT, self._rel_path
+            )
+        except OSError:
+            pass
         self._mtime = self._file_mtime(self._rel_path)
         self._dirty = False
         self._status_label.setText("已回滚到备份")
