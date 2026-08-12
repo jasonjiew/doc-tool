@@ -83,6 +83,7 @@ class TabsHost(QWidget):
             on_saved=self._on_saved,
             assets_root=self._assets_root,
             writable=self._writable,
+            on_dirty_changed=lambda dirty: self._on_editor_dirty(editor, dirty),
         )
         editor.load(rel_path, text)
         self._tabs.addTab(editor, rel_path.rsplit("/", 1)[-1])
@@ -133,15 +134,41 @@ class TabsHost(QWidget):
 
     # --- 内部 ---
 
+    def _on_editor_dirty(self, editor: EditorPanel, dirty: bool) -> None:
+        """脏状态变化 → 更新对应标签标题（● 前缀）。"""
+        index = self._tabs.indexOf(editor)
+        if index >= 0:
+            self._tabs.setTabText(index, self._tab_label(editor))
+
+    @staticmethod
+    def _tab_label(editor: EditorPanel) -> str:
+        name = (editor.current_rel_path() or "").rsplit("/", 1)[-1]
+        return "● " + name if editor.is_dirty() else name
+
     def _close_tab(self, index: int) -> None:
         widget = self._tabs.widget(index)
         if not isinstance(widget, EditorPanel):
+            return
+        if widget.is_dirty() and not self._confirm_close_dirty(widget):
             return
         rel_path = widget.current_rel_path()
         if rel_path is not None:
             self._editors.pop(rel_path, None)
         self._tabs.removeTab(index)
         widget.deleteLater()
+
+    @staticmethod
+    def _confirm_close_dirty(editor: EditorPanel) -> bool:
+        from PySide6.QtWidgets import QMessageBox
+
+        answer = QMessageBox.question(
+            editor,
+            "未保存的更改",
+            "该文件有未保存的更改：\n{0}\n\n关闭将丢失这些更改，确认关闭？".format(
+                editor.current_rel_path() or ""
+            ),
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _close_tab_by_path(self, rel_path: str) -> None:
         editor = self._editors.pop(rel_path, None)

@@ -13,14 +13,16 @@ import time
 from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QSplitter,
     QTextBrowser,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +30,10 @@ from PySide6.QtWidgets import (
 from doc_tool.application.content.preview import (
     preview_summary,
     render_markdown_html,
+)
+from doc_tool.ui.content.editor_highlight import (
+    MarkdownHighlighter,
+    _LineNumberedEdit,
 )
 
 _PREVIEW_DEBOUNCE_MS = 300
@@ -48,6 +54,7 @@ class EditorPanel(QWidget):
         on_saved: Optional[Callable[[str], None]] = None,
         assets_root=None,
         writable: bool = True,
+        on_dirty_changed: Optional[Callable[[bool], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -55,6 +62,7 @@ class EditorPanel(QWidget):
         self._on_saved = on_saved
         self._assets_root = assets_root
         self._writable = writable
+        self._on_dirty_changed = on_dirty_changed
         self._rel_path: Optional[str] = None
         self._mtime: Optional[float] = None
         self._dirty = False
@@ -93,6 +101,11 @@ class EditorPanel(QWidget):
         self._ext_btn.clicked.connect(self.open_external)
         layout.addWidget(self._ext_btn)
 
+        self._preview_btn = QPushButton("隐藏预览", bar)
+        self._preview_btn.setProperty("btnRole", "compact")
+        self._preview_btn.clicked.connect(self._toggle_preview)
+        layout.addWidget(self._preview_btn)
+
         self._save_btn = QPushButton("保存 (Ctrl+S)", bar)
         self._save_btn.setProperty("btnRole", "primary")
         self._save_btn.clicked.connect(self.save)
@@ -102,8 +115,37 @@ class EditorPanel(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
         outer.addWidget(bar)
+        self._find_bar = self._build_find_bar()
+        outer.addWidget(self._find_bar)
         self._body_host = QWidget(self)
         outer.addWidget(self._body_host, 1)
+
+    def _build_find_bar(self) -> QWidget:
+        """文件内查找条：输入 + 上/下导航 + 关闭。默认隐藏。"""
+        bar = QWidget(self)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(0, 0, 0, 4)
+        layout.setSpacing(6)
+        layout.addWidget(QLabel("查找：", bar))
+        self._find_entry = QLineEdit(bar)
+        self._find_entry.setPlaceholderText("在文件中查找…")
+        self._find_entry.textChanged.connect(self._on_find_changed)
+        self._find_entry.returnPressed.connect(self._find_next)
+        layout.addWidget(self._find_entry, 1)
+        prev_btn = QPushButton("上一个", bar)
+        prev_btn.setProperty("btnRole", "compact")
+        prev_btn.clicked.connect(self._find_prev)
+        layout.addWidget(prev_btn)
+        next_btn = QPushButton("下一个", bar)
+        next_btn.setProperty("btnRole", "compact")
+        next_btn.clicked.connect(self._find_next)
+        layout.addWidget(next_btn)
+        close_btn = QPushButton("关闭", bar)
+        close_btn.setProperty("btnRole", "compact")
+        close_btn.clicked.connect(self.hide_find)
+        layout.addWidget(close_btn)
+        bar.hide()
+        return bar
 
     def _build_panes(self) -> None:
         splitter = QSplitter(Qt.Orientation.Horizontal, self._body_host)
@@ -114,9 +156,13 @@ class EditorPanel(QWidget):
         edit_frame = QWidget(splitter)
         edit_layout = QVBoxLayout(edit_frame)
         edit_layout.setContentsMargins(0, 0, 0, 0)
-        self._editor = QPlainTextEdit(edit_frame)
+        self._editor = _LineNumberedEdit(edit_frame)
         self._editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         self._editor.textChanged.connect(self._on_edit)
+        self._editor.verticalScrollBar().valueChanged.connect(
+            self._sync_preview_scroll
+        )
+        self._highlighter = MarkdownHighlighter(self._editor.document())
         edit_layout.addWidget(self._editor)
         splitter.addWidget(edit_frame)
 
@@ -128,6 +174,7 @@ class EditorPanel(QWidget):
         self._preview.setOpenExternalLinks(True)
         preview_layout.addWidget(self._preview)
         splitter.addWidget(preview_frame)
+        self._preview_frame = preview_frame
 
         splitter.setSizes([600, 400])
         self._splitter = splitter
@@ -253,6 +300,104 @@ class EditorPanel(QWidget):
             self._editor.centerCursor()
             self._editor.setFocus(Qt.FocusReason.OtherFocusReason)
 
+    # --- 文件内查找 ---
+
+    def focus_find(self) -> None:
+        """显示查找条并聚焦输入框（Ctrl+F 且编辑器聚焦时调用）。"""
+        self._find_bar.show()
+        self._find_entry.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._find_entry.selectAll()
+
+    def hide_find(self) -> None:
+        self._find_bar.hide()
+        self._clear_highlights()
+
+    def _find_text(self) -> str:
+        return self._find_entry.text()
+
+    def _on_find_changed(self, _text: str) -> None:
+        self._update_highlights()
+
+    def _clear_highlights(self) -> None:
+        self._editor.setExtraSelections([])
+
+    def _update_highlights(self) -> None:
+        """高亮全部命中；最后一个命中用更深的颜色表示当前匹配。"""
+        query = self._find_text()
+        if not query:
+            self._clear_highlights()
+            return
+        doc = self._editor.document()
+        selections = []
+        cursor = QTextCursor(doc)
+        base_fmt = QTextCharFormat()
+        base_fmt.setBackground(QColor("#ffe08a"))
+        current_fmt = QTextCharFormat()
+        current_fmt.setBackground(QColor("#ffb84d"))
+        while True:
+            cursor = doc.find(query, cursor)
+            if cursor.isNull():
+                break
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            selection.format = base_fmt
+            selections.append(selection)
+        if selections:
+            selections[-1].format = current_fmt
+        self._editor.setExtraSelections(selections)
+
+    def _find_next(self) -> None:
+        query = self._find_text()
+        if not query:
+            return
+        if not self._editor.find(query):
+            # 到末尾未命中 → 循环回开头
+            self._editor.moveCursor(QTextCursor.MoveOperation.Start)
+            self._editor.find(query)
+
+    def _find_prev(self) -> None:
+        query = self._find_text()
+        if not query:
+            return
+        flags = QTextDocument.FindFlag.FindBackward
+        if not self._editor.find(query, flags):
+            self._editor.moveCursor(QTextCursor.MoveOperation.End)
+            self._editor.find(query, flags)
+
+    # --- 预览折叠 / 同步滚动 ---
+
+    def _toggle_preview(self) -> None:
+        """切换预览区显示/隐藏。"""
+        visible = self._preview_frame.isHidden()
+        self._preview_frame.setVisible(visible)
+        self._preview_btn.setText("隐藏预览" if visible else "显示预览")
+
+    def _sync_preview_scroll(self) -> None:
+        """编辑滚动时按当前光标所在标题把预览滚动到对应位置（单向 best-effort）。"""
+        if self._preview_frame.isHidden():
+            return
+        heading = self._current_heading_text()
+        if heading:
+            self._scroll_preview_to_heading(heading)
+
+    def _current_heading_text(self) -> Optional[str]:
+        """从光标所在块向上找最近的 Markdown 标题文本。"""
+        block = self._editor.textCursor().block()
+        while block.isValid():
+            text = block.text().strip()
+            if text.startswith("#"):
+                return text.lstrip("#").strip()
+            block = block.previous()
+        return None
+
+    def _scroll_preview_to_heading(self, heading: str) -> None:
+        """在预览中定位到包含该标题文本的位置并滚动到可见。"""
+        cursor = self._preview.document().find(heading)
+        if cursor.isNull():
+            return
+        self._preview.setTextCursor(cursor)
+        self._preview.ensureCursorVisible()
+
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
         self._apply_edit_state()
@@ -273,6 +418,8 @@ class EditorPanel(QWidget):
         self._dirty = True
         self._update_dirty()
         self._update_save_state()
+        if self._find_bar.isVisible():
+            self._update_highlights()
         if self._preview_timer is not None:
             self._preview_timer.stop()
         self._preview_timer = QTimer(self)
@@ -282,6 +429,8 @@ class EditorPanel(QWidget):
 
     def _update_dirty(self) -> None:
         self._dirty_label.setText("● 未保存" if self._dirty else "")
+        if self._on_dirty_changed is not None:
+            self._on_dirty_changed(self._dirty)
 
     def _schedule_preview(self) -> None:
         self._refresh_preview(self._editor.toPlainText())

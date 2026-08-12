@@ -607,8 +607,23 @@ class MainWindow(QMainWindow):
     def _on_content_search(self) -> None:
         if not self._content_workspace_available():
             return
+        # 编辑器聚焦时 Ctrl+F 走文件内查找，否则走全局搜索
+        if self._content_editor_has_focus():
+            self._content_workspace.focus_in_editor_find()
+            return
         self._show_panels_dock()
         self._content_workspace.focus_search()
+
+    def _content_editor_has_focus(self) -> bool:
+        """判断当前焦点是否在中心编辑器（EditorPanel）或其子控件上。"""
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        widget = QApplication.focusWidget()
+        while widget is not None:
+            if isinstance(widget, EditorPanel):
+                return True
+            widget = widget.parentWidget()
+        return False
 
     def _on_content_replace(self) -> None:
         if not self._content_workspace_available():

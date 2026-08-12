@@ -294,6 +294,12 @@ class ContentWorkspace(QWidget):
         if panel is not None:
             panel.focus_query()
 
+    def focus_in_editor_find(self) -> None:
+        """编辑器聚焦时的 Ctrl+F：聚焦当前文件的文件内查找条。"""
+        editor = self.tabs_host.current_editor()
+        if editor is not None:
+            editor.focus_find()
+
     def show_replace(self) -> None:
         self._select_panel("替换")
 

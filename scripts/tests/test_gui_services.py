@@ -1478,5 +1478,261 @@ class ChangesPanelTests(unittest.TestCase):
         panel.close()
 
 
+class TabsHostDirtyTests(unittest.TestCase):
+    """脏标签 ● 提示 + 关闭脏 tab 确认（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _host(self):
+        from doc_tool.ui.content.tabs_host import TabsHost
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-tabs-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        tabs = TabsHost(writer)
+        tabs.open_file(rel, path.read_text(encoding="utf-8"))
+        return tabs, rel
+
+    def test_dirty_tab_shows_bullet_and_clears_on_save(self):
+        tabs, _rel = self._host()
+        editor = tabs.current_editor()
+        self.assertNotIn("●", tabs._tabs.tabText(0))
+        editor._editor.setPlainText("# 1.1 目的\n被改\n")
+        self.assertTrue(editor.is_dirty())
+        self.assertIn("●", tabs._tabs.tabText(0))
+        editor.save()
+        self.assertFalse(editor.is_dirty())
+        self.assertNotIn("●", tabs._tabs.tabText(0))
+        tabs.close_all()
+        tabs.close()
+
+    def test_close_dirty_tab_requires_confirmation(self):
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        tabs, _rel = self._host()
+        editor = tabs.current_editor()
+        editor._editor.setPlainText("# 1.1 目的\n被改\n")
+        # 拒绝 → 标签保留
+        with patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.No,
+        ):
+            tabs._close_tab(0)
+        self.assertEqual(tabs._tabs.count(), 1)
+        # 确认 → 标签关闭
+        with patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            tabs._close_tab(0)
+        self.assertEqual(tabs._tabs.count(), 0)
+        tabs.close()
+
+
+class EditorFindTests(unittest.TestCase):
+    """文件内查找：高亮、导航、focus_find（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-find-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 1.1 目的\n正文含 目的 一词。\n再看 目的。\n",
+            encoding="utf-8",
+        )
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_focus_find_shows_bar_and_focuses(self):
+        from PySide6.QtTest import QTest
+
+        panel = self._panel()
+        panel.show()
+        panel.raise_()
+        panel.activateWindow()
+        QTest.qWait(50)
+        self.assertTrue(panel._find_bar.isHidden())
+        panel.focus_find()
+        self.assertFalse(panel._find_bar.isHidden())
+        self.assertTrue(panel._find_entry.hasFocus())
+        panel.close()
+
+    def test_highlights_all_matches(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        selections = panel._editor.extraSelections()
+        # 标题 + 两处正文 = 3 处命中
+        self.assertEqual(len(selections), 3)
+        panel.close()
+
+    def test_find_next_moves_cursor_to_match(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        panel._find_next()
+        self.assertEqual(panel._editor.textCursor().selectedText(), "目的")
+        panel.close()
+
+    def test_hide_find_clears_highlights(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        self.assertGreater(len(panel._editor.extraSelections()), 0)
+        panel.hide_find()
+        self.assertFalse(panel._find_bar.isVisible())
+        self.assertEqual(panel._editor.extraSelections(), [])
+        panel.close()
+
+
+class EditorPreviewTests(unittest.TestCase):
+    """预览折叠 + 编辑滚动联动预览（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-preview-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n正文内容。\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_preview_toggle_hides_and_shows(self):
+        panel = self._panel()
+        self.assertFalse(panel._preview_frame.isHidden())
+        panel._toggle_preview()
+        self.assertTrue(panel._preview_frame.isHidden())
+        self.assertIn("显示预览", panel._preview_btn.text())
+        panel._toggle_preview()
+        self.assertFalse(panel._preview_frame.isHidden())
+        self.assertIn("隐藏预览", panel._preview_btn.text())
+        panel.close()
+
+    def test_sync_preview_scroll_uses_current_heading(self):
+        from unittest.mock import patch
+
+        panel = self._panel()
+        with patch.object(panel._preview, "setTextCursor") as setc, patch.object(
+            panel._preview, "ensureCursorVisible"
+        ) as ensure:
+            panel._sync_preview_scroll()
+        setc.assert_called_once()
+        ensure.assert_called_once()
+        panel.close()
+
+    def test_current_heading_text(self):
+        panel = self._panel()
+        self.assertEqual(panel._current_heading_text(), "1.1 目的")
+        panel.close()
+
+
+class EditorHighlightTests(unittest.TestCase):
+    """Markdown 语法高亮 + 行号槽（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _make_panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-highlight-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n正文。\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_heading_format_bold(self):
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        hl = MarkdownHighlighter(edit.document())
+        self.assertEqual(hl._heading_fmt().fontWeight(), QFont.Weight.Bold)
+        edit.close()
+
+    def test_inline_code_format_has_background(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        hl = MarkdownHighlighter(edit.document())
+        fmt = hl._inline_code_fmt()
+        self.assertNotEqual(fmt.background().style(), Qt.BrushStyle.NoBrush)
+        edit.close()
+
+    def test_heading_line_gets_bold_format(self):
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        MarkdownHighlighter(edit.document())
+        edit.setPlainText("# 标题\n普通文本\n")
+        formats = edit.document().firstBlock().layout().formats()
+        any_bold = any(
+            fr.format.fontWeight() == QFont.Weight.Bold for fr in formats
+        )
+        self.assertTrue(any_bold)
+
+    def test_line_number_width_grows_with_lines(self):
+        from doc_tool.ui.content.editor_highlight import _LineNumberedEdit
+
+        edit = _LineNumberedEdit()
+        edit.setPlainText("一\n二\n")
+        small = edit.line_number_area_width()
+        edit.setPlainText("\n".join(str(i) for i in range(15)))
+        self.assertGreater(edit.line_number_area_width(), small)
+
+    def test_editor_panel_uses_line_numbers_and_highlighter(self):
+        from doc_tool.ui.content.editor_highlight import (
+            MarkdownHighlighter,
+            _LineNumberedEdit,
+        )
+
+        panel = self._make_panel()
+        self.assertIsInstance(panel._editor, _LineNumberedEdit)
+        self.assertIsInstance(panel._highlighter, MarkdownHighlighter)
+        panel.close()
+
+
 if __name__ == "__main__":
     unittest.main()
