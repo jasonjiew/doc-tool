@@ -41,12 +41,14 @@ class _IdleCard(QFrame):
         *,
         on_validate: Optional[Callable[[], None]] = None,
         on_diag_build: Optional[Callable[[], None]] = None,
+        on_open_report: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.setProperty("cardClass", "result")
         self._on_validate = on_validate
         self._on_diag_build = on_diag_build
+        self._on_open_report = on_open_report
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -126,21 +128,9 @@ class _IdleCard(QFrame):
             QMessageBox.warning(self, "无法打开", "产物已不可用：{0}".format(path))
 
     def _open_report(self) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        report = self._current_report()
-        if report and Path(report).is_file():
-            try:
-                import os
-
-                os.startfile(report)  # type: ignore[attr-defined]  # noqa: S606
-            except OSError:
-                QMessageBox.warning(
-                    self, "无法打开", "校验报告已不可用：{0}".format(report)
-                )
-
-    def _current_report(self) -> Optional[str]:
-        return None
+        """打开校验报告：转发给主窗口接线（报告路径存在性已在渲染时校验）。"""
+        if self._on_open_report is not None:
+            self._on_open_report()
 
 
 class TaskDock(QWidget):
@@ -193,7 +183,9 @@ class TaskDock(QWidget):
         self._stack = QStackedWidget(self)
 
         self._idle_card = _IdleCard(
-            on_validate=on_validate, on_diag_build=on_diag_build
+            on_validate=on_validate,
+            on_diag_build=on_diag_build,
+            on_open_report=on_open_report,
         )
         self._stack.addWidget(self._idle_card)
 

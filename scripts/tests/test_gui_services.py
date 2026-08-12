@@ -462,6 +462,23 @@ def _ensure_qapp():
     return app
 
 
+class _FakeWriter:
+    """Ctrl+S 测试用的假 ContentWriter：resolve 落到临时目录，write_text 记录调用。"""
+
+    def __init__(self, content_root):
+        self._root = Path(content_root)
+        self.written = None
+
+    def resolve(self, rel_path):
+        return self._root if rel_path == "." else self._root / rel_path
+
+    def write_text(self, rel_path, text):
+        self.written = (rel_path, text)
+        return SimpleNamespace(
+            written=True, error=None, backup_path=None, path=""
+        )
+
+
 class MainWindowInteractionTests(unittest.TestCase):
     """PySide6 主窗口交互（离屏渲染）。"""
 
@@ -887,6 +904,70 @@ class MainWindowInteractionTests(unittest.TestCase):
         self.assertTrue(win._panels_dock.isVisible())
         win.close()
 
+    def test_ctrl_s_shortcut_saves_current_tab(self):
+        """Ctrl+S 必须能保存当前标签页（回归：按钮文案有快捷键但未绑定）。"""
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtTest import QTest
+
+        from doc_tool.ui.content.tabs_host import TabsHost
+
+        _ensure_qapp()
+        with tempfile.TemporaryDirectory() as tmp:
+            content_root = Path(tmp) / "content"
+            rel = "requirement/第1章 引言/1.1 目的.md"
+            path = content_root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# 1.1 目的\n原文\n", encoding="utf-8")
+
+            writer = _FakeWriter(content_root)
+            tabs = TabsHost(writer)
+            tabs.open_file(rel, path.read_text(encoding="utf-8"))
+            editor = tabs.current_editor()
+            editor._editor.setPlainText("# 1.1 目的\n被改\n")
+            self.assertIsNotNone(tabs._save_shortcut)
+            self.assertEqual(
+                tabs._save_shortcut.key().toString(), QKeySequence("Ctrl+S").toString()
+            )
+            # 编辑器聚焦后发送 Ctrl+S，应触发保存（离屏下需先激活窗口）。
+            tabs.show()
+            tabs.raise_()
+            tabs.activateWindow()
+            QTest.qWait(50)
+            editor._editor.setFocus()
+            QTest.keySequence(editor._editor, QKeySequence("Ctrl+S"))
+            QTest.qWait(30)
+            self.assertEqual(writer.written, (rel, "# 1.1 目的\n被改\n"))
+            tabs.close_all()
+            tabs.close()
+
+    def test_idle_card_report_button_triggers_open_report(self):
+        """空闲卡「查看校验报告」必须接线到打开报告回调（回归：死按钮）。"""
+        from PySide6.QtWidgets import QPushButton
+
+        from doc_tool.ui.task_dock import TaskDock
+        from doc_tool.ui.workbench_state import ResultState
+
+        _ensure_qapp()
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "validation.md"
+            report.write_text("ok", encoding="utf-8")
+            opened = []
+            dock = TaskDock(on_open_report=lambda: opened.append(True))
+            dock.show_idle(
+                ResultState(
+                    status="success", report_path=report, project_root=Path(tmp)
+                ),
+                project_open=True,
+            )
+            button = next(
+                b
+                for b in dock._idle_card.findChildren(QPushButton)
+                if b.text() == "查看校验报告"
+            )
+            button.click()
+            self.assertEqual(opened, [True])
+            dock.close()
+
 
 class WizardInteractionTests(unittest.TestCase):
     def test_preflight_constant_and_page_structure(self):
@@ -912,6 +993,23 @@ class WizardInteractionTests(unittest.TestCase):
         wizard._on_cancel_clicked()
         self.assertTrue(wizard._closing)
         runner.cancel.assert_called_once()
+        wizard.close()
+
+    def test_run_returns_target_root_on_accepted_and_none_on_rejected(self):
+        """run() 必须用 QDialog.DialogCode 判定结果（回归：QDialogButtonBox 无该枚举导致崩溃）。"""
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QDialog
+
+        from doc_tool.ui.wizard import ImportWizard
+
+        _ensure_qapp()
+        wizard = ImportWizard()
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Accepted):
+            wizard._target_root = "C:/proj"
+            self.assertEqual(wizard.run(), "C:/proj")
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Rejected):
+            self.assertIsNone(wizard.run())
         wizard.close()
 class PresentationHelpersTests(unittest.TestCase):
     def test_pipeline_stage_percentages_are_contiguous_and_complete(self):
@@ -1175,3 +1273,6 @@ class EditorRollbackCleanupTests(unittest.TestCase):
 # 24. 任务运行中关闭窗口 → 确认对话框 → 请求安全取消，任务停止后自动退出；
 #     拒绝则继续运行
 # 25. 调整窗口尺寸/位置或最大化后退出 → 下次启动恢复相同几何与状态
+
+if __name__ == "__main__":
+    unittest.main()

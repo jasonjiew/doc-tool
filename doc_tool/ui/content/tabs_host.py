@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional
 
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QTabWidget, QWidget
 
 from doc_tool.ui.content.editor_panel import EditorPanel
@@ -40,6 +41,10 @@ class TabsHost(QWidget):
         self._tabs.setDocumentMode(True)
         self._tabs.tabCloseRequested.connect(self._close_tab)
         self._tabs.currentChanged.connect(self._on_tab_changed)
+
+        # Ctrl+S 保存当前标签页（按钮文案已声明，此前未绑定）。
+        self._save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        self._save_shortcut.activated.connect(self.save_current)
 
         layout = self._make_layout()
         layout.addWidget(self._tabs)

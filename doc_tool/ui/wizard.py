@@ -20,6 +20,7 @@ from typing import Optional
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
@@ -432,7 +433,7 @@ class ImportWizard(QWizard):
 
     def run(self) -> Optional[str]:
         """运行向导，返回项目路径或 None。"""
-        if self.exec() == QDialogButtonBox.DialogCode.Accepted:
+        if self.exec() == QDialog.DialogCode.Accepted:
             return self._target_root
         return None
 
