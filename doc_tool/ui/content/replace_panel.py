@@ -68,6 +68,9 @@ class ReplacePanel(QWidget):
         self._writable = writable
         self._matches: List[ReplaceMatch] = []
         self._preview: Optional[ReplacePreview] = None
+        # 「回滚本次替换」的起点：本次会话开始前的清单条目数，避免把同会话
+        # 更早的编辑/保存一并回滚。
+        self._rollback_marker: Optional[int] = None
 
         # 唯一外层布局：输入卡片 + diff 卡片 + 命中表 + 操作行。原先各
         # _build_* 各自创建 QVBoxLayout(self)，只有第一个会被安装，diff
@@ -200,6 +203,8 @@ class ReplacePanel(QWidget):
             return
         self._preview = preview
         self._matches = list(preview.matches)
+        # 捕获回滚起点：本次替换会话开始前已存在的改动清单条目数。
+        self._rollback_marker = self._writer.manifest.entry_count()
         self._render_matches()
         if preview.total == 0:
             self._set_status("无匹配")
@@ -217,10 +222,22 @@ class ReplacePanel(QWidget):
         results = self._service.apply_matches(
             [match], self._replace_entry.text(), self._writer
         )
+        if not all(getattr(r, "written", False) for r in results):
+            error = next(
+                (r.error for r in results if not getattr(r, "written", False)),
+                "写回失败",
+            )
+            # 写回失败时保留该命中供重试，不谎报成功。
+            self._set_status("替换失败：{0}".format(error or "未知原因"))
+            self._update_action_state()
+            return
         self._matches.remove(match)
+        # 先触发上层写后联动（索引同步刷新），再重扫受影响文件：逐项替换后
+        # 同一文件其余命中仍基于旧内容的列偏移，直接复用会把后续替换写错位。
+        self._after_applied(results)
+        self._refresh_file_matches(match.rel_path)
         self._render_matches()
         self._set_status("已替换 1 处")
-        self._after_applied(results)
 
     def skip_one(self) -> None:
         match = self._selected_match()
@@ -247,6 +264,18 @@ class ReplacePanel(QWidget):
         if confirmed != QMessageBox.StandardButton.Yes:
             return
         results = self._service.apply_matches(self._matches, replacement, self._writer)
+        failed = [r for r in results if not getattr(r, "written", False)]
+        if failed:
+            errors = "；".join(
+                r.error for r in failed if getattr(r, "error", None)
+            ) or "写回失败"
+            # 失败文件的命中保留供重试；成功文件从列表移除。
+            failed_files = {getattr(r, "rel_path", "") for r in failed}
+            self._matches = [m for m in self._matches if m.rel_path in failed_files]
+            self._preview = None
+            self._render_matches()
+            self._set_status("部分替换失败：{0}".format(errors))
+            return
         self._matches = []
         self._preview = None
         self._render_matches()
@@ -254,7 +283,7 @@ class ReplacePanel(QWidget):
         self._after_applied(results)
 
     def rollback(self) -> None:
-        failures = self._writer.rollback()
+        failures = self._writer.rollback(since=self._rollback_marker)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:
@@ -321,6 +350,22 @@ class ReplacePanel(QWidget):
         label = self._type_box.currentText()
         value = next((v for l, v in _TYPE_FILTERS if l == label), None)
         return [value] if value else None
+
+    def _refresh_file_matches(self, rel_path: str) -> None:
+        """用当前内容重扫已写回文件，替换该文件的陈旧命中。
+
+        逐项替换每次只应用一个缓存 match，写回后其余命中仍基于搜索时的
+        列偏移；直接复用会把后续替换写到错位位置（同一行多处命中尤其明显）。
+        此处经上层写后联动同步刷新索引后，用最新行重建该文件的命中。
+        """
+        fresh = self._service.find_in_file(
+            rel_path,
+            self._find_entry.text().strip(),
+            regex=self._regex_cb.isChecked(),
+            case_sensitive=self._case_cb.isChecked(),
+            whole_word=self._word_cb.isChecked(),
+        )
+        self._matches = [m for m in self._matches if m.rel_path != rel_path] + fresh
 
     def _set_status(self, text: str) -> None:
         if not hasattr(self, "_status_label"):

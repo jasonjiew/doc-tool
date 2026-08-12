@@ -88,6 +88,7 @@ class ContentWorkspace(QWidget):
         self._on_open_file = on_open_file
         self._on_request_validate = on_request_validate
         self._on_index_ready = on_index_ready
+        self._closing = False
 
         self._index: Optional[ContentIndex] = None
         self._index_service = ContentIndexService(self._content_root)
@@ -177,12 +178,29 @@ class ContentWorkspace(QWidget):
         )
         self._poll_timer.start()
 
+    def shutdown(self) -> None:
+        """项目切换/关闭时停止后台索引任务与轮询。
+
+        旧工作区被 deleteLater 时若索引任务仍在运行，其迟到回调会重建
+        控件并误把新项目标记为索引就绪；此方法停表、取消任务并置关闭
+        标志，保证旧回调在新工作区就绪前不会生效。
+        """
+        self._closing = True
+        self._poll_timer.stop()
+        if self._runner.is_running:
+            self._runner.cancel()
+
     def _poll_index(self) -> None:
+        if self._closing:
+            return
         self._runner.poll()
         if not self._runner.is_running:
             self._poll_timer.stop()
 
     def _on_index_done(self, result) -> None:
+        if self._closing:
+            # 项目切换/关闭后迟到的旧索引回调：不得重建控件或标记新项目就绪。
+            return
         if result is None:
             if self._on_status is not None:
                 self._on_status("内容索引构建失败或已取消")

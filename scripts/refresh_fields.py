@@ -14,7 +14,7 @@ import subprocess
 import sys
 from typing import Optional, Sequence
 
-from docx_common import AutomationError, load_config
+from docx_common import AutomationError, discover_document_types, load_config
 
 
 def _word_pid(word) -> Optional[int]:
@@ -189,7 +189,10 @@ def supervise(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="使用独立 Word 进程刷新 TOC、NUMPAGES 和域")
-    parser.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
+    # 与 build_docx/run_pipeline 一致，从 config/ 动态枚举文档类型。
+    available = discover_document_types()
+    choices = tuple(available) + ("all",)
+    parser.add_argument("document", choices=choices, nargs="?", default="all")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--output", help=argparse.SUPPRESS)
     parser.add_argument(
@@ -207,7 +210,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.skip_word_refresh:
         print("[SKIP] 已按显式参数跳过 Word 实机刷新；不能视为正式验收通过。")
         return 0
-    targets = ("requirement", "design") if args.document == "all" else (args.document,)
+    targets = tuple(available) if args.document == "all" else (args.document,)
     ok = True
     for target in targets:
         if not supervise(target):

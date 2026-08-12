@@ -611,6 +611,33 @@ class WriteSafetyTests(unittest.TestCase):
             "# 1.1 目的\n原始正文\n",
         )
 
+    def test_scoped_rollback_preserves_earlier_edits(self):
+        """回滚指定起点后只回滚新条目，保留同会话更早的编辑与备份。
+
+        回归：面板「回滚本次替换/联动」若调用全量 rollback，会把同会话里
+        更早保存的文件一并恢复并删除其 .bak，造成无关改动丢失。
+        """
+        writer = self._writer()
+        rel_x = "requirement/第1章 引言/1.1 目的.md"
+        rel_y = "requirement/第1章 引言/1.2 范围.md"
+        (self.content_root / rel_y).write_text("# 1.2 范围\ny 原\n", encoding="utf-8")
+        # 更早的编辑 X
+        writer.write_text(rel_x, "# 1.1 目的\nx 改\n")
+        marker = writer.manifest.entry_count()
+        # 本次操作编辑 Y
+        writer.write_text(rel_y, "# 1.2 范围\ny 换\n")
+        failures = writer.rollback(since=marker)
+        self.assertEqual(failures, [])
+        # X 的编辑保留，其 .bak 不被删除
+        self.assertEqual(self._read(rel_x), "# 1.1 目的\nx 改\n")
+        self.assertTrue(
+            (self.content_root / "requirement/第1章 引言/1.1 目的.md.bak").exists()
+        )
+        # Y 恢复
+        self.assertEqual(self._read(rel_y), "# 1.2 范围\ny 原\n")
+        writer.manifest.load()
+        self.assertEqual(len(writer.manifest.entries), 1)
+
 
 class ChapterTreeModelTests(unittest.TestCase):
     """任务 4.x：章节树模型推导（纯函数，不依赖 Tk）。"""
@@ -1152,6 +1179,31 @@ class ReplaceServiceTests(unittest.TestCase):
             self.FILES["requirement/第1章 引言/1.1 目的.md"],
         )
 
+    def test_find_in_file_returns_fresh_positions(self):
+        """逐项替换后 find_in_file 重建该文件命中，列偏移基于当前内容。
+
+        回归：面板逐项替换每次只应用一条缓存命中，写回后其余命中仍基于
+        旧内容的列偏移；find_in_file 用于按当前内容重建，避免后续替换写错位。
+        """
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        self.content_root.joinpath(rel).write_text(
+            "x foo foo y\n", encoding="utf-8"
+        )
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.replace import ReplaceService
+
+        self.index = ContentIndexService(self.content_root).build()
+        self.service = ReplaceService(self.index)
+        first = self.service.find_matches("foo")[0]
+        self.service.apply_matches([first], "X", self.writer)
+        # 刷新索引后用 find_in_file 重建该文件命中
+        self.index = ContentIndexService(self.content_root).build()
+        self.service = ReplaceService(self.index)
+        fresh = self.service.find_in_file(rel, "foo")
+        self.assertEqual(len(fresh), 1)
+        self.assertEqual(fresh[0].line_text, "x X foo y")
+        self.assertEqual(self._read(rel)[fresh[0].start : fresh[0].end], "foo")
+
 
 class RefactorServiceTests(unittest.TestCase):
     """任务 8.x：章节重命名/重编号联动。"""
@@ -1248,6 +1300,43 @@ class RefactorServiceTests(unittest.TestCase):
             "requirement/不存在.md", "x.md"
         )
         self.assertIsNone(plan)
+
+    def test_renumber_does_not_corrupt_longer_numbers(self):
+        """重编号只改目标编号，不把同行的更长编号（如 3.1.40）前缀误伤。
+
+        回归：整行 str.replace 把 ``3.1.4`` 一并改写进 ``3.1.40``，
+        生成指向不存在章节的 ``3.1.50``。
+        """
+        self.content_root.joinpath(
+            "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+        ).write_text(
+            "# 3.1.3 团队管理\n"
+            "详见 3.1.4 与 3.1.40 相关章节。\n"
+            "链接 [居民信息](3.1.4 居民信息.md)。\n",
+            encoding="utf-8",
+        )
+        self.content_root.joinpath(
+            "requirement/第3章 功能需求/3.1 KSHC/3.1.40 深层.md"
+        ).write_text("# 3.1.40 深层\n", encoding="utf-8")
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.references import ReferenceScanner
+        from doc_tool.application.content.refactor import RefactorService
+
+        self.index = ContentIndexService(self.content_root).build()
+        ReferenceScanner(self.index).scan_all()
+        service = RefactorService(self.index)
+        plan = service.compute_rename_plan(
+            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+            "3.1.5 居民信息.md",
+        )
+        self.assertIsNotNone(plan)
+        service.apply_rename_plan(plan, self.writer)
+        text = self._read(
+            "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+        )
+        self.assertIn("详见 3.1.5 与 3.1.40", text)
+        self.assertIn("[居民信息](3.1.5 居民信息.md)", text)
+        self.assertNotIn("3.1.50", text)
 
 
 class LintTests(unittest.TestCase):

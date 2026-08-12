@@ -165,8 +165,14 @@ def make_table_from_md(
     if extra.get("ind"):
         values = extra["ind"].split(":")
         indent = etree.SubElement(table_properties, qn("tblInd"))
-        indent.set(qn("w"), values[0] if values else "0")
-        indent.set(qn("type"), values[1] if len(values) > 1 else "dxa")
+        indent.set(
+            qn("w"),
+            values[0] if values and values[0] not in ("", "None") else "0",
+        )
+        indent.set(
+            qn("type"),
+            values[1] if len(values) > 1 and values[1] not in ("", "None") else "dxa",
+        )
     if extra.get("bd"):
         values = extra["bd"].split(":")
         borders = etree.SubElement(table_properties, qn("tblBorders"))
@@ -174,9 +180,13 @@ def make_table_from_md(
             edge = etree.SubElement(borders, qn(edge_name))
             edge.set(qn("val"), values[0])
             for index, attribute in ((1, "color"), (2, "sz"), (3, "space")):
-                if len(values) > index and values[index]:
+                if (
+                    len(values) > index
+                    and values[index]
+                    and values[index] != "None"
+                ):
                     edge.set(qn(attribute), values[index])
-    if extra.get("lay"):
+    if extra.get("lay") and extra["lay"] not in ("", "None"):
         etree.SubElement(table_properties, qn("tblLayout")).set(qn("type"), extra["lay"])
     if extra.get("cm"):
         cell_margins = etree.SubElement(table_properties, qn("tblCellMar"))
@@ -699,19 +709,28 @@ def process_markdown(
 
         unordered = re.match(r"^[-*]\s+(.+)$", stripped)
         if unordered:
-            insert_element(insert_before, make_paragraph(config.get("bodyStyle"), "\u2022 " + unordered.group(1).strip()))
+            # 列表项同样允许 <br> 换行约定，须转为真实 Word 换行。
+            item_text = re.sub(
+                r"<br\s*/?>", "\n", unordered.group(1).strip(), flags=re.IGNORECASE
+            )
+            insert_element(
+                insert_before,
+                make_paragraph(config.get("bodyStyle"), "\u2022 " + item_text),
+            )
             inserted += 1
             index += 1
             continue
         ordered = re.match(r"^(\d{1,3})[.、].*$", stripped)
         if ordered:
+            # 保留作者原始编号文本；<br> 同样转为真实换行。
+            item_text = re.sub(r"<br\s*/?>", "\n", stripped, flags=re.IGNORECASE)
             insert_element(
                 insert_before,
                 # Preserve the author's exact visible numbering text.  In
                 # particular, ``2.1 ...`` is business text rather than a
                 # Markdown list item, and ``1.foo`` must not become
                 # ``1. foo`` during a round trip.
-                make_paragraph(config.get("bodyStyle"), stripped),
+                make_paragraph(config.get("bodyStyle"), item_text),
             )
             inserted += 1
             index += 1

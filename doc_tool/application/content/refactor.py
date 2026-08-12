@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -51,6 +52,18 @@ class RenamePlan:
             files.append(self.old_rel_path)  # 保持排序的稳定性
             files.sort()
         return files
+
+
+def _replace_all_boundary(line: str, old: str, new: str) -> str:
+    """整行替换全部独立出现（不误伤作为其它编号前缀/后缀的相同数字）。
+
+    章节号是数值层级，直接 ``str.replace`` 会把 ``3.1`` 一并改写进
+    ``3.10``/``13.1`` 等更长编号（重编号 ``3.1`` -> ``3.2`` 会把另一处
+    引用 ``3.10`` 错改成 ``3.20``）。用词边界（字母数字）限制替换目标，
+    既保留同一行多处独立引用的全部更新，又避免前缀误伤。
+    """
+    pattern = r"(?<![0-9A-Za-z])(?:{0})(?![0-9A-Za-z])".format(re.escape(old))
+    return re.sub(pattern, new, line)
 
 
 class RefactorService:
@@ -170,8 +183,8 @@ class RefactorService:
         for edit in edits:
             index = edit.line_no - 1
             if 0 <= index < len(lines):
-                lines[index] = lines[index].replace(
-                    edit.old_substr, edit.new_substr
+                lines[index] = _replace_all_boundary(
+                    lines[index], edit.old_substr, edit.new_substr
                 )
         return "".join(lines)
 

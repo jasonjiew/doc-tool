@@ -996,8 +996,12 @@ class WizardInteractionTests(unittest.TestCase):
         wizard.close()
 
     def test_run_returns_target_root_on_accepted_and_none_on_rejected(self):
-        """run() 必须用 QDialog.DialogCode 判定结果（回归：QDialogButtonBox 无该枚举导致崩溃）。"""
-        from unittest.mock import patch
+        """run() 必须用 QDialog.DialogCode 判定结果（回归：QDialogButtonBox 无该枚举导致崩溃）。
+
+        导入成功后返回目标目录；取消/失败（目标未生成）时返回 None，避免主窗口
+        把失败路径当项目打开并误报「打开项目失败」。
+        """
+        from unittest.mock import Mock, patch
 
         from PySide6.QtWidgets import QDialog
 
@@ -1007,7 +1011,13 @@ class WizardInteractionTests(unittest.TestCase):
         wizard = ImportWizard()
         with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Accepted):
             wizard._target_root = "C:/proj"
+            wizard._import_result = Mock(success=True)
             self.assertEqual(wizard.run(), "C:/proj")
+        # 导入失败：结果页「关闭」也会 accept()，但不得返回未生成的目标路径
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Accepted):
+            wizard._target_root = "C:/proj"
+            wizard._import_result = Mock(success=False)
+            self.assertIsNone(wizard.run())
         with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Rejected):
             self.assertIsNone(wizard.run())
         wizard.close()

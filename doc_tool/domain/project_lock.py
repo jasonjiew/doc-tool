@@ -137,13 +137,24 @@ def _pid_alive_windows(pid: int) -> bool:
         from ctypes import wintypes
 
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = ctypes.windll.kernel32.OpenProcess(
+        kernel32 = ctypes.windll.kernel32
+        # 显式声明返回类型/参数类型：ctypes 默认把返回值当 32 位 c_int，
+        # 64 位句柄会被截断（可能误判为 0 → 把活动锁当陈旧锁清理）。
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        )
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = kernel32.OpenProcess(
             PROCESS_QUERY_LIMITED_INFORMATION, False, pid
         )
         if not handle:
             # OpenProcess 返回 0 表示失败（进程不存在或无权限）
             # 区分：ERROR_ACCESS_DENIED 表示进程存在但无权限
-            last_error = ctypes.windll.kernel32.GetLastError()
+            last_error = kernel32.GetLastError()
             if last_error == 5:  # ERROR_ACCESS_DENIED
                 return True
             return False
@@ -151,7 +162,7 @@ def _pid_alive_windows(pid: int) -> bool:
             # 句柄获取成功 → 进程存在
             return True
         finally:
-            ctypes.windll.kernel32.CloseHandle(handle)
+            kernel32.CloseHandle(handle)
     except (OSError, AttributeError):
         # ctypes 不可用或调用失败 → 回退到保守策略：视为存活
         return True

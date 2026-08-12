@@ -126,6 +126,44 @@ class ReplaceService:
             file_count=len(files),
         )
 
+    def find_in_file(
+        self,
+        rel_path: str,
+        query: str,
+        *,
+        regex: bool = False,
+        case_sensitive: bool = False,
+        whole_word: bool = False,
+    ) -> List[ReplaceMatch]:
+        """重新扫描单个文件的当前命中（供逐项替换后刷新剩余命中）。
+
+        逐项替换每次只应用一条缓存命中，写回后其余命中仍基于旧内容的列
+        偏移；调用方在写回并刷新索引后用本方法重建该文件的命中，避免把
+        陈旧的 start/end 应用到新内容上。
+        """
+        query = query.strip()
+        if not query or rel_path not in self._index.files:
+            return []
+        pattern = compile_pattern(
+            query,
+            regex=regex,
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
+        return [
+            ReplaceMatch(
+                rel_path=rel_path,
+                line_no=line_no,
+                line_text=line,
+                start=m.start(),
+                end=m.end(),
+            )
+            for line_no, line in enumerate(
+                self._index.lines.get(rel_path, []), start=1
+            )
+            for m in pattern.finditer(line)
+        ]
+
     def apply_matches(
         self,
         matches: List[ReplaceMatch],

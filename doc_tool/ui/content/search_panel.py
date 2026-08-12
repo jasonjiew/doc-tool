@@ -59,9 +59,13 @@ class SearchPanel(QWidget):
         super().__init__(parent)
         self._service = service
         self._on_open = on_open
-        self._debounce_timer: Optional[QTimer] = None
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.timeout.connect(self.search_now)
         self._limit = DEFAULT_LIMIT
         self._last_result: Optional[SearchResult] = None
+        # 旧搜索运行中输入的新查询：待旧任务终态后自动启动，不静默丢弃。
+        self._pending_options: Optional[SearchOptions] = None
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -139,19 +143,14 @@ class SearchPanel(QWidget):
     # --- 行为 ---
 
     def _schedule(self) -> None:
-        if self._debounce_timer is not None:
-            self._debounce_timer.stop()
-        self._debounce_timer = QTimer(self)
-        self._debounce_timer.setSingleShot(True)
-        self._debounce_timer.timeout.connect(self.search_now)
+        self._debounce_timer.stop()
         self._debounce_timer.start(_DEBOUNCE_MS)
 
     def search_now(self) -> None:
-        if self._debounce_timer is not None:
-            self._debounce_timer.stop()
-            self._debounce_timer = None
+        self._debounce_timer.stop()
         options = self._current_options()
         if not options.query.strip():
+            self._pending_options = None
             self._render(SearchResult(query=""))
             return
         from doc_tool.application.content.search import compile_pattern
@@ -166,9 +165,17 @@ class SearchPanel(QWidget):
         except ValueError as exc:
             self._summary_label.setText("查询无效：{0}".format(exc))
             return
-        self._summary_label.setText("搜索中…")
         if self._runner.is_running:
-            self._runner.cancel()
+            # 旧搜索仍在运行：TaskRunner.start 在运行中直接返回 False，取消再启动
+            # 会静默丢弃新查询。改为记录为排队查询，待旧任务终态回调后自动启动。
+            self._pending_options = options
+            self._summary_label.setText("搜索中…")
+            return
+        self._pending_options = None
+        self._summary_label.setText("搜索中…")
+        self._start_search(options)
+
+    def _start_search(self, options: SearchOptions) -> None:
         from doc_tool.application.content.search import run_search
         from doc_tool.ui.task_bridge import TaskSpec
 
@@ -188,6 +195,12 @@ class SearchPanel(QWidget):
             self._poll_timer.stop()
 
     def _on_search_done(self, result) -> None:
+        pending = self._pending_options
+        self._pending_options = None
+        if pending is not None:
+            # 有排队的新查询：丢弃过期旧结果，直接启动新搜索。
+            self._start_search(pending)
+            return
         if result is None:
             if self._runner.is_cancelled:
                 self._summary_label.setText("搜索被取消")

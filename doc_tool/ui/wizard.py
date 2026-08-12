@@ -294,6 +294,10 @@ class _ExecutingPage(QWizardPage):
         wizard._do_import(on_done=self._on_done)
         self._started = True
 
+    def isComplete(self) -> bool:
+        """导入任务运行期间禁用 Next，避免跳到结果页时 _import_result 仍为 None。"""
+        return bool(getattr(self.wizard(), "_step4_done", False))
+
     def _on_done(self, result, target_root: str) -> None:
         wizard = self.wizard()
         if wizard._closing:
@@ -432,9 +436,20 @@ class ImportWizard(QWizard):
         )
 
     def run(self) -> Optional[str]:
-        """运行向导，返回项目路径或 None。"""
+        """运行向导，返回项目路径（导入成功）或 None（取消/失败）。
+
+        导入失败时结果页的「关闭」也会 accept() 本向导，但目标目录可能
+        未生成；此时返回 None，避免主窗口随后把失败路径当项目打开并
+        误报「打开项目失败」。
+        """
         if self.exec() == QDialog.DialogCode.Accepted:
-            return self._target_root
+            result = getattr(self, "_import_result", None)
+            if (
+                result is not None
+                and result.success
+                and getattr(self, "_target_root", "")
+            ):
+                return self._target_root
         return None
 
     # --- 页面切换 ---

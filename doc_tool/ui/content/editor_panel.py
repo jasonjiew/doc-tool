@@ -66,7 +66,9 @@ class EditorPanel(QWidget):
         self._rel_path: Optional[str] = None
         self._mtime: Optional[float] = None
         self._dirty = False
-        self._preview_timer: Optional[QTimer] = None
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._schedule_preview)
 
         self._build_toolbar()
         self._build_panes()
@@ -276,11 +278,28 @@ class EditorPanel(QWidget):
             return False
 
     def check_external_change(self) -> bool:
-        """检测文件是否被外部修改；是则提示并刷新内容。返回是否发生了刷新。"""
+        """检测文件是否被外部修改；是则提示并刷新内容。返回是否发生了刷新。
+
+        编辑器有未保存更改时不静默重载——先弹确认框，避免外部写盘后
+        标签切换把用户正在编辑的内容无声清空。
+        """
         if self._rel_path is None:
             return False
         current = self._file_mtime(self._rel_path)
         if current is not None and self._mtime is not None and current != self._mtime:
+            if self._dirty:
+                from PySide6.QtWidgets import QMessageBox
+
+                answer = QMessageBox.question(
+                    self,
+                    "外部修改检测",
+                    "文件已在外部被修改：\n{0}\n\n"
+                    "重载将丢弃未保存的更改，是否重载？".format(self._rel_path),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    self._status_label.setText("保留未保存更改，未重载外部版本")
+                    return False
             try:
                 text = self._writer_abs(self._rel_path).read_text(encoding="utf-8")
             except (OSError, UnicodeError):
@@ -420,11 +439,7 @@ class EditorPanel(QWidget):
         self._update_save_state()
         if self._find_bar.isVisible():
             self._update_highlights()
-        if self._preview_timer is not None:
-            self._preview_timer.stop()
-        self._preview_timer = QTimer(self)
-        self._preview_timer.setSingleShot(True)
-        self._preview_timer.timeout.connect(self._schedule_preview)
+        self._preview_timer.stop()
         self._preview_timer.start(_PREVIEW_DEBOUNCE_MS)
 
     def _update_dirty(self) -> None:

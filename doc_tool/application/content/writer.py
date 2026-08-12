@@ -175,6 +175,22 @@ class ChangeManifest:
             self._entries = kept
             self.save()
 
+    def entry_count(self) -> int:
+        """返回当前清单条目数（从磁盘加载，保证新鲜）。
+
+        供面板捕获「操作前」条目序号，实现按批次的定向回滚。
+        """
+        self.load()
+        return len(self._entries)
+
+    def truncate(self, keep: int) -> None:
+        """仅保留前 keep 条条目（面板「回滚本次操作」定向回滚后调用）。"""
+        keep = max(0, int(keep))
+        if len(self._entries) <= keep:
+            return
+        self._entries = self._entries[:keep]
+        self.save()
+
     def clear(self) -> None:
         """清空清单（回滚成功后调用）。"""
         self._entries = []
@@ -361,6 +377,10 @@ class ContentWriter:
         trash_target = self._trash_dir / rel_path
         try:
             trash_target.parent.mkdir(parents=True, exist_ok=True)
+            if trash_target.exists():
+                # 上次软删除未回滚时槽位已被占用：先清掉旧回收站副本，
+                # 保证"删除→重建→再删除"等重复删除能成功而非静默失败。
+                trash_target.unlink()
             source.rename(trash_target)
         except OSError as exc:
             return WriteResult(
@@ -385,20 +405,28 @@ class ContentWriter:
 
     # --- 回滚 ---
 
-    def rollback(self) -> List[str]:
+    def rollback(self, since: Optional[int] = None) -> List[str]:
         """按改动清单反向恢复；返回操作失败的 rel_path 列表。
 
-        成功后清空清单。edit 用备份恢复内容；rename 移回原名并恢复内容。
-        回滚后丢弃对应 .bak，避免备份文件残留在 contentRoot 阻断构建。
+        ``since`` 为回滚起点条目序号：None 回滚全部会话条目；传面板在操作
+        前捕获的条目序号则只回滚该序号之后新增的条目，避免把同会话更早的
+        编辑/保存一并回滚。成功后清空/截断清单，并丢弃对应 .bak，避免备份
+        残留在 contentRoot 阻断构建。
         """
         self._manifest.load()
+        entries = self._manifest.entries
+        scope = entries if since is None else entries[since:]
         failures: List[str] = []
-        for entry in reversed(self._manifest.entries):
+        for entry in reversed(scope):
             try:
                 self._rollback_entry(entry)
-            except OSError:
+            except (OSError, PathOutsideContentError):
+                # 越界条目（清单损坏/被外部改动）计入失败并继续，不回滚全部中断。
                 failures.append(entry.rel_path)
-        self._manifest.clear()
+        if since is None:
+            self._manifest.clear()
+        else:
+            self._manifest.truncate(since)
         return failures
 
     def restore_file(

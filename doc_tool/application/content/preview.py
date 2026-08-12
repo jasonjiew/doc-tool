@@ -149,15 +149,13 @@ def render_markdown_html(md_text: str) -> str:
 
         def image(match: re.Match) -> str:
             alt, path = match.groups()
-            return '<img src="{0}" alt="{1}"/>'.format(
-                html.escape(path, quote=True), html.escape(alt, quote=True)
-            )
+            # alt/path 来自已整体转义后的文本；直接嵌入属性即可，二次转义
+            # 会把含 & 的路径变成 &amp;amp;，导致预览图片/链接失效。
+            return '<img src="{0}" alt="{1}"/>'.format(path, alt)
 
         def link(match: re.Match) -> str:
             label, target = match.groups()
-            return '<a href="{0}">{1}</a>'.format(
-                html.escape(target, quote=True), label
-            )
+            return '<a href="{0}">{1}</a>'.format(target, label)
 
         escaped = _IMAGE_INLINE_RE.sub(image, escaped)
         escaped = _LINK_INLINE_RE.sub(link, escaped)

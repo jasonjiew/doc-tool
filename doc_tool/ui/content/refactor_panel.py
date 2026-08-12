@@ -52,6 +52,9 @@ class RefactorPanel(QWidget):
         self._writable = writable
         self._plan = None
         self._all_files: List[str] = []
+        # 「回滚本次联动」的起点：本次操作开始前的清单条目数，避免把同会话
+        # 更早的编辑/保存一并回滚。
+        self._rollback_marker: Optional[int] = None
 
         # 唯一外层布局：输入卡片 + 影响清单 + 操作行。原先各 _build_*
         # 各自创建 QVBoxLayout(self)，只有第一个会被安装，影响清单因此不可见。
@@ -157,6 +160,8 @@ class RefactorPanel(QWidget):
             self._set_status("目标文件不在内容索引中")
             return
         self._plan = plan
+        # 捕获回滚起点：本次联动开始前已存在的改动清单条目数。
+        self._rollback_marker = self._writer.manifest.entry_count()
         self._tree.clear()
         for i, edit in enumerate(plan.edits):
             item = QTreeWidgetItem(
@@ -201,7 +206,7 @@ class RefactorPanel(QWidget):
         self._update_action_state()
 
     def rollback(self) -> None:
-        failures = self._writer.rollback()
+        failures = self._writer.rollback(since=self._rollback_marker)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:

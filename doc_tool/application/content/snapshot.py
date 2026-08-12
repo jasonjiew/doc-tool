@@ -123,13 +123,15 @@ class ContentSnapshot:
             target = content_root / rel_path
             try:
                 st = target.stat()
+                sha1 = _sha1_of(target)
             except OSError:
+                # stat 与读取之间文件被锁/删除：统一跳过，不中断整个打基线。
                 continue
             entries[rel_path] = FileSnapshot(
                 rel_path=rel_path,
                 size=st.st_size,
                 mtime_ns=st.st_mtime_ns,
-                sha1=_sha1_of(target),
+                sha1=sha1,
             )
         self._entries = entries
         self._write_content_copies(content_root, files)

@@ -55,7 +55,9 @@ from doc_tool.ui.task_bridge import (
     TaskSpec,
 )
 from doc_tool.ui.workbench_state import (
+    STEP_STATUS_RUNNING,
     ResultState,
+    StepItem,
     WorkView,
     derive_step_list,
     derive_workbench_state,
@@ -509,6 +511,11 @@ class MainWindow(QMainWindow):
         self._remove_content_docks()
         if self._content_workspace is not None:
             try:
+                # 先停止旧工作区的索引任务与轮询，避免其迟到回调污染新项目。
+                self._content_workspace.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
                 self._content_workspace.deleteLater()
             except Exception:  # noqa: BLE001
                 pass
@@ -889,6 +896,16 @@ class MainWindow(QMainWindow):
         steps = derive_step_list(
             self._stage_events, fallback_label=self._task_label(self._current_task)
         )
+        if not steps and self.runner.is_running:
+            # 校验等不产生阶段事件的任务：以单步运行态展示，避免空步骤清单
+            # + “—”进度（与文档承诺的心跳单步一致）。
+            steps = [
+                StepItem(
+                    stage="",
+                    label=self._task_label(self._current_task),
+                    status=STEP_STATUS_RUNNING,
+                )
+            ]
         current_stage = self._progress_recent_stage
         if current_stage not in {s.stage for s in steps}:
             current_stage = ""

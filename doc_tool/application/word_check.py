@@ -192,7 +192,10 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
             try:
                 messages.append(result_queue.get(timeout=queue_wait))
                 queue_wait = 0.01
-            except queue.Empty:
+            except (queue.Empty, EOFError):
+                # 子进程被强杀/崩溃导致管道关闭时 get 抛 EOFError，与超时同等
+                # 视为"无更多消息"，不能让异常穿透 check_word_available 破坏
+                # run_pipeline 的不抛异常契约。
                 break
         for message in messages:
             if message and message[0] == "pid":

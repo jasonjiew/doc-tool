@@ -25,6 +25,7 @@ from lxml import etree
 
 from docx_common import (
     AutomationError,
+    discover_document_types,
     iter_chapter_entries,
     load_config,
     normalize_business_text,
@@ -601,7 +602,9 @@ def word_semantic_preservation_errors(
     errors = {"styles": [], "numbering": [], "headers": [], "footers": [], "sections": [], "settings": []}
     template_style_names = _style_id_names(template)
     output_paragraph_names = _paragraph_style_names(output)
-    required_style_ids = [str(value) for value in config["headingStyles"].values()] + [str(config["bodyStyle"])]
+    required_style_ids = [str(value) for value in config["headingStyles"].values()] + [
+        str(config.get("bodyStyle", "") or "")
+    ]
     required_style_names = {template_style_names.get(style_id, "") for style_id in required_style_ids}
     if "" in required_style_names or not required_style_names.issubset(output_paragraph_names):
         errors["styles"].append("Word 刷新后配置的 Heading/正文段落样式缺失")
@@ -888,7 +891,10 @@ def validate(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="严格校验重建 Word")
-    parser.add_argument("document", choices=("requirement", "design", "all"), nargs="?", default="all")
+    # 与 build_docx/run_pipeline 一致，从 config/ 动态枚举文档类型。
+    available = discover_document_types()
+    choices = tuple(available) + ("all",)
+    parser.add_argument("document", choices=choices, nargs="?", default="all")
     parser.add_argument("--output", help="仅单文档时覆盖待校验输出路径")
     parser.add_argument("--report", help="仅单文档时覆盖报告路径")
     parser.add_argument("--baseline", action="store_true", help="同时与迁移原 Word 严格比较")
@@ -896,7 +902,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
     if args.document == "all" and (args.output or args.report):
         parser.error("--output/--report 仅可用于单文档")
-    targets = ("requirement", "design") if args.document == "all" else (args.document,)
+    targets = tuple(available) if args.document == "all" else (args.document,)
     ok = True
     try:
         for target in targets:

@@ -403,6 +403,10 @@ def _check_relationship_targets(
         # TargetMode 是 OOXML 判断外部关系的事实来源；URL 前缀仅作兼容。
         if _is_external_relationship(info):
             continue
+        if info.get("targetMode", "").lower() == "internal":
+            # 文档内书签/锚点关系（如 hyperlink Target="_Toc123"）：目标是
+            # 文档内位置而非包内部件，跳过部件存在性校验。
+            continue
         # 相对 word/ 目录的目标
         if target.startswith("/"):
             full = target.lstrip("/")
