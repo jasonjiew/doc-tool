@@ -401,6 +401,103 @@ class ContentWriter:
         self._manifest.clear()
         return failures
 
+    def restore_file(
+        self,
+        rel_path: str,
+        *,
+        status: str,
+        baseline_text: Optional[str] = None,
+        trash_path: Optional[str] = None,
+    ) -> WriteResult:
+        """按状态恢复单个文件（改动面板的单文件恢复）。
+
+        - ``added``   → 删除该文件并移除 create 条目（撤销新增）。
+        - ``deleted`` → 从回收站移回并移除 delete 条目（恢复删除）。
+        - ``modified``→ 写回基线内容并移除 edit 条目、清理 .bak（恢复到基线；
+          rename 的 modified 不接受本调用，走全局回滚）。
+
+        成功后改动清单相应条目被移除；失败返回 ``written=False`` + error。
+        """
+        try:
+            target = _resolve_inside(self._content_root, rel_path)
+        except PathOutsideContentError as exc:
+            return WriteResult(
+                rel_path=rel_path, backup_path=None, written=False, error=str(exc)
+            )
+
+        if status == "added":
+            if target.exists():
+                try:
+                    target.unlink()
+                except OSError as exc:
+                    return WriteResult(
+                        rel_path=rel_path,
+                        backup_path=None,
+                        written=False,
+                        error=str(exc),
+                    )
+            self._manifest.load()
+            self._manifest.drop(OP_CREATE, rel_path)
+            return WriteResult(
+                rel_path=rel_path, backup_path=None, written=True, path=str(target)
+            )
+
+        if status == "deleted":
+            if trash_path and Path(trash_path).exists():
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    Path(trash_path).rename(target)
+                except OSError as exc:
+                    return WriteResult(
+                        rel_path=rel_path,
+                        backup_path=None,
+                        written=False,
+                        error=str(exc),
+                    )
+            elif not target.exists():
+                return WriteResult(
+                    rel_path=rel_path,
+                    backup_path=None,
+                    written=False,
+                    error="回收站文件不存在：{0}".format(rel_path),
+                )
+            self._manifest.load()
+            self._manifest.drop(OP_DELETE, rel_path)
+            return WriteResult(
+                rel_path=rel_path, backup_path=None, written=True, path=str(target)
+            )
+
+        if status == "modified":
+            if baseline_text is None:
+                return WriteResult(
+                    rel_path=rel_path,
+                    backup_path=None,
+                    written=False,
+                    error="缺少基线内容，无法恢复到基线。",
+                )
+            try:
+                atomic_write(target, baseline_text)
+            except OSError as exc:
+                return WriteResult(
+                    rel_path=rel_path,
+                    backup_path=None,
+                    written=False,
+                    error=str(exc),
+                )
+            self._manifest.load()
+            self._manifest.drop(OP_EDIT, rel_path)
+            self._discard_backup(_backup_path_for(target))
+            return WriteResult(
+                rel_path=rel_path, backup_path=None, written=True, path=str(target)
+            )
+
+        return WriteResult(
+            rel_path=rel_path,
+            backup_path=None,
+            written=False,
+            error="未知状态：{0}".format(status),
+        )
+
     @staticmethod
     def _discard_backup(backup_path: Optional[str]) -> None:
         """回滚后丢弃备份文件（尽力而为，删除失败不阻断回滚）。"""

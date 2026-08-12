@@ -1943,5 +1943,213 @@ class TreeRenameTests(unittest.TestCase):
         self.assertEqual(ws._writer.manifest.entries[0].rel_path, old)
 
 
+class SnapshotContentTests(unittest.TestCase):
+    """基线内容副本：改动面板的「基线 vs 当前」diff 需要原文。"""
+
+    def setUp(self) -> None:
+        self.files = {
+            "requirement/第1章 引言/1.1 目的.md": "# 1.1 目的\n原始正文\n",
+            "requirement/第1章 引言/1.2 范围.md": "# 1.2 范围\n",
+        }
+        self.content_root = make_project(self.files)
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _snapshot(self):
+        from doc_tool.application.content.snapshot import ContentSnapshot
+
+        return ContentSnapshot(self.project_root / ".state")
+
+    def _rel_files(self):
+        from doc_tool.application.content.index import ContentIndexService
+
+        return [
+            rel for rel, _ in ContentIndexService(self.content_root).discover_files()
+        ]
+
+    def _baseline_dir(self):
+        from doc_tool.application.content.snapshot import (
+            BASELINE_CONTENT_DIR_NAME,
+        )
+
+        return self.project_root / ".state" / BASELINE_CONTENT_DIR_NAME
+
+    def test_take_copies_content_to_baseline_dir(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        copy = self._baseline_dir() / "requirement/第1章 引言/1.1 目的.md"
+        self.assertEqual(copy.read_text(encoding="utf-8"), "# 1.1 目的\n原始正文\n")
+
+    def test_content_of_reads_baseline_copy(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        self.assertEqual(
+            snap.content_of("requirement/第1章 引言/1.1 目的.md"),
+            "# 1.1 目的\n原始正文\n",
+        )
+
+    def test_content_of_missing_returns_none(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        self.assertIsNone(snap.content_of("requirement/第1章 引言/不存在.md"))
+
+    def test_ensure_baseline_content_backfills_missing_copies(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        copy = self._baseline_dir() / "requirement/第1章 引言/1.1 目的.md"
+        copy.unlink()
+        self.assertIsNone(snap.content_of("requirement/第1章 引言/1.1 目的.md"))
+        snap.ensure_baseline_content(self.content_root, self._rel_files())
+        self.assertEqual(
+            snap.content_of("requirement/第1章 引言/1.1 目的.md"),
+            "# 1.1 目的\n原始正文\n",
+        )
+
+    def test_rebaseline_refreshes_content_copies(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        target = self.content_root / "requirement/第1章 引言/1.1 目的.md"
+        target.write_text("# 1.1 目的\n第二版\n", encoding="utf-8")
+        snap.take(self.content_root, self._rel_files())  # 重新打基线
+        self.assertEqual(
+            snap.content_of("requirement/第1章 引言/1.1 目的.md"),
+            "# 1.1 目的\n第二版\n",
+        )
+
+
+class ChangeItemsTests(unittest.TestCase):
+    """改动汇总纯函数：build_change_items 与 render_unified_diff。"""
+
+    def test_build_change_items_maps_statuses_and_order(self):
+        from doc_tool.application.content.changes import build_change_items
+
+        status = {
+            "c.md": "modified",
+            "a.md": "added",
+            "d.md": "deleted",
+            "b.md": "modified",
+        }
+        items = build_change_items(
+            status, rename_map={}, trash_map={"d.md": "T/d.md"}
+        )
+        by_rel = {it.rel_path: it for it in items}
+        self.assertEqual(by_rel["a.md"].status, "added")
+        self.assertEqual(by_rel["b.md"].status, "modified")
+        self.assertEqual(by_rel["c.md"].status, "modified")
+        self.assertEqual(by_rel["d.md"].status, "deleted")
+        self.assertEqual(by_rel["d.md"].trash_path, "T/d.md")
+        # 分组排序：added 在前，modified 次之，deleted 最后
+        self.assertEqual(
+            [it.status for it in items],
+            ["added", "modified", "modified", "deleted"],
+        )
+
+    def test_build_change_items_rename_uses_old_path_as_baseline(self):
+        from doc_tool.application.content.changes import build_change_items
+
+        status = {"B.md": "modified"}
+        items = build_change_items(status, rename_map={"B.md": "A.md"}, trash_map={})
+        self.assertEqual(items[0].rel_path, "B.md")
+        self.assertEqual(items[0].baseline_rel_path, "A.md")
+        self.assertTrue(items[0].is_rename)
+
+    def test_build_change_items_non_rename_baseline_is_self(self):
+        from doc_tool.application.content.changes import build_change_items
+
+        status = {"A.md": "modified"}
+        items = build_change_items(status, rename_map={}, trash_map={})
+        self.assertEqual(items[0].baseline_rel_path, "A.md")
+        self.assertFalse(items[0].is_rename)
+
+    def test_render_unified_diff_returns_text_and_empty_for_same(self):
+        from doc_tool.application.content.changes import render_unified_diff
+
+        diff = render_unified_diff("第一行\n第二行\n", "第一行\n第二行改\n")
+        self.assertIn("-第二行", diff)
+        self.assertIn("+第二行改", diff)
+        self.assertEqual(render_unified_diff("相同\n", "相同\n"), "")
+
+
+class RestoreFileTests(unittest.TestCase):
+    """单文件恢复：撤销新增 / 恢复删除 / 恢复到基线。"""
+
+    def setUp(self) -> None:
+        self.content_root = make_project(
+            {"requirement/第1章 引言/1.1 目的.md": "# 1.1 目的\n原始正文\n"}
+        )
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _writer(self):
+        from doc_tool.application.content.writer import ContentWriter
+
+        return ContentWriter(
+            content_root=self.content_root,
+            state_dir=self.project_root / ".state",
+        )
+
+    def test_restore_removes_created_file_and_drops_entry(self):
+        writer = self._writer()
+        writer.create_file("requirement/第1章 引言/1.1 新增.md", "# 1.1 新增\n")
+        result = writer.restore_file(
+            "requirement/第1章 引言/1.1 新增.md", status="added"
+        )
+        self.assertTrue(result.written)
+        self.assertFalse(
+            (self.content_root / "requirement/第1章 引言/1.1 新增.md").exists()
+        )
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+    def test_restore_moves_deleted_back_and_drops_entry(self):
+        writer = self._writer()
+        writer.delete_file("requirement/第1章 引言/1.1 目的.md")
+        writer.manifest.load()
+        trash_path = writer.manifest.entries[-1].trash_path
+        result = writer.restore_file(
+            "requirement/第1章 引言/1.1 目的.md",
+            status="deleted",
+            trash_path=trash_path,
+        )
+        self.assertTrue(result.written)
+        self.assertEqual(
+            (
+                self.content_root / "requirement/第1章 引言/1.1 目的.md"
+            ).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+    def test_restore_modified_writes_baseline_and_cleans_backup(self):
+        writer = self._writer()
+        writer.write_text("requirement/第1章 引言/1.1 目的.md", "# 1.1 目的\n被改\n")
+        bak = self.content_root / "requirement/第1章 引言/1.1 目的.md.bak"
+        self.assertTrue(bak.exists())
+        result = writer.restore_file(
+            "requirement/第1章 引言/1.1 目的.md",
+            status="modified",
+            baseline_text="# 1.1 目的\n原始正文\n",
+        )
+        self.assertTrue(result.written)
+        self.assertEqual(
+            (
+                self.content_root / "requirement/第1章 引言/1.1 目的.md"
+            ).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        self.assertFalse(bak.exists())
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+    def test_restore_unknown_status_rejected(self):
+        writer = self._writer()
+        result = writer.restore_file(
+            "requirement/第1章 引言/1.1 目的.md", status="bogus"
+        )
+        self.assertFalse(result.written)
+        self.assertIsNotNone(result.error)
+
+
 if __name__ == "__main__":
     unittest.main()

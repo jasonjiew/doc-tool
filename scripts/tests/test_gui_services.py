@@ -1274,5 +1274,87 @@ class EditorRollbackCleanupTests(unittest.TestCase):
 #     拒绝则继续运行
 # 25. 调整窗口尺寸/位置或最大化后退出 → 下次启动恢复相同几何与状态
 
+
+class ChangesPanelTests(unittest.TestCase):
+    """改动面板：列出改动、选中显示 diff、恢复按钮接线（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self) -> None:
+        self.project_root = Path(tempfile.mkdtemp(prefix="doc-tool-changes-"))
+        self.content_root = self.project_root / "content"
+        self.rel = "requirement/第1章 引言/1.1 目的.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原始正文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, self.project_root, ignore_errors=True)
+
+        from doc_tool.application.content.snapshot import ContentSnapshot
+        from doc_tool.application.content.writer import ContentWriter
+
+        self.snapshot = ContentSnapshot(self.project_root / ".state")
+        self.snapshot.take(self.content_root, [self.rel])
+        self.writer = ContentWriter(
+            self.content_root, self.project_root / ".state"
+        )
+
+    def _items_for_modified(self):
+        """记录一次修改（写入 edit 条目 + .bak），返回改动项列表。"""
+        from doc_tool.application.content.changes import build_change_items
+
+        self.writer.write_text(self.rel, "# 1.1 目的\n被修改后的正文内容\n")
+        status = self.snapshot.diff(self.content_root, [self.rel])
+        self.assertEqual(status.get(self.rel), "modified")
+        return build_change_items(status, rename_map={}, trash_map={})
+
+    def _panel(self, **kw):
+        from doc_tool.ui.content.changes_panel import ChangesPanel
+
+        return ChangesPanel(
+            snapshot=self.snapshot,
+            writer=self.writer,
+            content_root=self.content_root,
+            on_restored=kw.get("on_restored", lambda: None),
+            writable=True,
+        )
+
+    def test_lists_items_and_counts(self):
+        panel = self._panel()
+        panel.set_items(self._items_for_modified())
+        self.assertEqual(panel._list.count(), 1)
+        self.assertIn("已修改 1", panel._counts_label.text())
+        self.assertIn(self.rel, panel._list.item(0).text())
+        panel.close()
+
+    def test_selection_shows_diff(self):
+        panel = self._panel()
+        panel.set_items(self._items_for_modified())
+        panel._list.setCurrentRow(0)
+        text = panel._diff_view.toPlainText()
+        self.assertIn("-原始正文", text)
+        self.assertIn("+被修改后的正文内容", text)
+        panel.close()
+
+    def test_restore_modified_reverts_file_and_refreshes(self):
+        restored = []
+        panel = self._panel(on_restored=lambda: restored.append(True))
+        panel.set_items(self._items_for_modified())
+        panel._list.setCurrentRow(0)
+        self.assertTrue(panel._restore_btn.isEnabled())
+        self.assertEqual(panel._restore_btn.text(), "恢复到基线")
+        panel._restore_btn.click()
+        # 文件恢复到基线内容，改动清单清空，回调触发刷新
+        self.assertEqual(
+            (self.content_root / self.rel).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        self.writer.manifest.load()
+        self.assertTrue(self.writer.manifest.empty)
+        self.assertEqual(restored, [True])
+        panel.close()
+
+
 if __name__ == "__main__":
     unittest.main()

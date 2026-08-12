@@ -593,8 +593,8 @@ class MainWindow(QMainWindow):
         if panels is None:
             return
         self._show_panels_dock()
-        # index 1..5：1=搜索,2=替换,3=重命名,4=检查
-        names = ["搜索", "替换", "重命名/重编号", "检查"]
+        # index 1..5：1=搜索,2=替换,3=重命名,4=检查,5=改动
+        names = ["搜索", "替换", "重命名/重编号", "检查", "改动"]
         if 1 <= index <= len(names):
             target = names[index - 1]
             for i in range(panels.count()):

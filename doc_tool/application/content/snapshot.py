@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Sequence
+from typing import Dict, Optional, Sequence
 
 from doc_tool.application.content.writer import (
     OP_RENAME,
@@ -31,6 +32,10 @@ from doc_tool.application.content.writer import (
 
 # 基线文件名（相对项目 .state/ 目录）。
 BASELINE_FILE_NAME = "content_baseline.json"
+
+# 基线内容副本目录名（相对项目 .state/ 目录）。改动面板的「基线 vs 当前」
+# diff 需要原文，打基线时把每个 .md 复制到该目录。
+BASELINE_CONTENT_DIR_NAME = "baseline"
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,7 @@ class ContentSnapshot:
 
     def __init__(self, state_dir: Path) -> None:
         self._file: Path = Path(state_dir) / BASELINE_FILE_NAME
+        self._content_dir: Path = Path(state_dir) / BASELINE_CONTENT_DIR_NAME
         self._entries: Dict[str, FileSnapshot] = {}
 
     @property
@@ -106,7 +112,11 @@ class ContentSnapshot:
         atomic_write(self._file, json.dumps(data, ensure_ascii=False, indent=2))
 
     def take(self, content_root: Path, files: Sequence[str]) -> None:
-        """把当前文件快照记为基线（跳过缺失文件，避免与磁盘瞬时状态竞争）。"""
+        """把当前文件快照记为基线（跳过缺失文件，避免与磁盘瞬时状态竞争）。
+
+        同时把每个文件内容复制到 baseline 目录，供改动面板做「基线 vs 当前」
+        diff；单文件复制失败跳过，不阻断打基线。
+        """
         content_root = Path(content_root).resolve()
         entries: Dict[str, FileSnapshot] = {}
         for rel_path in files:
@@ -122,6 +132,50 @@ class ContentSnapshot:
                 sha1=_sha1_of(target),
             )
         self._entries = entries
+        self._write_content_copies(content_root, files)
+
+    # --- 基线内容副本 ---
+
+    def _content_copy_path(self, rel_path: str) -> Path:
+        return self._content_dir / rel_path
+
+    def _write_content_copies(self, content_root: Path, files: Sequence[str]) -> None:
+        """把当前文件内容复制到 baseline 目录（尽力而为，失败跳过）。"""
+        content_root = Path(content_root).resolve()
+        for rel_path in files:
+            src = content_root / rel_path
+            dst = self._content_copy_path(rel_path)
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(src), str(dst))
+            except OSError:
+                continue
+
+    def content_of(self, rel_path: str) -> Optional[str]:
+        """读基线内容副本；缺失（升级前项目或复制失败）返回 None。"""
+        try:
+            return self._content_copy_path(rel_path).read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+    def ensure_baseline_content(self, content_root: Path, files: Sequence[str]) -> None:
+        """升级兜底：元数据已有但内容副本缺失的文件补拷当前内容。
+
+        旧项目升级到「基线内容副本」特性后首次打开时调用；副本已存在则跳过。
+        """
+        content_root = Path(content_root).resolve()
+        for rel_path in files:
+            if rel_path not in self._entries:
+                continue
+            if self._content_copy_path(rel_path).exists():
+                continue
+            src = content_root / rel_path
+            dst = self._content_copy_path(rel_path)
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(src), str(dst))
+            except OSError:
+                continue
 
     def diff(self, content_root: Path, files: Sequence[str]) -> Dict[str, str]:
         """对比当前文件与基线 → {rel_path: added | modified | deleted}。

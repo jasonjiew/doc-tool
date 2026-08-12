@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -21,14 +21,20 @@ from doc_tool.application.content.refactor import RefactorService
 from doc_tool.application.content.references import ReferenceScanner
 from doc_tool.application.content.replace import ReplaceService
 from doc_tool.application.content.search import SearchService
+from doc_tool.application.content.changes import ChangeItem, build_change_items
 from doc_tool.application.content.snapshot import (
     ContentSnapshot,
     overlay_rename_status,
 )
 from doc_tool.application.content.tree import build_tree
-from doc_tool.application.content.writer import ContentWriter
+from doc_tool.application.content.writer import (
+    OP_DELETE,
+    OP_RENAME,
+    ContentWriter,
+)
 from doc_tool.domain.content_index import ContentIndex
 
+from doc_tool.ui.content.changes_panel import ChangesPanel
 from doc_tool.ui.content.lint_panel import LintPanel
 from doc_tool.ui.content.refactor_panel import RefactorPanel
 from doc_tool.ui.content.replace_panel import ReplacePanel
@@ -97,6 +103,12 @@ class ContentWorkspace(QWidget):
                 [rel for rel, _ in self._index_service.discover_files()],
             )
             self._snapshot.save()
+        else:
+            # 旧项目升级：元数据已有但基线内容副本缺失时补拷（供改动面板 diff）。
+            self._snapshot.ensure_baseline_content(
+                self._content_root,
+                [rel for rel, _ in self._index_service.discover_files()],
+            )
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -135,7 +147,7 @@ class ContentWorkspace(QWidget):
         panels_layout.addWidget(self._panels)
         # 索引就绪前的占位
         self._placeholder_tabs: Dict[str, QWidget] = {}
-        for name in ("搜索", "替换", "重命名/重编号", "检查"):
+        for name in ("搜索", "替换", "重命名/重编号", "检查", "改动"):
             placeholder = QWidget(self.panels_host)
             self._panels.addTab(placeholder, name)
             self._placeholder_tabs[name] = placeholder
@@ -222,6 +234,18 @@ class ContentWorkspace(QWidget):
         self._panels.addTab(lint, "检查")
         self._remove_placeholder("检查")
 
+        changes = ChangesPanel(
+            snapshot=self._snapshot,
+            writer=self._writer,
+            content_root=self._content_root,
+            on_restored=self._after_restore,
+            writable=self._writable,
+        )
+        self._panels.addTab(changes, "改动")
+        self._remove_placeholder("改动")
+        self._changes_panel = changes
+        self._refresh_changes_panel()
+
         self._search_panel = search
         self._replace_panel = replace
         self._refactor_panel = refactor
@@ -305,10 +329,47 @@ class ContentWorkspace(QWidget):
         return overlay_rename_status(status, self._writer.manifest.entries)
 
     def _apply_status_map(self) -> None:
-        """从内容快照对比当前真实变动并应用到章节树徽标。"""
+        """从内容快照对比当前真实变动并应用到章节树徽标与改动面板。"""
         if self._index is None:
             return
-        self._tree.set_status_map(self._status_map())
+        status = self._status_map()
+        self._tree.set_status_map(status)
+        self._refresh_changes_panel(status)
+
+    # --- 改动面板 ---
+
+    def _change_items(self, status: Dict[str, str]) -> List[ChangeItem]:
+        """快照状态 + 改动清单 rename/delete 映射 → 改动项列表。"""
+        entries = self._writer.manifest.entries
+        rename_map = {
+            e.rel_path: e.original_path
+            for e in entries
+            if e.operation == OP_RENAME and e.original_path
+        }
+        trash_map = {
+            e.rel_path: e.trash_path
+            for e in entries
+            if e.operation == OP_DELETE and e.trash_path
+        }
+        return build_change_items(status, rename_map=rename_map, trash_map=trash_map)
+
+    def _refresh_changes_panel(self, status: Optional[Dict[str, str]] = None) -> None:
+        """刷新改动面板（status 缺省时重新推导）。"""
+        panel = getattr(self, "_changes_panel", None)
+        if panel is None or self._index is None:
+            return
+        if status is None:
+            status = self._status_map()
+        panel.set_items(self._change_items(status))
+
+    def _after_restore(self) -> None:
+        """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
+        if self._index is None:
+            return
+        self._index_service.refresh(self._index)
+        items = build_tree(self._index.all_files())
+        self._tree.set_items(items)
+        self._apply_status_map()
 
     def _rebuild_index(self) -> None:
         """手动刷新：非破坏性重扫索引 + 重扫引用 + 重绘树。"""
@@ -497,6 +558,7 @@ class ContentWorkspace(QWidget):
             getattr(self, "_replace_panel", None),
             getattr(self, "_refactor_panel", None),
             getattr(self, "_lint_panel", None),
+            getattr(self, "_changes_panel", None),
         ):
             if panel is not None:
                 panel.set_writable(writable)
