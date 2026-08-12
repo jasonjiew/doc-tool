@@ -19,7 +19,7 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 # 备份文件扩展名（追加在原名后，如 3.1.4 居民信息.md.bak）。
 BACKUP_SUFFIX = ".bak"
@@ -433,23 +433,3 @@ class ContentWriter:
             if entry.trash_path and Path(entry.trash_path).exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 Path(entry.trash_path).rename(target)
-
-
-def manifest_status_map(entries: List[ChangeEntry]) -> Dict[str, str]:
-    """按改动清单推导每文件的会话状态：added | modified | deleted。
-
-    优先级 deleted > added > modified：先编辑后删除仍标 deleted；先创建后
-    编辑仍标 added。rename 条目只对"新路径"标 modified，旧路径不标（文件
-    已不存在）。纯函数、无 IO，供章节树徽标与改动汇总复用。
-    """
-    status: Dict[str, str] = {}
-    for entry in entries:
-        if entry.operation == OP_DELETE:
-            status[entry.rel_path] = "deleted"
-    for entry in entries:
-        if entry.operation == OP_CREATE:
-            status.setdefault(entry.rel_path, "added")
-    for entry in entries:
-        if entry.operation in (OP_EDIT, OP_RENAME):
-            status.setdefault(entry.rel_path, "modified")
-    return status

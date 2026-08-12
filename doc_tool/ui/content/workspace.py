@@ -21,6 +21,10 @@ from doc_tool.application.content.refactor import RefactorService
 from doc_tool.application.content.references import ReferenceScanner
 from doc_tool.application.content.replace import ReplaceService
 from doc_tool.application.content.search import SearchService
+from doc_tool.application.content.snapshot import (
+    ContentSnapshot,
+    overlay_rename_status,
+)
 from doc_tool.application.content.tree import build_tree
 from doc_tool.application.content.writer import ContentWriter
 from doc_tool.domain.content_index import ContentIndex
@@ -83,6 +87,16 @@ class ContentWorkspace(QWidget):
         self._index_service = ContentIndexService(self._content_root)
         self._writer = ContentWriter(self._content_root, self._state_dir)
         self._term_store = TermStore(self._state_dir)
+
+        # 内容快照基线：首次打开打基线（此后徽标=相对基线的所有真实变动，含外部编辑）。
+        self._snapshot = ContentSnapshot(self._state_dir)
+        self._snapshot.load()
+        if not self._snapshot.entries:
+            self._snapshot.take(
+                self._content_root,
+                [rel for rel, _ in self._index_service.discover_files()],
+            )
+            self._snapshot.save()
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -284,14 +298,17 @@ class ContentWorkspace(QWidget):
 
     # --- 写后联动 ---
 
-    def _apply_status_map(self) -> None:
-        """从改动清单重推会话状态并应用到章节树徽标。"""
-        from doc_tool.application.content.writer import manifest_status_map
-
+    def _status_map(self) -> Dict[str, str]:
+        """快照 diff + 改动清单 rename 叠加 → 徽标状态（需索引已就绪）。"""
         self._writer.manifest.load()
-        self._tree.set_status_map(
-            manifest_status_map(self._writer.manifest.entries)
-        )
+        status = self._snapshot.diff(self._content_root, self._index.all_files())
+        return overlay_rename_status(status, self._writer.manifest.entries)
+
+    def _apply_status_map(self) -> None:
+        """从内容快照对比当前真实变动并应用到章节树徽标。"""
+        if self._index is None:
+            return
+        self._tree.set_status_map(self._status_map())
 
     def _rebuild_index(self) -> None:
         """手动刷新：非破坏性重扫索引 + 重扫引用 + 重绘树。"""
@@ -315,17 +332,12 @@ class ContentWorkspace(QWidget):
                 self._on_status("刷新索引失败：{0}".format(exc))
 
     def _on_file_saved(self, rel_path: str) -> None:
-        """编辑器保存后失效并重建该文件索引。"""
+        """编辑器保存后失效并重建该文件索引，增量刷新徽标（不重建树模型）。"""
         if self._index is None:
             return
         self._index.invalidate(rel_path)
         self._index_service.rebuild_file(self._index, rel_path)
-        from doc_tool.application.content.writer import manifest_status_map
-
-        self._writer.manifest.load()
-        self._tree.set_status(
-            manifest_status_map(self._writer.manifest.entries)
-        )
+        self._tree.set_status(self._status_map())
 
     def _on_current_file_changed(self, rel_path: Optional[str]) -> None:
         if rel_path is not None and self._on_open_file is not None:
@@ -442,21 +454,25 @@ class ContentWorkspace(QWidget):
         self._after_write()
 
     def _on_clear_markers(self) -> None:
-        """清除全部会话改动标记（同时失去本次回滚能力）。"""
+        """重新打基线：清空全部改动徽标（改动内容与回滚能力均保留）。"""
         from PySide6.QtWidgets import QMessageBox
 
-        self._writer.manifest.load()
-        if self._writer.manifest.empty:
+        self._snapshot.load()
+        if not self._snapshot.entries:
             return
         answer = QMessageBox.question(
             self,
             "清除标记",
-            "清除全部会话改动标记？\n（同时失去本次回滚能力，改动内容保留）",
+            "将当前内容重新设为基线，全部改动徽标清空？\n（改动内容与回滚能力均保留）",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self._writer.manifest.clear()
+        self._snapshot.take(
+            self._content_root,
+            [rel for rel, _ in self._index_service.discover_files()],
+        )
+        self._snapshot.save()
         self._apply_status_map()
 
     def _after_write(self) -> None:

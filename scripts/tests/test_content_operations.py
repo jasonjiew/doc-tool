@@ -550,6 +550,67 @@ class WriteSafetyTests(unittest.TestCase):
             "# 1.1 目的\n原始正文\n",
         )
 
+    def test_rollback_edit_deletes_backup(self):
+        """回滚编辑后 .bak 备份应被清理，contentRoot 恢复无备份的干净状态。
+
+        回归：构建前检查 `scan_entries` 只允许带编号文件夹/.md，遗留 .bak
+        会导致构建失败。
+        """
+        writer = self._writer()
+        writer.write_text(
+            "requirement/第1章 引言/1.1 目的.md", "# 1.1 目的\n被改\n"
+        )
+        bak = self.content_root / "requirement/第1章 引言/1.1 目的.md.bak"
+        self.assertTrue(bak.exists())
+
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertFalse(bak.exists())
+        self.assertEqual(
+            list(self.content_root.rglob("*.bak")), []
+        )
+
+    def test_rollback_rename_deletes_backup(self):
+        """回滚重命名后 .bak 备份应被清理。"""
+        writer = self._writer()
+        writer.rename(
+            "requirement/第1章 引言/1.1 目的.md",
+            "requirement/第1章 引言/1.1 目标.md",
+        )
+        source_bak = self.content_root / "requirement/第1章 引言/1.1 目的.md.bak"
+        self.assertTrue(source_bak.exists())
+
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertFalse(source_bak.exists())
+        self.assertEqual(
+            list(self.content_root.rglob("*.bak")), []
+        )
+
+    def test_rollback_edit_after_rename_cleans_both_backups(self):
+        """改名后再编辑：回滚后原路径与新路径两个 .bak 都应被清理。"""
+        writer = self._writer()
+        writer.rename(
+            "requirement/第1章 引言/1.1 目的.md",
+            "requirement/第1章 引言/1.1 目标.md",
+        )
+        writer.write_text(
+            "requirement/第1章 引言/1.1 目标.md", "# 1.1 目标\n内容\n"
+        )
+        baks_before = list(self.content_root.rglob("*.bak"))
+        self.assertEqual(len(baks_before), 2)
+
+        failures = writer.rollback()
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            list(self.content_root.rglob("*.bak")), []
+        )
+        # 恢复为原文件原内容
+        self.assertEqual(
+            self._read("requirement/第1章 引言/1.1 目的.md"),
+            "# 1.1 目的\n原始正文\n",
+        )
+
 
 class ChapterTreeModelTests(unittest.TestCase):
     """任务 4.x：章节树模型推导（纯函数，不依赖 Tk）。"""
@@ -1279,39 +1340,157 @@ class ChangeManifestSerializationTests(unittest.TestCase):
         )
 
 
-class ManifestStatusMapTests(unittest.TestCase):
-    """徽标状态推导：优先级与 rename/create+edit 映射。"""
+class ContentSnapshotTests(unittest.TestCase):
+    """内容快照基线：外部改动/新增/删除/回改原内容 → 徽标状态。"""
 
-    def test_status_precedence_and_mapping(self):
+    def setUp(self) -> None:
+        self.files = {
+            "requirement/第1章 引言/1.1 目的.md": "# 1.1 目的\n原始正文\n",
+            "requirement/第1章 引言/1.2 范围.md": "# 1.2 范围\n",
+        }
+        self.content_root = make_project(self.files)
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _snapshot(self):
+        from doc_tool.application.content.snapshot import ContentSnapshot
+
+        return ContentSnapshot(self.project_root / ".state")
+
+    def _rel_files(self):
+        from doc_tool.application.content.index import ContentIndexService
+
+        return [
+            rel for rel, _ in ContentIndexService(self.content_root).discover_files()
+        ]
+
+    def test_take_then_diff_empty(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        self.assertEqual(snap.diff(self.content_root, self._rel_files()), {})
+
+    def test_save_load_roundtrip(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        snap.save()
+        loaded = self._snapshot()
+        loaded.load()
+        self.assertEqual(sorted(snap.entries), sorted(loaded.entries))
+
+    def test_external_edit_marks_modified(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        target = self.content_root / "requirement/第1章 引言/1.1 目的.md"
+        target.write_text("# 1.1 目的\n外部改过的正文\n", encoding="utf-8")
+        status = snap.diff(self.content_root, self._rel_files())
+        self.assertEqual(status.get("requirement/第1章 引言/1.1 目的.md"), "modified")
+
+    def test_new_file_marks_added(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        path = self.content_root / "requirement/第1章 引言/1.3 外部新增.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.3 外部新增\n", encoding="utf-8")
+        status = snap.diff(self.content_root, self._rel_files())
+        self.assertEqual(status.get("requirement/第1章 引言/1.3 外部新增.md"), "added")
+
+    def test_deleted_file_marks_deleted(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        (self.content_root / "requirement/第1章 引言/1.2 范围.md").unlink()
+        status = snap.diff(self.content_root, self._rel_files())
+        self.assertEqual(status.get("requirement/第1章 引言/1.2 范围.md"), "deleted")
+
+    def test_bak_excluded_from_baseline_and_diff(self):
+        bak = self.content_root / "requirement/第1章 引言/1.1 目的.md.bak"
+        bak.parent.mkdir(parents=True, exist_ok=True)
+        bak.write_text("备份内容\n", encoding="utf-8")
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        self.assertNotIn("requirement/第1章 引言/1.1 目的.md.bak", snap.entries)
+        status = snap.diff(self.content_root, self._rel_files())
+        self.assertNotIn("requirement/第1章 引言/1.1 目的.md.bak", status)
+
+    def test_revert_to_baseline_content_not_flagged(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        target = self.content_root / "requirement/第1章 引言/1.1 目的.md"
+        # 改写 → 会标 modified；再改回原始内容 → 不标（mtime 变但 sha1 同）
+        target.write_text("# 1.1 目的\n中间内容\n", encoding="utf-8")
+        target.write_text("# 1.1 目的\n原始正文\n", encoding="utf-8")
+        status = snap.diff(self.content_root, self._rel_files())
+        self.assertNotIn("requirement/第1章 引言/1.1 目的.md", status)
+
+    def test_rebaseline_clears_all_markers(self):
+        snap = self._snapshot()
+        snap.take(self.content_root, self._rel_files())
+        target = self.content_root / "requirement/第1章 引言/1.1 目的.md"
+        target.write_text("# 1.1 目的\n新正文\n", encoding="utf-8")
+        self.assertIn(
+            "requirement/第1章 引言/1.1 目的.md",
+            snap.diff(self.content_root, self._rel_files()),
+        )
+        snap.take(self.content_root, self._rel_files())  # 重新打基线
+        self.assertEqual(snap.diff(self.content_root, self._rel_files()), {})
+
+    def test_load_corrupt_baseline_recovers_empty(self):
+        from doc_tool.application.content.snapshot import BASELINE_FILE_NAME
+
+        state_dir = self.project_root / ".state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / BASELINE_FILE_NAME).write_text("{ 损坏", encoding="utf-8")
+        snap = self._snapshot()
+        snap.load()
+        self.assertEqual(snap.entries, {})
+
+
+class OverlayRenameStatusTests(unittest.TestCase):
+    """快照 diff 叠加清单 rename：新路径 modified、旧路径不标。"""
+
+    def _rename(self, rel_path, original_path):
         from doc_tool.application.content.writer import (
             ChangeEntry,
-            OP_CREATE,
-            OP_DELETE,
-            OP_EDIT,
             OP_RENAME,
-            manifest_status_map,
         )
 
-        entries = [
-            ChangeEntry(operation=OP_EDIT, rel_path="a.md", backup_path="x"),
-            ChangeEntry(operation=OP_CREATE, rel_path="b.md"),
-            ChangeEntry(operation=OP_DELETE, rel_path="c.md", trash_path="t/c.md"),
-            ChangeEntry(operation=OP_RENAME, rel_path="d.md", original_path="e.md"),
-            # 先 create 后 edit 同一文件 → 仍为 added
-            ChangeEntry(operation=OP_CREATE, rel_path="f.md"),
-            ChangeEntry(operation=OP_EDIT, rel_path="f.md", backup_path="y"),
-            # 先 edit 后 delete 同一文件 → 覆盖为 deleted
-            ChangeEntry(operation=OP_EDIT, rel_path="g.md", backup_path="z"),
-            ChangeEntry(operation=OP_DELETE, rel_path="g.md", trash_path="t/g.md"),
-        ]
-        status = manifest_status_map(entries)
-        self.assertEqual(status["a.md"], "modified")
-        self.assertEqual(status["b.md"], "added")
-        self.assertEqual(status["c.md"], "deleted")
-        self.assertEqual(status["d.md"], "modified")
-        self.assertNotIn("e.md", status)  # rename 旧路径不标（文件已不存在）
-        self.assertEqual(status["f.md"], "added")
-        self.assertEqual(status["g.md"], "deleted")
+        return ChangeEntry(
+            operation=OP_RENAME, rel_path=rel_path, original_path=original_path
+        )
+
+    def test_rename_target_becomes_modified_and_old_path_cleared(self):
+        from doc_tool.application.content.snapshot import overlay_rename_status
+
+        status = {"A.md": "deleted", "B.md": "added", "C.md": "modified"}
+        result = overlay_rename_status(
+            status, [self._rename("B.md", "A.md")]
+        )
+        self.assertEqual(result["B.md"], "modified")
+        self.assertNotIn("A.md", result)
+        self.assertEqual(result["C.md"], "modified")
+
+    def test_rename_target_absent_leaves_status_untouched(self):
+        # 已重打基线后 rename 条目仍残留：B 不在 diff 中 → 不追加、不误清其他
+        from doc_tool.application.content.snapshot import overlay_rename_status
+
+        status = {"C.md": "modified"}
+        result = overlay_rename_status(
+            status, [self._rename("B.md", "A.md")]
+        )
+        self.assertEqual(result, {"C.md": "modified"})
+
+    def test_non_rename_entries_ignored(self):
+        from doc_tool.application.content.snapshot import overlay_rename_status
+        from doc_tool.application.content.writer import (
+            ChangeEntry,
+            OP_EDIT,
+        )
+
+        status = {"A.md": "modified"}
+        result = overlay_rename_status(
+            status,
+            [ChangeEntry(operation=OP_EDIT, rel_path="A.md", backup_path="x")],
+        )
+        self.assertEqual(result, {"A.md": "modified"})
 
 
 class CreateDeleteTests(unittest.TestCase):
@@ -1643,7 +1822,7 @@ class TreeRenameTests(unittest.TestCase):
         return (self.content_root / rel).read_text(encoding="utf-8")
 
     def test_on_rename_file_renames_updates_refs_and_rebuilds_tree(self):
-        """重命名：磁盘新名、引用文本联动、树重建含新路径、徽标 modified。"""
+        """重命名：磁盘新名、引用文本联动、树重建含新路径、徽标 modified(新路径)。"""
         from unittest import mock
 
         from PySide6.QtWidgets import QInputDialog, QMessageBox
@@ -1675,10 +1854,13 @@ class TreeRenameTests(unittest.TestCase):
         item_ids = [i.node_id for i in ws._tree._model.all_items()]
         self.assertIn(new, item_ids)
         self.assertNotIn(old, item_ids)
-        # rename 条目映射到新路径 → modified 徽标
-        ws._writer.manifest.load()
+        # 快照 diff + 清单 rename 叠加：新路径 → modified、旧路径不标、被联动改引用的文件 → modified
         status = ws._tree._model._status
         self.assertEqual(status.get(new), "modified")
+        self.assertNotIn(old, status)
+        self.assertEqual(
+            status.get("requirement/第3章/3.7 KSOA/3.7.9 相关章节.md"), "modified"
+        )
 
     def test_on_rename_file_same_name_is_noop(self):
         """输入名与当前名相同 → 不执行任何写操作。"""
@@ -1702,6 +1884,63 @@ class TreeRenameTests(unittest.TestCase):
         # 未产生改动清单条目
         ws._writer.manifest.load()
         self.assertTrue(ws._writer.manifest.empty)
+
+    def test_external_edit_surfaces_modified_after_rebuild(self):
+        """外部编辑内容 → 手动刷新后树徽标显示 modified（快照 diff 语义）。"""
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        # 构造时自动打基线 → 改动前无徽标
+        self.assertEqual(ws._tree._model._status, {})
+        target = (
+            self.content_root
+            / "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        )
+        target.write_text("# 3.7.10 设备管理\n外部改写的正文。\n", encoding="utf-8")
+        ws._rebuild_index()
+        self.assertEqual(
+            ws._tree._model._status.get(
+                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+            ),
+            "modified",
+        )
+
+    def test_clear_markers_rebaselines_keeps_rollback_manifest(self):
+        """清除标记 = 只重新打基线：徽标清空，改动清单（回滚账本）保留。"""
+        from unittest import mock
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        # 工具写一次 → 产生改动清单（回滚账本）+ 磁盘内容变化
+        ws._writer.write_text(old, "# 3.7.10 设备管理\n工具改写。\n")
+        # 外部编辑另一文件
+        (self.content_root / "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md").write_text(
+            "# 3.7.9 相关章节\n外部改写。\n", encoding="utf-8"
+        )
+        ws._rebuild_index()
+        self.assertEqual(ws._tree._model._status.get(old), "modified")
+        with mock.patch.object(
+            QMessageBox,
+            "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            ws._on_clear_markers()
+        # 徽标清空
+        self.assertEqual(ws._tree._model._status, {})
+        # 改动清单保留 → 仍可回滚
+        ws._writer.manifest.load()
+        self.assertEqual(len(ws._writer.manifest.entries), 1)
+        self.assertEqual(ws._writer.manifest.entries[0].rel_path, old)
 
 
 if __name__ == "__main__":
