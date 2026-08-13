@@ -1204,7 +1204,7 @@ def build(
     section_properties = body.find(qn("sectPr"))
     if section_properties is None:
         raise AutomationError("模板正文末尾缺少 w:sectPr")
-    # 需求/详细设计预设启用康尚封面字段同步；通用大文档不得
+    # 需求/详细设计预设启用封面字段同步；通用大文档不得
     # 假设存在“文件编号/版本号/页数”表格，原封面随模板保留。
     if doc_type in ("requirement", "design"):
         update_cover(document_root, config)

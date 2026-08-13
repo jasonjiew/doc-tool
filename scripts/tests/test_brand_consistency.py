@@ -60,6 +60,7 @@ FORBIDDEN_TERMS = [
 EXCLUDED_FILES = {
     os.path.normpath("doc_tool/domain/branding.py"),
     os.path.normpath("packaging/scan_vocabulary.txt"),
+    os.path.normpath("packaging/export_public_source.py"),
 }
 
 # 被扫描的目录。
@@ -237,23 +238,24 @@ class PublicLauncherTests(unittest.TestCase):
         self.assertIn("setup_pyside6.py", launcher)
         self.assertIn("python -m doc_tool.app", launcher)
 
-    def test_legacy_cmd_launchers_not_tracked_for_public(self):
-        """旧品牌启动脚本与需求/设计/全部生成 .cmd 兼容入口不被 Git 跟踪。"""
-        import subprocess
+    def test_legacy_cmd_launchers_excluded_from_public_export(self):
+        """旧品牌启动脚本与需求/设计/全部生成 .cmd 兼容入口不进入公共导出。"""
+        import importlib.util
 
-        result = subprocess.run(
-            ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
-        )
-        tracked = set(result.stdout.splitlines())
+        module_path = Path(REPO_ROOT) / "packaging" / "export_public_source.py"
+        spec = importlib.util.spec_from_file_location("doc_tool_export", module_path)
+        export = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(export)
+
         for legacy in (
             "启动康尚文档工具.cmd",
             "全部生成.cmd",
             "生成需求说明书.cmd",
             "生成详细设计说明书.cmd",
         ):
-            self.assertNotIn(
-                legacy, tracked,
-                "旧品牌/专用构建 .cmd 不得进入公共仓库跟踪清单: {0}".format(legacy),
+            self.assertTrue(
+                export._is_excluded(legacy),
+                "旧品牌/专用构建 .cmd 必须被公共导出排除: {0}".format(legacy),
             )
 
     def test_cli_build_requires_project(self):

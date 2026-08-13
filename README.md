@@ -124,7 +124,7 @@ python -m doc_tool.app
 
 公开仓库地址确定后，请将上面的占位符替换为真实 HTTPS 地址。
 
-在 Windows 中也可以双击 `启动康尚文档工具.cmd`。如果 PySide6 缺失，启动器会提示安装；受终端安全软件限制、无法正常使用 pip 时，可以运行：
+在 Windows 中也可以双击 `start-doc-tool.cmd`。如果 PySide6 缺失，启动器会提示安装；受终端安全软件限制、无法正常使用 pip 时，可以运行：
 
 ```powershell
 python scripts\setup_pyside6.py

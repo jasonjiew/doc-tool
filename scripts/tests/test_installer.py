@@ -165,12 +165,16 @@ class PublicInternalCoexistTests(unittest.TestCase):
 
     def test_install_dir_differs_from_legacy(self):
         """安装目录与内部版不同，保证独立卸载。"""
-        self.assertNotIn("Konsung\\DocTool", self.iss)
+        from doc_tool.domain.branding import LEGACY_INSTALL_DIR_SEGMENT
+
+        self.assertNotIn(LEGACY_INSTALL_DIR_SEGMENT, self.iss)
         self.assertIn("{localappdata}\\{#MyAppNameEn}", self.iss)
 
     def test_executable_differs_from_legacy(self):
         """可执行文件名与内部版不同，保证进程/快捷方式独立。"""
-        self.assertNotIn("KonsungDocTool.exe", self.iss)
+        from doc_tool.domain.branding import LEGACY_EXECUTABLE_NAME
+
+        self.assertNotIn(LEGACY_EXECUTABLE_NAME, self.iss)
         self.assertIn("DocTool.exe", self.iss)
         # 卸载 kill 命令使用公共可执行名
         self.assertIn("{#MyAppExeName}", self.iss)

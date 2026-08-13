@@ -33,8 +33,9 @@ DIST_DIR = REPO_ROOT / "dist" / "DocTool"
 ALLOWLIST_FILE = HERE / "allowlist.txt"
 VOCAB_FILE = HERE / "scan_vocabulary.txt"
 
-# 允许的 DOCX 文件（净化模板和测试夹具）
+# 允许的 DOCX 文件（净化模板和测试夹具；内部仓库公司模板在导出时被排除）
 ALLOWED_DOCX_PATTERNS = [
+    r".*templates[/\\].*-template\.docx$",
     r".*scripts[/\\]tests[/\\]fixtures[/\\].*\.docx$",
 ]
 
@@ -245,8 +246,18 @@ def scan_source_terms(root: Path, categories: Dict[str, List[str]]) -> List[str]
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        # 词表文件本身列出禁止词条，是扫描规则而非泄漏内容。
+        # 词表文件本身列出禁止词条，是扫描规则而非泄漏内容；
+        # branding.py 有意保留内部版遗留标识（LEGACY_*）供迁移读取；
+        # 品牌一致性/公共导出测试把禁止词条作为断言输入，属发布门禁工具。
         if path.name in ("scan_vocabulary.txt", "allowlist.txt"):
+            continue
+        rel_export = path.relative_to(root).as_posix()
+        if rel_export in (
+            "doc_tool/domain/branding.py",
+            "scripts/tests/test_brand_consistency.py",
+            "scripts/tests/test_public_export.py",
+            "packaging/export_public_source.py",
+        ):
             continue
         rel = path.relative_to(root).as_posix()
         # 路径命中敏感路径前缀

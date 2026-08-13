@@ -40,8 +40,18 @@ EXCLUDED_PREFIXES = (
     "migration/legacy/",
     "scripts/migration/",
     "docs/release/",
+    "openspec/changes/",
     ".claude/",
     ".codex/",
+)
+
+# 按文件名排除的仓库根旧品牌/专用构建入口与加密 BAT。
+EXCLUDED_ROOT_FILES = (
+    "启动康尚文档工具.cmd",
+    "全部生成.cmd",
+    "生成需求说明书.cmd",
+    "生成详细设计说明书.cmd",
+    "start-claude.bat",
 )
 
 # 输出中必须存在的关键文件（防止误排除核心代码）。
@@ -73,7 +83,12 @@ def _tracked_files() -> list[str]:
 
 def _is_excluded(rel_path: str) -> bool:
     normalized = rel_path.replace("\\", "/")
-    return any(normalized.startswith(prefix) for prefix in EXCLUDED_PREFIXES)
+    if any(normalized.startswith(prefix) for prefix in EXCLUDED_PREFIXES):
+        return True
+    # 仓库根旧品牌/专用构建入口按文件名排除（仅根目录层）。
+    if "/" not in normalized and normalized in EXCLUDED_ROOT_FILES:
+        return True
+    return False
 
 
 def export_public_source(output: Path) -> tuple[list[str], list[str]]:

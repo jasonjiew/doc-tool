@@ -14,7 +14,7 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "packaging" / "app.ico"
 
 SIZES = (16, 24, 32, 48, 64, 128, 256)
-BG = (56, 132, 110)       # 康尚主绿
+BG = (56, 132, 110)       # 应用主色（绿）
 FG = (255, 255, 255)
 
 

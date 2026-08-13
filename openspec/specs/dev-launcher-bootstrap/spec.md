@@ -2,7 +2,7 @@
 
 ## Purpose
 
-规定「启动康尚文档工具.cmd」在运行时依赖 PySide6 缺失时自动引导安装的行为，保证重新下载项目后「双击 → 确认一次 → 可用」的一步到位体验；依赖已就绪时启动行为不受任何影响。
+规定「start-doc-tool.cmd」在运行时依赖 PySide6 缺失时自动引导安装的行为，保证重新下载项目后「双击 → 确认一次 → 可用」的一步到位体验；依赖已就绪时启动行为不受任何影响。
 
 ## Requirements
 
@@ -39,5 +39,5 @@
 启动脚本 SHALL 保持纯 ASCII 字节（cmd.exe 按系统 ANSI 代码页解析批处理，非 ASCII 字节会破坏解析），新增提示与注释 MUST 使用英文。
 
 #### Scenario: Inspect script bytes
-- **WHEN** 检查「启动康尚文档工具.cmd」的字节内容
+- **WHEN** 检查「start-doc-tool.cmd」的字节内容
 - **THEN** 文件内不包含任何大于 0x7F 的非 ASCII 字节
