@@ -99,6 +99,11 @@ class LegacyMigrationTests(unittest.TestCase):
 
     def test_requirement_migrates_to_general(self):
         source = _make_legacy_project(os.path.join(self._tmp, "src"), "requirement")
+        # 模拟被打开过的旧项目：含运行锁与会话状态（迁移不应复制）。
+        _state_dir = Path(source) / ".state"
+        _state_dir.mkdir(parents=True, exist_ok=True)
+        (_state_dir / "project.lock").write_text("{}", encoding="utf-8")
+        (_state_dir / "workspace.json").write_text("{}", encoding="utf-8")
         target = os.path.join(self._tmp, "dst")
         before = _source_fingerprint(source)
 
@@ -116,6 +121,11 @@ class LegacyMigrationTests(unittest.TestCase):
         self.assertTrue((Path(target) / "assets" / "general" / "tables").is_dir())
         # 内容完整迁移
         self.assertTrue((Path(target) / "content" / "general" / "第1章 概述" / "1.1 背景.md").is_file())
+        # 试构建产物被清理；源项目的运行锁/会话状态不被复制
+        # （manifest.save 会重建 .state/ 下的备份，但不应含源锁与会话）。
+        self.assertFalse((Path(target) / "output" / ".trial-build.docx").exists())
+        self.assertFalse((Path(target) / ".state" / "project.lock").exists())
+        self.assertFalse((Path(target) / ".state" / "workspace.json").exists())
         # 迁移报告已写入
         report = json.loads(
             (Path(target) / "logs" / "migration.json").read_text(encoding="utf-8")
@@ -188,7 +198,31 @@ class LegacyMigrationTests(unittest.TestCase):
         self.assertFalse(Path(target).exists())
         self.assertEqual(_source_fingerprint(source), before)
 
-    def test_migrated_project_is_buildable_and_validatable(self):
+    def test_non_utf8_content_blocks_migration_cleanly(self):
+        """迁移遇非 UTF-8 内容应结构化失败并清理暂存，而非抛出未处理异常。
+
+        旧 Windows 手工编辑的 .md 常为 GBK/GB2312 编码；此前 UnicodeDecodeError
+        会逃逸 migrate 的 except 子句，导致 CLI 打印裸 traceback 且暂存目录残留。
+        """
+        source = _make_legacy_project(os.path.join(self._tmp, "src-enc"), "requirement")
+        content_md = (
+            Path(source) / "content" / "requirement" / "第1章 概述" / "1.1 背景.md"
+        )
+        content_md.write_bytes("背景 GBK 编码内容。\n".encode("gbk"))
+        before = _source_fingerprint(source)
+        target = os.path.join(self._tmp, "dst-enc")
+
+        result = migrate_legacy_project(source, target)
+
+        self.assertFalse(result.success)
+        self.assertFalse(Path(target).exists())
+        self.assertEqual(_source_fingerprint(source), before)
+        # 暂存目录已清理，无孤儿
+        staging = [
+            d for d in os.listdir(self._tmp)
+            if d.startswith(".dst-enc.migrate-staging")
+        ]
+        self.assertEqual(staging, [], "失败后暂存目录应被清理")
         """迁移后的 general 项目可通过构建与校验（试构建已覆盖，此处再验证产物）。"""
         source = _make_legacy_project(os.path.join(self._tmp, "src-ok"), "requirement")
         target = os.path.join(self._tmp, "dst-ok")

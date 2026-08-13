@@ -85,16 +85,36 @@ class NeutralWorkbenchBehaviorTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def test_general_single_type_tree_has_no_type_root(self):
-        """通用单项目章节树直接展示章节节点，无「通用大文档」类型根。"""
+        """通用单项目章节树直接展示章节节点，无「通用大文档」类型根。
+
+        真实 general 项目的 rel_path 以 ``general/`` 开头（layout A）；单一类型
+        时类型目录不产生根节点，章节目录直接作为顶层（节点 id 保留 rel_path 前缀）。
+        """
         from doc_tool.application.content.tree import build_tree
 
-        items = build_tree(["第1章 引言/1.1 目的.md", "第2章 功能/2.1 概述.md"])
+        items = build_tree([
+            "general/第1章 引言/1.1 目的.md",
+            "general/第2章 功能/2.1 概述.md",
+        ])
         roots = [i for i in items if i.parent_id is None]
         texts = [i.text for i in roots]
         self.assertIn("第1章 引言", texts)
         self.assertIn("第2章 功能", texts)
         self.assertNotIn("通用大文档", texts)
+        # 顶层节点是章节目录，不包含类型根。
         self.assertNotIn("general", [i.node_id for i in roots])
+        self.assertTrue(all(not i.is_file for i in roots))
+        # 文件仍挂在对应章节目录下，rel_path 保留 general/ 前缀。
+        self.assertEqual(
+            [i.node_id for i in items if i.is_file],
+            ["general/第1章 引言/1.1 目的.md", "general/第2章 功能/2.1 概述.md"],
+        )
+        # 祖先链完整：目录节点 id 是文件节点 id 的前缀。
+        by_id = {i.node_id: i for i in items}
+        for file_item in (i for i in items if i.is_file):
+            parent = by_id.get(file_item.parent_id)
+            self.assertIsNotNone(parent)
+            self.assertTrue(file_item.node_id.startswith(parent.node_id + "/"))
 
     def test_legacy_multi_type_tree_keeps_compat_roots(self):
         """旧版多类型布局保留需求/设计兼容类型根，使用中性兼容标签。"""
@@ -105,8 +125,8 @@ class NeutralWorkbenchBehaviorTests(unittest.TestCase):
             "design/第2章/2.1 设计.md",
         ])
         roots = {i.node_id: i.text for i in items if i.parent_id is None}
-        self.assertEqual(roots["requirement"], "需求文档（旧版）")
-        self.assertEqual(roots["design"], "详细设计文档（旧版）")
+        self.assertEqual(roots["requirement"], "需求文档（旧版专用）")
+        self.assertEqual(roots["design"], "详细设计文档（旧版专用）")
 
     def test_search_panel_hides_type_filter_for_single_type(self):
         """通用单项目搜索面板不显示类型筛选，默认搜索全部内容。"""
@@ -132,7 +152,7 @@ class NeutralWorkbenchBehaviorTests(unittest.TestCase):
 
         panel = SearchPanel(_FakeService(), show_type_filter=True)
         self.assertTrue(panel._type_box.isVisibleTo(panel))
-        panel._type_box.setCurrentIndex(1)  # 需求文档（旧版）
+        panel._type_box.setCurrentIndex(1)  # 需求文档（旧版专用）
         self.assertEqual(panel._current_options().document_types, ["requirement"])
 
     def test_issues_panel_hides_document_type_filter_for_single_type(self):

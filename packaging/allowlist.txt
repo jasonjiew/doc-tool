@@ -9,6 +9,7 @@
 
 # === 应用入口 ===
 DocTool.exe
+doc-tool-cli.exe
 
 # === Python 运行时和标准库 ===
 _internal/python313.dll
@@ -34,6 +35,13 @@ _internal/win32/**
 _internal/pythonwin/**
 _internal/pywin32_system32/**
 _internal/setuptools/**
+
+# === PySide6 / shiboken6（Qt Widgets 绑定与翻译） ===
+# PyInstaller 内置 PySide6 hook 按实际 import 收集 QtCore/QtGui/QtWidgets 的
+# .pyd 绑定模块、Qt DLL 与 plugins（platforms/styles/imageformats）到
+# _internal/PySide6/ 和 _internal/shiboken6/，翻译文件 *.qm 位于其 translations/。
+_internal/PySide6/**
+_internal/shiboken6/**
 
 # === tkinter ===
 _internal/tcl8/**

@@ -75,9 +75,10 @@ def check_public_gate() -> list[str]:
     if CHECKLIST_FILE.exists():
         text = CHECKLIST_FILE.read_text(encoding="utf-8")
         for role in ("著作权", "安全", "依赖许可", "发布"):
-            if "未签署" in text and role not in text:
-                # 检查单存在但未列出该角色批准 → 视为缺失
-                pass
+            # 检查单存在但整段未列出该角色批准 → 视为缺失，阻断。
+            if role not in text:
+                blockers.append("{0} 批准缺失（检查单未列出该角色）".format(role))
+                continue
             if re.search(r"{0}.*(未签署|待签署)".format(role), text):
                 blockers.append("{0} 批准未签署".format(role))
     return blockers

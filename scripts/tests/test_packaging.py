@@ -158,7 +158,10 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("signtool.Source verify", package_block)
 
     def test_release_gate_blocks_public_until_decisions_resolved(self):
-        """任务 9.3：未决发布决策阻断公共正式发布，允许内部测试产物。"""
+        """任务 9.3：未决发布决策阻断公共正式发布，允许内部测试产物。
+
+        用临时决策表驱动门禁机制，避免随真实决策表进入已决状态后本测试失效。
+        """
         import importlib.util
 
         module_path = Path(REPO_ROOT) / "packaging" / "release_gate.py"
@@ -166,9 +169,28 @@ class ReleasePipelineTests(unittest.TestCase):
         gate = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gate)
 
-        blockers = gate.check_public_gate()
-        # 决策登记表存在且含未决项（品牌/许可证等仍需权利人确认）。
-        self.assertTrue(blockers, "发布决策未决项应阻断公共发布")
+        with tempfile.TemporaryDirectory(prefix="doc-gate-") as tmp:
+            decisions = Path(tmp) / "decisions.md"
+            decisions.write_text(
+                "| 决策项 | 占位值 | 责任人 | 状态 | 备注 |\n"
+                "| --- | --- | --- | --- | --- |\n"
+                "| 品牌/许可证 | — | 权利人 | UNRESOLVED | 未定 |\n",
+                encoding="utf-8",
+            )
+            old_decisions = gate.DECISIONS_FILE
+            old_checklist = gate.CHECKLIST_FILE
+            gate.DECISIONS_FILE = decisions
+            gate.CHECKLIST_FILE = Path(tmp) / "absent-checklist.md"
+            try:
+                blockers = gate.check_public_gate()
+                self.assertTrue(any("品牌/许可证" in b for b in blockers))
+                # 未决决策应同时出现在 unresolved_items 中
+                self.assertEqual(
+                    gate.unresolved_items(decisions), ["品牌/许可证"]
+                )
+            finally:
+                gate.DECISIONS_FILE = old_decisions
+                gate.CHECKLIST_FILE = old_checklist
 
     def test_public_source_export_wired_into_ci(self):
         """任务 9.4：净化源码导出+扫描已接入公共 CI。"""

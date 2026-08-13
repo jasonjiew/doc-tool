@@ -39,8 +39,8 @@ from doc_tool.application.content.replace import (
 # 文档类型过滤下拉（与搜索面板一致）；仅旧版多类型布局展示。
 _TYPE_FILTERS = (
     ("全部", None),
-    ("需求文档（旧版）", "requirement"),
-    ("详细设计文档（旧版）", "design"),
+    ("需求文档（旧版专用）", "requirement"),
+    ("详细设计文档（旧版专用）", "design"),
     ("通用大文档", "general"),
 )
 

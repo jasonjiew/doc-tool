@@ -660,8 +660,8 @@ class ChapterTreeModelTests(unittest.TestCase):
         type_ids = [i.node_id for i in items if i.parent_id is None]
         self.assertEqual(type_ids, ["design", "requirement"])
         by_id = {i.node_id: i for i in items}
-        self.assertEqual(by_id["design"].text, "详细设计文档（旧版）")
-        self.assertEqual(by_id["requirement"].text, "需求文档（旧版）")
+        self.assertEqual(by_id["design"].text, "详细设计文档（旧版专用）")
+        self.assertEqual(by_id["requirement"].text, "需求文档（旧版专用）")
 
     def test_directory_hierarchy_nested(self):
         """章节目录按层级嵌套在类型节点下。"""
@@ -853,7 +853,7 @@ class ChapterTreeModelTests(unittest.TestCase):
         req_row = next(
             row
             for row in range(model.rowCount())
-            if model.data(model.index(row, 0)) == "需求文档（旧版）"
+            if model.data(model.index(row, 0)) == "需求文档（旧版专用）"
         )
         req_idx = model.index(req_row, 0)
         chapters = [

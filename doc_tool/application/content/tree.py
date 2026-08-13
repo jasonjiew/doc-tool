@@ -11,11 +11,12 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-# 文档类型中文标签（与主窗口 DOC_TYPE_LABELS 保持一致的缺省映射）。
+# 文档类型中文标签的唯一来源：章节树、搜索面板与主窗口项目条均引用此映射。
+# 旧版类型用「旧版专用」标记（对齐设计：项目栏将旧项目标注为「旧版专用项目」）。
 DEFAULT_TYPE_LABELS = {
     "general": "通用大文档",
-    "requirement": "需求文档（旧版）",
-    "design": "详细设计文档（旧版）",
+    "requirement": "需求文档（旧版专用）",
+    "design": "详细设计文档（旧版专用）",
 }
 
 _NATURAL_PART_RE = re.compile(r"(\d+)")
@@ -50,8 +51,10 @@ def build_tree(
 ) -> List[TreeItem]:
     """从 rel_path 列表推导章节树（扁平列表，含 parent_id 引用）。
 
-    ``files`` 通常来自 ``index.all_files()``（已稳定排序）。类型目录作为
-    顶层组，章节目录与文件按层级嵌套。
+    ``files`` 通常来自 ``index.all_files()``（已稳定排序）。多类型布局下类型目录
+    作为顶层组（使用兼容标签）；单一类型项目（公共版通用单项目）隐藏类型维度，
+    章节目录直接作为顶层，但目录/文件节点 id 仍保留完整 rel_path 前缀，
+    保证按路径前缀的祖先/子树推导逻辑不变。
     """
     labels = dict(DEFAULT_TYPE_LABELS)
     if type_labels:
@@ -66,23 +69,39 @@ def build_tree(
         document_type = rel.split("/", 1)[0]
         by_type.setdefault(document_type, []).append(rel)
 
+    # 单一类型项目隐藏类型维度：不创建类型根节点，章节目录直接作为顶层。
+    flatten_single_type = len(by_type) == 1
     for document_type in sorted(by_type):
-        type_id = document_type
-        items.append(
-            TreeItem(
-                node_id=type_id,
-                text=labels.get(document_type, document_type),
-                parent_id=None,
-                rel_path=None,
-                is_file=False,
+        if not flatten_single_type:
+            type_id = document_type
+            items.append(
+                TreeItem(
+                    node_id=type_id,
+                    text=labels.get(document_type, document_type),
+                    parent_id=None,
+                    rel_path=None,
+                    is_file=False,
+                )
             )
-        )
-        seen_dir_ids.add(type_id)
+            seen_dir_ids.add(type_id)
         for rel in sorted(by_type[document_type], key=_path_sort_key):
             parts = rel.split("/")
             dirs = parts[1:-1]
             file_name = parts[-1]
-            parent = type_id
+            if not dirs:
+                # 文件直接位于类型根下：flatten 时作为顶层文件，否则挂在类型节点下。
+                items.append(
+                    TreeItem(
+                        node_id=rel,
+                        text=file_name,
+                        parent_id=None if flatten_single_type else document_type,
+                        rel_path=rel,
+                        is_file=True,
+                    )
+                )
+                continue
+            parent = document_type  # 目录 id 前缀；flatten 时类型本身不产生节点
+            first_level = True
             for segment in dirs:
                 dir_id = parent + "/" + segment
                 if dir_id not in seen_dir_ids:
@@ -91,12 +110,15 @@ def build_tree(
                         TreeItem(
                             node_id=dir_id,
                             text=segment,
-                            parent_id=parent,
+                            parent_id=(
+                                None if (flatten_single_type and first_level) else parent
+                            ),
                             rel_path=None,
                             is_file=False,
                         )
                     )
                 parent = dir_id
+                first_level = False
             items.append(
                 TreeItem(
                     node_id=rel,

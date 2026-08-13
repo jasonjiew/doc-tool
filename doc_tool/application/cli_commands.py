@@ -151,15 +151,24 @@ def migrate_command(args) -> CommandResult:
     source = str(Path(args.project).resolve())
     target = str((Path(args.target)).resolve())
     result = migrate_legacy_project(source, target)
+    # 失败时迁移报告不会写出（report_path 为 None），真实原因在最后一条事件明细中；
+    # 把它透出到 message 供 human 序列化显示，避免只给一个指向不存在报告的笼统建议。
+    failure_detail = ""
+    if not result.success and result.last_event is not None:
+        failure_detail = result.last_event.detail
     item = ProjectCommandResult(
         project=source,
         success=result.success,
         error_code=result.error_code or "",
-        suggested_action="请查看迁移报告并修正源项目内容后重试。" if not result.success else "",
+        suggested_action=(
+            "" if result.success else
+            "请修正源项目内容后重试。"
+        ),
         data={
             "target": str(result.target),
             "report": str(result.report_path) if result.report_path else None,
             "events": [to_json_value(event) for event in result.events],
+            "message": failure_detail or None,
         },
     )
     return CommandResult("migrate", [item])

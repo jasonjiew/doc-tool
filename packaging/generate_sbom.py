@@ -6,9 +6,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+# 脚本可独立运行（任意 cwd）：把仓库根加入 sys.path，供品牌元数据导入。
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 
 def dependencies(paths):

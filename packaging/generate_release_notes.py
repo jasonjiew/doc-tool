@@ -19,6 +19,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
+# 脚本可独立运行（任意 cwd）：把仓库根加入 sys.path，供品牌/版本元数据导入。
+sys.path.insert(0, str(REPO_ROOT))
 
 
 def _checksum(path: Path) -> str:

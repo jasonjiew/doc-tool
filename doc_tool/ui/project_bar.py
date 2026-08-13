@@ -23,12 +23,8 @@ from PySide6.QtWidgets import (
 
 from doc_tool.ui.workbench_state import WorkbenchState
 
-# 文档类型中文映射（与菜单一致）。
-DOC_TYPE_LABELS = {
-    "general": "通用大文档",
-    "requirement": "需求文档（旧版专用）",
-    "design": "详细设计文档（旧版专用）",
-}
+# 文档类型中文映射（与章节树/搜索面板共用同一来源，避免文案漂移）。
+from doc_tool.application.content.tree import DEFAULT_TYPE_LABELS as DOC_TYPE_LABELS
 
 
 class ProjectBar(QWidget):

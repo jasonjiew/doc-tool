@@ -5,10 +5,11 @@
 
 验证：
 1. PyInstaller onedir 应用 EXE 存在
-2. _internal 目录包含所有必需资源（scripts/templates/config/resources）
+2. _internal 目录包含所有必需资源（scripts/resources）
 3. 第三方库（lxml/PIL/yaml/win32com）可被冻结运行时导入
 4. 资源定位（resource_root）在冻结态正确工作
 5. 内核脚本（docx_common 等）可被运行时导入
+6. 公司材料（templates/、config/）不被隐式打包
 
 由于 GUI 应用不输出到控制台，本测试通过检查文件结构和运行 CLI 版本来验证。
 """
@@ -66,21 +67,17 @@ class FrozenAppStructureTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(scripts, name)),
                             "缺少内核脚本: {0}".format(name))
 
-    def test_templates_packed(self):
-        """公司 Word 模板已打包到 _internal/templates/。"""
-        templates = os.path.join(INTERNAL_DIR, "templates")
-        self.assertTrue(os.path.isdir(templates))
-        for name in ("requirement-template.docx", "design-template.docx"):
-            self.assertTrue(os.path.isfile(os.path.join(templates, name)),
-                            "缺少模板: {0}".format(name))
+    def test_templates_and_config_not_packed(self):
+        """公司模板与文档配置不被隐式打包（任务 8.2：绝不隐式打包）。
 
-    def test_config_packed(self):
-        """文档配置已打包到 _internal/config/。"""
-        config = os.path.join(INTERNAL_DIR, "config")
-        self.assertTrue(os.path.isdir(config))
-        for name in ("requirement.yml", "design.yml"):
-            self.assertTrue(os.path.isfile(os.path.join(config, name)),
-                            "缺少配置: {0}".format(name))
+        打包 spec 不再收集 templates/ 与 config/（公司材料）；这里验证冻结产物
+        中确实不存在这两个目录，防止将来被意外重新纳入公共安装包。
+        """
+        for name in ("templates", "config"):
+            self.assertFalse(
+                os.path.isdir(os.path.join(INTERNAL_DIR, name)),
+                "不应打包公司目录: {0}".format(name),
+            )
 
     def test_resources_packed(self):
         """默认项目清单已打包到 _internal/doc_tool/resources/。"""

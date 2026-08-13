@@ -170,6 +170,17 @@ class BrandConsistencySourceTests(_ScanMixin, unittest.TestCase):
         hits = []
         for dirname in SCAN_DIRS:
             hits.extend(self._scan_for_terms(root / dirname, FORBIDDEN_TERMS))
+        # 顶层 scripts/*.py（内核脚本）随应用打包并进入公共导出，需一并覆盖扫描；
+        # scripts/migration/ 与 scripts/tests/ 为内部/测试目录，不进入公共产物。
+        scripts_dir = root / "scripts"
+        for path in sorted(scripts_dir.iterdir()):
+            if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            lowered = text.lower()
+            for term in FORBIDDEN_TERMS:
+                if term.lower() in lowered:
+                    hits.append("{0}: {1}".format(path.name, term))
         self.assertEqual(hits, [])
 
     def test_installer_uses_public_identity(self):
@@ -181,11 +192,6 @@ class BrandConsistencySourceTests(_ScanMixin, unittest.TestCase):
         self.assertNotIn("Konsung\\DocTool", text)
         self.assertNotIn("F6D0000F-13F0-50D9-8743-5B42D68FF071", text)
         self.assertIn("DocTool.exe", text)
-        # 公共 AppId 不再复用公司 AppId
-        self.assertNotEqual(
-            "8C61369A-D7C7-51D4-BD14-5B555EF93E52",
-            "F6D0000F-13F0-50D9-8743-5B42D68FF071",
-        )
 
     def test_spec_uses_public_executable_name(self):
         for spec_name in ("doc_tool.spec", "doc_tool_onefile.spec"):

@@ -60,6 +60,19 @@ try {
 }
 Write-Host "  泄漏扫描通过。" -ForegroundColor Green
 
+# 发布授权门禁状态：未决决策/未签署检查单会在此输出阻断提示。
+# （正式公共发布强制阻断由 CI 以 `release_gate.py --public` 执行；本地构建只报告状态。）
+Write-Host "  发布授权门禁..." -ForegroundColor Yellow
+Push-Location $RepoRoot
+try {
+    & python packaging\release_gate.py
+    if ($LASTEXITCODE -ne 0) {
+        throw "发布授权门禁失败 (exit $LASTEXITCODE)"
+    }
+} finally {
+    Pop-Location
+}
+
 # --- 阶段 2：PyInstaller 构建 ---
 if (-not $SkipPyInstaller) {
     Write-Host "[2/5] PyInstaller 构建 onedir..." -ForegroundColor Yellow
@@ -196,9 +209,8 @@ Inno Setup 6        Inno Setup License
 应用文件清单
 ------------
 入口: DocTool.exe (GUI)
+入口: doc-tool-cli.exe (CLI)
 内核: _internal/scripts/*.py
-模板: _internal/templates/*.docx
-配置: _internal/config/*.yml
 资源: _internal/doc_tool/resources/default_project.yml
 许可: _internal/THIRD_PARTY_LICENSES.txt
 
@@ -229,6 +241,22 @@ try {
 Write-Host "  CycloneDX: $CycloneFile" -ForegroundColor Green
 Write-Host "  SPDX: $SpdxFile" -ForegroundColor Green
 
+# 可审计发布说明（版本/提交/校验和/SBOM 摘要）
+$ReleaseNotesFile = "$ReleaseDir\release-notes.md"
+$ReleaseNotesArgs = @("--output", $ReleaseNotesFile)
+if ($SetupExe -and (Test-Path $SetupExe)) {
+    $ReleaseNotesArgs += @("--setup-exe", $SetupExe)
+}
+$ReleaseNotesArgs += @("--sbom", $SbomFile)
+Push-Location $RepoRoot
+try {
+    & python packaging\generate_release_notes.py @ReleaseNotesArgs
+    if ($LASTEXITCODE -ne 0) { throw "发布说明生成失败 (exit $LASTEXITCODE)" }
+} finally {
+    Pop-Location
+}
+Write-Host "  发布说明: $ReleaseNotesFile" -ForegroundColor Green
+
 Write-Host ""
 Write-Host "=== 构建完成 ===" -ForegroundColor Cyan
 if ($SetupExe) {
@@ -237,3 +265,4 @@ if ($SetupExe) {
 Write-Host "依赖清单: $SbomFile" -ForegroundColor White
 Write-Host "CycloneDX: $CycloneFile" -ForegroundColor White
 Write-Host "SPDX: $SpdxFile" -ForegroundColor White
+Write-Host "发布说明: $ReleaseNotesFile" -ForegroundColor White

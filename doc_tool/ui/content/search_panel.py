@@ -35,8 +35,8 @@ from doc_tool.application.content.search import (
 # 仅旧版多类型布局（同时含 requirement/design）时展示；通用单项目隐藏。
 _TYPE_FILTERS = (
     ("全部", None),
-    ("需求文档（旧版）", "requirement"),
-    ("详细设计文档（旧版）", "design"),
+    ("需求文档（旧版专用）", "requirement"),
+    ("详细设计文档（旧版专用）", "design"),
     ("通用大文档", "general"),
 )
 
@@ -157,7 +157,7 @@ class SearchPanel(QWidget):
         options = self._current_options()
         if not options.query.strip():
             self._pending_options = None
-            self._render(SearchResult(query=""))
+            self._render(SearchResult(query="", total=0))
             return
         from doc_tool.application.content.search import compile_pattern
 

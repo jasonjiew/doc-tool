@@ -157,8 +157,9 @@ class PublicExportTests(unittest.TestCase):
             output = Path(tmp) / "export"
             copied, excluded = export.export_public_source(output)
             self.assertGreater(len(copied), 100, "净化导出应保留核心文件")
-            # 公司目录被排除
-            for prefix in ("templates/", "config/", "content/", "assets/", "analysis/"):
+            # 公司目录与内部专用脚本被排除
+            for prefix in ("templates/", "config/", "content/", "assets/",
+                           "analysis/", "scripts/migration/"):
                 self.assertTrue(
                     any(rel.startswith(prefix) for rel in excluded),
                     "应排除 {0}".format(prefix),
@@ -188,6 +189,8 @@ class PublicExportTests(unittest.TestCase):
             self.assertFalse((output / "config").exists())
             self.assertFalse((output / "analysis").exists())
             self.assertFalse((output / "migration" / "legacy").exists())
+            # 内部一次性迁移脚本（含公司源文件名）不进入公共导出。
+            self.assertFalse((output / "scripts" / "migration").exists())
             self.assertFalse((output / "docs" / "release").exists())
 
 

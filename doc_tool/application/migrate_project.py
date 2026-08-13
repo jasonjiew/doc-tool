@@ -7,7 +7,7 @@
 
 迁移语义：
 - 目标目录必须是新目录（同卷暂存 + 原子重命名发布，与首次导入一致）。
-- 复制源项目全部内容（排除运行锁 ``project.lock``），保留源项目不变。
+- 复制源项目全部内容（排除运行锁与运行时状态 ``.state``），保留源项目不变。
 - 目录重写：``content/<legacy>`` → ``content/general``，``assets/<legacy>`` →
   ``assets/general``（含 ``tables``）。
 - 清单重写：``documentType: general``；编号/版本作为可选元数据保留。
@@ -37,8 +37,11 @@ from doc_tool.domain.manifest import (
 )
 from doc_tool.domain.paths import ProjectPaths
 
-# 迁移过程中需要排除的文件（运行锁等）。
-_MIGRATION_EXCLUDED = {"project.lock"}
+# 迁移过程中需要排除的顶层文件/目录。
+# - project.lock：旧版遗留的根级运行锁。
+# - .state：运行时状态目录（含真实运行锁 .state/project.lock、会话/草稿/基线），
+#   其内容引用源项目旧路径，迁移到新项目后为过期状态，不应复制。
+_MIGRATION_EXCLUDED = {"project.lock", ".state"}
 
 
 @dataclass
@@ -77,7 +80,7 @@ def _legacy_assets_dir(paths: ProjectPaths, doc_type: str) -> Path:
 
 
 def _copy_tree(source: Path, staging: Path) -> None:
-    """复制项目树到暂存目录，排除运行锁。"""
+    """复制项目树到暂存目录，排除运行锁与运行时状态（.state）。"""
     for item in source.iterdir():
         if item.name in _MIGRATION_EXCLUDED:
             continue
@@ -169,6 +172,11 @@ def _trial_build(manifest: ProjectManifest, paths: ProjectPaths) -> None:
             details={"errorType": type(exc).__name__},
         )
     _verify_valid_docx(Path(output_path))
+    # 试构建产物仅用于合法性验证；发布前清理，避免迁移项目残留 output/.trial-build.docx。
+    try:
+        os.remove(trial_output)
+    except OSError:
+        pass
 
 
 def _write_migration_report(
@@ -274,7 +282,7 @@ def migrate_legacy_project(
         _record(result, "publish", "succeeded", detail="target=" + target.name)
         return result
 
-    except (DocToolError, OSError) as exc:
+    except Exception as exc:  # noqa: BLE001
         result.error_code = getattr(exc, "code", "E9000")
         status = "failed"
         _record(result, result.last_event.stage if result.last_event else "migrate",

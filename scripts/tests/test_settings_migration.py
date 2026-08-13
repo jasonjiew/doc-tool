@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -121,7 +122,7 @@ class SettingsMigrationTests(unittest.TestCase):
 
     def test_no_legacy_settings_is_noop(self):
         public = Path(tempfile.mkdtemp(prefix="doc-settings-empty-"))
-        self.addCleanup(lambda: None)
+        self.addCleanup(shutil.rmtree, public, ignore_errors=True)
         report = migrate_legacy_settings(str(public), str(public / "absent"))
         self.assertEqual(report.copied, [])
         self.assertFalse(report.already_present)

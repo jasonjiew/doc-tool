@@ -48,8 +48,9 @@ class IssuesPanel(QWidget):
         outer.setContentsMargins(4, 4, 4, 4)
         filters = QHBoxLayout()
         self._type = self._new_filter("类型", filters)
-        self._document_type = self._new_filter("文档类型", filters)
-        self._document_type.setVisible(self._show_document_type)
+        self._document_type = self._new_filter(
+            "文档类型", filters, visible=self._show_document_type
+        )
         self._severity = self._new_filter("严重度", filters)
         self._file = self._new_filter("文件", filters)
         filters.addStretch(1)
@@ -68,11 +69,15 @@ class IssuesPanel(QWidget):
         self._tree.setHeaderLabels(headers)
         self._tree.setRootIsDecorated(False)
         self._tree.setUniformRowHeights(True)
-        self._tree.setColumnWidth(0, 72)
-        self._tree.setColumnWidth(1, 110)
-        self._tree.setColumnWidth(2, 90)
-        self._tree.setColumnWidth(3, 220)
-        self._tree.setColumnWidth(4, 48)
+        # 列宽按当前列布局定位：通用单项目（隐藏文档类型列）时，文件列保持宽、
+        # 行号列收窄，消息列不被迫压缩为固定小宽度。
+        widths = [(0, 72), (1, 110)]
+        if self._show_document_type:
+            widths += [(2, 90), (3, 220), (4, 48)]
+        else:
+            widths += [(2, 220), (3, 48)]
+        for col, width in widths:
+            self._tree.setColumnWidth(col, width)
         self._tree.itemDoubleClicked.connect(self._activate)
         outer.addWidget(self._tree, 1)
 
@@ -80,9 +85,12 @@ class IssuesPanel(QWidget):
         self._state.setObjectName("statusMuted")
         outer.addWidget(self._state)
 
-    def _new_filter(self, label: str, layout: QHBoxLayout) -> QComboBox:
-        layout.addWidget(QLabel(label, self))
+    def _new_filter(self, label: str, layout: QHBoxLayout, *, visible: bool = True) -> QComboBox:
+        label_widget = QLabel(label, self)
+        label_widget.setVisible(visible)
+        layout.addWidget(label_widget)
         combo = QComboBox(self)
+        combo.setVisible(visible)
         combo.addItem(_ALL, "")
         combo.currentIndexChanged.connect(self._render)
         layout.addWidget(combo)
@@ -147,7 +155,9 @@ class IssuesPanel(QWidget):
                 columns.insert(2, issue.document_type)
             item = QTreeWidgetItem(columns)
             item.setData(0, Qt.ItemDataRole.UserRole, issue)
-            item.setToolTip(5, issue.suggested_action)
+            # 提示气泡落在「消息」列：7 列布局为第 5 列，隐藏文档类型列后为第 4 列。
+            message_col = 5 if self._show_document_type else 4
+            item.setToolTip(message_col, issue.suggested_action)
             self._tree.addTopLevelItem(item)
         if not self._has_project:
             self._state.setText("无当前项目数据")
