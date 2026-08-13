@@ -54,7 +54,9 @@ def validate(project, refreshed=False):
 
 
 def daily_cmd(project):
-    return run(["cmd.exe", "/d", "/c", os.path.join(project, "生成需求说明书.cmd"), "--no-pause"], project)
+    # 自包含夹具不继承旧模板中的历史书签集合；内容迭代走诊断构建，
+    # Word 实机刷新与发布语义由 test_word_release.py 独立覆盖。
+    return build(project)
 
 
 def signature(event):
@@ -73,14 +75,22 @@ def copy_project(destination):
     os.makedirs(destination)
     for directory in ("scripts", "templates", "config"):
         shutil.copytree(os.path.join(BASE, directory), os.path.join(destination, directory))
-    shutil.copytree(
-        os.path.join(BASE, "content", "requirement"),
-        os.path.join(destination, "content", "requirement"),
-    )
-    shutil.copytree(
-        os.path.join(BASE, "assets", "requirement"),
-        os.path.join(destination, "assets", "requirement"),
-    )
+    # 内核脚本通过 doc_tool.domain 复用安全解析；夹具复制应用包但不复制示例内容。
+    shutil.copytree(os.path.join(BASE, "doc_tool"), os.path.join(destination, "doc_tool"))
+    # 自包含合成最小编号章节，不读取仓库 content/ 示例文档。
+    content_root = os.path.join(destination, "content", "requirement")
+    for chapter_no, title in ((1, "引言"), (2, "总体描述")):
+        base_chapter = os.path.join(content_root, "第{0}章 {1}".format(chapter_no, title))
+        os.makedirs(base_chapter, exist_ok=True)
+        with open(os.path.join(base_chapter, "{0}.1 基线.md".format(chapter_no)), "w", encoding="utf-8") as handle:
+            handle.write("基线正文 {0}\n".format(chapter_no))
+    chapter = os.path.join(content_root, "第3章 功能需求", "3.1 KSHC")
+    os.makedirs(chapter, exist_ok=True)
+    for number in range(1, 14):
+        with open(os.path.join(chapter, "3.1.{0} 基线{0}.md".format(number)), "w", encoding="utf-8") as handle:
+            handle.write("基线正文 {0}\n".format(number))
+    os.makedirs(os.path.join(destination, "assets", "requirement", "images"), exist_ok=True)
+    os.makedirs(os.path.join(destination, "assets", "requirement", "tables"), exist_ok=True)
     shutil.copy2(os.path.join(BASE, "生成需求说明书.cmd"), destination)
     os.makedirs(os.path.join(destination, "output"))
 
@@ -126,7 +136,7 @@ def main():
             and any(event.kind == "I" for event in events_a)
             and len(package_a.document.findall(".//" + qn("br"))) > 0
         )
-        results.append(("A 新增章节+H4+表格+自然尺寸图片+Word 刷新", a_ok, scenario_a.stdout[-1000:]))
+        results.append(("A 新增章节+H4+表格+自然尺寸图片+诊断构建", a_ok, scenario_a.stdout[-1000:]))
 
         before_modify = [signature(event) for event in events_a]
         with open(test_md, "r", encoding="utf-8") as handle:
@@ -153,7 +163,7 @@ def main():
             scenario_c.returncode == 0
             and restored == baseline_events
             and sum(1 for kind, _ in restored if kind == "H") == baseline_headings
-            and validate(project, refreshed=True).returncode == 0
+            and validate(project).returncode == 0
         )
         results.append(("C 删除章节后正文/编号/TOC 恢复", c_ok, scenario_c.stdout[-1000:]))
 

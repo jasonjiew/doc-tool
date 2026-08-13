@@ -34,6 +34,7 @@ if hasattr(sys.stdout, "reconfigure"):
 DIST_DIR = os.path.join(REPO_ROOT, "dist", "KonsungDocTool")
 INTERNAL_DIR = os.path.join(DIST_DIR, "_internal")
 EXE_PATH = os.path.join(DIST_DIR, "KonsungDocTool.exe")
+CLI_EXE_PATH = os.path.join(DIST_DIR, "doc-tool-cli.exe")
 
 
 def _frozen_exists():
@@ -50,6 +51,7 @@ class FrozenAppStructureTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(EXE_PATH))
         # EXE 至少 1MB
         self.assertGreater(os.path.getsize(EXE_PATH), 1024 * 1024)
+        self.assertTrue(os.path.isfile(CLI_EXE_PATH))
 
     def test_internal_dir_exists(self):
         """_internal 目录存在。"""
@@ -181,6 +183,21 @@ class FrozenAppRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0,
                          "第三方库导入失败: {0}".format(result.stderr))
         self.assertIn("ALL_LIBS_OK", result.stdout)
+
+    def test_frozen_cli_info_and_help(self):
+        """冻结 CLI 可运行既有 info 与新增机器可读命令帮助。"""
+        info = subprocess.run(
+            [CLI_EXE_PATH, "info"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=30, check=False,
+        )
+        self.assertEqual(info.returncode, 0, info.stderr)
+        self.assertIn("appVersion", info.stdout)
+        help_result = subprocess.run(
+            [CLI_EXE_PATH, "validate", "--help"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=30, check=False,
+        )
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("--output", help_result.stdout)
 
 
 if __name__ == "__main__":

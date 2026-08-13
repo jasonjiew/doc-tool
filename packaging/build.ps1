@@ -1,4 +1,4 @@
-﻿﻿# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     康尚文档工具安装包构建脚本
@@ -29,6 +29,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Python test subprocesses emit UTF-8 paths and markers; avoid the Windows GBK
+# fallback corrupting captured output in PowerShell-driven release builds.
+$env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $Version = "1.0.0"
 
@@ -182,6 +185,7 @@ PyYAML 6.0.3        MIT License
 lxml 6.1.1          BSD License
 Pillow 12.3.0       MIT-CMU License
 pywin32 312         PSF-2.0 License
+PySide6 6.8.3       LGPL-3.0 / GPL-3.0 License
 Python 3.13         PSF-2.0 License
 
 构建依赖（不打包）
@@ -204,9 +208,26 @@ _internal/lxml/     libxml2/libxslt XML 解析
 _internal/PIL/      Pillow 图片处理
 _internal/yaml/     PyYAML YAML 解析
 _internal/win32/    pywin32 COM 自动化
+_internal/PySide6/  Qt Widgets 桌面 UI（仅 QtCore/QtGui/QtWidgets）
 "@
 $SbomContent | Out-File -FilePath $SbomFile -Encoding utf8
 Write-Host "  依赖清单: $SbomFile" -ForegroundColor Green
+
+$CycloneFile = "$ReleaseDir\KonsungDocTool-$Version.cdx.json"
+$SpdxFile = "$ReleaseDir\KonsungDocTool-$Version.spdx.json"
+Push-Location $RepoRoot
+try {
+    & python packaging\generate_sbom.py `
+        --requirements requirements.txt `
+        --requirements requirements-build.txt `
+        --cyclonedx $CycloneFile `
+        --spdx $SpdxFile
+    if ($LASTEXITCODE -ne 0) { throw "结构化 SBOM 生成失败 (exit $LASTEXITCODE)" }
+} finally {
+    Pop-Location
+}
+Write-Host "  CycloneDX: $CycloneFile" -ForegroundColor Green
+Write-Host "  SPDX: $SpdxFile" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "=== 构建完成 ===" -ForegroundColor Cyan
@@ -214,3 +235,5 @@ if ($SetupExe) {
     Write-Host "安装器: $SetupExe" -ForegroundColor White
 }
 Write-Host "依赖清单: $SbomFile" -ForegroundColor White
+Write-Host "CycloneDX: $CycloneFile" -ForegroundColor White
+Write-Host "SPDX: $SpdxFile" -ForegroundColor White

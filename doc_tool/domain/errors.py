@@ -105,6 +105,12 @@ class NumberingGapError(ValidationError):
     suggested_action = "请按提示的期望编号修正文件名。"
 
 
+class RoundtripCheckError(DocToolError):
+    code = "E2004"
+    user_message = "往返差异门禁未通过。"
+    suggested_action = "重建 Word 与源 Word 存在关键内容差异，导入已中止且未留下半成品项目；请检查源文档或重建规则后重试。"
+
+
 # --- Word 刷新（E3xxx） ---
 
 

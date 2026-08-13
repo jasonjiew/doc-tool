@@ -54,6 +54,23 @@ DOCUMENT_TYPES = ("general", "requirement", "design")
 DEFAULT_REFRESH_TIMEOUT_SECONDS = 900
 
 
+def _parse_heading_level(value) -> int:
+    """严格把 ``headingStyles`` 键解析为正整数。
+
+    YAML 键常以字符串（``"1"``）或整型出现；浮点（``1.5``）或布尔必须被拒绝
+    而非静默截断成 ``1``——否则项目会按错误的标题层级映射构建，往返门禁与
+    校验产生难以定位的差异。
+    """
+    if isinstance(value, bool):
+        raise ValueError("headingStyles 级别不能是布尔值")
+    if isinstance(value, float) and not value.is_integer():
+        raise ValueError("headingStyles 级别必须是整数，实际为 {0}".format(value))
+    level = int(value)
+    if level < 1:
+        raise ValueError("headingStyles 级别必须 ≥ 1，实际为 {0}".format(value))
+    return level
+
+
 @dataclass
 class ProjectManifest:
     """项目清单：可移植、版本化的项目元数据。
@@ -71,6 +88,7 @@ class ProjectManifest:
     paths: Dict[str, str] = field(default_factory=dict)
     createdWithVersion: str = APP_VERSION
     lastSuccessfulBuildVersion: Optional[str] = None
+    publishNotes: str = ""
     refreshTimeoutSeconds: int = DEFAULT_REFRESH_TIMEOUT_SECONDS
     # 模板相关的构建样式（v1 附加字段，向后兼容：旧清单无此字段时为空）。
     # 由导入服务根据源文档类型从默认配置写入，构建时由适配层消费。
@@ -152,6 +170,7 @@ class ProjectManifest:
             "sourceSha256": self.sourceSha256,
             "createdWithVersion": self.createdWithVersion,
             "lastSuccessfulBuildVersion": self.lastSuccessfulBuildVersion,
+            "publishNotes": self.publishNotes,
             "headingStyles": {str(k): v for k, v in self.headingStyles.items()},
             "bodyStyle": self.bodyStyle,
             "refresh": {"timeoutSeconds": self.refreshTimeoutSeconds},
@@ -267,8 +286,9 @@ class ProjectManifest:
                 paths={str(key): str(value) for key, value in paths_data.items()},
                 createdWithVersion=str(data.get("createdWithVersion", APP_VERSION)),
                 lastSuccessfulBuildVersion=data.get("lastSuccessfulBuildVersion"),
+                publishNotes=str(data.get("publishNotes", "") or ""),
                 headingStyles={
-                    int(level): str(style_id)
+                    _parse_heading_level(level): str(style_id)
                     for level, style_id in heading_styles_data.items()
                 },
                 bodyStyle=str(data.get("bodyStyle", "") or ""),
@@ -298,3 +318,20 @@ class ProjectManifest:
 
     def mark_successful_build(self, version: str) -> None:
         self.lastSuccessfulBuildVersion = version
+
+
+def increment_version(current: str, kind: str) -> str:
+    """Increment a semantic version, accepting one to three numeric components."""
+    if kind not in ("patch", "minor", "major"):
+        raise ValueError("版本递增类型必须是 patch、minor 或 major。")
+    parts = str(current).strip().split(".")
+    if not parts or len(parts) > 3 or any(not part.isdigit() for part in parts):
+        raise ValueError("版本号必须由 1 至 3 个点分十进制数字组成。")
+    values = [int(part) for part in parts] + [0] * (3 - len(parts))
+    if kind == "major":
+        values = [values[0] + 1, 0, 0]
+    elif kind == "minor":
+        values = [values[0], values[1] + 1, 0]
+    else:
+        values[2] += 1
+    return ".".join(str(value) for value in values)

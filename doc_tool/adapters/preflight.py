@@ -18,18 +18,24 @@ from __future__ import annotations
 import os
 import posixpath
 import re
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from lxml import etree
 
+from doc_tool.adapters.fidelity import FidelityReport, scan_fidelity
 from doc_tool.domain.errors import (
     BrokenRelationshipError,
+    DocToolError,
     HeadingHierarchyError,
     InvalidDocxError,
     MissingHeading1Error,
+)
+from doc_tool.domain.ooxml import (
+    OOXMLSecurityError,
+    parse_xml_safe,
+    read_docx_package,
 )
 
 
@@ -51,19 +57,8 @@ PREVIEW_HEADING_LIMIT = 5
 MIN_HEADING_LEVEL = 1
 MAX_HEADING_LEVEL = 6
 
-# 加密 DOCX 在 ZIP 中的特征条目。
-ENCRYPTED_ENTRY = "EncryptedPackage"
-
 # DOCX 包中必须存在的核心部件。
 REQUIRED_PARTS = ("word/document.xml",)
-
-# 不受信任的 DOCX 本质上是 ZIP。先检查目录元数据，再做 CRC/解压，避免压缩
-# 炸弹或异常巨大的 XML 在预检阶段耗尽内存。上限明显高于当前真实基线文档。
-MAX_PACKAGE_ENTRIES = 20_000
-MAX_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
-MAX_SINGLE_ENTRY_BYTES = 256 * 1024 * 1024
-MAX_XML_PART_BYTES = 64 * 1024 * 1024
-MAX_COMPRESSION_RATIO = 2_000
 
 # 关系类型常量（仅取末尾片段用于分类）。
 REL_TYPE_IMAGE = "/image"
@@ -88,7 +83,7 @@ class HeadingInfo:
     body_index: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class DocumentTypeSuggestion:
     """文档类型建议。
 
@@ -98,6 +93,16 @@ class DocumentTypeSuggestion:
     document_type: str
     confidence: str  # "high" | "low"
     reason: str
+
+
+@dataclass(frozen=True)
+class StyleCensus:
+    """一个段落样式的普查信息（供样式映射向导展示）。"""
+
+    style_id: str
+    name: str
+    usage_count: int
+    suspected_heading: bool
 
 
 @dataclass
@@ -122,6 +127,8 @@ class ImportPreview:
     relationship_count: int = 0
     warnings: List[str] = field(default_factory=list)
     document_type_suggestion: Optional[DocumentTypeSuggestion] = None
+    fidelity: Optional[FidelityReport] = None
+    style_census: Dict[str, StyleCensus] = field(default_factory=dict)
 
     @property
     def has_heading1(self) -> bool:
@@ -131,7 +138,11 @@ class ImportPreview:
 # --- 预检主入口 ---
 
 
-def preflight(path: Union[str, Path]) -> ImportPreview:
+def preflight(
+    path: Union[str, Path],
+    heading_style_map: Optional[Dict[str, int]] = None,
+    allow_missing_headings: bool = False,
+) -> ImportPreview:
     """对任意文件名的 DOCX 执行完整预检，返回预览模型。
 
     任何检查失败均抛出 ``DocToolError`` 子类，调用方应据此向用户显示
@@ -139,6 +150,10 @@ def preflight(path: Union[str, Path]) -> ImportPreview:
 
     Args:
         path: 用户选择的 DOCX 文件路径，文件名任意。
+        heading_style_map: 可选的用户样式映射覆盖（styleId -> 级别 1~6）。
+            传入时不再自动解析 styles.xml 的 Heading 样式，标题树按该映射构建。
+        allow_missing_headings: 为 True 时跳过标题层级 fail-closed 校验，
+            供向导在进入「样式映射」步骤前扫描用；结构性错误仍会抛出。
 
     Returns:
         ``ImportPreview`` 预览模型。
@@ -146,75 +161,89 @@ def preflight(path: Union[str, Path]) -> ImportPreview:
     Raises:
         InvalidDocxError: 扩展名、ZIP、CRC、XML 或加密检查失败。
         BrokenRelationshipError: 关系目标缺失或正文引用的资源不存在。
-        MissingHeading1Error: 没有可识别的 Heading 1。
+        MissingHeading1Error: 没有可识别的 Heading 1（未传映射且未宽松扫描时）。
         HeadingHierarchyError: 标题层级跳跃，无法构成可闭合章节树。
     """
     file_path = Path(path)
     file_name = file_path.name
     file_size = file_path.stat().st_size if file_path.exists() else 0
 
-    # --- 3.1 包结构校验 ---
+    # --- 3.1 包结构校验（统一安全入口） ---
     _check_extension(file_name)
-    with _open_and_check_zip(file_path) as zip_handle:
-        _check_encryption(zip_handle)
-        parts = _read_parts(zip_handle)
-        _check_xml_wellformed(parts)
-        _check_required_parts(parts)
+    try:
+        with read_docx_package(file_path) as package:
+            parts = package.read_xml_parts()
+            _check_xml_wellformed(parts)
+            _check_required_parts(parts)
 
-        # --- 3.2 关系目标完整性 ---
-        rel_map = _parse_relationships(parts)
-        _check_relationship_targets(rel_map, zip_handle)
+            # --- 3.2 关系目标完整性 ---
+            rel_map = _parse_relationships(parts)
+            _check_relationship_targets(rel_map, set(package.names))
 
-        # --- 3.3 标题样式映射与标题树 ---
-        heading_style_map = _parse_heading_styles(parts)
-        headings = _build_heading_tree(parts, heading_style_map)
+            # --- 3.3 标题样式映射与标题树 ---
+            if heading_style_map is None:
+                heading_style_map = _parse_heading_styles(parts)
+            else:
+                heading_style_map = dict(heading_style_map)
+            headings = _build_heading_tree(parts, heading_style_map)
 
-        # --- 3.4 层级校验（fail-closed） ---
-        _validate_heading_hierarchy(headings)
+            # --- 3.4 层级校验（fail-closed；样式映射/宽松扫描时由调用方负责） ---
+            if not allow_missing_headings:
+                _validate_heading_hierarchy(headings)
 
-        # --- 3.2 续：正文资源引用预检 ---
-        body_resource_warnings = _check_body_resource_references(parts, rel_map)
+            # --- 3.2 续：正文资源引用预检 ---
+            body_resource_warnings = _check_body_resource_references(parts, rel_map)
 
-        # --- 3.6 预览统计 ---
-        image_count = _count_images(parts)
-        table_count = _count_tables(parts)
-        all_names = zip_handle.namelist()
-        media_names = [n for n in all_names if n.startswith("word/media/")]
-        entry_count = len(all_names)
+            # --- 2.1 保真扫描（分级报告，随预览返回） ---
+            fidelity_report = scan_fidelity(parts)
 
-        level_counts: Dict[int, int] = {}
-        for h in headings:
-            level_counts[h.level] = level_counts.get(h.level, 0) + 1
+            # --- 3.1 段落样式普查（供样式映射页展示） ---
+            style_census = census_paragraph_styles(parts)
 
-        warnings: List[str] = []
-        if not heading_style_map:
-            warnings.append("未在 styles.xml 中找到任何 Heading 样式定义。")
-        warnings.extend(body_resource_warnings)
-        if len(media_names) == 0 and image_count > 0:
-            warnings.append("正文引用了图片但 media 目录为空。")
+            # --- 3.6 预览统计 ---
+            image_count = _count_images(parts)
+            table_count = _count_tables(parts)
+            all_names = package.names
+            media_names = [n for n in all_names if n.startswith("word/media/")]
+            entry_count = len(all_names)
 
-        # --- 3.5 文档类型建议 ---
-        suggestion = _suggest_document_type(headings, parts)
+            level_counts: Dict[int, int] = {}
+            for h in headings:
+                level_counts[h.level] = level_counts.get(h.level, 0) + 1
 
-        return ImportPreview(
-            file_name=file_name,
-            file_size_bytes=file_size,
-            package_entry_count=entry_count,
-            heading_style_map=heading_style_map,
-            headings=headings,
-            heading_level_counts=level_counts,
-            first_headings=headings[:PREVIEW_HEADING_LIMIT],
-            last_headings=(
-                headings[-PREVIEW_HEADING_LIMIT:]
-                if len(headings) > PREVIEW_HEADING_LIMIT else []
-            ),
-            image_count=image_count,
-            table_count=table_count,
-            media_count=len(media_names),
-            relationship_count=len(rel_map),
-            warnings=warnings,
-            document_type_suggestion=suggestion,
-        )
+            warnings: List[str] = []
+            if not heading_style_map:
+                warnings.append("未在 styles.xml 中找到任何 Heading 样式定义。")
+            warnings.extend(body_resource_warnings)
+            if len(media_names) == 0 and image_count > 0:
+                warnings.append("正文引用了图片但 media 目录为空。")
+
+            # --- 3.5 文档类型建议 ---
+            suggestion = _suggest_document_type(headings, parts)
+
+            return ImportPreview(
+                file_name=file_name,
+                file_size_bytes=file_size,
+                package_entry_count=entry_count,
+                heading_style_map=heading_style_map,
+                headings=headings,
+                heading_level_counts=level_counts,
+                first_headings=headings[:PREVIEW_HEADING_LIMIT],
+                last_headings=(
+                    headings[-PREVIEW_HEADING_LIMIT:]
+                    if len(headings) > PREVIEW_HEADING_LIMIT else []
+                ),
+                image_count=image_count,
+                table_count=table_count,
+                media_count=len(media_names),
+                relationship_count=len(rel_map),
+                warnings=warnings,
+                document_type_suggestion=suggestion,
+                fidelity=fidelity_report,
+                style_census=style_census,
+            )
+    except OOXMLSecurityError as exc:
+        raise _map_security_error(exc) from exc
 
 
 # --- 3.1 包结构校验 ---
@@ -230,135 +259,56 @@ def _check_extension(file_name: str) -> None:
         )
 
 
-def _open_and_check_zip(file_path: Path) -> zipfile.ZipFile:
-    """打开 ZIP 并校验完整性和 CRC。
-
-    非 ZIP 文件、损坏 ZIP 或 CRC 校验失败均视为非法 DOCX。
-    """
-    try:
-        zf = zipfile.ZipFile(str(file_path), "r")
-    except (zipfile.BadZipFile, OSError) as exc:
-        raise InvalidDocxError(
-            "文件不是有效的 ZIP 包或不存在。",
-            suggested_action="请确认选择了正确的 .docx 文件且文件未损坏。",
-            details={"error": str(exc)},
-        ) from exc
-    try:
-        _check_zip_limits(zf)
-        # CRC 校验：testzip() 返回第一个损坏条目名，None 表示全部通过。
-        bad = zf.testzip()
-    except Exception:
-        zf.close()
-        raise
-    if bad is not None:
-        zf.close()
-        raise InvalidDocxError(
-            "ZIP 包 CRC 校验失败：{0}".format(bad),
-            suggested_action="文件可能在传输中损坏，请重新获取原始 DOCX。",
-            details={"badEntry": bad},
+def _map_security_error(exc: OOXMLSecurityError) -> DocToolError:
+    """把统一安全入口的中性异常映射为 ``InvalidDocxError``（含稳定错误码）。"""
+    if exc.reason == "dtd":
+        return InvalidDocxError(
+            "XML 部件包含不允许的 DTD/实体声明：{0}".format(
+                exc.part_name or "未知部件"
+            ),
+            details={"part": exc.part_name},
         )
-    return zf
-
-
-def _check_zip_limits(zf: zipfile.ZipFile) -> None:
-    """在解压前限制条目数、展开体积、单条目体积和压缩比。"""
-    infos = zf.infolist()
-    if len(infos) > MAX_PACKAGE_ENTRIES:
-        raise InvalidDocxError(
-            "DOCX 包含过多 ZIP 条目。",
-            details={"entryCount": str(len(infos))},
+    if exc.reason == "wellformed":
+        return InvalidDocxError(
+            "XML 部件解析失败：{0}".format(exc.part_name or "未知部件"),
+            suggested_action="文件可能已损坏，请在 Word 中尝试打开并另存后重新导入。",
+            details={"part": exc.part_name, "error": str(exc)},
         )
-    total = 0
-    for info in infos:
-        total += info.file_size
-        if info.file_size > MAX_SINGLE_ENTRY_BYTES:
-            raise InvalidDocxError(
-                "DOCX 包含异常大的条目：{0}".format(info.filename),
-                details={"entry": info.filename, "size": str(info.file_size)},
-            )
-        if info.compress_size > 0 and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
-            raise InvalidDocxError(
-                "DOCX 包含异常压缩比的条目：{0}".format(info.filename),
-                details={"entry": info.filename},
-            )
-    if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
-        raise InvalidDocxError(
-            "DOCX 解压后的总大小超过安全上限。",
-            details={"uncompressedBytes": str(total)},
-        )
-
-
-def _check_encryption(zf: zipfile.ZipFile) -> None:
-    """检测加密 DOCX（OOXML 加密后 ZIP 内仅含 ``EncryptedPackage``）。"""
-    names = zf.namelist()
-    if ENCRYPTED_ENTRY in names and "word/document.xml" not in names:
-        raise InvalidDocxError(
+    if exc.reason == "encrypted":
+        return InvalidDocxError(
             "文件已加密或受密码保护。",
             suggested_action="请先在 Word 中解除文档密码保护后重新导入。",
-            details={"entry": ENCRYPTED_ENTRY},
+            details={"entry": exc.part_name},
         )
-
-
-def _read_parts(zf: zipfile.ZipFile) -> Dict[str, bytes]:
-    """只读取预检需要的 XML/关系部件，避免把全部图片载入内存。"""
-    parts: Dict[str, bytes] = {}
-    for info in zf.infolist():
-        name = info.filename
-        # 跳过目录条目
-        if name.endswith("/") or not (name.endswith(".xml") or name.endswith(".rels")):
-            continue
-        if info.file_size > MAX_XML_PART_BYTES:
-            raise InvalidDocxError(
-                "XML 部件超过安全上限：{0}".format(name),
-                details={"part": name, "size": str(info.file_size)},
-            )
-        try:
-            parts[name] = zf.read(name)
-        except (zipfile.BadZipFile, RuntimeError) as exc:
-            raise InvalidDocxError(
-                "读取 ZIP 条目失败：{0}".format(name),
-                details={"error": str(exc)},
-            ) from exc
-    return parts
+    if exc.reason == "limits":
+        return InvalidDocxError(
+            "DOCX 包大小超过安全上限：{0}".format(exc),
+            details={"reason": str(exc)},
+        )
+    if exc.reason == "crc":
+        return InvalidDocxError(
+            "ZIP 包 CRC 校验失败：{0}".format(exc.part_name),
+            suggested_action="文件可能在传输中损坏，请重新获取原始 DOCX。",
+            details={"badEntry": exc.part_name},
+        )
+    if exc.reason == "missing":
+        return InvalidDocxError(
+            "缺少核心部件：{0}".format(exc.part_name),
+            suggested_action="文件结构不完整，请确认是标准的 Word .docx 文件。",
+            details={"missingPart": exc.part_name},
+        )
+    return InvalidDocxError(str(exc))
 
 
 def _check_xml_wellformed(parts: Dict[str, bytes]) -> None:
-    """校验所有 XML 部件良构。"""
+    """校验所有 XML 部件良构（统一安全解析，DTD/实体/良构失败均映射）。"""
     for name, data in parts.items():
         if not name.endswith(".xml") and not name.endswith(".rels"):
             continue
         try:
-            _parse_xml(data, name)
-        except etree.XMLSyntaxError as exc:
-            raise InvalidDocxError(
-                "XML 部件解析失败：{0}".format(name),
-                suggested_action="文件可能已损坏，请在 Word 中尝试打开并另存后重新导入。",
-                details={"part": name, "error": str(exc)},
-            ) from exc
-
-
-def _parse_xml(data: bytes, part_name: str = ""):
-    """使用禁用 DTD、实体解析和网络访问的解析器读取 OOXML。"""
-    upper = data[:4096].upper()
-    if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
-        raise InvalidDocxError(
-            "XML 部件包含不允许的 DTD/实体声明：{0}".format(part_name or "unknown"),
-            details={"part": part_name or "unknown"},
-        )
-    parser = etree.XMLParser(
-        resolve_entities=False,
-        no_network=True,
-        load_dtd=False,
-        huge_tree=False,
-        recover=False,
-    )
-    root = etree.fromstring(data, parser=parser)
-    if root.getroottree().docinfo.doctype:
-        raise InvalidDocxError(
-            "XML 部件包含不允许的 DTD 声明：{0}".format(part_name or "unknown"),
-            details={"part": part_name or "unknown"},
-        )
-    return root
+            parse_xml_safe(data, name)
+        except OOXMLSecurityError as exc:
+            raise _map_security_error(exc) from exc
 
 
 def _check_required_parts(parts: Dict[str, bytes]) -> None:
@@ -380,7 +330,7 @@ def _parse_relationships(parts: Dict[str, bytes]) -> Dict[str, Dict[str, str]]:
     rels_name = "word/_rels/document.xml.rels"
     if rels_name not in parts:
         return {}
-    rels_root = _parse_xml(parts[rels_name], rels_name)
+    rels_root = parse_xml_safe(parts[rels_name], rels_name)
     rel_map: Dict[str, Dict[str, str]] = {}
     for rel in rels_root:
         rid = rel.get("Id")
@@ -394,14 +344,17 @@ def _parse_relationships(parts: Dict[str, bytes]) -> Dict[str, Dict[str, str]]:
 
 
 def _check_relationship_targets(
-    rel_map: Dict[str, Dict[str, str]], zf: zipfile.ZipFile
+    rel_map: Dict[str, Dict[str, str]], names: set
 ) -> None:
     """校验每条关系的 Target 在包内存在（外部链接除外）。"""
-    names = set(zf.namelist())
     for rid, info in rel_map.items():
         target = info["target"]
         # TargetMode 是 OOXML 判断外部关系的事实来源；URL 前缀仅作兼容。
         if _is_external_relationship(info):
+            continue
+        if info.get("targetMode", "").lower() == "internal":
+            # 文档内书签/锚点关系（如 hyperlink Target="_Toc123"）：目标是
+            # 文档内位置而非包内部件，跳过部件存在性校验。
             continue
         # 相对 word/ 目录的目标
         if target.startswith("/"):
@@ -433,7 +386,7 @@ def _check_body_resource_references(
     document_xml = parts.get("word/document.xml")
     if document_xml is None:
         return warnings
-    root = _parse_xml(document_xml, "word/document.xml")
+    root = parse_xml_safe(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
     if body is None:
         return warnings
@@ -480,7 +433,7 @@ def _parse_heading_styles(parts: Dict[str, bytes]) -> Dict[str, int]:
     styles_xml = parts.get("word/styles.xml")
     if styles_xml is None:
         return {}
-    sroot = _parse_xml(styles_xml, "word/styles.xml")
+    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
     heading_map: Dict[str, int] = {}
     for style in sroot.iter(_qn("style")):
         if style.get(_qn("type")) != "paragraph":
@@ -501,12 +454,98 @@ def _parse_heading_styles(parts: Dict[str, bytes]) -> Dict[str, int]:
     return heading_map
 
 
+def census_paragraph_styles(parts: Dict[str, bytes]) -> Dict[str, StyleCensus]:
+    """普查段落样式：显示名 + 正文实际使用次数 + 疑似标题标记（任务 3.1）。
+
+    从 ``styles.xml`` 枚举全部段落样式，从 ``document.xml`` 统计每个样式在正文
+    段落中的实际使用次数。已被自动识别为 Heading 的样式不重复标记为疑似标题。
+    """
+    styles_xml = parts.get("word/styles.xml")
+    if styles_xml is None:
+        return {}
+    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
+    style_names: Dict[str, str] = {}
+    for style in sroot.iter(_qn("style")):
+        if style.get(_qn("type")) != "paragraph":
+            continue
+        style_id = style.get(_qn("styleId"))
+        name_elem = style.find(_qn("name"))
+        if style_id and name_elem is not None:
+            style_names[style_id] = name_elem.get(_qn("val")) or ""
+
+    document_xml = parts.get("word/document.xml", b"")
+    usage: Dict[str, int] = {}
+    if document_xml:
+        root = parse_xml_safe(document_xml, "word/document.xml")
+        for paragraph in root.iter(_qn("p")):
+            pPr = paragraph.find(_qn("pPr"))
+            if pPr is None:
+                continue
+            pStyle = pPr.find(_qn("pStyle"))
+            if pStyle is None:
+                continue
+            style_id = pStyle.get(_qn("val"))
+            if style_id:
+                usage[style_id] = usage.get(style_id, 0) + 1
+
+    census: Dict[str, StyleCensus] = {}
+    for style_id, name in style_names.items():
+        census[style_id] = StyleCensus(
+            style_id=style_id,
+            name=name,
+            usage_count=usage.get(style_id, 0),
+            suspected_heading=_looks_like_heading(name),
+        )
+    return census
+
+
+def _looks_like_heading(name: str) -> bool:
+    """判断样式名是否疑似标题（非标准 Heading 命名，但含层级/章节特征）。"""
+    lowered = (name or "").strip().lower()
+    if re.match(r"(?i)heading\s*\d", lowered) or re.match(r"标题\s*\d", lowered):
+        return False  # 已是标准 Heading 样式，由自动识别处理
+    return bool(
+        re.search(r"(章|节|篇|部分|标题|heading|h[1-9])", lowered, re.I)
+        or re.match(r"^[\d\.]+\s*$", lowered)
+        or re.fullmatch(r"[一二三四五六七八九十百]+", lowered)
+    )
+
+
+def validate_heading_mapping(path: Union[str, Path], heading_style_map: Dict[str, int]) -> str:
+    """按用户样式映射重建标题树并校验层级；返回错误文本（空串表示通过）。
+
+    供向导「样式映射」页在用户完成映射后即时校验：至少一个样式映射到级别 1，
+    且映射后正文标题序列不存在层级跳跃。
+    """
+    if not heading_style_map:
+        return "请至少把一个段落样式映射到级别 1（Heading 1）。"
+    if 1 not in heading_style_map.values():
+        return "请至少把一个段落样式映射到级别 1（Heading 1）。"
+    try:
+        with read_docx_package(path) as package:
+            parts = package.read_xml_parts()
+    except OOXMLSecurityError as exc:
+        # 源文件在向导预检后可能被删除/占用/损坏：映射校验必须返回稳定错误
+        # 文本而非把内部异常传播进向导页面（否则页面导航异常、错误不可读）。
+        return "源文档无法读取：{0}".format(_map_security_error(exc).user_message)
+    headings = _build_heading_tree(parts, heading_style_map)
+    try:
+        _validate_heading_hierarchy(headings)
+    except HeadingHierarchyError as exc:
+        return exc.user_message
+    except MissingHeading1Error:
+        if not headings:
+            return "映射到级别 1 的样式在正文中没有被使用，无法构成章节树。"
+        return "按当前映射未找到可识别的 Heading 1 标题。"
+    return ""
+
+
 def _build_heading_tree(
     parts: Dict[str, bytes], heading_style_map: Dict[str, int]
 ) -> List[HeadingInfo]:
     """遍历 ``document.xml`` 正文段落，按样式提取标题树。"""
     document_xml = parts.get("word/document.xml", b"")
-    root = _parse_xml(document_xml, "word/document.xml")
+    root = parse_xml_safe(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
     if body is None:
         return []
@@ -614,13 +653,13 @@ def _suggest_document_type(
     document_xml = parts.get("word/document.xml", b"")
     cover_text = ""
     try:
-        root = _parse_xml(document_xml, "word/document.xml")
+        root = parse_xml_safe(document_xml, "word/document.xml")
         body = root.find(_qn("body"))
         if body is not None:
             for elem in list(body)[:30]:
                 cover_text += _para_text(elem) + " "
-    except etree.XMLSyntaxError:
-        pass
+    except OOXMLSecurityError:
+        pass  # 解析失败不影响类型建议（正文良构已由预检先行校验）
     cover_has_requirement = bool(re.search(r"需求", cover_text))
     cover_has_design = bool(re.search(r"(详细设计|系统设计|设计说明书)", cover_text))
 
@@ -659,7 +698,7 @@ def _count_images(parts: Dict[str, bytes]) -> int:
     document_xml = parts.get("word/document.xml", b"")
     if not document_xml:
         return 0
-    root = _parse_xml(document_xml, "word/document.xml")
+    root = parse_xml_safe(document_xml, "word/document.xml")
     count = 0
     for _ in root.iter(A + "blip"):
         count += 1
@@ -673,7 +712,7 @@ def _count_tables(parts: Dict[str, bytes]) -> int:
     document_xml = parts.get("word/document.xml", b"")
     if not document_xml:
         return 0
-    root = _parse_xml(document_xml, "word/document.xml")
+    root = parse_xml_safe(document_xml, "word/document.xml")
     count = 0
     body = root.find(_qn("body"))
     if body is None:

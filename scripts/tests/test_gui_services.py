@@ -34,25 +34,71 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
+class IssuesPanelTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _records(self):
+        from doc_tool.application.issues import IssueRecord
+        return [
+            IssueRecord("pipeline", "build", "requirement", "error", "a.md", 2, "E2001", "失败", "建议", "t1"),
+            IssueRecord("lint", "todo_residual", "requirement", "warning", "b.md", 4, None, "TODO", "修正", "t2"),
+            IssueRecord("lint", "term_case", "design", "info", "missing.md", None, None, "术语", "修正", "t3"),
+        ]
+
+    def test_combined_filters_summary_and_refresh_preservation(self):
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+        panel = IssuesPanel()
+        panel.set_issues(self._records())
+        panel._document_type.setCurrentIndex(panel._document_type.findData("requirement"))
+        panel._severity.setCurrentIndex(panel._severity.findData("warning"))
+        self.assertEqual([item.rel_path for item in panel.filtered_issues()], ["b.md"])
+        self.assertIn("warning 1", panel._summary.text())
+        panel.set_issues(self._records() + [self._records()[1]])
+        self.assertEqual(panel._document_type.currentData(), "requirement")
+        self.assertEqual(panel._severity.currentData(), "warning")
+
+    def test_double_click_location_missing_line_file_and_clear(self):
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+        opened = []
+        panel = IssuesPanel(on_open=lambda path, line: opened.append((path, line)))
+        panel.set_issues(self._records())
+        panel._activate(panel._tree.topLevelItem(0))
+        self.assertEqual(opened[-1], ("a.md", 2))
+        panel._activate(panel._tree.topLevelItem(2))
+        self.assertEqual(opened[-1], ("missing.md", None))
+        panel.clear_project()
+        self.assertEqual(panel._tree.topLevelItemCount(), 0)
+        self.assertEqual(panel._state.text(), "无当前项目数据")
+
+
 class TaskRunnerTests(unittest.TestCase):
     """任务 6.8：TaskRunner 后台执行、事件推送与取消。"""
 
     def test_successful_task_emits_events(self):
-        """成功任务推送 started + succeeded 事件。"""
+        """成功任务推送 started + succeeded 事件（不产生 failed）。"""
         from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
 
         runner = TaskRunner()
+        seen = []
 
         def simple_task():
             return 42
 
-        runner.start(TaskSpec(name="test", target=simple_task))
+        runner.start(
+            TaskSpec(name="test", target=simple_task),
+            on_event=lambda event: seen.append(event),
+        )
         runner.join(timeout=5)
-        runner.poll()  # 处理事件
+        runner.poll()  # 驱动事件回调
 
-        events = runner.drain_events()
-        kinds = [e.kind for e in events]
-        # poll 已消费事件，但 _on_done 被调用说明 succeeded 已处理
+        kinds = [e.kind for e in seen]
+        self.assertIn("started", kinds)
+        self.assertIn("succeeded", kinds)
+        self.assertNotIn("failed", kinds)
         self.assertFalse(runner.is_running)
 
     def test_failed_task_emits_error(self):
@@ -170,6 +216,76 @@ class TaskRunnerTests(unittest.TestCase):
         self.assertEqual(len(received), 1)
         self.assertTrue(received[0])  # 非空版本号
 
+    def test_watchdog_timeout_reports_stable_error(self):
+        """看门狗超时解锁 UI，并发布稳定错误码与任务名。"""
+        from doc_tool.ui.task_bridge import (
+            ERR_WATCHDOG_TIMEOUT,
+            TaskRunner,
+            TaskSpec,
+        )
+
+        runner = TaskRunner()
+        events = []
+        done = []
+        runner.start(
+            TaskSpec(
+                name="merge",
+                target=lambda: time.sleep(0.2),
+                timeout_seconds=0.01,
+            ),
+            on_event=events.append,
+            on_done=done.append,
+        )
+        time.sleep(0.03)
+        runner.poll()
+
+        self.assertFalse(runner.is_running)
+        failed = [event for event in events if event.kind == "failed"]
+        self.assertEqual(failed[-1].error_code, ERR_WATCHDOG_TIMEOUT)
+        self.assertEqual(failed[-1].stage, "merge")
+        self.assertEqual(done, [None])
+        runner.join(timeout=1)
+        runner.poll()
+        self.assertEqual(done, [None])
+
+    def test_late_timed_out_worker_cannot_complete_new_run(self):
+        """超时旧线程的迟到终态不得污染随后启动的新任务。"""
+        from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
+
+        runner = TaskRunner()
+        first_done = []
+        second_done = []
+
+        runner.start(
+            TaskSpec(
+                name="old",
+                target=lambda: (time.sleep(0.08), "old")[1],
+                timeout_seconds=0.01,
+            ),
+            on_done=first_done.append,
+        )
+        time.sleep(0.03)
+        runner.poll()
+        self.assertEqual(first_done, [None])
+
+        runner.start(
+            TaskSpec(
+                name="new",
+                target=lambda: (time.sleep(0.15), "new")[1],
+                timeout_seconds=1,
+            ),
+            on_done=second_done.append,
+        )
+        time.sleep(0.08)  # 此时旧线程已返回，新线程仍在运行
+        runner.poll()
+        self.assertTrue(runner.is_running)
+        self.assertEqual(second_done, [])
+
+        runner.join(timeout=2)
+        runner.poll()
+        self.assertFalse(runner.is_running)
+        self.assertEqual(second_done, ["new"])
+
 
 class ProjectServiceTests(unittest.TestCase):
     """任务 6.4：打开项目与最近项目列表。"""
@@ -231,6 +347,26 @@ class ProjectServiceTests(unittest.TestCase):
         self.assertEqual(summary["passCount"], 1)
         self.assertEqual(summary["failCount"], 1)
         self.assertIn("expected=3.1.14", summary["failures"][0])
+
+    def test_window_geometry_roundtrip_and_invalid_json(self):
+        from unittest.mock import patch
+
+        from doc_tool.application.project_service import (
+            load_window_geometry,
+            save_window_geometry,
+        )
+
+        home = Path(self._tmp) / "home"
+        with patch("pathlib.Path.home", return_value=home):
+            self.assertIsNone(load_window_geometry())
+            save_window_geometry("900x700+10+20", True)
+            self.assertEqual(
+                load_window_geometry(),
+                {"geometry": "900x700+10+20", "maximized": True},
+            )
+            geometry_file = home / ".konsung-doc-tool" / "geometry.json"
+            geometry_file.write_text("{broken", encoding="utf-8")
+            self.assertIsNone(load_window_geometry())
 
     def test_recent_projects_add_and_load(self):
         """添加最近项目后可加载。"""
@@ -329,49 +465,1621 @@ class ImportWizardPresentationTests(unittest.TestCase):
         self.assertIn("图片数量：4", text)
         self.assertIn("建议模式：通用大文档", text)
 
+    def test_wizard_exposes_six_qwizard_pages(self):
+        _ensure_qapp()
+        from doc_tool.ui.wizard import ImportWizard
 
-# === 人工操作清单 ===
+        wizard = ImportWizard()
+        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4, 5])
+        self.assertTrue(hasattr(wizard, "_source_page"))
+        self.assertTrue(hasattr(wizard, "_preflight_page"))
+        self.assertTrue(hasattr(wizard, "_mapping_page"))
+        self.assertTrue(hasattr(wizard, "_info_page"))
+        self.assertTrue(hasattr(wizard, "_executing_page"))
+        self.assertTrue(hasattr(wizard, "_result_page"))
+        wizard.close()
+
+    def test_project_info_validation_rules(self):
+        from doc_tool.ui.wizard import ImportWizard
+
+        wizard = ImportWizard.__new__(ImportWizard)
+        wizard._doc_type = "requirement"
+        wizard._doc_no = ""
+        wizard._doc_name = "文档"
+        wizard._doc_version = "1.0"
+        wizard._project_name = "proj"
+        wizard._target_parent = "C:/x"
+        self.assertIn("文档编号", wizard._validate_project_info())
+
+        wizard._doc_no = "KSHC-001"
+        wizard._project_name = "a:b"
+        self.assertIn("不允许的字符", wizard._validate_project_info())
+
+        wizard._project_name = "good-name"
+        self.assertEqual(wizard._validate_project_info(), "")
+
+
+class WizardFidelityAndMappingTests(unittest.TestCase):
+    """任务 2.3/3.3：预检页阻断确认门禁与样式映射页下拉逻辑。"""
+
+    def _wizard(self):
+        _ensure_qapp()
+        from doc_tool.ui.wizard import ImportWizard
+
+        wizard = ImportWizard()
+        self.addCleanup(wizard.close)
+        return wizard
+
+    def test_preflight_block_gate_requires_confirmation(self):
+        wizard = self._wizard()
+        page = wizard._preflight_page
+        page._preview_ok = True
+        page._has_block = True
+        page._confirm_block.setChecked(False)
+        self.assertFalse(page.isComplete(), "存在阻断特性且未确认时不得继续")
+        page._confirm_block.setChecked(True)
+        self.assertTrue(page.isComplete(), "确认「仍然导入」后放行")
+        # 无阻断特性时不要求确认
+        page._has_block = False
+        page._confirm_block.setChecked(False)
+        self.assertTrue(page.isComplete())
+        # 结构性预检失败始终阻断
+        page._preview_ok = False
+        self.assertFalse(page.isComplete())
+
+    def test_format_preview_summary_renders_fidelity_block(self):
+        from types import SimpleNamespace
+
+        from doc_tool.adapters.fidelity import FidelityFinding, FidelityReport, SEVERITY_BLOCK
+        from doc_tool.ui.wizard import format_preview_summary
+
+        preview = SimpleNamespace(
+            heading_level_counts={1: 2},
+            image_count=1,
+            table_count=0,
+            warnings=[],
+            document_type_suggestion=SimpleNamespace(
+                document_type="general", confidence="high", reason="通用"
+            ),
+            fidelity=FidelityReport(findings=(
+                FidelityFinding("comment", "批注", SEVERITY_BLOCK, 1, ("body[3]",)),
+            )),
+        )
+        text = format_preview_summary(preview)
+        self.assertIn("保真风险", text)
+        self.assertIn("批注", text)
+        self.assertIn("阻断", text)
+
+    def test_style_mapping_page_mapping_and_complete(self):
+        from types import SimpleNamespace
+
+        from doc_tool.adapters.preflight import StyleCensus
+
+        census = {
+            "ChapterTitle": StyleCensus("ChapterTitle", "章标题", 2, True),
+            "SectionTitle": StyleCensus("SectionTitle", "节标题", 2, True),
+            "Normal": StyleCensus("Normal", "Normal", 5, False),
+        }
+        preview = SimpleNamespace(
+            style_census=census,
+            heading_style_map={"ChapterTitle": 1},
+        )
+        wizard = self._wizard()
+        page = wizard._mapping_page
+        page._populate(preview)
+        self.assertEqual(page.mapping(), {"ChapterTitle": 1}, "自动识别级别应预填")
+        self.assertTrue(page.isComplete(), "存在级别 1 映射时允许继续")
+        # 把 ChapterTitle 改为忽略 -> 无 H1 -> 不可继续
+        chapter_combo = next(r["combo"] for r in page._rows if r["style_id"] == "ChapterTitle")
+        chapter_combo.setCurrentIndex(chapter_combo.findData(0))
+        self.assertFalse(page.isComplete(), "缺少级别 1 映射时不可继续")
+        # 映射 SectionTitle 到级别 1 -> 恢复可继续
+        section_combo = next(r["combo"] for r in page._rows if r["style_id"] == "SectionTitle")
+        section_combo.setCurrentIndex(section_combo.findData(1))
+        self.assertTrue(page.isComplete())
+        self.assertEqual(page.mapping()["SectionTitle"], 1)
+
+
+def _ensure_qapp():
+    """在无 QApplication 时创建（离屏环境可用）。"""
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app
+
+
+class _FakeWriter:
+    """Ctrl+S 测试用的假 ContentWriter：resolve 落到临时目录，write_text 记录调用。"""
+
+    def __init__(self, content_root):
+        self._root = Path(content_root)
+        self.written = None
+
+    def resolve(self, rel_path):
+        return self._root if rel_path == "." else self._root / rel_path
+
+    def write_text(self, rel_path, text):
+        self.written = (rel_path, text)
+        return SimpleNamespace(
+            written=True, error=None, backup_path=None, path=""
+        )
+
+
+class MainWindowInteractionTests(unittest.TestCase):
+    """PySide6 主窗口交互（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def test_workbench_state_covers_word_and_missing_artifacts(self):
+        from doc_tool.ui.workbench_state import derive_workbench_state
+
+        state = derive_workbench_state(
+            SimpleNamespace(is_writable=True, output_exists=False),
+            running=False,
+            word_available=False,
+        )
+
+        self.assertFalse(state.actions["merge"].enabled)
+        self.assertTrue(state.actions["diag_build"].enabled)
+        self.assertFalse(state.actions["output"].enabled)
+        self.assertFalse(state.actions["report"].enabled)
+        self.assertIn("Microsoft Word", state.readiness_text)
+        self.assertTrue(any("输出目录" in reason for reason in state.reasons))
+
+    def test_workbench_state_matrix_and_four_views(self):
+        from doc_tool.ui.workbench_state import derive_workbench_state
+
+        no_project = derive_workbench_state(None, running=False)
+        self.assertEqual(no_project.view, "empty")
+        self.assertFalse(no_project.actions["validate"].enabled)
+
+        readonly = derive_workbench_state(
+            SimpleNamespace(is_writable=False, output_exists=True), running=False
+        )
+        self.assertFalse(readonly.actions["validate"].enabled)
+        self.assertTrue(readonly.actions["content"].enabled)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "validation.md"
+            report.write_text("ok", encoding="utf-8")
+            writable = derive_workbench_state(
+                SimpleNamespace(is_writable=True, output_exists=True),
+                running=False,
+                report_path=report,
+            )
+            self.assertTrue(writable.actions["validate"].enabled)
+            self.assertTrue(writable.actions["report"].enabled)
+            self.assertEqual(writable.view, "idle")
+
+            running = derive_workbench_state(
+                SimpleNamespace(is_writable=True, output_exists=True),
+                running=True,
+                task_label="校验",
+                report_path=report,
+            )
+            self.assertFalse(running.actions["validate"].enabled)
+            self.assertEqual(running.view, "running")
+
+            result = derive_workbench_state(
+                SimpleNamespace(is_writable=True, output_exists=True),
+                running=False,
+                report_path=report,
+                result_available=True,
+            )
+            self.assertEqual(result.view, "result")
+
+    def test_derive_step_list_pipeline_and_heartbeat(self):
+        from doc_tool.ui.workbench_state import derive_step_list
+
+        steps = derive_step_list([
+            ("build", "started", "", None),
+            ("validate_pre", "succeeded", "校验通过", None),
+            ("word_refresh", "skipped", "已显式跳过", None),
+            ("publish", "failed", "发布失败", "E9000"),
+        ])
+        by_stage = {s.stage: s.status for s in steps}
+        self.assertEqual(by_stage["build"], "running")
+        self.assertEqual(by_stage["validate_pre"], "success")
+        self.assertEqual(by_stage["word_refresh"], "skipped")
+        self.assertEqual(by_stage["publish"], "failed")
+        # 心跳任务回退为单一步骤，不伪造百分比
+        heartbeat = derive_step_list(
+            [("validate", "started", "", None)], fallback_label="校验"
+        )
+        self.assertEqual(len(heartbeat), 1)
+        self.assertEqual(heartbeat[0].status, "running")
+
+    def test_task_dock_renders_running_and_result(self):
+        from doc_tool.ui.task_dock import TaskDock
+        from doc_tool.ui.workbench_state import ResultState, StepItem
+
+        dock = TaskDock()
+        dock.show_running(
+            "正式合并",
+            [
+                StepItem(stage="build", label="构建", status="success"),
+                StepItem(stage="validate_pre", label="前校验", status="running"),
+            ],
+            current_stage="validate_pre",
+            elapsed=5,
+        )
+        dock.show_result(
+            "正式合并",
+            ResultState(
+                status="success",
+                title="正式合并成功",
+                summary="完成",
+                project_root=Path("C:/x"),
+            ),
+            [StepItem(stage="build", label="构建", status="success")],
+        )
+        self.assertTrue(dock.has_result())
+
+    def test_result_card_action_buttons_keep_captured_paths(self):
+        """clicked(bool) 不能覆盖结果卡片中捕获的产物路径。"""
+        from doc_tool.ui.work_detail_pane import ResultCard
+        from doc_tool.ui.workbench_state import ResultState
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output.docx"
+            output.write_bytes(b"docx")
+            opened = []
+            card = ResultCard(
+                on_open_output=opened.append,
+                on_open_directory=opened.append,
+            )
+            card.render(ResultState(status="success", output_path=output))
+
+            for button in card._action_buttons:
+                button.click()
+
+            self.assertEqual(opened, [str(output), str(output.parent)])
+
+    def test_log_stream_pending_unread_while_collapsed(self):
+        from doc_tool.ui.work_detail_pane import LogStream
+
+        log = LogStream()
+        log.append_line("a")
+        log.set_expanded(False)
+        log.append_line("b")
+        log.append_line("c")
+        self.assertEqual(log.pending_unread, 2)
+        log.set_expanded(True)
+        self.assertEqual(log.pending_unread, 0)
+
+    def test_pipeline_success_sets_persistent_result(self):
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "output.docx"
+            output.write_bytes(b"docx")
+            report = root / "validation.md"
+            report.write_text("ok", encoding="utf-8")
+            window = MainWindow()
+            window._project_summary = SimpleNamespace(project_root=root)
+            window._current_task = "merge"
+            window._last_error_code = None
+            window._last_error_stage = ""
+            window._last_error_detail = ""
+            window._task_terminal_kind = "succeeded"
+            window._validation_report_path = lambda: report
+            window._current_log_path = lambda: root / "runtime.log"
+            result = SimpleNamespace(
+                success=True, output_path=str(output), error_code=None
+            )
+            with patch(
+                "doc_tool.domain.output_state.is_formal_success", return_value=True
+            ):
+                window._handle_pipeline_result(result)
+            self.assertEqual(window._result_state.status, "success")
+            self.assertEqual(window._result_state.output_path, output)
+            self.assertEqual(window._result_state.report_path, report)
+            self.assertIn("正式合并成功", window._result_state.title)
+            window.close()
+
+    def test_validation_success_result_exposes_report_only(self):
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "validation.md"
+            report_path.write_text("ok", encoding="utf-8")
+            window = MainWindow()
+            window._current_task = "validate"
+            window._last_error_code = None
+            window._last_error_stage = ""
+            window._last_error_detail = ""
+            window._project_summary = SimpleNamespace(project_root=Path(tmp))
+            window._validation_report_path = lambda: report_path
+            window._current_log_path = lambda: Path(tmp) / "runtime.log"
+            summary = {"exists": True, "passCount": 5, "failCount": 0, "failures": []}
+            with patch(
+                "doc_tool.application.project_service.read_validation_report_summary",
+                return_value=summary,
+            ):
+                window._handle_validation_result(True)
+            self.assertEqual(window._result_state.status, "success")
+            self.assertEqual(window._result_state.report_path, report_path)
+            self.assertIsNone(window._result_state.output_path)
+            window.close()
+
+    def test_failure_result_keeps_sanitized_technical_fields(self):
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.workbench_state import ResultState
+
+        window = MainWindow()
+        window._result_state = ResultState(
+            status="failure",
+            error_code="E3003",
+            stage="word_save",
+            exception_summary="Word 保存失败",
+            log_path=Path("C:/project/logs/runtime.log"),
+        )
+        with patch("doc_tool.ui.main_window.QMessageBox.information") as info:
+            window._show_result_technical_details()
+        details = info.call_args.args[2]
+        self.assertIn("E3003", details)
+        self.assertIn("Word 保存失败", details)
+        self.assertIn("runtime.log", details)
+        window.close()
+
+    def test_file_and_directory_opening_keep_distinct_semantics(self):
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing_file = root / "report.md"
+            with patch.object(MainWindow, "_open_path", return_value=True):
+                self.assertFalse(MainWindow._open_file(missing_file))
+                self.assertFalse(missing_file.exists())
+                directory = root / "logs"
+                self.assertTrue(MainWindow._open_directory(directory, create=True))
+                self.assertTrue(directory.is_dir())
+
+    def test_task_result_dispatch_uses_task_metadata(self):
+        from unittest.mock import Mock
+
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        window._current_task = "validate"
+        window._last_error_code = None
+        window._last_error_stage = ""
+        window._last_error_detail = ""
+        window._task_terminal_kind = ""
+        window._drain_stage_progress = Mock()
+        window._refresh_interaction_state = Mock()
+        window._refresh_recent_projects = Mock()
+        window._task_dock.show_result = Mock()
+        window._handle_pipeline_result = Mock()
+        window._handle_validation_result = Mock()
+        window._on_task_done(True)
+        window._handle_validation_result.assert_called_once_with(True)
+        window._handle_pipeline_result.assert_not_called()
+        window.close()
+
+    def test_project_switch_resets_persistent_result(self):
+        from unittest.mock import Mock, patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        root = Path("C:/new-project")
+        manifest = SimpleNamespace(
+            documentName="新文档",
+            documentNo="NO-1",
+            documentType="general",
+            documentVersion="1.0",
+            sourceSha256="abc123",
+            lastSuccessfulBuildVersion=None,
+        )
+        summary = SimpleNamespace(
+            project_root=root, manifest=manifest, lock_info=None, is_writable=True
+        )
+        window = MainWindow()
+        window._init_content_workspace = Mock()
+        with patch("doc_tool.application.project_service.add_recent_project"):
+            window.show_project(summary)
+        self.assertEqual(window._result_state.status, "idle")
+        self.assertEqual(window._result_state.project_root, root)
+        window.close()
+
+    def test_close_running_task_requests_cancel_once(self):
+        from unittest.mock import Mock, patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        window.runner = SimpleNamespace(is_running=True, cancel=Mock())
+        window._close_after_task = False
+        with patch(
+            "doc_tool.ui.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            window.close()
+            window.close()
+        window.runner.cancel.assert_called_once()
+        self.assertTrue(window._close_after_task)
+        window.close()
+
+    def test_close_running_task_can_be_refused(self):
+        from unittest.mock import Mock, patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        window.runner = SimpleNamespace(is_running=True, cancel=Mock())
+        window._close_after_task = False
+        with patch(
+            "doc_tool.ui.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ):
+            window.close()
+        window.runner.cancel.assert_not_called()
+        self.assertFalse(window._close_after_task)
+        # 关闭保护拒绝后不应弹出对话框；模拟任务结束后正常关闭
+        window.runner = SimpleNamespace(is_running=False, cancel=Mock())
+        window.close()
+
+    def test_search_panel_results_tree_is_layout_managed(self):
+        """搜索面板结果树由唯一外层布局管理（回归：二次 QVBoxLayout 不可见）。"""
+        from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+        # 旧缺陷根因：第二次 QVBoxLayout(self) 不会被安装，子控件脱离布局。
+        host = QWidget()
+        first = QVBoxLayout(host)
+        first.addWidget(QWidget())
+        second = QVBoxLayout(host)
+        second.addWidget(QWidget())
+        self.assertIs(host.layout(), first)
+        self.assertIsNone(second.parentWidget())
+
+        from doc_tool.application.content.search import SearchResult
+        from doc_tool.ui.content.search_panel import SearchPanel
+
+        class _FakeService:
+            def search(self, options, cancel_token=None):
+                return SearchResult(
+                    query=options.query,
+                    total=2,
+                    hits=[
+                        SimpleNamespace(rel_path="a.md", line_no=1, text="hello world"),
+                        SimpleNamespace(rel_path="a.md", line_no=2, text="nothing here"),
+                    ],
+                    file_count=1,
+                )
+
+        app = _ensure_qapp()
+        panel = SearchPanel(_FakeService())
+        panel.resize(600, 400)
+        panel.show()
+        panel._query_entry.setText("hello")
+        panel.search_now()
+        for _ in range(200):
+            panel._runner.poll()
+            app.processEvents()
+            if not panel._runner.is_running:
+                break
+            time.sleep(0.01)
+        app.processEvents()
+        self.assertGreater(panel._tree.topLevelItemCount(), 0)
+        self.assertGreater(panel._tree.height(), 200)
+        panel.close()
+
+    def test_closed_content_docks_reopen_via_view_menu_and_search(self):
+        """关闭章节树/工具面板 Dock 后可从「视图」菜单或 Ctrl+F 重新打开。"""
+        from unittest.mock import Mock
+
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QDockWidget
+
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.workbench_state import derive_workbench_state
+
+        _ensure_qapp()
+        win = MainWindow()
+        win.show()
+        # 模拟项目打开后由 _init_content_workspace 创建的章节树/工具面板 Dock。
+        win._tree_dock = QDockWidget("章节树", win)
+        win._tree_dock.setObjectName("chapterTreeDock")
+        win.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, win._tree_dock)
+        win._panels_dock = QDockWidget("工具面板", win)
+        win._panels_dock.setObjectName("panelsDock")
+        win.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, win._panels_dock)
+        win._rebuild_view_menu()
+
+        # 离开空状态进入 IDE 视图后，右侧任务/结果 Dock 必须重新显示。
+        state = derive_workbench_state(
+            SimpleNamespace(is_writable=True, output_exists=False), running=False
+        )
+        win._apply_workbench_state(state)
+        self.assertTrue(win._task_dock_widget.isVisible())
+
+        # 「视图」菜单为每个 Dock 提供显隐开关。
+        labels = [a.text() for a in win._view_menu.actions()]
+        for expected in ("章节树", "工具面板", "任务 / 结果"):
+            self.assertIn(expected, labels)
+
+        # 关闭两个内容 Dock 后，Ctrl+F 必须重新显示底部工具面板。
+        win._content_workspace = SimpleNamespace(focus_search=Mock())
+        win._content_index_ready = True
+        win._tree_dock.close()
+        win._panels_dock.close()
+        win._on_content_search()
+        self.assertTrue(win._panels_dock.isVisible())
+
+        # 再次关闭后，「视图」菜单的 toggle 项也能重新打开。
+        win._panels_dock.close()
+        panels_action = next(
+            a for a in win._view_menu.actions() if a.text() == "工具面板"
+        )
+        panels_action.trigger()
+        self.assertTrue(win._panels_dock.isVisible())
+        win.close()
+
+    def test_ctrl_s_shortcut_saves_current_tab(self):
+        """Ctrl+S 必须能保存当前标签页（回归：按钮文案有快捷键但未绑定）。"""
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtTest import QTest
+
+        from doc_tool.ui.content.tabs_host import TabsHost
+
+        _ensure_qapp()
+        with tempfile.TemporaryDirectory() as tmp:
+            content_root = Path(tmp) / "content"
+            rel = "requirement/第1章 引言/1.1 目的.md"
+            path = content_root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# 1.1 目的\n原文\n", encoding="utf-8")
+
+            writer = _FakeWriter(content_root)
+            tabs = TabsHost(writer)
+            tabs.open_file(rel, path.read_text(encoding="utf-8"))
+            editor = tabs.current_editor()
+            editor._editor.setPlainText("# 1.1 目的\n被改\n")
+            self.assertIsNotNone(tabs._save_shortcut)
+            self.assertEqual(
+                tabs._save_shortcut.key().toString(), QKeySequence("Ctrl+S").toString()
+            )
+            # 编辑器聚焦后发送 Ctrl+S，应触发保存（离屏下需先激活窗口）。
+            tabs.show()
+            tabs.raise_()
+            tabs.activateWindow()
+            QTest.qWait(50)
+            editor._editor.setFocus()
+            QTest.keySequence(editor._editor, QKeySequence("Ctrl+S"))
+            QTest.qWait(30)
+            self.assertEqual(writer.written, (rel, "# 1.1 目的\n被改\n"))
+            tabs.close_all()
+            tabs.close()
+
+    def test_idle_card_report_button_triggers_open_report(self):
+        """空闲卡「查看校验报告」必须接线到打开报告回调（回归：死按钮）。"""
+        from PySide6.QtWidgets import QPushButton
+
+        from doc_tool.ui.task_dock import TaskDock
+        from doc_tool.ui.workbench_state import ResultState
+
+        _ensure_qapp()
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "validation.md"
+            report.write_text("ok", encoding="utf-8")
+            opened = []
+            dock = TaskDock(on_open_report=lambda: opened.append(True))
+            dock.show_idle(
+                ResultState(
+                    status="success", report_path=report, project_root=Path(tmp)
+                ),
+                project_open=True,
+            )
+            button = next(
+                b
+                for b in dock._idle_card.findChildren(QPushButton)
+                if b.text() == "查看校验报告"
+            )
+            button.click()
+            self.assertEqual(opened, [True])
+            dock.close()
+
+
+class WizardInteractionTests(unittest.TestCase):
+    def test_preflight_constant_and_page_structure(self):
+        from doc_tool.ui.wizard import ImportWizard, PREFLIGHT_TIMEOUT_SECONDS
+
+        self.assertGreater(PREFLIGHT_TIMEOUT_SECONDS, 0)
+        _ensure_qapp()
+        wizard = ImportWizard()
+        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4, 5])
+        wizard.close()
+
+    def test_cancel_during_running_requests_safe_cancel(self):
+        from unittest.mock import Mock
+
+        from doc_tool.ui.wizard import ImportWizard
+
+        _ensure_qapp()
+        wizard = ImportWizard()
+        runner = Mock()
+        runner.is_running = True
+        wizard._runner = runner
+        wizard._closing = False
+        wizard._on_cancel_clicked()
+        self.assertTrue(wizard._closing)
+        runner.cancel.assert_called_once()
+        wizard.close()
+
+    def test_run_returns_target_root_on_accepted_and_none_on_rejected(self):
+        """run() 必须用 QDialog.DialogCode 判定结果（回归：QDialogButtonBox 无该枚举导致崩溃）。
+
+        导入成功后返回目标目录；取消/失败（目标未生成）时返回 None，避免主窗口
+        把失败路径当项目打开并误报「打开项目失败」。
+        """
+        from unittest.mock import Mock, patch
+
+        from PySide6.QtWidgets import QDialog
+
+        from doc_tool.ui.wizard import ImportWizard
+
+        _ensure_qapp()
+        wizard = ImportWizard()
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Accepted):
+            wizard._target_root = "C:/proj"
+            wizard._import_result = Mock(success=True)
+            self.assertEqual(wizard.run(), "C:/proj")
+        # 导入失败：结果页「关闭」也会 accept()，但不得返回未生成的目标路径
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Accepted):
+            wizard._target_root = "C:/proj"
+            wizard._import_result = Mock(success=False)
+            self.assertIsNone(wizard.run())
+        with patch.object(wizard, "exec", return_value=QDialog.DialogCode.Rejected):
+            self.assertIsNone(wizard.run())
+        wizard.close()
+class PresentationHelpersTests(unittest.TestCase):
+    def test_pipeline_stage_percentages_are_contiguous_and_complete(self):
+        from doc_tool.application.pipeline import (
+            PIPELINE_STAGE_ORDER,
+            stage_percent_table,
+        )
+
+        table = stage_percent_table()
+        self.assertEqual(list(table), list(PIPELINE_STAGE_ORDER))
+        self.assertEqual(table[PIPELINE_STAGE_ORDER[0]][0], 5)
+        self.assertEqual(table[PIPELINE_STAGE_ORDER[-1]][1], 100)
+        for previous, current in zip(
+            PIPELINE_STAGE_ORDER, PIPELINE_STAGE_ORDER[1:]
+        ):
+            self.assertEqual(table[previous][1], table[current][0])
+
+    def test_diagnostic_info_is_copy_friendly(self):
+        from doc_tool.ui.about_dialog import format_diagnostic_info
+
+        info = {
+            "appVersion": "1.2.3",
+            "commit": "abc123",
+            "projectSchemaVersion": "1",
+            "python": "3.11",
+            "platform": "Windows",
+            "machine": "AMD64",
+        }
+        report = SimpleNamespace(
+            available=False,
+            version="",
+            pywin32_available=True,
+            interactive_session=False,
+            reasons=["未安装 Word"],
+        )
+        text = format_diagnostic_info(info, report)
+        self.assertIn("应用版本：1.2.3", text)
+        self.assertIn("Microsoft Word：未检测到", text)
+        self.assertIn("- 未安装 Word", text)
+
+
+class ContentOperationsStateTests(unittest.TestCase):
+    """任务 10.4：内容操作状态矩阵（菜单可用性随项目/只读/索引就绪变化）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _make_window(self, *, project, index_ready=False, workspace=None):
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        window._project_summary = project
+        window._content_index_ready = index_ready
+        window._content_workspace = workspace
+        return window
+
+    def _states(self, window):
+        return {
+            "search": window._search_action.isEnabled(),
+            "references": window._references_action.isEnabled(),
+            "lint": window._lint_action.isEnabled(),
+            "replace": window._replace_action.isEnabled(),
+            "refactor": window._refactor_action.isEnabled(),
+            "open_external": window._open_external_action.isEnabled(),
+        }
+
+    def test_writable_project_index_ready_enables_all(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._states(window)
+        self.assertTrue(states["search"])
+        self.assertTrue(states["references"])
+        self.assertTrue(states["lint"])
+        self.assertTrue(states["replace"])
+        self.assertTrue(states["refactor"])
+        self.assertTrue(states["open_external"])
+        window.close()
+
+    def test_readonly_project_disables_write_actions(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=False),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._states(window)
+        self.assertTrue(states["search"])
+        self.assertFalse(states["replace"])
+        self.assertFalse(states["refactor"])
+        window.close()
+
+    def test_index_not_ready_disables_read_actions(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=False,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=False)
+        states = self._states(window)
+        self.assertFalse(states["search"])
+        self.assertFalse(states["replace"])
+        # open_external 仅依赖 workspace 存在
+        self.assertTrue(states["open_external"])
+        window.close()
+
+    def test_task_running_disables_content_menu(self):
+        window = self._make_window(
+            project=SimpleNamespace(is_writable=True),
+            index_ready=True,
+            workspace=object(),
+        )
+        window._refresh_content_menu_state(running=True)
+        states = self._states(window)
+        self.assertFalse(states["search"])
+        self.assertFalse(states["replace"])
+        window.close()
+
+
+class EditorRollbackCleanupTests(unittest.TestCase):
+    """编辑器「回滚上次保存」：恢复内容并清理 .bak 与改动清单条目。
+
+    回归：此前 rollback_last 只把 .bak 复制回文件、不删除 .bak，也不移除
+    改动清单 edit 条目——遗留备份会触发构建前检查失败，徽标仍显示已修改。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self) -> None:
+        self.project_root = Path(tempfile.mkdtemp(prefix="doc-tool-editor-"))
+        self.content_root = self.project_root / "content"
+        self.rel = "requirement/第1章 引言/1.1 目的.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原始正文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, self.project_root, ignore_errors=True)
+
+    def _make_panel(self):
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        writer = ContentWriter(
+            content_root=self.content_root,
+            state_dir=self.project_root / ".state",
+        )
+        return writer, EditorPanel(writer=writer, writable=True)
+
+    def test_rollback_last_restores_cleans_backup_and_drops_entry(self):
+        writer, panel = self._make_panel()
+        panel.load(self.rel, "# 1.1 目的\n原始正文\n")
+        panel._editor.setPlainText("# 1.1 目的\n被改\n")
+        self.assertTrue(panel.save())
+
+        bak = self.content_root / (self.rel + ".bak")
+        self.assertTrue(bak.exists())
+        writer.manifest.load()
+        self.assertEqual(len(writer.manifest.entries), 1)
+
+        self.assertTrue(panel.rollback_last())
+        # 内容恢复到保存前
+        self.assertEqual(
+            (self.content_root / self.rel).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        # .bak 被清理，改动清单条目被移除
+        self.assertFalse(bak.exists())
+        writer.manifest.load()
+        self.assertTrue(writer.manifest.empty)
+
+
+# === 人工验收清单（PySide6 IDE 工作台，任务 8.3/8.4） ===
 # 以下操作需要在 Windows 桌面环境中手动执行，无法自动化测试：
 #
+# 启动与外壳：
 # 1. 启动应用：python -m doc_tool.app
-#    - 预期：主窗口正常显示，标题包含版本号，字体清晰（高 DPI 生效）
+#    - 预期：PySide6 主窗口正常显示（无 Tk 窗口），标题包含版本号，菜单栏/状态栏存在
+#    - 高 DPI 生效（HiDPI 下文字清晰不模糊、不截断）
 #
-# 2. 新建项目向导：
-#    - 文件 → 新建项目 → 选择 .docx → 预检预览 → 填写信息 → 导入
-#    - 预期：每步过渡正常，导入成功后自动打开项目
+# 2. 空状态（未打开项目）：
+#    - 启动后无项目 → 中央显示空状态页：新建项目/打开项目/最近项目入口
+#    - 三个 Dock（章节树/任务结果/工具面板）隐藏，菜单仅文件可用
 #
-# 3. 打开已有项目：
-#    - 文件 → 打开项目 → 选择项目目录
-#    - 预期：摘要面板显示文档信息，操作菜单可用
+# 3. 新建项目向导（QWizard 五步）：
+#    - 文件 → 新建项目 → 选源 DOCX → 预检预览（标题/图片/表格计数、告警）→
+#      项目信息（类型建议 high confidence 自动采用）→ 执行 → 结果
+#    - 阻断告警（无 Heading 1）时不可进入下一步；导入成功后自动打开项目
 #
-# 4. 最近项目列表：
-#    - 打开多个项目后，文件 → 最近打开应有记录
-#    - 点击列表中的项目可直接打开
+# 4. 打开已有项目 → 看到 IDE 骨架：
+#    - 文件 → 打开项目 → 选择 projects/design 或 projects/requirement
+#    - 预期：顶部项目条显示文档名/类型/版本/就绪状态；左侧章节树 Dock、
+#      中心编辑器、右侧任务/结果 Dock、底部工具面板全部出现
+#    - 项目条高频入口（正式合并/诊断构建/校验）可用性随项目状态变化
 #
-# 5. 独立校验：
-#    - 操作 → 校验项目
-#    - 预期：进度条动画，事件日志显示阶段，完成后状态栏显示结果
+# 5. 空闲态（任务/结果 Dock）：
+#    - 打开项目后尚未执行任务 → 右侧显示引导卡片（校验 / 诊断构建入口）
+#    - 执行一次校验后 → 空闲态显示最近结果卡片；继续浏览章节树/内容时结果保留
 #
-# 6. 诊断构建（无 Word）：
-#    - 操作 → 诊断构建
-#    - 预期：跳过 Word 刷新，构建完成后显示输出路径
+# 6. 运行态（步骤清单 + 日志流 + 取消）：
+#    - 操作 → 诊断构建 → 右侧显示步骤清单：①构建 → ②前校验 → ③Word 刷新(跳过) →
+#      ④后校验(跳过) → ⑤发布；当前步骤高亮，总体进度与已用时间实时更新
+#    - 日志流按时间顺序追加；向上滚动后新日志仍记录并显示待读提示
+#    - 心跳任务（独立校验）→ 显示单个「进行中」步骤 + 已用时间，无伪造百分比
 #
-# 7. 正式合并：
-#    - 操作 → 正式合并
-#    - 预期：构建 → 前校验 → Word 刷新 → 后校验，进度条显示阶段
+# 7. 成功终态：
+#    - 诊断构建/正式合并成功 → 结果卡片显示成功摘要与输出路径；
+#      「打开产物」「打开所在目录」「查看校验报告」入口可用
+#    - 独立校验成功（未生成 DOCX）→ 只显示报告入口，不显示误导性「打开产物」
 #
-# 8. 取消任务：
-#    - 任务运行中点击「取消」
-#    - 预期：界面响应，任务在阶段边界安全停止，状态显示已取消
+# 8. 失败终态与技术详情：
+#    - 人为制造失败（如损坏源文件）→ 结果卡片显示原因与建议；
+#      「技术详情…」可展开并显示错误码/阶段/异常摘要/日志路径
 #
-# 9. 打开目录：
-#    - 工具 → 打开 Markdown/输出/日志目录
-#    - 预期：Windows 文件管理器打开对应目录
+# 9. 取消：
+#    - 任务运行中点击「取消」→ 界面标记等待安全停止点（当前阶段名），
+#      任务在阶段边界以取消状态收尾，后续步骤保持待处理
 #
-# 10. 关于/环境诊断：
-#     - 帮助 → 关于
-#     - 预期：显示版本、提交、Python、平台信息和 Word 可用性
+# 10. 只读项目：
+#     - 打开模式版本不兼容的项目 → 章节树/编辑器只读，搜索/检查可用，
+#       替换/重命名不可用；项目条标注只读原因
+#
+# 11. Word 不可用：
+#     - 无 Microsoft Word 环境 → 正式合并入口标注原因，诊断构建仍可用
+#
+# 12. 结果路径失效：
+#     - 任务成功后将产物文件移动/删除 → 结果卡片不再显示「打开产物」，
+#       或点击时提示结果已不可用并引导打开仍存在的目录
+#
+# 13. 项目切换：
+#     - 任务成功后打开另一个项目 → 右侧结果卡片清除旧项目结果，不显示旧产物操作
+#
+# 内容操作（IDE 布局）：
+# 14. 章节树：展开全部/折叠全部/刷新；右键文件 → 打开 / 复制相对路径；
+#     点击文件 → 中心编辑器打开并定位，树选中与编辑器同步
+# 15. 中心多标签编辑器：同时打开多个文件切换编辑；侧边轻量 Markdown 预览去抖刷新；
+#     Ctrl+S 保存（生成 .md.bak）→ 索引失效重建 + 预览刷新；外部修改检测提示刷新
+# 16. 全文搜索（Ctrl+F）：聚焦输入框；结果表 文件/行/预览 点击定位并高亮命中行；
+#     正则/大小写/整词/类型过滤生效；「显示更多」追加结果
+# 17. 全局替换：逐项「替换此项/跳过」+「全部替换…」确认；写回后自动跑校验；
+#     「回滚本次替换」恢复
+# 18. 重命名/重编号：当前文件预填，dry-run 列受影响引用（旧→新），确认后
+#     引用更新 + 文件重命名 + 自动校验 + 同级连续编号检查
+# 19. 引用分析对话框：当前文件被引用情况 + 全项目悬空引用（确定/疑似），点击定位
+# 20. 术语/一致性检查：重复标题/术语大小写/TODO 残留列出并定位；术语清单增删后立即重跑
+# 21. 快捷键：F5 校验；Ctrl+Shift+B 诊断构建；Ctrl+1..4 切换底部面板；
+#     Ctrl+F 搜索；F1 关于；Ctrl+L 日志回到底部
+#
+# 主题与可读性（任务 8.4）：
+# 22. 深色主题：工具 → 切换深色主题 → 标题/正文/按钮/状态文字/语义色按深色渲染；
+#     再次切换回到浅色；菜单项文字随主题切换
+# 23. 高对比度/DPI 缩放：在 100%/125%/150% 缩放与高对比度系统主题下检查
+#     标题、正文、按钮、状态文字与最小窗口尺寸可读性；最小宽度窗口下
+#     主要控件不被固定像素假设截断（依赖 Dock 折叠/滚动）
+#
+# 关闭保护与几何持久化：
+# 24. 任务运行中关闭窗口 → 确认对话框 → 请求安全取消，任务停止后自动退出；
+#     拒绝则继续运行
+# 25. 调整窗口尺寸/位置或最大化后退出 → 下次启动恢复相同几何与状态
+
+
+class ChapterTreeInteractionTests(unittest.TestCase):
+    """章节树键盘操作与右键菜单（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self):
+        from doc_tool.application.content.tree import build_tree
+
+        self.content_root = Path(tempfile.mkdtemp(prefix="doc-tool-tree-"))
+        self.rel = "requirement/第3章/3.7 KSOA/3.7.1 设备管理.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 3.7.1 设备管理\n", encoding="utf-8")
+        self.items = build_tree([self.rel])
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _make_tree(self, writable=True):
+        from doc_tool.ui.content.tree_panel import ChapterTree
+
+        self.opened = []
+        self.renamed = []
+        self.deleted = []
+        self.external = []
+        self.dirs_opened = []
+        self.moves = []
+        tree = ChapterTree(
+            on_open=self.opened.append,
+            on_rename_file=self.renamed.append,
+            on_delete_file=self.deleted.append,
+            on_move_node=lambda source, parent, before: self.moves.append(
+                (source, parent, before)
+            ) or True,
+            on_open_external=self.external.append,
+            on_open_directory=self.dirs_opened.append,
+            content_root=self.content_root,
+            writable=writable,
+        )
+        tree.set_items(self.items)
+        return tree
+
+    def _select_file(self, tree):
+        index = tree._model.index_for_id(self.rel)
+        tree._tree.setCurrentIndex(index)
+        tree._tree.scrollTo(index)
+        tree._tree.setFocus()
+
+    def test_enter_opens_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)  # 选中即打开一次（currentChanged → on_open）
+        self.assertEqual(self.opened, [self.rel])
+        QTest.keyClick(tree._tree, Qt.Key.Key_Return)
+        QTest.qWait(10)
+        # Enter 再次打开当前选中文件
+        self.assertEqual(self.opened, [self.rel, self.rel])
+        tree.close()
+
+    def test_f2_renames_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_F2)
+        QTest.qWait(10)
+        self.assertEqual(self.renamed, [self.rel])
+        tree.close()
+
+    def test_delete_key_deletes_file(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree()
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_Delete)
+        QTest.qWait(10)
+        self.assertEqual(self.deleted, [self.rel])
+        tree.close()
+
+    def test_readonly_ignores_write_keys(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+
+        tree = self._make_tree(writable=False)
+        tree.show()
+        self._select_file(tree)
+        QTest.keyClick(tree._tree, Qt.Key.Key_F2)
+        QTest.keyClick(tree._tree, Qt.Key.Key_Delete)
+        QTest.qWait(10)
+        self.assertEqual(self.renamed, [])
+        self.assertEqual(self.deleted, [])
+        tree.close()
+
+    def test_model_drop_resolves_parent_and_insert_position(self):
+        from PySide6.QtCore import Qt
+
+        tree = self._make_tree()
+        source = tree._model.index_for_id(self.rel)
+        mime = tree._model.mimeData([source])
+        parent_id = "requirement/第3章/3.7 KSOA"
+        parent = tree._model.index_for_id(parent_id)
+        accepted = tree._model.dropMimeData(
+            mime, Qt.DropAction.MoveAction, 0, 0, parent
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(self.moves, [(self.rel, parent_id, self.rel)])
+        tree.close()
+
+    def test_model_drop_on_file_inserts_before_that_file(self):
+        from PySide6.QtCore import Qt
+
+        tree = self._make_tree()
+        source = tree._model.index_for_id(self.rel)
+        mime = tree._model.mimeData([source])
+        accepted = tree._model.dropMimeData(
+            mime, Qt.DropAction.MoveAction, -1, 0, source
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(
+            self.moves,
+            [(self.rel, "requirement/第3章/3.7 KSOA", self.rel)],
+        )
+        tree.close()
+
+    def test_readonly_disables_drag_and_rejects_drop_callback(self):
+        tree = self._make_tree(writable=False)
+        self.assertFalse(tree._tree.dragEnabled())
+        self.assertFalse(tree._tree.acceptDrops())
+        self.assertFalse(tree._handle_drop(self.rel, "requirement/第3章", None))
+        self.assertEqual(self.moves, [])
+        tree.close()
+
+    def test_context_menu_actions_and_copy_markdown_link(self):
+        from PySide6.QtWidgets import QApplication
+
+        tree = self._make_tree()
+        index = tree._model.index_for_id(self.rel)
+        menu = tree._context_menu(index)
+        labels = [a.text() for a in menu.actions()]
+        for expected in (
+            "打开",
+            "在外部编辑器打开",
+            "复制相对路径",
+            "复制绝对路径",
+            "复制 Markdown 引用",
+        ):
+            self.assertIn(expected, labels)
+        action = next(
+            a for a in menu.actions() if a.text() == "复制 Markdown 引用"
+        )
+        # 离屏平台的剪贴板 read-back 不可靠（setText 后 text() 常返回空）：
+        # 用 spy 捕获实际写入值验证接线，不依赖 QApplication.clipboard().text()。
+        clipboard = QApplication.clipboard()
+        written: list = []
+        original_set_text = clipboard.setText
+        clipboard.setText = lambda text, mode=None: written.append(text)
+        try:
+            action.trigger()
+        finally:
+            clipboard.setText = original_set_text
+        self.assertEqual(written, ["[设备管理]({0})".format(self.rel)])
+        tree.close()
+
+
+class ChangesPanelTests(unittest.TestCase):
+    """改动面板：列出改动、选中显示 diff、恢复按钮接线（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self) -> None:
+        self.project_root = Path(tempfile.mkdtemp(prefix="doc-tool-changes-"))
+        self.content_root = self.project_root / "content"
+        self.rel = "requirement/第1章 引言/1.1 目的.md"
+        path = self.content_root / self.rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原始正文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, self.project_root, ignore_errors=True)
+
+        from doc_tool.application.content.snapshot import ContentSnapshot
+        from doc_tool.application.content.writer import ContentWriter
+
+        self.snapshot = ContentSnapshot(self.project_root / ".state")
+        self.snapshot.take(self.content_root, [self.rel])
+        self.writer = ContentWriter(
+            self.content_root, self.project_root / ".state"
+        )
+
+    def _items_for_modified(self):
+        """记录一次修改（写入 edit 条目 + .bak），返回改动项列表。"""
+        from doc_tool.application.content.changes import build_change_items
+
+        self.writer.write_text(self.rel, "# 1.1 目的\n被修改后的正文内容\n")
+        status = self.snapshot.diff(self.content_root, [self.rel])
+        self.assertEqual(status.get(self.rel), "modified")
+        return build_change_items(status, rename_map={}, trash_map={})
+
+    def _panel(self, **kw):
+        from doc_tool.ui.content.changes_panel import ChangesPanel
+
+        return ChangesPanel(
+            snapshot=self.snapshot,
+            writer=self.writer,
+            content_root=self.content_root,
+            on_restored=kw.get("on_restored", lambda: None),
+            writable=True,
+        )
+
+    def test_lists_items_and_counts(self):
+        panel = self._panel()
+        panel.set_items(self._items_for_modified())
+        self.assertEqual(panel._list.count(), 1)
+        self.assertIn("已修改 1", panel._counts_label.text())
+        self.assertIn(self.rel, panel._list.item(0).text())
+        panel.close()
+
+    def test_selection_shows_diff(self):
+        panel = self._panel()
+        panel.set_items(self._items_for_modified())
+        panel._list.setCurrentRow(0)
+        text = panel._diff_view.toPlainText()
+        self.assertIn("-原始正文", text)
+        self.assertIn("+被修改后的正文内容", text)
+        panel.close()
+
+    def test_restore_modified_reverts_file_and_refreshes(self):
+        restored = []
+        panel = self._panel(on_restored=lambda: restored.append(True))
+        panel.set_items(self._items_for_modified())
+        panel._list.setCurrentRow(0)
+        self.assertTrue(panel._restore_btn.isEnabled())
+        self.assertEqual(panel._restore_btn.text(), "恢复到基线")
+        panel._restore_btn.click()
+        # 文件恢复到基线内容，改动清单清空，回调触发刷新
+        self.assertEqual(
+            (self.content_root / self.rel).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        self.writer.manifest.load()
+        self.assertTrue(self.writer.manifest.empty)
+        self.assertEqual(restored, [True])
+        panel.close()
+
+
+class TabsHostDirtyTests(unittest.TestCase):
+    """脏标签 ● 提示 + 关闭脏 tab 确认（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _host(self):
+        from doc_tool.ui.content.tabs_host import TabsHost
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-tabs-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n原文\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        tabs = TabsHost(writer)
+        tabs.open_file(rel, path.read_text(encoding="utf-8"))
+        return tabs, rel
+
+    def test_dirty_tab_shows_bullet_and_clears_on_save(self):
+        tabs, _rel = self._host()
+        editor = tabs.current_editor()
+        self.assertNotIn("●", tabs._tabs.tabText(0))
+        editor._editor.setPlainText("# 1.1 目的\n被改\n")
+        self.assertTrue(editor.is_dirty())
+        self.assertIn("●", tabs._tabs.tabText(0))
+        editor.save()
+        self.assertFalse(editor.is_dirty())
+        self.assertNotIn("●", tabs._tabs.tabText(0))
+        tabs.close_all()
+        tabs.close()
+
+    def test_close_dirty_tab_requires_confirmation(self):
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        tabs, _rel = self._host()
+        editor = tabs.current_editor()
+        editor._editor.setPlainText("# 1.1 目的\n被改\n")
+        # 拒绝 → 标签保留
+        with patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.No,
+        ):
+            tabs._close_tab(0)
+        self.assertEqual(tabs._tabs.count(), 1)
+        # 确认 → 标签关闭
+        with patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            tabs._close_tab(0)
+        self.assertEqual(tabs._tabs.count(), 0)
+        tabs.close()
+
+
+class EditorFindTests(unittest.TestCase):
+    """文件内查找：高亮、导航、focus_find（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-find-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# 1.1 目的\n正文含 目的 一词。\n再看 目的。\n",
+            encoding="utf-8",
+        )
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_focus_find_shows_bar_and_focuses(self):
+        from PySide6.QtTest import QTest
+
+        panel = self._panel()
+        panel.show()
+        panel.raise_()
+        panel.activateWindow()
+        QTest.qWait(50)
+        self.assertTrue(panel._find_bar.isHidden())
+        panel.focus_find()
+        self.assertFalse(panel._find_bar.isHidden())
+        self.assertTrue(panel._find_entry.hasFocus())
+        panel.close()
+
+    def test_highlights_all_matches(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        selections = panel._editor.extraSelections()
+        # 标题 + 两处正文 = 3 处命中
+        self.assertEqual(len(selections), 3)
+        panel.close()
+
+    def test_find_next_moves_cursor_to_match(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        panel._find_next()
+        self.assertEqual(panel._editor.textCursor().selectedText(), "目的")
+        panel.close()
+
+    def test_hide_find_clears_highlights(self):
+        panel = self._panel()
+        panel._find_entry.setText("目的")
+        self.assertGreater(len(panel._editor.extraSelections()), 0)
+        panel.hide_find()
+        self.assertFalse(panel._find_bar.isVisible())
+        self.assertEqual(panel._editor.extraSelections(), [])
+        panel.close()
+
+
+class EditorPreviewTests(unittest.TestCase):
+    """预览折叠 + 编辑滚动联动预览（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-preview-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n正文内容。\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_preview_toggle_hides_and_shows(self):
+        panel = self._panel()
+        self.assertFalse(panel._preview_frame.isHidden())
+        panel._toggle_preview()
+        self.assertTrue(panel._preview_frame.isHidden())
+        self.assertIn("显示预览", panel._preview_btn.text())
+        panel._toggle_preview()
+        self.assertFalse(panel._preview_frame.isHidden())
+        self.assertIn("隐藏预览", panel._preview_btn.text())
+        panel.close()
+
+    def test_sync_preview_scroll_uses_current_heading(self):
+        from unittest.mock import patch
+
+        panel = self._panel()
+        with patch.object(panel._preview, "setTextCursor") as setc, patch.object(
+            panel._preview, "ensureCursorVisible"
+        ) as ensure:
+            panel._sync_preview_scroll()
+        setc.assert_called_once()
+        ensure.assert_called_once()
+        panel.close()
+
+    def test_current_heading_text(self):
+        panel = self._panel()
+        self.assertEqual(panel._current_heading_text(), "1.1 目的")
+        panel.close()
+
+
+class EditorHighlightTests(unittest.TestCase):
+    """Markdown 语法高亮 + 行号槽（离屏渲染）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _make_panel(self):
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-highlight-"))
+        content_root = root / "content"
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        path = content_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# 1.1 目的\n正文。\n", encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(content_root)
+        panel = EditorPanel(writer=writer, writable=True)
+        panel.load(rel, path.read_text(encoding="utf-8"))
+        return panel
+
+    def test_heading_format_bold(self):
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        hl = MarkdownHighlighter(edit.document())
+        self.assertEqual(hl._heading_fmt().fontWeight(), QFont.Weight.Bold)
+        edit.close()
+
+    def test_inline_code_format_has_background(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        hl = MarkdownHighlighter(edit.document())
+        fmt = hl._inline_code_fmt()
+        self.assertNotEqual(fmt.background().style(), Qt.BrushStyle.NoBrush)
+        edit.close()
+
+    def test_heading_line_gets_bold_format(self):
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        MarkdownHighlighter(edit.document())
+        edit.setPlainText("# 标题\n普通文本\n")
+        formats = edit.document().firstBlock().layout().formats()
+        any_bold = any(
+            fr.format.fontWeight() == QFont.Weight.Bold for fr in formats
+        )
+        self.assertTrue(any_bold)
+
+    def test_line_number_width_grows_with_lines(self):
+        from doc_tool.ui.content.editor_highlight import _LineNumberedEdit
+
+        edit = _LineNumberedEdit()
+        edit.setPlainText("一\n二\n")
+        small = edit.line_number_area_width()
+        edit.setPlainText("\n".join(str(i) for i in range(15)))
+        self.assertGreater(edit.line_number_area_width(), small)
+
+    def test_editor_panel_uses_line_numbers_and_highlighter(self):
+        from doc_tool.ui.content.editor_highlight import (
+            MarkdownHighlighter,
+            _LineNumberedEdit,
+        )
+
+        panel = self._make_panel()
+        self.assertIsInstance(panel._editor, _LineNumberedEdit)
+        self.assertIsInstance(panel._highlighter, MarkdownHighlighter)
+        panel.close()
+
+
+class EditorAuthoringWorkbenchTests(unittest.TestCase):
+    """创作工作台离屏交互：替换、格式、图片 MIME、预览链接与 Mermaid。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="doc-tool-authoring-ui-"))
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.content = self.root / "content"
+        self.assets = self.root / "assets"
+        self.rel = "requirement/章节.md"
+        path = self.content / self.rel
+        path.parent.mkdir(parents=True)
+        path.write_text("# 标题\nfoo foo\n", encoding="utf-8")
+
+    def _panel(self, writable=True):
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        writer = ContentWriter(self.content, self.root / ".state", assets_root=self.assets)
+        panel = EditorPanel(
+            writer=writer, assets_root=self.assets, writable=writable
+        )
+        panel.load(self.rel, (self.content / self.rel).read_text(encoding="utf-8"))
+        return panel
+
+    def test_replace_all_is_single_undo_unit(self):
+        panel = self._panel()
+        panel._find_entry.setText("foo")
+        panel._replace_entry.setText("bar")
+        panel._replace_all()
+        self.assertIn("bar bar", panel._editor.toPlainText())
+        panel._editor.undo()
+        self.assertIn("foo foo", panel._editor.toPlainText())
+        panel.close()
+
+    def test_replace_one_replaces_selection_and_moves_to_next(self):
+        from PySide6.QtGui import QTextCursor
+
+        panel = self._panel()
+        panel._find_entry.setText("foo")
+        panel._replace_entry.setText("bar")
+        cursor = panel._editor.textCursor()
+        start = panel._editor.toPlainText().index("foo")
+        cursor.setPosition(start)
+        cursor.setPosition(start + 3, QTextCursor.MoveMode.KeepAnchor)
+        panel._editor.setTextCursor(cursor)
+        panel._replace_one()
+        self.assertIn("bar foo", panel._editor.toPlainText())
+        self.assertEqual(panel._editor.textCursor().selectedText(), "foo")
+        panel.close()
+
+    def test_snippet_tab_follows_placeholder_number_order(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from doc_tool.application.content.snippets import Snippet
+
+        panel = self._panel()
+        panel._editor.moveCursor(panel._editor.textCursor().MoveOperation.End)
+        panel.insert_snippet(Snippet("demo", "", "${2:乙}-${1:甲}"))
+        self.assertEqual(panel._editor.textCursor().selectedText(), "甲")
+        QTest.keyClick(panel._editor, Qt.Key.Key_Tab)
+        self.assertEqual(panel._editor.textCursor().selectedText(), "乙")
+        QTest.keyClick(panel._editor, Qt.Key.Key_Tab)
+        self.assertFalse(panel._editor.snippet_active)
+        panel.close()
+
+    def test_toolbar_wraps_selection(self):
+        from PySide6.QtGui import QTextCursor
+
+        panel = self._panel()
+        cursor = panel._editor.textCursor()
+        start = panel._editor.toPlainText().index("foo")
+        cursor.setPosition(start)
+        cursor.setPosition(start + 3, QTextCursor.MoveMode.KeepAnchor)
+        panel._editor.setTextCursor(cursor)
+        panel.wrap_selection("**", "**")
+        self.assertIn("**foo**", panel._editor.toPlainText())
+        panel.close()
+
+    def test_clipboard_image_imports_asset_and_inserts_reference(self):
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QImage
+
+        panel = self._panel()
+        mime = QMimeData()
+        mime.setImageData(QImage(8, 6, QImage.Format.Format_RGB32))
+        panel._editor.insertFromMimeData(mime)
+        self.assertIn("images/img_0001.png =8x6", panel._editor.toPlainText())
+        self.assertTrue((self.assets / "requirement/images/img_0001.png").is_file())
+        panel.close()
+
+    def test_drop_image_file_calls_import_callback(self):
+        from PySide6.QtCore import QMimeData, QUrl
+        from doc_tool.ui.content.editor_highlight import _LineNumberedEdit
+
+        image = self.root / "drop.png"
+        from PIL import Image
+        Image.new("RGB", (4, 3), "blue").save(image)
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(image))])
+
+        class Event:
+            accepted = False
+            def mimeData(self):
+                return mime
+            def acceptProposedAction(self):
+                self.accepted = True
+
+        received = []
+        edit = _LineNumberedEdit()
+        edit.set_image_import_callback(received.append)
+        event = Event()
+        edit.dropEvent(event)
+        self.assertEqual([Path(value).resolve() for value in received], [image.resolve()])
+        self.assertTrue(event.accepted)
+        edit.close()
+
+    def test_readonly_rejects_image_import(self):
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QImage
+
+        panel = self._panel(writable=False)
+        mime = QMimeData()
+        mime.setImageData(QImage(8, 6, QImage.Format.Format_RGB32))
+        before = panel._editor.toPlainText()
+        panel._editor.insertFromMimeData(mime)
+        self.assertEqual(panel._editor.toPlainText(), before)
+        self.assertFalse((self.assets / "requirement/images").exists())
+        panel.close()
+
+    def test_preview_line_anchor_locates_but_external_link_does_not(self):
+        from unittest.mock import patch
+        from PySide6.QtCore import QUrl
+
+        panel = self._panel()
+        with patch.object(panel, "highlight_line") as locate:
+            panel._on_preview_anchor_clicked(QUrl("line-2"))
+            locate.assert_called_once_with(2)
+            locate.reset_mock()
+            with patch("doc_tool.ui.content.editor_panel.QDesktopServices.openUrl") as open_url:
+                panel._on_preview_anchor_clicked(QUrl("https://example.com"))
+                locate.assert_not_called()
+                open_url.assert_called_once()
+        panel.close()
+
+    def test_mermaid_dialog_valid_source_renders_preview(self):
+        from doc_tool.ui.content.mermaid_dialog import MermaidDialog
+
+        dialog = MermaidDialog("flowchart TD\n A[开始] --> B[结束]")
+        dialog.refresh_preview()
+        self.assertEqual(dialog.errors.count(), 0)
+        self.assertIsNotNone(dialog.render_result)
+        self.assertTrue(dialog.render_result.ok)
+        self.assertFalse(dialog.preview.pixmap().isNull())
+        dialog.close()
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()

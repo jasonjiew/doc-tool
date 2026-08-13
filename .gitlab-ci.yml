@@ -19,6 +19,7 @@ stages:
 variables:
   APP_VERSION: "1.0.0"
   PYTHON_VERSION: "3.13"
+  COVERAGE_MIN: "60"
 
 # --- 阶段 1：版本一致性校验 ---
 validate-version:
@@ -60,12 +61,50 @@ test-unit:
   tags:
     - windows
   script:
-    - python -m pip install -r requirements.txt --no-cache-dir
-    - python scripts\tests\run_tests.py
+    - python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
+    - python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN
   artifacts:
     reports:
       junit: test-results.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - coverage.json
     when: always
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+dependency-audit:
+  stage: test
+  tags:
+    - windows
+  script:
+    - python -m pip install pip-audit==2.9.0 --no-cache-dir
+    - python packaging/audit_dependencies.py --requirements requirements.txt --output dependency-audit.json
+    - python packaging/audit_dependencies.py --requirements requirements-build.txt --output dependency-audit-build.json
+  artifacts:
+    paths:
+      - dependency-audit.json
+      - dependency-audit-build.json
+    when: always
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
+generate-sbom:
+  stage: test
+  tags:
+    - windows
+  script:
+    - python packaging/generate_sbom.py --requirements requirements.txt --requirements requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+    - python -c "import json; c=json.load(open('sbom.cdx.json', encoding='utf-8')); s=json.load(open('sbom.spdx.json', encoding='utf-8')); assert c['bomFormat']=='CycloneDX' and c['specVersion']=='1.5'; assert s['spdxVersion']=='SPDX-2.3'"
+  artifacts:
+    paths:
+      - sbom.cdx.json
+      - sbom.spdx.json
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
@@ -75,7 +114,7 @@ build-onedir:
   stage: build
   tags:
     - windows
-  needs: ["test-unit"]
+  needs: ["test-unit", "dependency-audit", "generate-sbom"]
   script:
     - python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
     - pyinstaller packaging/doc_tool.spec --noconfirm --clean
@@ -150,6 +189,8 @@ package-installer:
       "康尚文档工具 $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
       "生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $sbom -Append -Encoding utf8
       "PyYAML 6.0.3 (MIT), lxml 6.1.1 (BSD), Pillow 12.3.0 (MIT-CMU), pywin32 312 (PSF), Python 3.13 (PSF)" | Out-File $sbom -Append -Encoding utf8
+      Copy-Item sbom.cdx.json "packaging\Output\KonsungDocTool-$env:APP_VERSION.cdx.json"
+      Copy-Item sbom.spdx.json "packaging\Output\KonsungDocTool-$env:APP_VERSION.spdx.json"
   artifacts:
     paths:
       - packaging/Output/
@@ -169,6 +210,8 @@ release-upload:
       $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
       $sha = "$exe.sha256"
       $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
+      $cyclone = "packaging\Output\KonsungDocTool-$env:APP_VERSION.cdx.json"
+      $spdx = "packaging\Output\KonsungDocTool-$env:APP_VERSION.spdx.json"
 
       # 生成发布说明
       $notes = "packaging\Output\release-notes.md"
@@ -186,6 +229,8 @@ release-upload:
       Write-Host "安装器: $exe"
       Write-Host "SHA-256: $sha"
       Write-Host "SBOM: $sbom"
+      Write-Host "CycloneDX: $cyclone"
+      Write-Host "SPDX: $spdx"
       Write-Host "发布说明: $notes"
   artifacts:
     paths:
@@ -205,3 +250,7 @@ release-upload:
           url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-Setup-$APP_VERSION.exe.sha256"
         - name: "SBOM"
           url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION-sbom.txt"
+        - name: "CycloneDX SBOM"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION.cdx.json"
+        - name: "SPDX SBOM"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION.spdx.json"

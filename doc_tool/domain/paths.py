@@ -217,11 +217,12 @@ class ProjectPaths:
             return False
 
     def _ensure_inside(self, target: Path) -> None:
-        """校验目标路径在项目根内，使用路径前缀匹配防穿越。"""
-        root_str = str(self.root)
-        target_str = str(target)
-        # 必须等于根或以根 + 分隔符开头，防止 ``/project`` 误匹配 ``/project-other``。
-        if target_str != root_str and not target_str.startswith(root_str + os.sep):
+        """校验目标路径在项目根内（含 Windows 大小写与盘符根目录）。"""
+        try:
+            inside = target.is_relative_to(self.root)
+        except (TypeError, ValueError):
+            inside = False
+        if not inside:
             raise PathEscapeError(
                 "资源路径越出项目根目录。",
                 suggested_action="请检查 Markdown 中的资源引用路径。",

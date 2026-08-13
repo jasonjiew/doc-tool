@@ -247,11 +247,11 @@ class PackageValidationTests(unittest.TestCase):
         self.assertIn("XML", ctx.exception.user_message)
 
     def test_zip_uncompressed_size_limit_rejected_before_read(self):
+        from doc_tool.domain.ooxml import PARSE_LIMITS
+
         path = os.path.join(self._tmp, "oversized.docx")
         write_docx(path, build_paragraph("1", "第一章"))
-        with patch(
-            "doc_tool.adapters.preflight.MAX_TOTAL_UNCOMPRESSED_BYTES", 1
-        ):
+        with patch.dict(PARSE_LIMITS, {"max_total_uncompressed_bytes": 1}):
             with self.assertRaises(InvalidDocxError) as ctx:
                 preflight(path)
         self.assertIn("安全上限", ctx.exception.user_message)
@@ -398,6 +398,84 @@ class RelationshipTests(unittest.TestCase):
         with self.assertRaises(BrokenRelationshipError) as ctx:
             preflight(path)
         self.assertIn("外部链接", ctx.exception.user_message)
+
+    def test_internal_bookmark_anchor_not_misreported(self):
+        """书签锚点超链接（TargetMode=Internal）不当作缺失部件误报。"""
+        paras = build_paragraph("1", "第1章 概述")
+        doc_body = (
+            '<w:p><w:hyperlink r:id="rIdBookmark" w:anchor="_Toc123">'
+            '<w:r><w:t>跳转目录锚点</w:t></w:r></w:hyperlink></w:p>'
+        )
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:document xmlns:w="{w_ns}" xmlns:r="{r_ns}">'
+            '<w:body>{paras}{body}<w:sectPr/></w:body>'
+            '</w:document>'
+        ).format(w_ns=W_NS, r_ns=R_NS, paras=paras, body=doc_body).encode("utf-8")
+        rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="{pr_ns}">'
+            '<Relationship Id="rIdBookmark" Type="{pr_ns}/hyperlink" '
+            'Target="_Toc123" TargetMode="Internal"/>'
+            '</Relationships>'
+        ).format(pr_ns=PR_NS).encode("utf-8")
+        path = os.path.join(self._tmp, "bookmark-anchor.docx")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", document_xml)
+            zf.writestr("word/styles.xml", build_styles_xml(True))
+            zf.writestr("word/_rels/document.xml.rels", rels_xml)
+        # 预检不应把 _Toc123 当作缺失部件误报
+        preview = preflight(path)
+        self.assertGreater(len(preview.headings), 0)
+
+    def test_hyperlink_missing_rid_rejected(self):
+        """正文 w:hyperlink 引用不存在的 rId 被检出。"""
+        paras = build_paragraph("1", "第1章 概述")
+        doc_body = (
+            '<w:p><w:hyperlink r:id="rIdGone">'
+            '<w:r><w:t>链接</w:t></w:r></w:hyperlink></w:p>'
+        )
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:document xmlns:w="{w_ns}" xmlns:r="{r_ns}">'
+            '<w:body>{paras}{body}<w:sectPr/></w:body>'
+            '</w:document>'
+        ).format(w_ns=W_NS, r_ns=R_NS, paras=paras, body=doc_body).encode("utf-8")
+        path = os.path.join(self._tmp, "hyperlink-missing-rid.docx")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", document_xml)
+            zf.writestr("word/styles.xml", build_styles_xml(True))
+            zf.writestr("word/_rels/document.xml.rels", build_rels_xml())
+        with self.assertRaises(BrokenRelationshipError) as ctx:
+            preflight(path)
+        self.assertIn("E1004", ctx.exception.code)
+
+    def test_vml_imagedata_missing_rid_rejected(self):
+        """旧版 VML 图片 v:imagedata 引用不存在的 rId 被检出。"""
+        paras = build_paragraph("1", "第1章 概述")
+        doc_body = (
+            '<w:p><w:r><w:pict>'
+            '<v:shape xmlns:v="urn:schemas-microsoft-com:vml">'
+            '<v:imagedata r:id="rIdGone"/></v:shape>'
+            '</w:pict></w:r></w:p>'
+        )
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:document xmlns:w="{w_ns}" xmlns:r="{r_ns}">'
+            '<w:body>{paras}{body}<w:sectPr/></w:body>'
+            '</w:document>'
+        ).format(w_ns=W_NS, r_ns=R_NS, paras=paras, body=doc_body).encode("utf-8")
+        path = os.path.join(self._tmp, "vml-imagedata-missing-rid.docx")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", document_xml)
+            zf.writestr("word/styles.xml", build_styles_xml(True))
+            zf.writestr("word/_rels/document.xml.rels", build_rels_xml())
+        with self.assertRaises(BrokenRelationshipError) as ctx:
+            preflight(path)
+        self.assertIn("E1004", ctx.exception.code)
 
 
 class PreviewModelTests(unittest.TestCase):

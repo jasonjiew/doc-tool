@@ -1,321 +1,393 @@
-# 大型 Word 文档 Markdown 维护工具
+<div align="center">
 
-本工具采用“Word 模板管版式，目录树管章节结构，Markdown 管内容”的方式维护大型 `.docx` 文档。任意有规范 Heading 1～6 标题样式的 Word 都可以导入：工具会保留原文档的封面、样式、页面设置、页眉页脚和资源，把正文拆成 Markdown 章节树；维护后再校验并合并回 Word。
+# Doc Tool
 
-“通用大文档”是默认模式，不要求康尚封面、TOC、文档编号或版本。“需求文档”和“详细设计”仅是两个可选的公司文档预设，会额外校验封面编号、版本、NUMPAGES 和 TOC。
+**把大型 Word 文档变成可维护、可审查、可可靠重建的 Markdown 项目。**
 
-## 1. 大文档日常工作流
+面向需求说明书、详细设计和其他结构化长文档的 Windows 桌面工具。
 
-1. 启动「康尚文档工具」，选择「新建项目」。
-2. 选择源 `.docx`，确认预检中的 Heading、图片和表格计数。
-3. 默认使用「通用大文档」；只有公司需求/详细设计说明书才选对应预设。
-4. 导入后通过「打开 Markdown 目录」维护章节、图片和表格。
-5. 先执行「校验项目」或「诊断构建」，最后执行「正式合并」。
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
+![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Status](https://img.shields.io/badge/open--source-preparing-orange)
 
-正式合并执行：章节/资源预检 → 构建 DOCX → 严格校验 → Microsoft Word 独立进程刷新字段 → 刷新后再校验 → 原子发布。任一步失败都不会覆盖上一份有效输出。
+[功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献)
 
-### 仓库内置需求/详细设计示例的兼容入口
+</div>
 
-以下三个 `.cmd` 只用于本仓库内置的两份历史示例，不是通用大文档的产品边界：
+> [!IMPORTANT]
+> 本仓库正在进行公开开源前的整理。目前尚未添加开源许可证；在 `LICENSE` 文件正式加入前，源代码默认仍受著作权保护，不能视为已获得开源使用授权。公开发布前还需要替换内部模板、业务示例和内网地址。详见[开源准备状态](#开源准备状态)。
 
-- `生成需求说明书.cmd`：只生成需求说明书；
-- `生成详细设计说明书.cmd`：只生成详细设计说明书；
-- `全部生成.cmd`：依次生成两份文档。
+## 为什么需要 Doc Tool？
 
-入口会自动执行：章节/资源预检 → 构建 DOCX → 严格校验 → Microsoft Word 独立进程刷新 TOC、NUMPAGES 和页码 → 刷新后再次严格校验。任一步失败都会显示 `[FAIL]` 并返回非零退出码，不会假报成功，也不会用失败结果覆盖上一次有效输出。
+大型 Word 文档很适合最终交付，却不适合长期协作维护：章节难以拆分、全文变更难审查、复杂资源容易丢失，自动生成后还可能出现目录、页码和样式偏差。
 
-生成结果位于 `output/`。文件名由配置中的文档编号、名称和版本自动组成，例如：
+Doc Tool 采用一种更适合工程协作的方式：
 
-```text
-KF-2090-1-001 康尚健康云软件需求说明书(3.8)-REBUILD.docx
-KF-2090-1-006 康尚健康云系统详细设计说明书(2.5)-REBUILD.docx
+- **Word 管版式**：保留封面、样式、页面设置、页眉页脚和复杂资源；
+- **目录树管结构**：文件夹和文件名表达章节层级与顺序；
+- **Markdown 管内容**：正文可以搜索、审查、批量修改并进入版本控制；
+- **质量门禁管交付**：在发布前完成结构、资源、Word 字段和产物完整性校验。
+
+它不是一个追求“任意格式互转”的通用转换器，而是一个面向**长周期文档维护与可靠回写**的工作台。
+
+## 功能亮点
+
+### Word 导入与保真
+
+- 识别 Heading 1～6、正文、图片、普通表格和复杂表格；
+- 保留源文档的封面、样式、页面设置、页眉与页脚；
+- 导入前展示结构和潜在保真风险；
+- 通过试构建和往返差异检查阻止明显损坏的项目落地；
+- 使用统一的安全 OOXML 解析策略处理不可信文档。
+
+### Markdown 创作工作台
+
+- 章节树与多标签编辑；
+- Markdown 即时预览；
+- 全文搜索、正则替换、引用分析；
+- 章节重命名、重编号和关联引用更新；
+- 拼写检查、术语一致性检查、代码片段；
+- 图片粘贴、拖放、缺失引用修复和未使用资源清理；
+- Mermaid 流程图和时序图编辑、预览与 PNG 导出。
+
+### 安全编辑与恢复
+
+- 未保存内容保护和“保存全部”；
+- 自动草稿与崩溃恢复；
+- 工作区、标签页和布局会话恢复；
+- 文件改动对比、单文件恢复和可回滚删除；
+- 项目锁与只读兼容模式，避免并发写入或旧版本破坏新项目。
+
+### 校验与发布
+
+- 章节编号、Markdown、图片、复杂表格和模板校验；
+- 统一问题中心、质量规则和评审意见；
+- 诊断构建与正式构建分离；
+- Microsoft Word 独立进程刷新 TOC、页码和 `NUMPAGES`；
+- 刷新后再次校验，并通过原子替换发布产物；
+- JSON、SARIF、JUnit 等机器可读输出，可接入 CI。
+
+## 界面预览
+
+项目正在准备可公开使用的脱敏截图和演示文档。公开发布时建议在此加入：
+
+1. 项目工作台全景；
+2. Word 导入预检；
+3. Markdown 编辑与预览；
+4. 正式构建结果和问题中心。
+
+<!--
+公开截图就绪后替换为：
+![Doc Tool 工作台](docs/images/workbench.png)
+-->
+
+## 工作原理
+
+```mermaid
+flowchart LR
+    A[结构化 DOCX] --> B[安全预检]
+    B --> C[导入项目]
+    C --> D[Markdown 章节树]
+    C --> E[Word 模板与资源]
+    D --> F[编辑 / 搜索 / 评审]
+    E --> G[重建 DOCX]
+    F --> G
+    G --> H[严格校验]
+    H --> I[Word 刷新字段]
+    I --> J[刷新后复验]
+    J --> K[原子发布]
 ```
 
-## 2. 章节目录就是 Word 层级
+正式构建失败时不会覆盖上一份有效输出。Word 字段刷新使用本次任务专用的隐藏进程，不会复用或关闭用户已经打开的 Word 窗口。
 
-期望结构如下：
+## 快速开始
+
+### 系统要求
+
+- Windows 10 或 Windows 11；
+- Python 3.13；
+- Microsoft Word，仅正式构建和最终字段验收需要；
+- 建议使用 Git 管理 Markdown 项目，但运行工具本身不依赖 Git。
+
+当前桌面应用仅支持 Windows。无 Word 环境可以完成导入、编辑、校验和诊断构建，但不能将结果视为正式 Word 交付物。
+
+### 从源码运行
+
+```powershell
+git clone <公开仓库地址>
+cd doc-tool
+python -m pip install -r requirements.txt
+python -m doc_tool.app
+```
+
+公开仓库地址确定后，请将上面的占位符替换为真实 HTTPS 地址。
+
+在 Windows 中也可以双击 `启动康尚文档工具.cmd`。如果 PySide6 缺失，启动器会提示安装；受终端安全软件限制、无法正常使用 pip 时，可以运行：
+
+```powershell
+python scripts\setup_pyside6.py
+```
+
+### 安装版
+
+项目支持通过 PyInstaller 和 Inno Setup 生成独立安装包，最终用户无需安装 Python。公开 Release 建立后，可在这里提供下载入口和 SHA-256 校验说明。
+
+```powershell
+Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
+```
+
+## 使用方法
+
+### 1. 创建项目
+
+1. 启动应用并选择“新建项目”；
+2. 选择具有 Heading 1～6 结构的 `.docx`；
+3. 检查标题层级、图片/表格数量和保真风险；
+4. 选择文档类型并指定项目目录；
+5. 等待导入、试构建和往返检查完成。
+
+文档类型包括：
+
+- `general`：通用结构化长文档；
+- `requirement`：需求说明书规则预设；
+- `design`：详细设计说明书规则预设。
+
+`requirement` 和 `design` 是可选的规则预设，不影响通用文档工作流。
+
+### 2. 编辑项目
+
+打开包含 `project.yml` 的目录，然后在章节树中选择 Markdown 文件。可以使用内置编辑器，也可以使用 VS Code、Typora 等外部编辑器。
+
+应用会记录自动草稿和会话状态。异常退出后再次打开项目时，恢复操作需要用户确认，不会静默覆盖正式内容。
+
+### 3. 校验和构建
+
+- **校验项目**：只检查结构、内容与资源；
+- **诊断构建**：重建 DOCX，但跳过 Word 字段刷新；
+- **正式构建**：构建、刷新字段、复验并发布可交付 DOCX。
+
+正式产物位于项目的 `output/`，运行和质量报告位于 `logs/`。
+
+## 项目格式
+
+导入后的项目是自包含、可移动的目录：
+
+```text
+my-document/
+├─ project.yml                 # 项目元数据和相对路径
+├─ original/
+│  └─ source.docx             # 导入时保存的源文件副本
+├─ template/
+│  └─ template.docx           # Word 版式与样式模板
+├─ content/
+│  └─ general/
+│     └─ ...                  # Markdown 章节树
+├─ assets/
+│  └─ general/
+│     ├─ images/              # 图片
+│     └─ tables/              # 复杂表格 OOXML
+├─ output/                    # 构建产物
+├─ logs/                      # 日志和质量报告
+└─ .state/                    # 草稿、锁、会话和回滚状态
+```
+
+所有清单路径都相对于项目根目录，因此项目可以整体复制。`.state/` 由应用管理，不建议手工修改或加入版本控制。
+
+### 章节树约定
 
 ```text
 content/general/
 └─ 第3章 功能需求/                 # Word Heading 1
-   └─ 3.1 KSHC/                   # Word Heading 2
-      ├─ _index.md                # 可选：3.1 自身正文
-      ├─ 3.1.1 登录页.md           # Word Heading 3 + 文件正文
-      ├─ 3.1.2 首页.md
-      └─ 3.1.3 注册.md
+   └─ 3.1 用户管理/                # Word Heading 2
+      ├─ _index.md                # 可选：父标题自身正文
+      ├─ 3.1.1 用户列表.md         # Word Heading 3
+      └─ 3.1.2 新增用户.md
 ```
 
-规则：
+- 一级目录采用 `第N章 标题`；
+- 二级及以下采用 `N.N 标题`；
+- 同级编号必须连续，不能重复、跳号或使用错误的父编号；
+- 父标题既有正文又有子章节时，将父正文写入 `_index.md`；
+- 文件内部标题必须深于文件自身代表的 Word Heading；
+- 推荐使用应用内的重命名/重编号功能修改章节结构。
 
-- 文件夹和 Markdown 文件名必须带完整章节编号，编号决定排序与层级；
-- 一级目录使用 `第N章 标题`，二级及以下使用 `N.N 标题`；
-- 同一层编号必须从 1 连续递增，不能重复、跳号或使用错误父编号；
-- 构建发现 `3.1.99` 之类跳号时会失败，并明确提示当前实际应为 `3.1.14`；
-- 文件名中的编号不写入标题正文，显示编号仍由公司 Word 模板的多级编号体系生成；
-- Windows 文件名不能使用 `/ : * ? " < > | \`。标题需要这些字符时，在文件名中使用对应全角字符，生成器会在 Word 标题中还原。
+### 支持的 Markdown 扩展
 
-### `_index.md` 的含义
+Word 段落内换行：
 
-当一个文件夹标题本身有正文，而且后面还有子章节时，把父标题正文写在该文件夹的 `_index.md` 中：
+```markdown
+第一行<br>第二行
+```
+
+带尺寸的图片：
+
+```markdown
+![示例截图](images/example.png =800x450)
+```
+
+复杂 Word 表格会保存为独立 OOXML，并在 Markdown 中使用 `<!-- TABLE:... -->` 引用。可以移动或删除完整引用，但不要手工编辑表格 XML。
+
+更完整的格式说明将在公开文档站或 `docs/` 中维护，避免 README 变成冗长的用户手册。
+
+## 命令行
+
+统一入口为 `python doc_tool_cli.py`，也可以运行 `python -m doc_tool.cli`。
+
+```powershell
+# 查看版本和构建信息
+python doc_tool_cli.py --version
+
+# 导入预检
+python doc_tool_cli.py preflight --docx D:\docs\source.docx
+
+# 导入通用文档
+python doc_tool_cli.py import `
+  --docx D:\docs\source.docx `
+  --name my-document `
+  --target-dir D:\projects `
+  --document-type general
+
+# 正式构建
+python doc_tool_cli.py build --project D:\projects\my-document
+
+# 无 Word 诊断构建
+python doc_tool_cli.py build --project D:\projects\my-document --skip-word-refresh
+
+# 质量命令
+python doc_tool_cli.py validate --project D:\projects\my-document
+python doc_tool_cli.py lint --project D:\projects\my-document
+python doc_tool_cli.py status --project D:\projects\my-document --output json
+python doc_tool_cli.py search --project D:\projects\my-document --query "keyword"
+
+# CI 报告
+python doc_tool_cli.py validate --project D:\projects\my-document --format sarif
+python doc_tool_cli.py validate --project D:\projects\my-document --format junit
+```
+
+`--project` 可以重复传入，以便一次处理多个项目。`preflight`、`import`、`validate`、`lint`、`search` 和 `status` 支持 JSON 输出；`validate` 支持 SARIF/JUnit，`lint` 支持 SARIF。质量门禁或执行失败时命令返回非零退出码。
+
+## 开发
+
+安装运行和构建依赖：
+
+```powershell
+python -m pip install -r requirements.txt -r requirements-build.txt
+```
+
+运行完整测试：
+
+```powershell
+python scripts\tests\run_tests.py
+```
+
+运行指定测试或覆盖率门禁：
+
+```powershell
+python scripts\tests\run_tests.py test_cli_machine.py test_project_build.py
+python scripts\tests\run_tests.py --coverage --coverage-min 80
+```
+
+构建 Windows 安装包：
+
+```powershell
+.\packaging\build.ps1
+```
+
+发布流水线包括测试、依赖审计、敏感文档泄漏扫描、PyInstaller 构建、冻结应用和安装级冒烟测试，并生成 SHA-256、CycloneDX 与 SPDX 清单。
+
+### 代码结构
 
 ```text
-6.5 呼吸机接口/
-├─ _index.md                      # 6.5 标题之后、6.5.1 之前的概述/表格
-├─ 6.5.1 接口说明.md
-└─ 6.5.2 参数说明.md
+doc_tool/
+├─ domain/                    领域模型、路径、安全和错误定义
+├─ application/               导入、内容、质量、评审和构建用例
+├─ adapters/                  DOCX 内核与外部能力适配
+├─ ui/                        PySide6 桌面界面
+└─ resources/                 应用运行资源
+scripts/                      构建、校验、字段刷新和测试
+packaging/                    PyInstaller、安装器、审计与 SBOM
+openspec/                     功能规格、设计和变更任务
 ```
 
-`_index.md` 内容会严格插入在父标题之后、第一个子标题之前。不要把父章节概述复制到第一个子章节中。
+## 路线图
 
-## 3. 新增、修改、删除章节
+当前优先级：
 
-### 新增
+- [x] Word → Markdown 项目导入；
+- [x] Markdown 工作台和可靠 Word 重建；
+- [x] 自动草稿、恢复与变更回滚；
+- [x] 保真检查、问题中心和机器可读 CLI；
+- [ ] 完成公共品牌、截图和脱敏示例；
+- [ ] 发布可复现的 Windows 安装包；
+- [ ] 建立公开文档站和示例项目；
+- [ ] 完善 macOS/Linux 上不依赖 Word 的工作流；
+- [ ] 评估 LibreOffice 字段刷新后端；
+- [ ] 插件化文档类型、模板和质量规则。
 
-例如 `3.1 KSHC` 当前最后一个文件是 `3.1.13 出厂管理.md`，新增注册功能时直接创建：
+更细的设计和计划位于 `openspec/` 与 `docs/roadmap.md`。公开 Issue 系统启用后，路线图将以 Issue/Milestone 为准。
 
-```text
-content/requirement/第3章 功能需求/3.1 KSHC/3.1.14 注册.md
-```
+## 参与贡献
 
-写完后双击 `生成需求说明书.cmd` 或 `全部生成.cmd`。无需在 YAML 中登记新章节。
+欢迎提交缺陷报告、功能建议、文档改进和代码贡献。正式开放贡献前，项目会补充独立的 `CONTRIBUTING.md` 和行为准则。
 
-### 修改
+建议的贡献流程：
 
-直接编辑对应 Markdown。重新生成后，正文、普通表格、图片和文件内更深层标题会按原位置更新。
-
-### 删除
-
-删除对应 Markdown 或章节文件夹，然后重新生成。若删除的是中间编号，必须同时把后续同级文件连续重编号；若删除的是最后一个编号则无需调整其他文件。
-
-## 4. Markdown 写法
-
-### 正文与换行
-
-普通文本行生成正文段落。需要同一 Word 段落内换行时写：
-
-```markdown
-A<br>B
-```
-
-输出使用真正的 Word 换行节点，不会把 `<br>` 字样显示在文档中。
-
-### 文件内更深层标题
-
-`3.1.3 注册.md` 自身已经代表 Heading 3，文件内部只能从 Heading 4 开始：
-
-```markdown
-#### 验收说明
-```
-
-内部标题层级不深于文件章节层级时，构建会失败。
-
-### 普通表格
-
-```markdown
-| 字段 | 说明 |
-| --- | --- |
-| 状态 | A\|B<br>下一行 |
-```
-
-- 单元格中的 `\|` 表示文字竖线，不会被拆成新单元格；
-- `\\` 表示一个反斜杠；
-- `<br>` 表示单元格内真实 Word 换行。
-
-### 截图和普通图片
-
-日常截图只需放入相应资源目录并使用标准 Markdown 引用：
-
-```markdown
-![登录页截图](images/login.png)
-```
-
-尺寸不是必填项。未写尺寸时，生成器按图片 DPI 和原始宽高比计算自然尺寸；超出页面可用宽度时只做等比缩小，不拉伸、不放大。
-
-确需固定显示尺寸时可选写：
-
-```markdown
-![登录页截图](images/login.png =800x450)
-```
-
-图片不存在、损坏、越出资源目录或 relationship/媒体部件不完整时，构建或校验会直接失败。构建器会按图片内容哈希复用媒体，避免同一图片重复打包。
-
-### 复杂表格
-
-原 Word 中无法无损表达为 Markdown 的合并单元格、复杂边框等表格保存在 `assets/<type>/tables/*.xml`，Markdown 中保留 `<!-- TABLE:... -->` 引用。日常可移动或删除完整引用，但不要手工改 XML 内部结构。
-
-如果确实需要修改复杂表格，建议先在 Word 中完成表格修改，再使用 `scripts/migration/` 下的迁移工具重新提取并做基线验收。复杂表格 XML 缺失、损坏或引用无效时会失败，不会静默跳过。
-
-## 5. 配置与版本
-
-下列全局配置是仓库内置需求/详细设计示例的旧入口：
-
-- `config/requirement.yml`
-- `config/design.yml`
-
-`documentNo`、`documentName`、`documentVersion` 是封面与输出文件名的唯一配置来源。修改版本时只改配置，不要手工改模板封面或输出文件名。构建器会同步封面编号/版本并保留 `NUMPAGES` 字段，Word 刷新后写入实际总页数。
-
-`baseline.file` 只用于首次迁移验收。未来有意修改业务 Markdown 后，日常入口不会要求内容仍与旧版原 Word 相同；发布前可按项目策略选择新的受控基线。
-
-## 6. 环境要求
-
-- Windows；
-- Python 3 已加入 `PATH`；
-- Python 包：`pyyaml`、`lxml`、`pillow`、`pywin32`；
-- 本机安装 Microsoft Word。
-
-安装缺失依赖：
+1. Fork 仓库；
+2. 从主分支创建功能分支；
+3. 为行为变更补充测试和文档；
+4. 运行完整测试，确保没有引入真实业务文档或敏感数据；
+5. 提交清晰、范围单一的 Pull Request。
 
 ```powershell
-python -m pip install pyyaml lxml pillow pywin32
+git checkout -b feature/short-description
+python scripts\tests\run_tests.py
+git commit -m "feat: describe the change"
 ```
 
-Word 刷新使用 `DispatchEx` 启动本次专用隐藏进程，不复用、关闭或杀死用户已经打开的 Word。超时值来自配置 `refresh.timeoutSeconds`；超时只终止本次工作进程并返回失败。刷新完成后还会只读复打开一次，以确认 Word 不需要修复文档。
+首次贡献可以从文档、测试、错误信息、可访问性和带有 `good first issue` 标签的任务开始。
 
-无 Word 的诊断环境可在命令行显式使用 `--skip-word-refresh`，但这种结果只算构建级验证，不能作为正式 Word 验收通过。
+## 安全
 
-## 7. 校验和测试
+请不要在公开 Issue 中披露可利用的安全漏洞、恶意 DOCX 样本或敏感文档。公开托管平台确定后，请使用仓库提供的私密安全报告渠道；项目发布前会增加 `SECURITY.md`，说明支持版本和响应流程。
 
-日常入口已经自动校验。需要单独运行时：
+处理不可信 Word 文件存在解析和资源消耗风险。虽然项目包含路径约束、OOXML 安全检查和构建隔离，但在安全报告流程完善前，不建议把它部署为接收匿名公网文件的无人值守服务。
 
-```powershell
-python scripts/build_docx.py all
-python scripts/validate_docx.py all
-python scripts/refresh_fields.py all
-python scripts/validate_docx.py all --require-refreshed
-```
+## 开源准备状态
 
-首次迁移闭环还可与原 Word 严格比较：
+要把当前仓库安全地公开，还需要完成：
 
-```powershell
-python scripts/validate_docx.py all --baseline
-```
+- [ ] 选择 OSI 批准的许可证并添加 `LICENSE`；
+- [ ] 确认项目名称、图标、公司名称和商标的公开使用授权；
+- [ ] 删除或替换 `templates/`、`content/`、`assets/` 中的内部业务材料；
+- [ ] 清理 Git 历史中的文档、内网地址、账号、密钥和客户信息；
+- [ ] 建立公开仓库、Issue 模板、贡献指南、行为准则和安全策略；
+- [ ] 准备脱敏测试夹具、示例项目、截图和首个 Release；
+- [ ] 审核第三方依赖许可证、安装包内容和 SBOM；
+- [ ] 在干净环境中复现安装、测试、构建和卸载流程。
 
-自动测试：
+> 只从当前工作树删除敏感文件并不够；如果内容曾被提交，还必须清理 Git 历史，并在公开前轮换可能暴露的凭据。
 
-```powershell
-python scripts/tests/run_tests.py
-```
+## 限制
 
-覆盖范围包括：`_index` 父正文顺序、连续编号、缺图、普通表格转义、真实 Word 换行、自然尺寸图片、增加/修改/删除迭代，以及空正文、删/换标题、正文篡改、父正文错位、普通/复杂表格损坏、图片关系缺失、非法 OOXML 和重复媒体等负向门禁。
+- 当前仅提供 Windows 桌面应用；
+- 正式 DOCX 字段刷新依赖桌面版 Microsoft Word；
+- 仅支持有规范 Heading 结构的 `.docx`，不支持旧 `.doc`；
+- 极复杂的 Word 对象可能只能作为 OOXML 资源保留，不能直接在 Markdown 中编辑；
+- 诊断构建不等同于完成 Word 字段刷新和人工视觉验收；
+- 生成的 `output/` 不是内容源，不应反向覆盖 Markdown 项目。
 
-## 8. 模板、迁移和历史文件
+## 许可证
 
-```text
-templates/                  公司 Word 模板骨架，日常不要改
-content/                    日常维护的 Markdown 章节树
-assets/                     日常 Markdown 引用的图片和复杂表格资源
-config/                     文档配置
-scripts/                    日常核心构建/校验/刷新脚本
-scripts/migration/          首次导入或重新提取时才使用
-scripts/diagnostics/        问题分析脚本，不参与日常生成
-migration/legacy/           旧 BAT、旧映射元数据等历史证据
-output/                     最终 DOCX
-```
+**待确定。** 当前仓库尚未包含开源许可证，因此不授予复制、修改、分发或再许可代码的权利。公开发布前请根据预期生态选择合适的 OSI 批准许可证，并在仓库根目录添加 `LICENSE`。
 
-`migration/legacy/binary-bat/` 中的旧 `.bat` 含安全软件封装/NUL 字节，只作历史留存，禁止作为入口。日常只使用最外层三个纯文本 `.cmd`。
+第三方依赖的许可证信息见 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)。第三方组件仍分别受其原始许可证约束。
 
-## 9. 日常边界
+## 致谢
 
-可以：
+本项目使用 Python、PySide6、lxml、PyYAML、Pillow、pywin32、ReportLab、pypdf、PyInstaller 和 Inno Setup 构建。感谢这些项目及其贡献者。
 
-- 增加、修改、删除 Markdown 章节；
-- 在 Markdown 中写正文、内部标题、普通表格；
-- 放入截图并用标准 Markdown 引用；
-- 通过 `_index.md` 维护父章节自身正文；
-- 修改配置中的文档版本后重新生成。
+---
 
-不可以：
-
-- 手工编辑 `output/` 后把它当作内容源；
-- 跳过报错继续使用失败产物；
-- 在同级章节中跳号或重复编号；
-- 把父章节正文塞进第一个子章节；
-- 删除 Markdown 引用的图片或复杂表格 XML；
-- 使用 `migration/legacy` 中的旧 BAT；
-- 在未完成 Word 刷新与视觉检查时宣称正式 QMS 文档验收通过。
-
-## 10. 桌面应用安装与操作（团队成员指南）
-
-### 10.1 安装
-
-1. 从公司 Git Release 页面下载 `KonsungDocTool-Setup-X.Y.Z.exe` 和 `.sha256` 文件。
-2. 验证 SHA-256（可选）：在 PowerShell 中运行
-   ```powershell
-   Get-FileHash KonsungDocTool-Setup-X.Y.Z.exe -Algorithm SHA256
-   ```
-   与 `.sha256` 文件中的哈希比对。
-3. 双击 `KonsungDocTool-Setup-X.Y.Z.exe` 安装。安装不需要管理员权限，
-   默认安装到 `%LOCALAPPDATA%\Konsung\DocTool`。
-4. 安装完成后在开始菜单找到「康尚文档工具」启动。
-
-**无需安装 Python 或任何开发工具。** 应用自带 Python 运行时和所有依赖。
-
-### 10.2 新建项目（首次导入）
-
-1. 启动应用，选择「新建项目」。
-2. 选择有 Heading 1～6 结构的源 DOCX 文件。
-3. 普通文档使用默认的「通用大文档」；公司需求/详细设计说明书可选对应预设，应用会根据标题和封面给出建议。
-4. 输入项目名称，选择目标父目录。
-5. 预览标题树：确认 H1/H2/H3 层级、图片/表格数量正确。
-6. 点击「导入」，等待导入完成。失败时会给出明确错误，不会留下半成品。
-
-### 10.3 打开已有项目
-
-1. 启动应用，选择「打开项目」。
-2. 选择项目目录（包含 `project.yml` 的目录）。
-3. 应用加载清单，显示文档信息和最近构建状态。
-
-### 10.4 日常维护
-
-1. 打开项目后，点击「打开内容目录」在文件管理器中查看 Markdown 章节。
-2. 用任意 Markdown 编辑器（如 VS Code、Typora）编辑章节内容。
-3. 新增章节：创建对应文件夹和 `.md` 文件，文件名带完整章节编号。
-4. 修改章节：直接编辑对应 `.md` 文件。
-5. 删除章节：删除对应文件/文件夹，注意重编号。
-
-### 10.5 校验与合并
-
-1. **诊断构建（无 Word）**：点击「诊断构建」快速验证内容结构。
-   结果标记为「非正式」，不能作为最终交付。
-2. **正式合并**：点击「正式合并」，应用会：
-   - 构建 DOCX 到临时文件
-   - 前校验
-   - Microsoft Word 专用进程刷新 TOC/页码/NUMPAGES
-   - 后校验
-   - 原子替换正式输出
-   成功后状态显示「正式合并成功」。
-
-### 10.6 故障处理
-
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| 安装失败 | 杀毒软件拦截 | 将安装目录加入白名单 |
-| 启动后提示 Word 不可用 | 未安装 Word 或在服务中运行 | 在安装了 Word 的桌面环境运行正式合并 |
-| 合并时提示编号跳号 | Markdown 文件名编号不连续 | 按提示修正编号后重试 |
-| 合并时提示图片缺失 | Markdown 引用的图片不存在 | 将图片放入对应资源目录 |
-| 合并时提示模板损坏 | template.docx 被修改或损坏 | 从备份恢复模板 |
-| 正式合并失败但旧输出仍在 | 原子发布保证 | 检查日志，修正问题后重新合并 |
-| 应用升级后无法打开项目 | 项目模式版本不兼容 | 重新安装新版本，或恢复备份的 project.yml |
-
-### 10.7 日志与诊断
-
-- 应用日志位于项目目录的 `logs/` 下，自动轮转。
-- 点击「帮助 → 关于」查看应用版本、提交标识和 Word 可用性。
-- 点击「帮助 → 打开日志目录」快速定位日志文件。
-- 日志不含正文内容，仅记录阶段、计数和哈希指纹。
-
-## 11. 旧仓库迁移
-
-已有 `requirement/design` 目录结构的旧仓库可通过迁移工具转为自包含项目：
-
-1. 在应用中选择「新建项目」，选择旧 DOCX 作为源文件。
-2. 导入向导会自动识别标题样式、提取内容并生成 `project.yml`。
-3. 迁移完成后，旧的 `.cmd` 入口仍可使用（兼容层），但建议使用桌面应用。
-
-迁移工具源码位于 `scripts/migration/`，包含：
-- `analyze_docx.py`：分析 DOCX 结构
-- `extract_docx.py`：提取正文、图片和复杂表格
-- `make_template.py`：生成模板骨架
-- `split_content.py`：拆分为编号连续的 Markdown 章节树
-
-迁移前自动备份 `project.yml`，迁移失败不会修改原有内容。
+如果这个项目对你有帮助，公开仓库上线后欢迎提交 Issue、参与讨论或贡献代码。

@@ -29,13 +29,10 @@ import json
 import os
 import shutil
 import tempfile
-import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-
-from lxml import etree
 
 from doc_tool.adapters.importer import (
     ExtractionResult,
@@ -50,6 +47,7 @@ from doc_tool.domain.errors import (
     CancelledError,
     DocToolError,
     InvalidDocxError,
+    RoundtripCheckError,
     TargetProjectExistsError,
 )
 from doc_tool.domain.manifest import ProjectManifest, DOCUMENT_TYPES
@@ -66,6 +64,7 @@ STAGE_SPLIT_CONTENT = "split_content"
 STAGE_VALIDATE_STRUCTURE = "validate_structure"
 STAGE_SAVE_MANIFEST = "save_manifest"
 STAGE_TRIAL_BUILD = "trial_build"
+STAGE_ROUNDTRIP_CHECK = "roundtrip_check"
 STAGE_PUBLISH = "publish"
 
 
@@ -81,6 +80,11 @@ class ImportRequest:
         document_name: 文档名称。
         document_version: 文档版本字符串。
         refresh_timeout_seconds: Word 刷新超时，默认 900。
+        require_exact_roundtrip: 往返门禁要求完全一致；开启时非关键（WARN）
+            差异也阻止发布，默认 False（仅 BLOCK 差异阻止）。
+        heading_style_map: 可选的用户样式映射覆盖（styleId -> 级别 1~6）。
+            传入时预检/模板生成/内容提取均按该映射识别标题，清单写入
+            ``headingStyles``（级别 -> styleId）；缺省时按自动识别结果。
     """
 
     source_docx: Path
@@ -90,6 +94,8 @@ class ImportRequest:
     document_name: str
     document_version: str
     refresh_timeout_seconds: int = 900
+    require_exact_roundtrip: bool = False
+    heading_style_map: Optional[Dict[str, int]] = None
 
 
 @dataclass
@@ -147,20 +153,27 @@ def import_first_time(
         _record(result, STAGE_VALIDATE_TARGET, "succeeded",
                 detail="目标目录可用", metrics={"target": target.name})
 
-        # 2. 预检（fail-closed 重新校验）
+        # 2. 预检（fail-closed 重新校验；样式映射优先于自动识别）
         _check_cancel()
         _record(result, STAGE_PREFLIGHT, "started")
-        preview = preflight(str(source_path))
+        preview = preflight(
+            str(source_path),
+            heading_style_map=request.heading_style_map,
+        )
+        fidelity_report = getattr(preview, "fidelity", None)
         if request.document_type not in DOCUMENT_TYPES:
             raise InvalidDocxError(
                 "未知的文档类型：{0}".format(request.document_type),
                 details={"documentType": request.document_type},
             )
-        _record(result, STAGE_PREFLIGHT, "succeeded", metrics={
+        preflight_metrics = {
             "headings": len(preview.headings),
             "images": preview.image_count,
             "tables": preview.table_count,
-        })
+        }
+        if fidelity_report is not None:
+            preflight_metrics["fidelity"] = fidelity_report.summary_text()
+        _record(result, STAGE_PREFLIGHT, "succeeded", metrics=preflight_metrics)
 
         # 3. 创建同卷暂存目录
         _check_cancel()
@@ -181,7 +194,11 @@ def import_first_time(
         # 5. 生成模板 (4.1)
         _check_cancel()
         _record(result, STAGE_GENERATE_TEMPLATE, "started")
-        template_meta = generate_template(paths.source_docx, paths.template_docx)
+        template_meta = generate_template(
+            paths.source_docx,
+            paths.template_docx,
+            heading_style_map=request.heading_style_map,
+        )
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
             "headingStyles": len(template_meta.heading_styles),
             "bodyStyle": template_meta.body_style,
@@ -196,6 +213,7 @@ def import_first_time(
             paths.images_dir(request.document_type),
             paths.tables_dir(request.document_type),
             request.document_type,
+            heading_style_map=request.heading_style_map,
         )
         _record(result, STAGE_EXTRACT_CONTENT, "succeeded", metrics={
             "chapters": extraction.chapter_count,
@@ -235,6 +253,36 @@ def import_first_time(
         _record(result, STAGE_TRIAL_BUILD, "succeeded", metrics={
             "output": Path(trial_output).name,
         })
+
+        # 10b. 往返差异门禁 (2.5)：trial_build 后、publish 前，fail-closed。
+        _check_cancel()
+        _record(result, STAGE_ROUNDTRIP_CHECK, "started")
+        roundtrip_report = _run_roundtrip_check(request, paths.source_docx, trial_output)
+        if roundtrip_report.has_block or (
+            request.require_exact_roundtrip and roundtrip_report.issues
+        ):
+            summary = roundtrip_report.summary_text()
+            if not roundtrip_report.has_block:
+                summary = "开启严格往返要求，存在非关键差异：{0}".format(summary)
+            raise RoundtripCheckError(
+                "往返差异门禁未通过：{0}".format(summary),
+                suggested_action="重建 Word 与源 Word 存在差异，导入已中止；请检查源文档后重试。",
+                details={"summary": summary},
+            )
+        _remove_trial_output(trial_output)
+        _record(result, STAGE_ROUNDTRIP_CHECK, "succeeded", metrics={
+            "sourceElements": roundtrip_report.source_count,
+            "rebuiltElements": roundtrip_report.rebuilt_count,
+            "issues": len(roundtrip_report.issues),
+            "block": len(roundtrip_report.block_issues),
+            "warn": len(roundtrip_report.warn_issues),
+        })
+
+        # 2.7 保真报告与往返差异摘要持久化到成功项目 logs/（尽力而为）。
+        _persist_reports(paths, fidelity_report, roundtrip_report)
+
+        # 2.8 播种重导入基线：首次导入的正文哈希作为后续重导入冲突判定基线。
+        _seed_reimport_base(paths, request.document_type)
 
         # 11. 原子发布 (4.5)
         _check_cancel()
@@ -314,6 +362,15 @@ def _build_manifest(
     request: ImportRequest, paths: ProjectPaths, template_meta: TemplateMeta, sha256: str
 ) -> ProjectManifest:
     doc_type = request.document_type
+    if request.heading_style_map:
+        # 用户映射（styleId -> 级别）写入清单的 headingStyles（级别 -> styleId）。
+        heading_styles = {
+            level: style_id for style_id, level in request.heading_style_map.items()
+        }
+    else:
+        heading_styles = {
+            level: sid for sid, level in template_meta.heading_styles.items()
+        }
     manifest = ProjectManifest(
         documentType=doc_type,
         documentNo=request.document_no,
@@ -321,7 +378,7 @@ def _build_manifest(
         documentVersion=request.document_version,
         sourceSha256=sha256,
         refreshTimeoutSeconds=request.refresh_timeout_seconds,
-        headingStyles={level: sid for sid, level in template_meta.heading_styles.items()},
+        headingStyles=heading_styles,
         bodyStyle=template_meta.body_style,
     )
     manifest.paths = {
@@ -380,7 +437,11 @@ def _check_resource_references(paths: ProjectPaths, doc_type: str) -> None:
 
 
 def _trial_build(manifest: ProjectManifest, paths: ProjectPaths) -> str:
-    """试构建：在暂存输出目录构建 DOCX，并校验产物为合法 OOXML 包。"""
+    """试构建：在暂存输出目录构建 DOCX，并校验产物为合法 OOXML 包。
+
+    试构建产物保留到往返差异门禁完成后再清理（``_remove_trial_output``），
+    供 ``roundtrip_diff`` 对比源 Word 与重建 Word。
+    """
     from doc_tool.adapters.kernel import build_with_project, ensure_kernel_importable
 
     ensure_kernel_importable()
@@ -397,32 +458,91 @@ def _trial_build(manifest: ProjectManifest, paths: ProjectPaths) -> str:
             details={"errorType": type(exc).__name__},
         )
     _verify_valid_docx(Path(output_path))
-    # 试构建产物为临时诊断文件，发布后由正式构建重新生成；清理以免污染项目。
-    try:
-        os.remove(str(output_path))
-    except OSError:
-        pass
     return str(trial_output)
 
 
+def _remove_trial_output(trial_output: str) -> None:
+    """往返门禁完成后清理试构建临时产物。"""
+    try:
+        os.remove(trial_output)
+    except OSError:
+        pass
+
+
+def _run_roundtrip_check(request: ImportRequest, source_docx: Path, trial_output: str):
+    """执行源 Word 与试构建重建 Word 的往返差异对比。"""
+    from doc_tool.adapters.roundtrip import roundtrip_diff
+
+    # 样式映射导入的文档标题识别依赖用户映射（级别 -> styleId）。
+    heading_styles = None
+    if request.heading_style_map:
+        heading_styles = {
+            level: style_id for style_id, level in request.heading_style_map.items()
+        }
+    try:
+        return roundtrip_diff(source_docx, trial_output, heading_styles=heading_styles)
+    except Exception as exc:
+        raise RoundtripCheckError(
+            "往返对比失败：{0}".format(exc),
+            suggested_action="无法对试构建产物执行往返对比，请检查源文档后重试。",
+            details={"errorType": type(exc).__name__},
+        ) from exc
+
+
+def _persist_reports(paths: ProjectPaths, fidelity_report, roundtrip_report) -> None:
+    """把保真报告与往返差异摘要写入成功项目 ``logs/``（尽力而为）。"""
+    try:
+        paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        if fidelity_report is not None:
+            (paths.logs_dir / "fidelity.md").write_text(
+                fidelity_report.markdown_text() + "\n", encoding="utf-8"
+            )
+        (paths.logs_dir / "roundtrip.md").write_text(
+            roundtrip_report.markdown_text() + "\n", encoding="utf-8"
+        )
+    except OSError:
+        # 日志写入失败不中止导入。
+        pass
+
+
+def _seed_reimport_base(paths: ProjectPaths, doc_type: str) -> None:
+    """首次导入成功时播种 ``reimport_base.json``（sha1 正文哈希）。
+
+    重导入用「上次导入后的内容」作为冲突判定基线；首次导入不播种会导致第一次
+    重导入无基线、全部章节被判冲突、自动合入失效。本函数在原子发布前写入
+    暂存项目，随发布一起进入正式项目。
+    """
+    content_root = paths.content_dir(doc_type)
+    files = {}
+    for path in content_root.rglob("*.md"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(content_root).as_posix()
+        files[rel] = hashlib.sha1(path.read_bytes()).hexdigest()
+    paths.state_dir.mkdir(parents=True, exist_ok=True)
+    (paths.state_dir / "reimport_base.json").write_text(
+        json.dumps({"files": files}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
 def _verify_valid_docx(path: Path) -> None:
-    """校验产物为合法 OOXML 包：ZIP CRC、核心部件、XML 良构。"""
+    """校验产物为合法 OOXML 包：ZIP CRC、核心部件、XML 良构（统一安全入口）。"""
+    from doc_tool.domain.ooxml import (
+        OOXMLSecurityError,
+        parse_xml_safe,
+        read_docx_package,
+    )
+
     if not path.exists() or path.stat().st_size == 0:
         raise DocToolError("试构建未生成有效 DOCX 产物。")
     try:
-        with zipfile.ZipFile(str(path), "r") as zf:
-            bad = zf.testzip()
-            if bad is not None:
-                raise DocToolError("试构建产物 ZIP 校验失败：{0}".format(bad))
-            names = set(zf.namelist())
-            for part in ("word/document.xml", "word/_rels/document.xml.rels"):
-                if part not in names:
-                    raise DocToolError("试构建产物缺少核心部件：{0}".format(part))
-            etree.fromstring(zf.read("word/document.xml"))
-    except zipfile.BadZipFile as exc:
-        raise DocToolError("试构建产物不是合法 ZIP 包。", details={"error": str(exc)})
-    except etree.XMLSyntaxError as exc:
-        raise DocToolError("试构建产物 document.xml 解析失败。", details={"error": str(exc)})
+        with read_docx_package(path) as package:
+            parse_xml_safe(package.read("word/document.xml"), "word/document.xml")
+    except OOXMLSecurityError as exc:
+        raise DocToolError(
+            "试构建产物校验失败：{0}".format(exc),
+            details={"part": exc.part_name, "reason": exc.reason},
+        ) from exc
 
 
 def _publish(staging: Path, target: Path) -> None:
@@ -480,10 +600,28 @@ def _write_diagnostic_log(
     return log_path
 
 
+def _safe_traceback(exc: Exception) -> str:
+    """截断的堆栈文本（诊断日志使用；不包含正文或凭据）。"""
+    import traceback
+
+    lines = traceback.format_exception(type(exc), exc, exc.__traceback__)
+    text = "".join(lines)
+    return text[-2000:]
+
+
 def _map_exception(exc: Exception) -> DocToolError:
     """把任意异常映射为结构化错误类型。"""
     if isinstance(exc, DocToolError):
         return exc
+    # 统一安全解析入口的中性异常 → 导入侧 InvalidDocxError（带稳定错误码）。
+    from doc_tool.domain.ooxml import OOXMLSecurityError
+
+    if isinstance(exc, OOXMLSecurityError):
+        return InvalidDocxError(
+            str(exc),
+            suggested_action="源文档无法通过安全解析校验，请确认文件完整后重新导入。",
+            details={"part": exc.part_name, "reason": exc.reason},
+        )
     # 导入纯函数使用 ValueError 表示结构问题
     if isinstance(exc, ValueError):
         return InvalidDocxError(
@@ -492,5 +630,10 @@ def _map_exception(exc: Exception) -> DocToolError:
         )
     return DocToolError(
         "导入过程中发生意外错误。",
-        details={"errorType": type(exc).__name__},
+        details={
+            "errorType": type(exc).__name__,
+            # 保留原始异常消息与截断堆栈，便于诊断（诊断日志已整体脱敏）。
+            "error": str(exc)[:500],
+            "traceback": _safe_traceback(exc),
+        },
     )
