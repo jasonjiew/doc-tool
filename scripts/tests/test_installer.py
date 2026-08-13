@@ -145,6 +145,37 @@ class InstallerArtifactTests(unittest.TestCase):
         self.assertRegex(parts[0], r"^[0-9A-Fa-f]{64}$")
 
 
+class PublicInternalCoexistTests(unittest.TestCase):
+    """任务 3.4：公共版与内部版并存安装、独立升级与独立卸载。
+
+    并存的前提是安装身份完全隔离：不同 AppId、不同安装目录、不同可执行文件名。
+    任何一项与内部版相同都会导致覆盖或卸载冲突，因此作为硬约束验证。
+    """
+
+    def setUp(self):
+        self.iss = _read_iss()
+
+    def test_appid_differs_from_legacy(self):
+        """公共 AppId 与内部版不同，保证注册表识别独立。"""
+        from doc_tool.domain.branding import LEGACY_INSTALL_DIR_SEGMENT
+
+        match = re.search(r'#define\s+MyAppId\s+"([0-9A-Fa-f-]+)"', self.iss)
+        self.assertIsNotNone(match)
+        self.assertNotEqual(match.group(1).upper(), "F6D0000F-13F0-50D9-8743-5B42D68FF071")
+
+    def test_install_dir_differs_from_legacy(self):
+        """安装目录与内部版不同，保证独立卸载。"""
+        self.assertNotIn("Konsung\\DocTool", self.iss)
+        self.assertIn("{localappdata}\\{#MyAppNameEn}", self.iss)
+
+    def test_executable_differs_from_legacy(self):
+        """可执行文件名与内部版不同，保证进程/快捷方式独立。"""
+        self.assertNotIn("KonsungDocTool.exe", self.iss)
+        self.assertIn("DocTool.exe", self.iss)
+        # 卸载 kill 命令使用公共可执行名
+        self.assertIn("{#MyAppExeName}", self.iss)
+
+
 class SchemaCompatibilityGuardTests(unittest.TestCase):
     """任务 8.7：旧应用拒写更高模式项目（安装器无关，由应用层保证）。"""
 

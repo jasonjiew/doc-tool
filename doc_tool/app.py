@@ -37,6 +37,15 @@ def main() -> int:
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setOrganizationName(ORGANIZATION_SETTINGS_KEY)
 
+    # 首次启动：把内部版旧命名空间中的非敏感偏好（窗口几何、最近项目）
+    # 只读迁移到公共命名空间；旧值保留，已有公共设置则不覆盖。
+    try:
+        from doc_tool.application.settings_migration import migrate_legacy_settings
+
+        migrate_legacy_settings()
+    except Exception:  # pragma: no cover - 迁移失败不阻断启动
+        pass
+
     from doc_tool.domain.version import APP_VERSION
     from doc_tool.ui.main_window import MainWindow
     from doc_tool.ui.styles import apply_theme, set_window_icon
