@@ -4,7 +4,7 @@
 
 **把大型 Word 文档变成可维护、可审查、可可靠重建的 Markdown 项目。**
 
-面向需求说明书、详细设计和其他结构化长文档的 Windows 桌面工具。
+面向需求说明书、详细设计、技术手册等结构化长文档的 Windows 桌面工具。
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
@@ -12,7 +12,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Status](https://img.shields.io/badge/open--source-preparing-orange)
 
-[功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献)
+[功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md)
 
 </div>
 
