@@ -237,7 +237,10 @@ class ReplacePanel(QWidget):
         self._after_applied(results)
         self._refresh_file_matches(match.rel_path)
         self._render_matches()
-        self._set_status("已替换 1 处")
+        if any(getattr(r, "backup_failed", False) for r in results):
+            self._set_status("已替换 1 处（⚠ 备份失败，回滚不可用）")
+        else:
+            self._set_status("已替换 1 处")
 
     def skip_one(self) -> None:
         match = self._selected_match()
@@ -279,10 +282,25 @@ class ReplacePanel(QWidget):
         self._matches = []
         self._preview = None
         self._render_matches()
-        self._set_status("已批量替换 {0} 处（{1} 个文件）".format(total, len(files)))
+        no_backup = [
+            r.rel_path for r in results if getattr(r, "backup_failed", False)
+        ]
+        if no_backup:
+            self._set_status(
+                "已批量替换 {0} 处（{1} 个文件）；以下文件备份失败，回滚不可用：{2}".format(
+                    total, len(files), "、".join(no_backup)
+                )
+            )
+        else:
+            self._set_status("已批量替换 {0} 处（{1} 个文件）".format(total, len(files)))
         self._after_applied(results)
 
     def rollback(self) -> None:
+        if self._rollback_marker is None:
+            # 双保险：按钮禁用之外，直接调用也拒绝——since=None 会回滚整个
+            # 会话改动（含本次替换前更早的独立编辑/保存），非「本次替换」。
+            self._set_status("请先执行查找，再回滚本次替换")
+            return
         failures = self._writer.rollback(since=self._rollback_marker)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
@@ -343,7 +361,9 @@ class ReplacePanel(QWidget):
         self._replace_one_btn.setEnabled(can_write and has_matches)
         self._skip_btn.setEnabled(has_matches)
         self._replace_all_btn.setEnabled(can_write and has_matches)
-        self._rollback_btn.setEnabled(can_write)
+        # 未执行过查找（无回滚起点）时禁用「回滚本次替换」：旧逻辑在可写时
+        # 恒启用，用户未查找直接点回滚会以 since=None 回滚整个会话改动。
+        self._rollback_btn.setEnabled(can_write and self._rollback_marker is not None)
         self._clear_btn.setEnabled(has_matches)
 
     def _selected_types(self) -> Optional[List[str]]:

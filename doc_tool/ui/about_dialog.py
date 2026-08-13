@@ -160,7 +160,16 @@ def show_about_dialog(parent) -> None:
         copied_label.setText("已复制诊断信息")
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(2000, lambda: copied_label.setText(""))
+        # 定时器必须挂到 dialog 下：孤儿 singleShot 在对话框关闭后 2 秒内
+        # 回调会访问已销毁的 copied_label，抛 RuntimeError。
+        if copy_diagnostics._clear_timer is None:
+            timer = QTimer(dialog)
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda: copied_label.setText(""))
+            copy_diagnostics._clear_timer = timer
+        copy_diagnostics._clear_timer.start(2000)
+
+    copy_diagnostics._clear_timer = None
 
     copy_btn = QPushButton("复制诊断信息", dialog)
     copy_btn.setProperty("btnRole", "secondary")

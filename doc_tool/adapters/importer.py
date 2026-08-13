@@ -31,6 +31,12 @@ from typing import Dict, List, Optional, Tuple, Union
 import yaml
 from lxml import etree
 
+from doc_tool.domain.ooxml import (
+    OOXMLSecurityError,
+    parse_xml_safe,
+    read_docx_package,
+)
+
 
 # --- OOXML 命名空间 ---
 
@@ -100,7 +106,9 @@ class TemplateMeta:
 
 
 def generate_template(
-    source_docx: Union[str, Path], target_template: Union[str, Path]
+    source_docx: Union[str, Path],
+    target_template: Union[str, Path],
+    heading_style_map: Optional[Dict[str, int]] = None,
 ) -> TemplateMeta:
     """从源 DOCX 生成项目模板（任务 4.1）。
 
@@ -111,6 +119,8 @@ def generate_template(
     Args:
         source_docx: 用户选择的源 DOCX 路径，文件名任意。
         target_template: 目标模板路径，由调用方提供（通常位于暂存工作区）。
+        heading_style_map: 可选的用户样式映射覆盖（styleId -> 级别 1~6）；
+            传入时不自行解析 styles.xml，直接使用该映射定位第一个 Heading 1。
 
     Returns:
         模板元数据，含标题样式映射与正文样式。
@@ -123,20 +133,23 @@ def generate_template(
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(src), str(out))
 
-    with zipfile.ZipFile(str(out), "r") as z:
-        names = z.namelist()
-        document_xml = z.read("word/document.xml")
-        styles_xml = z.read("word/styles.xml") if "word/styles.xml" in names else b""
+    with read_docx_package(out) as package:
+        names = package.names
+        document_xml = package.read("word/document.xml")
+        styles_xml = package.read("word/styles.xml") if "word/styles.xml" in names else b""
         rels_name = "word/_rels/document.xml.rels"
         has_rels = rels_name in names
-        rels_xml = z.read(rels_name) if has_rels else b""
+        rels_xml = package.read(rels_name) if has_rels else b""
 
-    root = etree.fromstring(document_xml)
+    root = parse_xml_safe(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
     if body is None:
         raise ValueError("源文档 document.xml 缺少 w:body，无法生成模板。")
 
-    heading_style_map = _parse_heading_styles(styles_xml)
+    if heading_style_map is None:
+        heading_style_map = _parse_heading_styles(styles_xml)
+    else:
+        heading_style_map = dict(heading_style_map)
     if not heading_style_map:
         raise ValueError("源文档 styles.xml 未定义任何 Heading 样式，无法生成模板。")
     body_style = _find_body_style(styles_xml)
@@ -175,7 +188,7 @@ def _parse_heading_styles(styles_xml: bytes) -> Dict[str, int]:
     """从 styles.xml 建立 styleId -> Heading 级别（1~6）映射。"""
     if not styles_xml:
         return {}
-    sroot = etree.fromstring(styles_xml)
+    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
     heading_map: Dict[str, int] = {}
     for style in sroot.iter(_qn("style")):
         if style.get(_qn("type")) != "paragraph":
@@ -199,7 +212,7 @@ def _find_body_style(styles_xml: bytes) -> str:
     """定位正文（Normal）样式的 styleId，找不到时返回空字符串。"""
     if not styles_xml:
         return ""
-    sroot = etree.fromstring(styles_xml)
+    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
     for style in sroot.iter(_qn("style")):
         style_id = style.get(_qn("styleId"))
         name_elem = style.find(_qn("name"))
@@ -253,6 +266,7 @@ def extract_content(
     images_dir: Union[str, Path],
     tables_dir: Union[str, Path],
     document_type: str,
+    heading_style_map: Optional[Dict[str, int]] = None,
 ) -> ExtractionResult:
     """从源 DOCX 提取正文 Markdown、图片与复杂表格（任务 4.2）。
 
@@ -267,6 +281,8 @@ def extract_content(
         images_dir: 暂存图片输出目录。
         tables_dir: 暂存复杂表格 XML 输出目录。
         document_type: 文档类型（general/requirement/design），用于资源映射前缀。
+        heading_style_map: 可选的用户样式映射覆盖（styleId -> 级别 1~6）；
+            传入时不自行解析 styles.xml，标题识别直接使用该映射。
 
     Returns:
         提取结果统计。
@@ -279,16 +295,20 @@ def extract_content(
     images_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(str(src), "r") as z:
-        document_xml = z.read("word/document.xml")
-        styles_xml = z.read("word/styles.xml") if "word/styles.xml" in z.namelist() else b""
-        rels_xml = z.read("word/_rels/document.xml.rels")
-        media_files = {n: z.read(n) for n in z.namelist() if n.startswith("word/media/")}
+    with read_docx_package(src) as package:
+        names = package.names
+        document_xml = package.read("word/document.xml")
+        styles_xml = package.read("word/styles.xml") if "word/styles.xml" in names else b""
+        rels_xml = package.read("word/_rels/document.xml.rels")
+        media_files = {n: package.read(n) for n in names if n.startswith("word/media/")}
 
-    root = etree.fromstring(document_xml)
+    root = parse_xml_safe(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
 
-    heading_style_map = _parse_heading_styles(styles_xml)
+    if heading_style_map is None:
+        heading_style_map = _parse_heading_styles(styles_xml)
+    else:
+        heading_style_map = dict(heading_style_map)
     rel_map = _parse_rel_map(rels_xml)
 
     children = list(body)
@@ -390,7 +410,7 @@ def extract_content(
 
 
 def _parse_rel_map(rels_xml: bytes) -> Dict[str, Dict[str, str]]:
-    rroot = etree.fromstring(rels_xml)
+    rroot = parse_xml_safe(rels_xml, "word/_rels/document.xml.rels")
     rel_map: Dict[str, Dict[str, str]] = {}
     for rel in rroot:
         rid = rel.get("Id")
@@ -906,9 +926,13 @@ def _emit(node: _Node, out_dir: Path, stats: SplitResult) -> None:
             body.pop(0)
         while body and not body[-1].strip():
             body.pop()
-        if body:
-            (node_path / "_index.md").write_text("\n".join(body) + "\n", encoding="utf-8", newline="\n")
-            stats.indexes += 1
+        # 即使正文为空（仅有标题、正文被剥离的章节）也写 _index.md：
+        # validate_content_tree 要求目录要么有 _index.md 要么有子章节，
+        # 否则报「空章节目录」阻断整个导入（仅有标题的章节是常见形态）。
+        (node_path / "_index.md").write_text(
+            "\n".join(body) + "\n", encoding="utf-8", newline="\n"
+        )
+        stats.indexes += 1
         for c in node.children:
             _emit(c, node_path, stats)
     else:

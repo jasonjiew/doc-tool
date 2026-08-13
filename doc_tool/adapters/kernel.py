@@ -19,9 +19,8 @@ from __future__ import annotations
 
 import os
 import sys
-import zipfile
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 from doc_tool.domain.manifest import ProjectManifest
 from doc_tool.domain.paths import ProjectPaths, build_output_filename
@@ -49,23 +48,34 @@ def _effective_heading_styles(
     styleId 在构建后可暂时存在，但 Word 保存时会删除无效的段落样式
     引用，导致标题和 TOC 全部丢失。构建时从项目模板发现真正的
     paragraph Heading 样式，仅对明确非段落/缺失的旧值自动修复。
+
+    用户/清单显式配置且模板中存在对应段落样式的 styleId 一律保留
+    （即使其名字不匹配 ``Heading N`` 命名）——样式映射导入依赖该映射
+    驱动往返门禁比对，擅自替换会让试构建用别的 styleId、而门禁仍按
+    原映射识别，误报关键差异并阻断导入。
     """
     from doc_tool.adapters.importer import _parse_heading_styles
+    from doc_tool.domain.ooxml import OOXMLSecurityError, read_docx_package
 
     try:
-        with zipfile.ZipFile(str(template_path), "r") as package:
+        with read_docx_package(template_path) as package:
             styles_xml = package.read("word/styles.xml")
-    except (OSError, KeyError, zipfile.BadZipFile):
+    except (OSError, KeyError, OOXMLSecurityError):
         return dict(manifest.headingStyles)
 
     style_to_level = _parse_heading_styles(styles_xml)
     discovered = {level: style_id for style_id, level in style_to_level.items()}
+    paragraph_ids = _paragraph_style_ids(styles_xml)
     effective: Dict[int, str] = {}
     changed = False
     for level, configured_style in manifest.headingStyles.items():
         level = int(level)
         configured_style = str(configured_style)
         if style_to_level.get(configured_style) == level:
+            effective[level] = configured_style
+            continue
+        if configured_style in paragraph_ids:
+            # 配置的 styleId 是模板中的真实段落样式：保留，不擅自替换。
             effective[level] = configured_style
             continue
         replacement = discovered.get(level)
@@ -86,6 +96,24 @@ def _effective_heading_styles(
         # 的无损自修复；发布失败时不会写回 project.yml。
         manifest.headingStyles = dict(sorted(effective.items()))
     return dict(sorted(effective.items()))
+
+
+def _paragraph_style_ids(styles_xml: bytes) -> set:
+    """返回模板 styles.xml 中全部段落样式的 styleId 集合。"""
+    from doc_tool.domain.ooxml import OOXMLSecurityError, parse_xml_safe
+
+    try:
+        sroot = parse_xml_safe(styles_xml, "word/styles.xml")
+    except OOXMLSecurityError:
+        return set()
+    from lxml import etree
+
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    return {
+        style.get(w + "styleId")
+        for style in sroot.iter(w + "style")
+        if style.get(w + "type") == "paragraph" and style.get(w + "styleId")
+    }
 
 
 def config_from_project(
@@ -146,13 +174,22 @@ def build_with_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
+    on_warning: Optional[Callable[[str], None]] = None,
 ) -> str:
-    """以项目上下文调用 ``build_docx.build``，返回输出 DOCX 路径。"""
+    """以项目上下文调用 ``build_docx.build``，返回输出 DOCX 路径。
+
+    ``on_warning`` 可选：构建不阻断的表达式警告（缺失链接目标、未定义脚注等，
+    形如 ``源文件:行号 描述``）逐条回调，供上层透出（CLI stderr / 管线日志）。
+    """
     ensure_kernel_importable()
     from build_docx import build  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
-    return build(config=config)
+    output = build(config=config)
+    if on_warning is not None:
+        for warning in config.get("_expressionWarnings", []):
+            on_warning(warning)
+    return output
 
 
 def validate_with_project(

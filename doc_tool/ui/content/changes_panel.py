@@ -155,6 +155,8 @@ class ChangesPanel(QWidget):
         self._update_action_state()
 
     def _read_current(self, rel_path: str) -> str:
+        if rel_path.startswith("assets/"):
+            return ""
         try:
             return (self._content_root / rel_path).read_text(encoding="utf-8")
         except OSError:

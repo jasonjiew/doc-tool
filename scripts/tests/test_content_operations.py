@@ -1070,7 +1070,9 @@ class PreviewRendererTests(unittest.TestCase):
             "| 名称 | 说明 |\n| --- | --- |\n| A | `代码` |\n"
             "\n![图](images/a.png =1x1)\n\n<script>alert(1)</script>\n"
         )
-        self.assertIn("<h1>标题</h1>", rendered)
+        self.assertIn(
+            '<h1><a name="line-1" href="#line-1">标题</a></h1>', rendered
+        )
         self.assertIn("<b>加粗</b>", rendered)
         self.assertIn("<i>斜体</i>", rendered)
         self.assertIn("<ul><li>条目</li></ul>", rendered)
@@ -1289,6 +1291,7 @@ class RefactorServiceTests(unittest.TestCase):
         self.writer.rollback()
 
         self.assertTrue((self.content_root / self.OLD).exists())
+        self.assertEqual(self._read(self.OLD), self.FILES[self.OLD])
         self.assertEqual(
             self._read("requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"),
             self.FILES["requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"],
@@ -1337,6 +1340,53 @@ class RefactorServiceTests(unittest.TestCase):
         self.assertIn("详见 3.1.5 与 3.1.40", text)
         self.assertIn("[居民信息](3.1.5 居民信息.md)", text)
         self.assertNotIn("3.1.50", text)
+
+    def test_batch_swap_uses_transaction_staging(self):
+        """同目录交换编号时先腾挪全部源文件，不因目标占用失败。"""
+        first = "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+        second = self.OLD
+        plan = self.service.compute_batch_rename_plan(
+            [
+                (first, first.replace("3.1.3 团队管理", "3.1.4 团队管理")),
+                (second, second.replace("3.1.4 居民信息", "3.1.3 居民信息")),
+            ]
+        )
+        self.assertTrue(plan.can_apply)
+        results = self.service.apply_rename_plan(plan, self.writer)
+        self.assertTrue(all(item.written for item in results))
+        self.assertTrue((self.content_root / first.replace("3.1.3 团队管理", "3.1.4 团队管理")).exists())
+        self.assertTrue((self.content_root / second.replace("3.1.4 居民信息", "3.1.3 居民信息")).exists())
+
+    def test_batch_target_conflict_blocks_apply(self):
+        plan = self.service.compute_batch_rename_plan(
+            [(self.OLD, "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md")]
+        )
+        self.assertFalse(plan.can_apply)
+        self.assertTrue(any("目标文件已存在" in item for item in plan.conflicts))
+
+    def test_batch_failure_rolls_back_prior_edits_and_moves(self):
+        """任一步失败时只回滚本事务，不破坏更早的会话清单。"""
+        plan = self.service.compute_batch_rename_plan(
+            [(self.OLD, self.OLD.replace("3.1.4 居民信息", "3.1.5 居民信息"))]
+        )
+        original_rename = self.writer.rename
+        calls = {"count": 0}
+
+        def fail_second_rename(old, new, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                from doc_tool.application.content.writer import WriteResult
+                return WriteResult(new, None, False, error="injected failure")
+            return original_rename(old, new, **kwargs)
+
+        self.writer.rename = fail_second_rename
+        with self.assertRaises(OSError):
+            self.service.apply_rename_plan(plan, self.writer)
+        self.assertTrue((self.content_root / self.OLD).exists())
+        self.assertEqual(
+            self._read("requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"),
+            self.FILES["requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"],
+        )
 
 
 class LintTests(unittest.TestCase):
@@ -2315,6 +2365,69 @@ class TreeInteractionPureTests(unittest.TestCase):
                 )
             ],
         )
+
+    def test_move_plan_reorders_same_directory(self):
+        from doc_tool.application.content.tree import chapter_move_renumber_plan
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 KSOA/3.7.2 乙.md",
+            "requirement/第3章/3.7 KSOA/3.7.3 丙.md",
+        ]
+        plan = chapter_move_renumber_plan(
+            files[1], "requirement/第3章/3.7 KSOA", files, before_node=files[0]
+        )
+        self.assertEqual(
+            plan,
+            [
+                (files[1], "requirement/第3章/3.7 KSOA/3.7.1 乙.md"),
+                (files[0], "requirement/第3章/3.7 KSOA/3.7.2 甲.md"),
+            ],
+        )
+
+    def test_move_plan_cross_directory_renumbers_both_sides(self):
+        from doc_tool.application.content.tree import chapter_move_renumber_plan
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 KSOA/3.7.2 乙.md",
+            "requirement/第5章/5.1 附录/5.1.1 丁.md",
+        ]
+        plan = chapter_move_renumber_plan(
+            files[0], "requirement/第5章/5.1 附录", files
+        )
+        self.assertIn((files[1], "requirement/第3章/3.7 KSOA/3.7.1 乙.md"), plan)
+        self.assertIn((files[0], "requirement/第5章/5.1 附录/5.1.2 甲.md"), plan)
+
+    def test_move_plan_rewrites_directory_subtree_prefix(self):
+        from doc_tool.application.content.tree import chapter_move_renumber_plan
+
+        files = [
+            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 KSOA/3.7.2 子目录/3.7.2.1 子.md",
+            "requirement/第5章/5.1 附录/5.1.1 丁.md",
+        ]
+        plan = chapter_move_renumber_plan(
+            "requirement/第3章/3.7 KSOA", "requirement/第5章/5.1 附录", files
+        )
+        mapping = dict(plan)
+        self.assertEqual(
+            mapping[files[0]],
+            "requirement/第5章/5.1 附录/5.1.2 KSOA/5.1.2.1 甲.md",
+        )
+        self.assertEqual(
+            mapping[files[1]],
+            "requirement/第5章/5.1 附录/5.1.2 KSOA/5.1.2.2 子目录/5.1.2.2.1 子.md",
+        )
+
+    def test_move_plan_rejects_descendant_and_cross_type(self):
+        from doc_tool.application.content.tree import ChapterMoveError, chapter_move_renumber_plan
+
+        files = ["requirement/3.1 A/3.1.1 B/3.1.1.1 子.md"]
+        with self.assertRaisesRegex(ChapterMoveError, "自身子目录"):
+            chapter_move_renumber_plan("requirement/3.1 A", "requirement/3.1 A/3.1.1 B", files)
+        with self.assertRaisesRegex(ChapterMoveError, "跨文档类型"):
+            chapter_move_renumber_plan(files[0], "design/5.1 目标", files)
 
 
 class DeleteRenumberTests(unittest.TestCase):

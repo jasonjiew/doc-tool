@@ -10,10 +10,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt
+import re
+from typing import List, Optional, Tuple
+
+from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QSyntaxHighlighter
-from PySide6.QtGui import QTextCharFormat
+from PySide6.QtGui import QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
+
+# 英文词 token（与拼写服务一致）：至少一个字母开头，可含撇号/连字符。
+_SPELL_TOKEN_RE = re.compile(r"\b[a-zA-Z][a-zA-Z'-]{1,}\b")
 
 
 # --- Markdown 语法高亮 ---
@@ -129,7 +135,18 @@ class LineNumberArea(QWidget):
 
 
 class _LineNumberedEdit(QPlainTextEdit):
-    """带行号的只读友好编辑器（标准 gutter 模式）。"""
+    """带行号的只读友好编辑器（标准 gutter 模式）。
+
+    扩展：
+    - 拼写检查右键菜单：对错误词提供「更改为…」建议与「加入词典」
+      （``addWordRequested`` 信号交由上层持久化）。
+    - 代码片段占位符跳转：``begin_snippet`` 记录占位符位置，片段激活期间
+      ``Tab`` 依次选中下一个占位符，全部填完后恢复普通 Tab。
+    - 图片粘贴/拖放（见 ``insertFromMimeData``/``dropEvent``，由资源面板接线）。
+    """
+
+    addWordRequested = Signal(str)
+    mermaidEditRequested = Signal(int)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -137,6 +154,149 @@ class _LineNumberedEdit(QPlainTextEdit):
         self.blockCountChanged.connect(self._update_line_number_width)
         self.updateRequest.connect(self._update_line_number_area)
         self._update_line_number_width()
+
+        self._spell_checker = None
+        self._snippet_active = False
+        self._snippet_placeholders: List[Tuple[int, int]] = []
+        self._snippet_index: Optional[int] = None
+        self._image_import_callback = None
+
+    # --- 拼写检查 ---
+
+    def set_spellchecker(self, checker) -> None:
+        """注入拼写检查器（右键菜单据此提供候选与「加入词典」）。"""
+        self._spell_checker = checker
+
+    def set_image_import_callback(self, callback) -> None:
+        """注入图片导入回调（粘贴/拖放时调用；回调签名见资源面板）。"""
+        self._image_import_callback = callback
+
+    def _misspelled_at(self, position: int) -> Optional[Tuple[str, int, int]]:
+        """返回位置处的拼写错误 (词, 起, 止)；无错误或非错误词返回 None。"""
+        if self._spell_checker is None:
+            return None
+        block = self.document().findBlock(position)
+        if not block.isValid():
+            return None
+        text = block.text()
+        relative = position - block.position()
+        for match in _SPELL_TOKEN_RE.finditer(text):
+            if match.start() <= relative <= match.end():
+                word = match.group(0)
+                if not self._spell_checker.contains(word):
+                    return (
+                        word,
+                        block.position() + match.start(),
+                        block.position() + match.end(),
+                    )
+                return None
+        return None
+
+    def _replace_text_range(self, start: int, end: int, text: str) -> None:
+        cursor = self.textCursor()
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(text)
+        self.setTextCursor(cursor)
+
+    def contextMenuEvent(self, event) -> None:
+        menu = self.createStandardContextMenu()
+        menu.addSeparator()
+        mermaid_action = menu.addAction("用 Mermaid 工作台编辑")
+        position = self.cursorForPosition(event.pos()).position()
+        mermaid_action.triggered.connect(
+            lambda _=False, p=position: self.mermaidEditRequested.emit(p)
+        )
+        if self._spell_checker is not None and not self.isReadOnly():
+            found = self._misspelled_at(position)
+            if found is not None:
+                word, start, end = found
+                menu.addSeparator()
+                suggestions = self._spell_checker.suggest(word)
+                for suggestion in suggestions[:6]:
+                    action = menu.addAction("更改为「{0}」".format(suggestion))
+                    action.triggered.connect(
+                        lambda _=False, s=suggestion, a=start, b=end: (
+                            self._replace_text_range(a, b, s)
+                        )
+                    )
+                menu.addSeparator()
+                add_action = menu.addAction("加入词典")
+                add_action.triggered.connect(
+                    lambda _=False, w=word: self.addWordRequested.emit(w)
+                )
+        menu.exec(event.globalPos())
+
+    # --- 代码片段占位符跳转 ---
+
+    def begin_snippet(self, positions: List[Tuple[int, int]]) -> None:
+        """片段插入后记录占位符文档区间；第一个占位符由调用方选中。"""
+        self._snippet_placeholders = list(positions)
+        self._snippet_index = 0 if positions else None
+        self._snippet_active = bool(positions)
+
+    def end_snippet(self) -> None:
+        self._snippet_active = False
+        self._snippet_index = None
+        self._snippet_placeholders = []
+
+    @property
+    def snippet_active(self) -> bool:
+        return self._snippet_active
+
+    def _advance_snippet(self) -> None:
+        if self._snippet_index is None or not self._snippet_placeholders:
+            self._snippet_active = False
+            return
+        self._snippet_index += 1
+        if self._snippet_index >= len(self._snippet_placeholders):
+            # 全部占位符已填完：恢复正常 Tab（插入一个制表符）。
+            self.end_snippet()
+            self.textCursor().insertText("\t")
+            return
+        start, end = self._snippet_placeholders[self._snippet_index]
+        doc_length = self.document().characterCount()
+        if 0 <= start <= end <= doc_length:
+            cursor = self.textCursor()
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(cursor)
+
+    def keyPressEvent(self, event) -> None:
+        if self._snippet_active and event.key() == Qt.Key.Key_Tab:
+            self._advance_snippet()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    # --- 图片导入钩子 ---
+
+    def insertFromMimeData(self, source) -> None:
+        if (
+            self._image_import_callback is not None
+            and not self.isReadOnly()
+            and source.hasImage()
+        ):
+            image = source.imageData()
+            if image is not None:
+                self._image_import_callback(image)
+                return
+        super().insertFromMimeData(source)
+
+    def dropEvent(self, event) -> None:
+        if self._image_import_callback is not None and not self.isReadOnly():
+            urls = event.mimeData().urls()
+            if urls:
+                local = urls[0].toLocalFile()
+                if local.lower().endswith(
+                    (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+                ):
+                    import os
+
+                    self._image_import_callback(local)
+                    event.acceptProposedAction()
+                    return
+        super().dropEvent(event)
 
     def line_number_area_width(self) -> int:
         """行号区宽度：按当前最大行号位数自适应。"""

@@ -5,6 +5,8 @@
 
 # -r requirements.txt          # 运行依赖（构建前必须先安装）
 pyinstaller==6.14.0
+coverage==7.10.2
+pip-audit==2.9.0
 
 # 桌面 UI（PySide6 / Qt Widgets）。迁移后不再依赖 tkinter 运行时。
 # 运行时也需安装（requirements.txt 以可选方式注释，见下），冻结打包时

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 # 文档类型中文标签（与主窗口 DOC_TYPE_LABELS 保持一致的缺省映射）。
 DEFAULT_TYPE_LABELS = {
@@ -176,6 +176,182 @@ def strip_number_prefix(name: str) -> str:
 
 def _format_num(num_tuple) -> str:
     return ".".join(str(part) for part in num_tuple)
+
+
+class ChapterMoveError(ValueError):
+    """章节移动目标非法或无法生成无冲突计划。"""
+
+
+def _parent_rel(rel_path: str) -> str:
+    parent = Path(rel_path).parent.as_posix()
+    return "" if parent == "." else parent
+
+
+def _join_rel(parent: str, name: str) -> str:
+    return parent + "/" + name if parent else name
+
+
+def _direct_child_nodes(parent: str, files: Iterable[str]) -> List[str]:
+    """返回 parent 下可排序的直接文件/目录节点 id。"""
+    prefix = parent + "/" if parent else ""
+    children = set()
+    for rel_path in files:
+        if not rel_path.startswith(prefix):
+            continue
+        rest = rel_path[len(prefix):]
+        if not rest:
+            continue
+        first = rest.split("/", 1)[0]
+        children.add(_join_rel(parent, first))
+    return sorted(children, key=_path_sort_key)
+
+
+def _renumbered_name(name: str, number: Optional[Tuple[int, ...]]) -> str:
+    suffix = Path(name).suffix if Path(name).suffix.lower() in (".md", ".markdown") else ""
+    stem = name[: -len(suffix)] if suffix else name
+    title = strip_number_prefix(stem)
+    if number is None:
+        return name
+    numbered = _format_num(number) + ((" " + title) if title else "")
+    return numbered + suffix
+
+
+def _rewrite_descendant_path(
+    rel_path: str,
+    old_node: str,
+    new_node: str,
+    old_prefix: Optional[Tuple[int, ...]],
+    new_prefix: Optional[Tuple[int, ...]],
+) -> str:
+    """重写目录子树路径及各层编号前缀，保持内部相对顺序。"""
+    suffix = rel_path[len(old_node):].lstrip("/")
+    if not suffix:
+        return new_node
+    parts = suffix.split("/")
+    rewritten = []
+    for part in parts:
+        extension = Path(part).suffix if Path(part).suffix.lower() in (".md", ".markdown") else ""
+        stem = part[: -len(extension)] if extension else part
+        number = _numeric_prefix(stem)
+        if (
+            number is not None
+            and old_prefix is not None
+            and new_prefix is not None
+            and number[: len(old_prefix)] == old_prefix
+        ):
+            number = new_prefix + number[len(old_prefix):]
+            part = _renumbered_name(part, number)
+        rewritten.append(part)
+    return new_node + "/" + "/".join(rewritten)
+
+
+def chapter_move_renumber_plan(
+    source_node: str,
+    target_parent: str,
+    files: Sequence[str],
+    *,
+    before_node: Optional[str] = None,
+    allow_cross_type: bool = False,
+) -> List[Tuple[str, str]]:
+    """生成文件/目录拖拽后的批量 ``(旧 rel_path, 新 rel_path)`` 计划。
+
+    ``source_node`` 可为文件或目录；``target_parent`` 为释放后的父目录，
+    ``before_node`` 为目标父目录中的插入参照节点，None 表示末尾追加。目录移动
+    会重写整棵子树的编号前缀。返回值按目标路径自然排序，且仅包含实际变化。
+    """
+    normalized = sorted({str(path).replace("\\", "/") for path in files})
+    source_node = source_node.replace("\\", "/").rstrip("/")
+    target_parent = target_parent.replace("\\", "/").rstrip("/")
+    before_node = before_node.replace("\\", "/") if before_node else None
+    is_file = source_node in normalized
+    is_directory = any(path.startswith(source_node + "/") for path in normalized)
+    if not is_file and not is_directory:
+        raise ChapterMoveError("移动源不存在：{0}".format(source_node))
+    if target_parent == source_node or target_parent.startswith(source_node + "/"):
+        raise ChapterMoveError("不能移动到自身子目录")
+
+    source_type = source_node.split("/", 1)[0]
+    target_type = target_parent.split("/", 1)[0] if target_parent else source_type
+    explicit_types = set(DEFAULT_TYPE_LABELS)
+    if (
+        source_type in explicit_types
+        and target_type in explicit_types
+        and source_type != target_type
+        and not allow_cross_type
+    ):
+        raise ChapterMoveError("不允许跨文档类型移动")
+
+    source_parent = _parent_rel(source_node)
+    affected_parents = {source_parent, target_parent}
+    children_by_parent = {
+        parent: _direct_child_nodes(parent, normalized) for parent in affected_parents
+    }
+    source_children = children_by_parent[source_parent]
+    if source_node not in source_children:
+        raise ChapterMoveError("移动源不是可排序的直接子节点")
+    source_children.remove(source_node)
+    target_children = children_by_parent[target_parent]
+    if source_parent != target_parent:
+        target_children = [node for node in target_children if node != source_node]
+        children_by_parent[target_parent] = target_children
+    if before_node is not None:
+        if _parent_rel(before_node) != target_parent or before_node not in target_children:
+            raise ChapterMoveError("插入位置不属于目标目录")
+        insert_at = target_children.index(before_node)
+    else:
+        insert_at = len(target_children)
+    target_children.insert(insert_at, source_node)
+
+    node_mapping: Dict[str, str] = {}
+    for parent in sorted(affected_parents):
+        parent_number = _numeric_prefix(Path(parent).name) if parent else None
+        for position, node in enumerate(children_by_parent[parent], start=1):
+            old_name = Path(node).name
+            old_number = _numeric_prefix(old_name)
+            # 既有编号体系才参与连续重编号；无编号根保持文件名不变。
+            number = parent_number + (position,) if parent_number is not None else old_number
+            new_node = _join_rel(parent, _renumbered_name(old_name, number))
+            node_mapping[node] = new_node
+
+    # 被移动节点需要先切换到目标父目录，再使用目标位置计算出的名字。
+    moved_name = Path(node_mapping[source_node]).name
+    target_number = _numeric_prefix(moved_name)
+    target_parent_number = _numeric_prefix(Path(target_parent).name) if target_parent else None
+    if target_parent_number is not None:
+        target_number = target_parent_number + (insert_at + 1,)
+        moved_name = _renumbered_name(Path(source_node).name, target_number)
+    node_mapping[source_node] = _join_rel(target_parent, moved_name)
+
+    result: Dict[str, str] = {}
+    for rel_path in normalized:
+        matching = [
+            node for node in node_mapping
+            if rel_path == node or rel_path.startswith(node + "/")
+        ]
+        if not matching:
+            continue
+        old_node = max(matching, key=len)
+        new_node = node_mapping[old_node]
+        old_prefix = _numeric_prefix(Path(old_node).name)
+        new_prefix = _numeric_prefix(Path(new_node).name)
+        new_path = (
+            new_node
+            if rel_path == old_node
+            else _rewrite_descendant_path(
+                rel_path, old_node, new_node, old_prefix, new_prefix
+            )
+        )
+        if new_path != rel_path:
+            result[rel_path] = new_path
+
+    targets = list(result.values())
+    if len(targets) != len(set(targets)):
+        raise ChapterMoveError("移动计划产生重复目标路径")
+    occupied = set(normalized) - set(result)
+    conflicts = sorted(set(targets) & occupied)
+    if conflicts:
+        raise ChapterMoveError("目标路径已存在：{0}".format(conflicts[0]))
+    return sorted(result.items(), key=lambda pair: _path_sort_key(pair[1]))
 
 
 def renumber_plan_after_delete(

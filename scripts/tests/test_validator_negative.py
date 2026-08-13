@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import copy
+import base64
 import os
 import posixpath
 import re
 import subprocess
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -197,7 +199,7 @@ def create_mutation(source: str, destination: str, config, mutation: Callable) -
     write_package(destination, items)
 
 
-def validator_exit(document: str, output: str, report: str) -> int:
+def validator_exit(document: str, output: str, report: str, fixture_base: str) -> int:
     command = [
         sys.executable,
         os.path.join(SCRIPTS, "validate_docx.py"),
@@ -207,11 +209,13 @@ def validator_exit(document: str, output: str, report: str) -> int:
         "--report",
         report,
     ]
-    result = subprocess.run(command, cwd=BASE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    env = dict(os.environ)
+    env["DOC_TOOL_TEST_BASE"] = fixture_base
+    result = subprocess.run(command, cwd=BASE, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     return result.returncode
 
 
-def isolated_build(document: str, output: str) -> bool:
+def isolated_build(document: str, output: str, fixture_base: str) -> bool:
     command = [
         sys.executable,
         os.path.join(SCRIPTS, "build_docx.py"),
@@ -219,20 +223,41 @@ def isolated_build(document: str, output: str) -> bool:
         "--output",
         output,
     ]
+    env = dict(os.environ)
+    env["DOC_TOOL_TEST_BASE"] = fixture_base
     return subprocess.run(
-        command, cwd=BASE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
+        command, cwd=BASE, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
     ).returncode == 0
 
 
+def create_isolated_fixture(work: str) -> str:
+    """Copy build inputs and replace business image placeholders only in the copy."""
+    fixture = os.path.join(work, "fixture")
+    for name in ("config", "templates", "content", "assets"):
+        shutil.copytree(os.path.join(BASE, name), os.path.join(fixture, name))
+    valid_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    for document_type in ("requirement", "design"):
+        image_root = os.path.join(fixture, "assets", document_type, "images")
+        for current, _, names in os.walk(image_root):
+            for name in names:
+                if name.lower().endswith(".png"):
+                    with open(os.path.join(current, name), "wb") as handle:
+                        handle.write(valid_png)
+    return fixture
+
+
 def main() -> int:
-    requirement = load_config("requirement", BASE)
-    design = load_config("design", BASE)
     failures = []
     with tempfile.TemporaryDirectory(prefix="doc-validator-regression-") as work:
+        fixture = create_isolated_fixture(work)
+        requirement = load_config("requirement", fixture)
+        design = load_config("design", fixture)
         requirement["paths"]["output"] = os.path.join(work, "requirement-clean.docx")
         design["paths"]["output"] = os.path.join(work, "design-clean.docx")
-        if not isolated_build("requirement", requirement["paths"]["output"]) or not isolated_build(
-            "design", design["paths"]["output"]
+        if not isolated_build("requirement", requirement["paths"]["output"], fixture) or not isolated_build(
+            "design", design["paths"]["output"], fixture
         ):
             print("[FAIL] 无法创建隔离的正向基线输出", file=sys.stderr)
             return 1
@@ -255,7 +280,7 @@ def main() -> int:
             if mutation is not None:
                 output = os.path.join(work, "case-{0}.docx".format(index))
                 create_mutation(config["paths"]["output"], output, config, mutation)
-            code = validator_exit(document, output, os.path.join(work, "case-{0}.md".format(index)))
+            code = validator_exit(document, output, os.path.join(work, "case-{0}.md".format(index)), fixture)
             actual_pass = code == 0
             status = "PASS" if actual_pass == should_pass else "FAIL"
             print("[{0}] {1}: validator exit={2}, expected={3}".format(status, name, code, "accept" if should_pass else "reject"))

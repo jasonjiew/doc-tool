@@ -34,25 +34,71 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
+class IssuesPanelTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _records(self):
+        from doc_tool.application.issues import IssueRecord
+        return [
+            IssueRecord("pipeline", "build", "requirement", "error", "a.md", 2, "E2001", "失败", "建议", "t1"),
+            IssueRecord("lint", "todo_residual", "requirement", "warning", "b.md", 4, None, "TODO", "修正", "t2"),
+            IssueRecord("lint", "term_case", "design", "info", "missing.md", None, None, "术语", "修正", "t3"),
+        ]
+
+    def test_combined_filters_summary_and_refresh_preservation(self):
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+        panel = IssuesPanel()
+        panel.set_issues(self._records())
+        panel._document_type.setCurrentIndex(panel._document_type.findData("requirement"))
+        panel._severity.setCurrentIndex(panel._severity.findData("warning"))
+        self.assertEqual([item.rel_path for item in panel.filtered_issues()], ["b.md"])
+        self.assertIn("warning 1", panel._summary.text())
+        panel.set_issues(self._records() + [self._records()[1]])
+        self.assertEqual(panel._document_type.currentData(), "requirement")
+        self.assertEqual(panel._severity.currentData(), "warning")
+
+    def test_double_click_location_missing_line_file_and_clear(self):
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+        opened = []
+        panel = IssuesPanel(on_open=lambda path, line: opened.append((path, line)))
+        panel.set_issues(self._records())
+        panel._activate(panel._tree.topLevelItem(0))
+        self.assertEqual(opened[-1], ("a.md", 2))
+        panel._activate(panel._tree.topLevelItem(2))
+        self.assertEqual(opened[-1], ("missing.md", None))
+        panel.clear_project()
+        self.assertEqual(panel._tree.topLevelItemCount(), 0)
+        self.assertEqual(panel._state.text(), "无当前项目数据")
+
+
 class TaskRunnerTests(unittest.TestCase):
     """任务 6.8：TaskRunner 后台执行、事件推送与取消。"""
 
     def test_successful_task_emits_events(self):
-        """成功任务推送 started + succeeded 事件。"""
+        """成功任务推送 started + succeeded 事件（不产生 failed）。"""
         from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
 
         runner = TaskRunner()
+        seen = []
 
         def simple_task():
             return 42
 
-        runner.start(TaskSpec(name="test", target=simple_task))
+        runner.start(
+            TaskSpec(name="test", target=simple_task),
+            on_event=lambda event: seen.append(event),
+        )
         runner.join(timeout=5)
-        runner.poll()  # 处理事件
+        runner.poll()  # 驱动事件回调
 
-        events = runner.drain_events()
-        kinds = [e.kind for e in events]
-        # poll 已消费事件，但 _on_done 被调用说明 succeeded 已处理
+        kinds = [e.kind for e in seen]
+        self.assertIn("started", kinds)
+        self.assertIn("succeeded", kinds)
+        self.assertNotIn("failed", kinds)
         self.assertFalse(runner.is_running)
 
     def test_failed_task_emits_error(self):
@@ -419,14 +465,15 @@ class ImportWizardPresentationTests(unittest.TestCase):
         self.assertIn("图片数量：4", text)
         self.assertIn("建议模式：通用大文档", text)
 
-    def test_wizard_exposes_five_qwizard_pages(self):
+    def test_wizard_exposes_six_qwizard_pages(self):
         _ensure_qapp()
         from doc_tool.ui.wizard import ImportWizard
 
         wizard = ImportWizard()
-        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4])
+        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4, 5])
         self.assertTrue(hasattr(wizard, "_source_page"))
         self.assertTrue(hasattr(wizard, "_preflight_page"))
+        self.assertTrue(hasattr(wizard, "_mapping_page"))
         self.assertTrue(hasattr(wizard, "_info_page"))
         self.assertTrue(hasattr(wizard, "_executing_page"))
         self.assertTrue(hasattr(wizard, "_result_page"))
@@ -450,6 +497,87 @@ class ImportWizardPresentationTests(unittest.TestCase):
 
         wizard._project_name = "good-name"
         self.assertEqual(wizard._validate_project_info(), "")
+
+
+class WizardFidelityAndMappingTests(unittest.TestCase):
+    """任务 2.3/3.3：预检页阻断确认门禁与样式映射页下拉逻辑。"""
+
+    def _wizard(self):
+        _ensure_qapp()
+        from doc_tool.ui.wizard import ImportWizard
+
+        wizard = ImportWizard()
+        self.addCleanup(wizard.close)
+        return wizard
+
+    def test_preflight_block_gate_requires_confirmation(self):
+        wizard = self._wizard()
+        page = wizard._preflight_page
+        page._preview_ok = True
+        page._has_block = True
+        page._confirm_block.setChecked(False)
+        self.assertFalse(page.isComplete(), "存在阻断特性且未确认时不得继续")
+        page._confirm_block.setChecked(True)
+        self.assertTrue(page.isComplete(), "确认「仍然导入」后放行")
+        # 无阻断特性时不要求确认
+        page._has_block = False
+        page._confirm_block.setChecked(False)
+        self.assertTrue(page.isComplete())
+        # 结构性预检失败始终阻断
+        page._preview_ok = False
+        self.assertFalse(page.isComplete())
+
+    def test_format_preview_summary_renders_fidelity_block(self):
+        from types import SimpleNamespace
+
+        from doc_tool.adapters.fidelity import FidelityFinding, FidelityReport, SEVERITY_BLOCK
+        from doc_tool.ui.wizard import format_preview_summary
+
+        preview = SimpleNamespace(
+            heading_level_counts={1: 2},
+            image_count=1,
+            table_count=0,
+            warnings=[],
+            document_type_suggestion=SimpleNamespace(
+                document_type="general", confidence="high", reason="通用"
+            ),
+            fidelity=FidelityReport(findings=(
+                FidelityFinding("comment", "批注", SEVERITY_BLOCK, 1, ("body[3]",)),
+            )),
+        )
+        text = format_preview_summary(preview)
+        self.assertIn("保真风险", text)
+        self.assertIn("批注", text)
+        self.assertIn("阻断", text)
+
+    def test_style_mapping_page_mapping_and_complete(self):
+        from types import SimpleNamespace
+
+        from doc_tool.adapters.preflight import StyleCensus
+
+        census = {
+            "ChapterTitle": StyleCensus("ChapterTitle", "章标题", 2, True),
+            "SectionTitle": StyleCensus("SectionTitle", "节标题", 2, True),
+            "Normal": StyleCensus("Normal", "Normal", 5, False),
+        }
+        preview = SimpleNamespace(
+            style_census=census,
+            heading_style_map={"ChapterTitle": 1},
+        )
+        wizard = self._wizard()
+        page = wizard._mapping_page
+        page._populate(preview)
+        self.assertEqual(page.mapping(), {"ChapterTitle": 1}, "自动识别级别应预填")
+        self.assertTrue(page.isComplete(), "存在级别 1 映射时允许继续")
+        # 把 ChapterTitle 改为忽略 -> 无 H1 -> 不可继续
+        chapter_combo = next(r["combo"] for r in page._rows if r["style_id"] == "ChapterTitle")
+        chapter_combo.setCurrentIndex(chapter_combo.findData(0))
+        self.assertFalse(page.isComplete(), "缺少级别 1 映射时不可继续")
+        # 映射 SectionTitle 到级别 1 -> 恢复可继续
+        section_combo = next(r["combo"] for r in page._rows if r["style_id"] == "SectionTitle")
+        section_combo.setCurrentIndex(section_combo.findData(1))
+        self.assertTrue(page.isComplete())
+        self.assertEqual(page.mapping()["SectionTitle"], 1)
 
 
 def _ensure_qapp():
@@ -976,7 +1104,7 @@ class WizardInteractionTests(unittest.TestCase):
         self.assertGreater(PREFLIGHT_TIMEOUT_SECONDS, 0)
         _ensure_qapp()
         wizard = ImportWizard()
-        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4])
+        self.assertEqual(wizard.pageIds(), [0, 1, 2, 3, 4, 5])
         wizard.close()
 
     def test_cancel_during_running_requests_safe_cancel(self):
@@ -1311,10 +1439,14 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         self.deleted = []
         self.external = []
         self.dirs_opened = []
+        self.moves = []
         tree = ChapterTree(
             on_open=self.opened.append,
             on_rename_file=self.renamed.append,
             on_delete_file=self.deleted.append,
+            on_move_node=lambda source, parent, before: self.moves.append(
+                (source, parent, before)
+            ) or True,
             on_open_external=self.external.append,
             on_open_directory=self.dirs_opened.append,
             content_root=self.content_root,
@@ -1381,6 +1513,45 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         self.assertEqual(self.deleted, [])
         tree.close()
 
+    def test_model_drop_resolves_parent_and_insert_position(self):
+        from PySide6.QtCore import Qt
+
+        tree = self._make_tree()
+        source = tree._model.index_for_id(self.rel)
+        mime = tree._model.mimeData([source])
+        parent_id = "requirement/第3章/3.7 KSOA"
+        parent = tree._model.index_for_id(parent_id)
+        accepted = tree._model.dropMimeData(
+            mime, Qt.DropAction.MoveAction, 0, 0, parent
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(self.moves, [(self.rel, parent_id, self.rel)])
+        tree.close()
+
+    def test_model_drop_on_file_inserts_before_that_file(self):
+        from PySide6.QtCore import Qt
+
+        tree = self._make_tree()
+        source = tree._model.index_for_id(self.rel)
+        mime = tree._model.mimeData([source])
+        accepted = tree._model.dropMimeData(
+            mime, Qt.DropAction.MoveAction, -1, 0, source
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(
+            self.moves,
+            [(self.rel, "requirement/第3章/3.7 KSOA", self.rel)],
+        )
+        tree.close()
+
+    def test_readonly_disables_drag_and_rejects_drop_callback(self):
+        tree = self._make_tree(writable=False)
+        self.assertFalse(tree._tree.dragEnabled())
+        self.assertFalse(tree._tree.acceptDrops())
+        self.assertFalse(tree._handle_drop(self.rel, "requirement/第3章", None))
+        self.assertEqual(self.moves, [])
+        tree.close()
+
     def test_context_menu_actions_and_copy_markdown_link(self):
         from PySide6.QtWidgets import QApplication
 
@@ -1399,11 +1570,17 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         action = next(
             a for a in menu.actions() if a.text() == "复制 Markdown 引用"
         )
-        QApplication.clipboard().setText("")
-        action.trigger()
-        self.assertEqual(
-            QApplication.clipboard().text(), "[设备管理]({0})".format(self.rel)
-        )
+        # 离屏平台的剪贴板 read-back 不可靠（setText 后 text() 常返回空）：
+        # 用 spy 捕获实际写入值验证接线，不依赖 QApplication.clipboard().text()。
+        clipboard = QApplication.clipboard()
+        written: list = []
+        original_set_text = clipboard.setText
+        clipboard.setText = lambda text, mode=None: written.append(text)
+        try:
+            action.trigger()
+        finally:
+            clipboard.setText = original_set_text
+        self.assertEqual(written, ["[设备管理]({0})".format(self.rel)])
         tree.close()
 
 
@@ -1742,6 +1919,166 @@ class EditorHighlightTests(unittest.TestCase):
         self.assertIsInstance(panel._editor, _LineNumberedEdit)
         self.assertIsInstance(panel._highlighter, MarkdownHighlighter)
         panel.close()
+
+
+class EditorAuthoringWorkbenchTests(unittest.TestCase):
+    """创作工作台离屏交互：替换、格式、图片 MIME、预览链接与 Mermaid。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="doc-tool-authoring-ui-"))
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.content = self.root / "content"
+        self.assets = self.root / "assets"
+        self.rel = "requirement/章节.md"
+        path = self.content / self.rel
+        path.parent.mkdir(parents=True)
+        path.write_text("# 标题\nfoo foo\n", encoding="utf-8")
+
+    def _panel(self, writable=True):
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.ui.content.editor_panel import EditorPanel
+
+        writer = ContentWriter(self.content, self.root / ".state", assets_root=self.assets)
+        panel = EditorPanel(
+            writer=writer, assets_root=self.assets, writable=writable
+        )
+        panel.load(self.rel, (self.content / self.rel).read_text(encoding="utf-8"))
+        return panel
+
+    def test_replace_all_is_single_undo_unit(self):
+        panel = self._panel()
+        panel._find_entry.setText("foo")
+        panel._replace_entry.setText("bar")
+        panel._replace_all()
+        self.assertIn("bar bar", panel._editor.toPlainText())
+        panel._editor.undo()
+        self.assertIn("foo foo", panel._editor.toPlainText())
+        panel.close()
+
+    def test_replace_one_replaces_selection_and_moves_to_next(self):
+        from PySide6.QtGui import QTextCursor
+
+        panel = self._panel()
+        panel._find_entry.setText("foo")
+        panel._replace_entry.setText("bar")
+        cursor = panel._editor.textCursor()
+        start = panel._editor.toPlainText().index("foo")
+        cursor.setPosition(start)
+        cursor.setPosition(start + 3, QTextCursor.MoveMode.KeepAnchor)
+        panel._editor.setTextCursor(cursor)
+        panel._replace_one()
+        self.assertIn("bar foo", panel._editor.toPlainText())
+        self.assertEqual(panel._editor.textCursor().selectedText(), "foo")
+        panel.close()
+
+    def test_snippet_tab_follows_placeholder_number_order(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from doc_tool.application.content.snippets import Snippet
+
+        panel = self._panel()
+        panel._editor.moveCursor(panel._editor.textCursor().MoveOperation.End)
+        panel.insert_snippet(Snippet("demo", "", "${2:乙}-${1:甲}"))
+        self.assertEqual(panel._editor.textCursor().selectedText(), "甲")
+        QTest.keyClick(panel._editor, Qt.Key.Key_Tab)
+        self.assertEqual(panel._editor.textCursor().selectedText(), "乙")
+        QTest.keyClick(panel._editor, Qt.Key.Key_Tab)
+        self.assertFalse(panel._editor.snippet_active)
+        panel.close()
+
+    def test_toolbar_wraps_selection(self):
+        from PySide6.QtGui import QTextCursor
+
+        panel = self._panel()
+        cursor = panel._editor.textCursor()
+        start = panel._editor.toPlainText().index("foo")
+        cursor.setPosition(start)
+        cursor.setPosition(start + 3, QTextCursor.MoveMode.KeepAnchor)
+        panel._editor.setTextCursor(cursor)
+        panel.wrap_selection("**", "**")
+        self.assertIn("**foo**", panel._editor.toPlainText())
+        panel.close()
+
+    def test_clipboard_image_imports_asset_and_inserts_reference(self):
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QImage
+
+        panel = self._panel()
+        mime = QMimeData()
+        mime.setImageData(QImage(8, 6, QImage.Format.Format_RGB32))
+        panel._editor.insertFromMimeData(mime)
+        self.assertIn("images/img_0001.png =8x6", panel._editor.toPlainText())
+        self.assertTrue((self.assets / "requirement/images/img_0001.png").is_file())
+        panel.close()
+
+    def test_drop_image_file_calls_import_callback(self):
+        from PySide6.QtCore import QMimeData, QUrl
+        from doc_tool.ui.content.editor_highlight import _LineNumberedEdit
+
+        image = self.root / "drop.png"
+        from PIL import Image
+        Image.new("RGB", (4, 3), "blue").save(image)
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(image))])
+
+        class Event:
+            accepted = False
+            def mimeData(self):
+                return mime
+            def acceptProposedAction(self):
+                self.accepted = True
+
+        received = []
+        edit = _LineNumberedEdit()
+        edit.set_image_import_callback(received.append)
+        event = Event()
+        edit.dropEvent(event)
+        self.assertEqual([Path(value).resolve() for value in received], [image.resolve()])
+        self.assertTrue(event.accepted)
+        edit.close()
+
+    def test_readonly_rejects_image_import(self):
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QImage
+
+        panel = self._panel(writable=False)
+        mime = QMimeData()
+        mime.setImageData(QImage(8, 6, QImage.Format.Format_RGB32))
+        before = panel._editor.toPlainText()
+        panel._editor.insertFromMimeData(mime)
+        self.assertEqual(panel._editor.toPlainText(), before)
+        self.assertFalse((self.assets / "requirement/images").exists())
+        panel.close()
+
+    def test_preview_line_anchor_locates_but_external_link_does_not(self):
+        from unittest.mock import patch
+        from PySide6.QtCore import QUrl
+
+        panel = self._panel()
+        with patch.object(panel, "highlight_line") as locate:
+            panel._on_preview_anchor_clicked(QUrl("line-2"))
+            locate.assert_called_once_with(2)
+            locate.reset_mock()
+            with patch("doc_tool.ui.content.editor_panel.QDesktopServices.openUrl") as open_url:
+                panel._on_preview_anchor_clicked(QUrl("https://example.com"))
+                locate.assert_not_called()
+                open_url.assert_called_once()
+        panel.close()
+
+    def test_mermaid_dialog_valid_source_renders_preview(self):
+        from doc_tool.ui.content.mermaid_dialog import MermaidDialog
+
+        dialog = MermaidDialog("flowchart TD\n A[开始] --> B[结束]")
+        dialog.refresh_preview()
+        self.assertEqual(dialog.errors.count(), 0)
+        self.assertIsNotNone(dialog.render_result)
+        self.assertTrue(dialog.render_result.ok)
+        self.assertFalse(dialog.preview.pixmap().isNull())
+        dialog.close()
 
 
 if __name__ == "__main__":

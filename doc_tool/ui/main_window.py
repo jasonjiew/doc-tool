@@ -42,9 +42,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from doc_tool.application.content.unsaved import (
+    UnsavedChoice,
+    UnsavedResolver,
+    collect_unsaved,
+)
+from doc_tool.application.content.workspace_state import (
+    SessionState,
+    WorkspaceStateStore,
+)
 from doc_tool.domain.version import APP_VERSION, get_build_info
+from doc_tool.ui.content.unsaved_prompt import confirm_unsaved_dialog
 from doc_tool.ui.project_bar import ProjectBar
 from doc_tool.ui.empty_state import EmptyState
+from doc_tool.ui.styles import apply_theme, is_dark_theme
 from doc_tool.ui.task_dock import TaskDock
 from doc_tool.ui.task_bridge import (
     DEFAULT_TASK_TIMEOUT_SECONDS,
@@ -117,9 +128,15 @@ def _pipeline_stage_labels():
 class MainWindow(QMainWindow):
     """PySide6 主窗口。"""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        unsaved_resolver: Optional[UnsavedResolver] = None,
+    ) -> None:
         super().__init__(parent)
         self.runner = TaskRunner()
+        self._unsaved_resolver = unsaved_resolver or confirm_unsaved_dialog
+        self._pending_session: Optional[SessionState] = None
         self._project_summary = None  # ProjectSummary
         self._word_available: Optional[bool] = None
         self._workbench_state = derive_workbench_state(None, running=False)
@@ -233,6 +250,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._open_action)
         self._recent_menu = file_menu.addMenu("最近打开")
         file_menu.addSeparator()
+        self._save_all_action = QAction("保存全部", self)
+        self._save_all_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self._save_all_action.triggered.connect(self._on_save_all)
+        file_menu.addAction(self._save_all_action)
+        file_menu.addSeparator()
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
@@ -296,6 +318,15 @@ class MainWindow(QMainWindow):
         self._logs_action = QAction("打开日志目录", self)
         self._logs_action.triggered.connect(self._on_open_logs)
         tools_menu.addAction(self._logs_action)
+        self._settings_action = QAction("项目设置…", self)
+        self._settings_action.triggered.connect(self._on_project_settings)
+        tools_menu.addAction(self._settings_action)
+        self._review_action = QAction("评审意见…", self)
+        self._review_action.triggered.connect(self._on_review_panel)
+        tools_menu.addAction(self._review_action)
+        self._reimport_action = QAction("重新导入更新源 Word…", self)
+        self._reimport_action.triggered.connect(self._on_reimport_source)
+        tools_menu.addAction(self._reimport_action)
         tools_menu.addSeparator()
         self._theme_action = QAction("切换深色主题", self)
         self._theme_action.triggered.connect(self._toggle_theme)
@@ -390,6 +421,9 @@ class MainWindow(QMainWindow):
         self._content_action.setEnabled(state.actions["content"].enabled)
         self._output_action.setEnabled(state.actions["output"].enabled)
         self._logs_action.setEnabled(state.actions["logs"].enabled)
+        self._settings_action.setEnabled(bool(self._project_summary) and not running)
+        self._review_action.setEnabled(bool(self._project_summary) and not running)
+        self._reimport_action.setEnabled(bool(self._project_summary) and not running)
 
         self._refresh_content_menu_state(running)
         if hasattr(self, "_empty_state"):
@@ -406,6 +440,7 @@ class MainWindow(QMainWindow):
         self._replace_action.setEnabled(workspace_ready and writable)
         self._refactor_action.setEnabled(workspace_ready and writable)
         self._open_external_action.setEnabled(bool(self._content_workspace))
+        self._save_all_action.setEnabled(workspace_ready and writable)
 
     def _switch_to_result_view(self) -> None:
         """任务终态：切到 result 视图（右侧 Dock 已由 on_task_done 渲染）。"""
@@ -455,10 +490,17 @@ class MainWindow(QMainWindow):
         """显示已打开的项目摘要并初始化内容工作区。"""
         from doc_tool.application.project_service import add_recent_project
 
+        # 未保存保护：当前工作区存在脏标签时先确认；取消则中止打开新项目。
+        if not self._confirm_switch_project():
+            return
+        # 保存旧项目会话（在旧工作区销毁前收集）。
+        self._persist_workspace_session()
+
         self._project_summary = summary
         self._word_available = None
         self._result_state = ResultState(project_root=summary.project_root)
         self._stage_events = []
+        self._pending_session = self._load_session_state(summary)
 
         m = summary.manifest
         if summary.lock_info:
@@ -477,9 +519,16 @@ class MainWindow(QMainWindow):
 
         add_recent_project(str(summary.project_root), m)
         self._init_content_workspace(summary)
+        self._restore_window_session()
         self._refresh_recent_projects()
         self._task_dock.show_idle(None, project_open=True)
         self._refresh_interaction_state()
+        try:
+            from doc_tool.application.content.reimport import ReimportService
+            if ReimportService(summary.manifest, summary.paths).source_changed():
+                self._status_label.setText("检测到源 Word 已变化，可从工具菜单重新导入")
+        except (OSError, AttributeError):
+            pass
 
     def _open_project_path(self, path: str) -> None:
         if self.runner.is_running:
@@ -532,6 +581,7 @@ class MainWindow(QMainWindow):
             on_open_file=self._on_content_open_file,
             on_request_validate=self._on_content_request_validate,
             on_index_ready=self._on_content_index_ready,
+            unsaved_resolver=self._unsaved_resolver,
         )
 
         # 左侧章节树 Dock
@@ -724,10 +774,14 @@ class MainWindow(QMainWindow):
     def _on_merge(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
+        self._pending_publish_skip_note = None
         summary = self._project_summary
         from doc_tool.adapters.kernel import ensure_kernel_importable
         from doc_tool.application.pipeline import run_pipeline
         from doc_tool.application.word_check import check_word_available
+
+        if not self._confirm_pre_publish_checks():
+            return
 
         report = check_word_available(dispatch_check=False)
         self._word_available = bool(report.available)
@@ -746,6 +800,15 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             self._show_error("内核不可用", str(exc)[:200])
             return
+        # 合并已确认、Word 与内核均可用：此时才把「跳过检查」标注写入发布说明，
+        # 保证不会因后续中止留下未发布却标注跳过的陈旧审计记录。
+        if getattr(self, "_pending_publish_skip_note", None):
+            note = self._pending_publish_skip_note
+            summary.manifest.publishNotes = (summary.manifest.publishNotes + "\n" + note).strip()
+            try:
+                summary.manifest.save(summary.project_root, backup=True)
+            except Exception:
+                pass
         self._stage_progress_enabled = TASK_UI["merge"]["stage_progress"]
         spec = TaskSpec(
             name="merge",
@@ -755,6 +818,121 @@ class MainWindow(QMainWindow):
             timeout_seconds=TASK_UI["merge"]["timeout"],
         )
         self._start_task(spec)
+
+    def _confirm_pre_publish_checks(self) -> bool:
+        """Show the required pre-publish checklist and return whether to continue.
+
+        全量 lint 扫描在后台线程执行（大项目可能数秒）：旧实现在 UI 线程同步
+        扫描全部章节文件，期间主窗口冻结无进度。后台线程计算期间显示模态进度
+        对话框，UI 保持响应；其余快速项在同一线程内一并计算。
+        """
+        import threading
+        import time
+
+        from PySide6.QtWidgets import QProgressDialog
+
+        summary = self._project_summary
+        workspace = self._content_workspace
+        if summary is None or workspace is None:
+            return False
+        if workspace.index() is None:
+            QMessageBox.information(
+                self,
+                "内容索引未就绪",
+                "内容索引仍在构建中，请稍候再执行正式合并。",
+            )
+            return False
+        manifest = summary.manifest
+        state_dir = summary.paths.state_dir
+        index = workspace.index()
+        holder: dict = {}
+
+        def compute() -> None:
+            from doc_tool.application.content.baselines import pre_publish_checks
+            from doc_tool.application.content.lint import ContentLinter, TermStore
+            from doc_tool.application.content.quality_rules import QualityRulesConfig
+            from doc_tool.application.content.writer import ChangeManifest
+            from doc_tool.application.review.review_store import ReviewStore
+
+            try:
+                config = QualityRulesConfig(state_dir, manifest.documentType, writable=False)
+                quality_errors = sum(
+                    issue.severity == "error"
+                    for issue in ContentLinter(index, config).check_all(
+                        TermStore(state_dir).load()
+                    )
+                )
+                review_store = ReviewStore(state_dir)
+                baseline_versions = [
+                    path.stem for path in (state_dir / "baselines").glob("*.json")
+                ]
+                baseline_version = max(
+                    baseline_versions,
+                    key=lambda value: tuple(
+                        int(part) for part in value.split(".") if part.isdigit()
+                    ),
+                    default=None,
+                )
+                pending_changes = ChangeManifest(state_dir).entry_count()
+                holder["checks"] = pre_publish_checks(
+                    quality_errors=quality_errors,
+                    unresolved_reviews=review_store.unresolved_count,
+                    current_version=manifest.documentVersion,
+                    baseline_version=baseline_version,
+                    pending_changes=pending_changes,
+                )
+                holder["review_store"] = review_store
+            except Exception as exc:  # noqa: BLE001
+                # 线程内异常必须传回主线程：吞掉会静默显示空清单并放行合并。
+                holder["error"] = exc
+
+        dialog = QProgressDialog("正在检查发布前置条件…", "", 0, 0, self)
+        dialog.setWindowTitle("发布前检查")
+        dialog.setCancelButton(None)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.show()
+        thread = threading.Thread(target=compute, daemon=True)
+        thread.start()
+        try:
+            while thread.is_alive():
+                QApplication.processEvents()
+                time.sleep(0.05)
+        finally:
+            dialog.close()
+
+        error = holder.get("error")
+        if error is not None:
+            QMessageBox.warning(
+                self,
+                "发布前检查失败",
+                "无法完成发布前检查：{0}".format(error),
+            )
+            return False
+        checks = holder.get("checks", [])
+        review_store = holder.get("review_store")
+        lines = ["{0} {1}".format("✓" if item.passed else "✗", item.message) for item in checks]
+        failed = [item for item in checks if not item.passed]
+        if not failed:
+            QMessageBox.information(self, "发布前检查", "\n".join(lines))
+            return True
+        answer = QMessageBox.warning(
+            self,
+            "发布前检查存在阻断项",
+            "\n".join(lines) + "\n\n是否跳过检查并继续发布？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Yes and review_store is not None:
+            from doc_tool.application.review.review_store import approval_gate
+
+            gate = approval_gate(review_store.comments(), review_store.signoffs(), skip=True)
+            note = gate.history_note or "跳过检查清单"
+            # 不立即写入 project.yml：合并还可能因 Word 不可用/内核加载失败而中止，
+            # 此时落盘会留下「未发布却标注跳过」的陈旧记录。仅暂存，待合并真正
+            # 启动前再写入发布说明，供本次发布的历史归档记录。
+            self._pending_publish_skip_note = note
+            return True
+        return False
 
     def _on_diag_build(self) -> None:
         if not self._project_summary or self.runner.is_running:
@@ -886,6 +1064,8 @@ class MainWindow(QMainWindow):
             self._append_log("▶ {0} 开始".format(label))
         elif status == "skipped":
             self._append_log("· {0} 已跳过".format(label))
+        elif status == "warning":
+            self._append_log("⚠ {0} 警告：{1}".format(label, detail))
         elif status == "succeeded":
             self._append_log("✓ {0} 完成".format(label))
         elif status == "failed":
@@ -998,6 +1178,18 @@ class MainWindow(QMainWindow):
                 summary="任务已成功完成。",
                 project_root=getattr(
                     getattr(self, "_project_summary", None), "project_root", None
+                ),
+            )
+
+        workspace = self._content_workspace
+        project = self._project_summary
+        if workspace is not None and project is not None:
+            report_path = self._validation_report_path()
+            workspace.refresh_issues(
+                pipeline_events=getattr(result, "events", None),
+                document_type=project.manifest.documentType,
+                validation_report=(
+                    report_path if report_path is not None and report_path.is_file() else None
                 ),
             )
 
@@ -1185,6 +1377,62 @@ class MainWindow(QMainWindow):
                 self._project_summary.paths.logs_dir, "日志目录", create=True
             )
 
+    def _on_project_settings(self) -> None:
+        if not self._project_summary or self.runner.is_running:
+            return
+        from doc_tool.ui.settings_dialog import SettingsDialog
+
+        summary = self._project_summary
+        dialog = SettingsDialog(
+            summary.manifest,
+            summary.project_root,
+            writable=summary.is_writable,
+            parent=self,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            summary.manifest = dialog.manifest
+            self._project_bar.render(summary, self._workbench_state)
+            self._status_label.setText("项目设置已保存")
+
+    def _on_review_panel(self) -> None:
+        if not self._project_summary:
+            return
+        from PySide6.QtWidgets import QInputDialog
+        from doc_tool.application.review.review_store import ReviewStore
+
+        store = ReviewStore(self._project_summary.paths.state_dir)
+        comments = store.comments()
+        summary = "\n".join(
+            "[{0}] {1}:{2} {3}".format(item.status, item.rel_path, item.line_no, item.text)
+            for item in comments
+        ) or "暂无评审意见"
+        if not self._project_summary.is_writable:
+            QMessageBox.information(self, "评审意见", summary)
+            return
+        text, accepted = QInputDialog.getMultiLineText(self, "评审意见", summary + "\n\n新增意见：", "")
+        if accepted and text.strip():
+            store.add_comment(text, os.environ.get("USERNAME", "local"), self._content_current_file or "", 1)
+            self._status_label.setText("评审意见已添加")
+
+    def _on_reimport_source(self) -> None:
+        if not self._project_summary or not self._project_summary.is_writable:
+            return
+        source, _ = QFileDialog.getOpenFileName(self, "选择更新后的源 Word", "", "Word 文档 (*.docx)")
+        if not source:
+            return
+        from doc_tool.application.content.reimport import ReimportService
+        service = ReimportService(self._project_summary.manifest, self._project_summary.paths)
+        result = service.reimport(Path(source))
+        if not result.success:
+            self._show_error("重新导入失败", result.message, result.error_code)
+            return
+        if self._content_workspace is not None:
+            self._content_workspace._rebuild_index()
+        detail = "已合入 {0} 个章节变更。".format(sum(item.status != "unchanged" for item in result.changes))
+        if result.conflicts:
+            detail += "\n{0} 个冲突章节默认保留本地内容。".format(len(result.conflicts))
+        QMessageBox.information(self, "重新导入完成", detail)
+
     def _on_open_validation_report(self) -> None:
         path = self._validation_report_path()
         if not path or not path.exists():
@@ -1327,6 +1575,147 @@ class MainWindow(QMainWindow):
             return False
         return True
 
+    # --- 未保存保护 / 会话持久化 ---
+
+    def _on_save_all(self) -> None:
+        """「保存全部」：保存全部脏标签，汇总失败提示。"""
+        ws = self._content_workspace
+        if ws is None:
+            return
+        failed = ws.tabs_host.save_all()
+        if failed:
+            self._show_error(
+                "部分保存失败",
+                "以下文件保存失败：\n" + "\n".join(failed),
+                "请检查文件权限或磁盘状态后重试。",
+            )
+            return
+        self._status_label.setText("已全部保存")
+
+    def _confirm_close_with_unsaved(self) -> bool:
+        """退出前未保存保护：返回 True 表示可继续关闭。"""
+        ws = self._content_workspace
+        tabs_host = getattr(ws, "tabs_host", None) if ws is not None else None
+        if tabs_host is None:
+            return True
+        dirty = collect_unsaved(tabs_host.editors())
+        if not dirty:
+            return True
+        choice = self._unsaved_resolver(dirty, "exit")
+        if choice == UnsavedChoice.SAVE:
+            failed = tabs_host.save_all()
+            if failed:
+                # 保存失败中止退出，避免内容丢失。
+                self._show_error(
+                    "部分保存失败",
+                    "以下文件保存失败：\n" + "\n".join(failed),
+                )
+                return False
+            return True
+        if choice == UnsavedChoice.DISCARD:
+            ws.clear_drafts(dirty)  # 明确放弃 → 清除这些文件的草稿
+            return True
+        return False  # CANCEL → 中止退出
+
+    def _confirm_switch_project(self) -> bool:
+        """切项目前未保存保护：返回 True 表示可打开新项目。"""
+        ws = self._content_workspace
+        tabs_host = getattr(ws, "tabs_host", None) if ws is not None else None
+        if tabs_host is None:
+            return True
+        dirty = collect_unsaved(tabs_host.editors())
+        if not dirty:
+            return True
+        choice = self._unsaved_resolver(dirty, "switch")
+        if choice == UnsavedChoice.SAVE:
+            failed = tabs_host.save_all()
+            if failed:
+                self._show_error(
+                    "部分保存失败",
+                    "以下文件保存失败：\n" + "\n".join(failed),
+                )
+                return False
+            return True
+        if choice == UnsavedChoice.DISCARD:
+            ws.clear_drafts(dirty)
+            return True
+        return False  # CANCEL → 中止项目切换
+
+    def _persist_workspace_session(self) -> None:
+        """收集并写入当前项目的工作区会话（Dock/主题/标签/滚动）。"""
+        ws = self._content_workspace
+        if ws is None:
+            return
+        try:
+            session = ws.collect_session_state(
+                theme="dark" if is_dark_theme(QApplication.instance()) else "light",
+                dock_visibility=self._dock_visibility(),
+                dock_state=self._dock_state(),
+            )
+            ws.session_store().save(session)
+        except Exception:  # noqa: BLE001  # 会话写入失败不影响关闭
+            pass
+
+    def _load_session_state(self, summary) -> SessionState:
+        try:
+            return WorkspaceStateStore(summary.paths.state_dir).load()
+        except Exception:  # noqa: BLE001
+            return SessionState()
+
+    def _restore_window_session(self) -> None:
+        """恢复主题与 Dock 布局/显隐（会话标签由工作区在索引就绪后恢复）。"""
+        session = self._pending_session or SessionState()
+        self._restore_theme(session.theme)
+        self._restore_dock_state(session)
+
+    def _restore_theme(self, theme: str) -> None:
+        target_dark = theme == "dark"
+        if target_dark != self._dark:
+            apply_theme(QApplication.instance(), dark=target_dark)
+            self._dark = target_dark
+            self._task_dock.set_dark(target_dark)
+            self._theme_action.setText(
+                "切换浅色主题" if target_dark else "切换深色主题"
+            )
+
+    def _restore_dock_state(self, session: SessionState) -> None:
+        if session.dock_state:
+            try:
+                from PySide6.QtCore import QByteArray
+
+                self.restoreState(
+                    QByteArray.fromBase64(session.dock_state.encode("utf-8"))
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        vis = session.dock_visibility
+        for name, dock in self._dock_widgets():
+            if dock is not None and name in vis:
+                if vis[name]:
+                    dock.show()
+                else:
+                    dock.hide()
+
+    def _dock_widgets(self):
+        return (
+            ("taskDock", getattr(self, "_task_dock_widget", None)),
+            ("chapterTreeDock", getattr(self, "_tree_dock", None)),
+            ("panelsDock", getattr(self, "_panels_dock", None)),
+        )
+
+    def _dock_visibility(self) -> dict:
+        result = {}
+        for name, dock in self._dock_widgets():
+            if dock is not None:
+                result[name] = not dock.isHidden()
+        return result
+
+    def _dock_state(self) -> str:
+        try:
+            return self.saveState().toBase64().data().decode("utf-8")
+        except Exception:  # noqa: BLE001
+            return ""
+
     # --- 窗口几何持久化 ---
 
     def _restore_geometry(self) -> None:
@@ -1365,8 +1754,16 @@ class MainWindow(QMainWindow):
         self.close()
 
     def closeEvent(self, event) -> None:
-        """任务运行中先请求安全取消，终态回调到达后再关闭窗口。"""
+        """任务运行中先请求安全取消，终态回调到达后再关闭窗口。
+
+        未保存保护：存在脏标签时先确认（保存/不保存/取消），取消中止退出；
+        退出前持久化工作区会话与窗口几何。
+        """
         if not self.runner.is_running:
+            if not self._confirm_close_with_unsaved():
+                event.ignore()
+                return
+            self._persist_workspace_session()
             self._persist_geometry()
             event.accept()
             return

@@ -24,12 +24,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from doc_tool.application.content.lint import ContentLinter, TermStore
+from doc_tool.application.content.lint import ContentLinter, LintIssue, TermStore
 
 _RULE_LABELS = {
     "duplicate_title": "重复标题",
     "term_case": "术语大小写",
     "todo_residual": "待办残留",
+    "required_section": "必备章节",
+    "field_completeness": "字段完整性",
+    "numbering_uniqueness": "编号唯一性",
+    "sensitive_info": "敏感信息",
+    "interface_table_structure": "接口表结构",
+}
+
+_SEVERITY_LABELS = {
+    "error": "阻断",
+    "warning": "警告",
+    "info": "提示",
 }
 
 
@@ -46,6 +57,7 @@ class LintPanel(QWidget):
         terms: TermStore,
         *,
         on_open: Optional[Callable[[str, int], None]] = None,
+        on_issues: Optional[Callable[[List[LintIssue]], None]] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -53,6 +65,7 @@ class LintPanel(QWidget):
         self._linter = linter
         self._terms = terms
         self._on_open = on_open
+        self._on_issues = on_issues
         self._writable = writable
 
         # 唯一外层布局：术语卡片 + 结果表 + 状态行。原先各 _build_*
@@ -103,11 +116,12 @@ class LintPanel(QWidget):
 
     def _build_results(self) -> None:
         self._tree = QTreeWidget(self)
-        self._tree.setColumnCount(4)
-        self._tree.setHeaderLabels(["文件", "行", "类型", "说明"])
+        self._tree.setColumnCount(5)
+        self._tree.setHeaderLabels(["文件", "行", "类型", "级别", "说明"])
         self._tree.setColumnWidth(0, 240)
         self._tree.setColumnWidth(1, 48)
         self._tree.setColumnWidth(2, 90)
+        self._tree.setColumnWidth(3, 56)
         self._tree.setRootIsDecorated(False)
         self._tree.setUniformRowHeights(True)
         self._tree.itemActivated.connect(self._on_activate)
@@ -129,16 +143,23 @@ class LintPanel(QWidget):
         terms = self._current_terms()
         self._terms.save(terms)
         issues = self._linter.check_all(terms)
+        if self._on_issues is not None:
+            self._on_issues(issues)
         self._tree.clear()
         for i, issue in enumerate(issues):
             item = QTreeWidgetItem(
                 [
                     issue.rel_path,
                     str(issue.line_no),
-                    _RULE_LABELS.get(issue.rule, issue.rule),
+                    _RULE_LABELS.get(issue.rule_id, issue.rule_id),
+                    _SEVERITY_LABELS.get(issue.severity, issue.severity),
                     issue.message,
                 ]
             )
+            if issue.severity == "error":
+                item.setForeground(3, Qt.GlobalColor.red)
+            elif issue.severity == "warning":
+                item.setForeground(3, Qt.GlobalColor.darkYellow)
             item.setData(0, Qt.ItemDataRole.UserRole, i)
             self._tree.addTopLevelItem(item)
         if not issues:

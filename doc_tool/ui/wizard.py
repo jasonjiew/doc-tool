@@ -3,10 +3,11 @@
 
 向导流程：
 1. 选择源 DOCX 文件
-2. 执行预检，展示标题/图片/表格计数和告警（阻断告警时不可继续）
-3. 选择通用模式或需求/详细设计预设，填写文档信息和目标父目录
-4. 执行事务化导入
-5. 显示导入结果（成功/失败）
+2. 执行预检，展示标题/图片/表格计数、保真风险分级报告和告警（阻断告警需显式确认）
+3. 样式映射：把 Word 段落样式映射到章节级别（覆盖自动识别，含非标准 Heading 文档）
+4. 选择通用模式或需求/详细设计预设，填写文档信息和目标父目录（含往返严格开关）
+5. 执行事务化导入（含往返差异门禁）
+6. 显示导入结果（成功/失败）
 
 业务步骤与规则与 Tk 版一致，仅替换组件为 ``QWizard``。预检与导入均在
 后台线程执行（``TaskRunner``），支持安全取消（阶段边界生效）。
@@ -19,11 +20,13 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -31,6 +34,8 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
     QWizard,
@@ -71,6 +76,20 @@ def format_preview_summary(preview) -> str:
         lines.extend("  ⚠ {0}".format(warning) for warning in preview.warnings)
     else:
         lines.append("无告警。")
+    fidelity = getattr(preview, "fidelity", None)
+    if fidelity is not None and fidelity.findings:
+        lines.append("")
+        lines.append("保真风险：")
+        for finding in fidelity.findings:
+            tag = {
+                "BLOCK": "阻断",
+                "WARN": "告警",
+                "INFO": "提示",
+            }.get(finding.severity, finding.severity)
+            sample = "（{0}）".format("、".join(finding.samples)) if finding.samples else ""
+            lines.append("  [{0}] {1}: {2}{3}".format(tag, finding.label, finding.count, sample))
+        if fidelity.has_block:
+            lines.append("  ⛔ 存在阻断特性：默认阻止导入，可在确认风险后勾选「仍然导入」。")
     suggestion = getattr(preview, "document_type_suggestion", None)
     if suggestion is not None:
         lines.extend([
@@ -133,11 +152,11 @@ class _SourcePage(QWizardPage):
 
 
 class _PreflightPage(QWizardPage):
-    """步骤 2：导入预检（异步执行并展示结果）。"""
+    """步骤 2：导入预检（异步执行并展示结果，含保真风险与阻断确认）。"""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 2/5：导入预检")
+        self.setTitle("步骤 2/6：导入预检")
         layout = QVBoxLayout(self)
         self._status_label = QLabel("准备中…", self)
         layout.addWidget(self._status_label)
@@ -148,12 +167,22 @@ class _PreflightPage(QWizardPage):
         self._preview_text = QPlainTextEdit(self)
         self._preview_text.setReadOnly(True)
         layout.addWidget(self._preview_text, 1)
+        self._confirm_block = QCheckBox(
+            "我已了解上述阻断特性可能导致内容损失，仍然导入", self
+        )
+        self._confirm_block.hide()
+        self._confirm_block.toggled.connect(lambda _checked: self.completeChanged.emit())
+        layout.addWidget(self._confirm_block)
         self._preview_ok = False
+        self._has_block = False
 
     def initializePage(self) -> None:
         wizard = self.wizard()
         self._preview_ok = False
+        self._has_block = False
         self._preview_text.clear()
+        self._confirm_block.hide()
+        self._confirm_block.setChecked(False)
         self._progress.hide()
         self._status_label.setText("正在预检…")
         wizard._start_preflight(on_done=self._on_preflight_done)
@@ -174,6 +203,17 @@ class _PreflightPage(QWizardPage):
             self._preview_ok = bool(ok)
             self._set_text(text)
             wizard._preview = preview
+            self._has_block = bool(
+                ok
+                and preview is not None
+                and getattr(preview, "fidelity", None) is not None
+                and preview.fidelity.has_block
+            )
+            if self._has_block:
+                self._confirm_block.show()
+            else:
+                self._confirm_block.hide()
+                self._confirm_block.setChecked(False)
             if ok and preview is not None and preview.document_type_suggestion is not None:
                 suggestion = preview.document_type_suggestion
                 if suggestion.confidence == "high":
@@ -185,15 +225,116 @@ class _PreflightPage(QWizardPage):
         self._preview_text.setPlainText(text)
 
     def isComplete(self) -> bool:
-        return self._preview_ok
+        # 结构性预检通过，且（无阻断特性，或用户显式确认「仍然导入」）。
+        if not self._preview_ok:
+            return False
+        if self._has_block:
+            return self._confirm_block.isChecked()
+        return True
 
 
-class _ProjectInfoPage(QWizardPage):
-    """步骤 3：项目信息。"""
+class _StyleMappingPage(QWizardPage):
+    """步骤 3：样式映射（候选样式 → 章节级别）。
+
+    把 Word 段落样式映射到章节级别（1~6）或「忽略」；用户映射覆盖自动识别
+    结果。完成映射后即时校验：至少一个样式映射到级别 1，且层级不跳跃。
+    """
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 3/5：项目信息")
+        self.setTitle("步骤 3/6：样式映射")
+        layout = QVBoxLayout(self)
+        hint = QLabel(
+            "把 Word 段落样式映射到章节级别（1~6，或「忽略」视为正文）。"
+            "至少需要一个样式映射到级别 1，且映射后层级不能跳跃。",
+            self,
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self._status = QLabel("", self)
+        self._status.setObjectName("statusMuted")
+        self._status.setWordWrap(True)
+        layout.addWidget(self._status)
+        self._table = QTableWidget(self)
+        self._table.setColumnCount(4)
+        self._table.setHorizontalHeaderLabels(["样式名", "样式 ID", "使用次数", "章节级别"])
+        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self._table.verticalHeader().setVisible(False)
+        layout.addWidget(self._table, 1)
+        self._rows: list = []
+
+    def initializePage(self) -> None:
+        preview = self.wizard()._preview
+        self._populate(preview)
+        self.completeChanged.emit()
+
+    def _populate(self, preview) -> None:
+        self._table.clearContents()
+        self._rows = []
+        census = dict(getattr(preview, "style_census", None) or {})
+        auto_map = dict(getattr(preview, "heading_style_map", None) or {})
+        # 候选：正文实际使用过的段落样式（排除 Normal/正文样式）。
+        candidates = [
+            c for c in census.values()
+            if c.usage_count > 0 and c.style_id.lower() != "normal"
+        ]
+        candidates.sort(key=lambda c: (-c.usage_count, c.name))
+        self._table.setRowCount(len(candidates))
+        for row, census_entry in enumerate(candidates):
+            self._table.setItem(row, 0, QTableWidgetItem(census_entry.name))
+            self._table.setItem(row, 1, QTableWidgetItem(census_entry.style_id))
+            self._table.setItem(row, 2, QTableWidgetItem(str(census_entry.usage_count)))
+            combo = QComboBox(self)
+            combo.addItem("忽略", 0)
+            for level in range(1, 7):
+                combo.addItem("级别 {0}".format(level), level)
+            default_level = auto_map.get(census_entry.style_id, 0)
+            index = combo.findData(default_level)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.currentIndexChanged.connect(self._on_mapping_changed)
+            self._table.setCellWidget(row, 3, combo)
+            self._rows.append({"style_id": census_entry.style_id, "combo": combo})
+        if not candidates:
+            self._status.setText(
+                "未发现可映射的段落样式（正文样式除外）。若文档标题未应用任何段落样式，"
+                "将无法构建章节结构。"
+            )
+
+    def _on_mapping_changed(self, *_args) -> None:
+        self.completeChanged.emit()
+
+    def mapping(self) -> Dict[str, int]:
+        """返回当前映射：styleId -> 级别（忽略的样式不包含）。"""
+        result: Dict[str, int] = {}
+        for row in self._rows:
+            level = row["combo"].currentData()
+            if level:
+                result[row["style_id"]] = int(level)
+        return result
+
+    def isComplete(self) -> bool:
+        return 1 in self.mapping().values()
+
+    def validatePage(self) -> bool:
+        mapping = self.mapping()
+        from doc_tool.adapters.preflight import validate_heading_mapping
+
+        error = validate_heading_mapping(
+            self.wizard()._source_page.source_path(), mapping
+        )
+        if error:
+            QMessageBox.warning(self, "样式映射无效", error)
+            return False
+        self.wizard()._heading_style_map = mapping
+        return True
+
+
+class _ProjectInfoPage(QWizardPage):
+    """步骤 4：项目信息（含往返严格开关）。"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setTitle("步骤 4/6：项目信息")
         self.setCommitPage(True)
         layout = QVBoxLayout(self)
         form = QHBoxLayout()
@@ -222,6 +363,10 @@ class _ProjectInfoPage(QWizardPage):
         browse_btn.clicked.connect(self._browse_target)
         target_row.addWidget(browse_btn)
         left.addLayout(target_row)
+        self._exact_roundtrip = QCheckBox(
+            "往返检查要求完全一致（存在非关键差异也阻止导入）", self
+        )
+        left.addWidget(self._exact_roundtrip)
         form.addLayout(left)
         layout.addLayout(form)
         layout.addStretch(1)
@@ -262,6 +407,7 @@ class _ProjectInfoPage(QWizardPage):
         wizard._doc_version = self._doc_version_entry.text().strip()
         wizard._project_name = self._project_name_entry.text().strip()
         wizard._target_parent = self._target_entry.text().strip()
+        wizard._require_exact_roundtrip = self._exact_roundtrip.isChecked()
         error = wizard._validate_project_info()
         if error:
             QMessageBox.warning(self, "项目信息无效", error)
@@ -274,7 +420,7 @@ class _ExecutingPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 4/5：正在导入…")
+        self.setTitle("步骤 5/6：正在导入…")
         layout = QVBoxLayout(self)
         self._status_label = QLabel("准备中…", self)
         layout.addWidget(self._status_label)
@@ -317,7 +463,7 @@ class _ResultPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 5/5：导入结果")
+        self.setTitle("步骤 6/6：导入结果")
         layout = QVBoxLayout(self)
         self._result_label = QLabel(self)
         self._result_label.setObjectName("resultTitle")
@@ -408,6 +554,8 @@ class ImportWizard(QWizard):
         self._doc_version = "1.0"
         self._project_name = ""
         self._target_parent = ""
+        self._heading_style_map: Optional[dict] = None
+        self._require_exact_roundtrip = False
         self._last_error_code: Optional[str] = None
         self._closing = False
         self._import_result = None
@@ -421,11 +569,13 @@ class ImportWizard(QWizard):
 
         self._source_page = _SourcePage(self)
         self._preflight_page = _PreflightPage(self)
+        self._mapping_page = _StyleMappingPage(self)
         self._info_page = _ProjectInfoPage(self)
         self._executing_page = _ExecutingPage(self)
         self._result_page = _ResultPage(self)
         self.addPage(self._source_page)
         self.addPage(self._preflight_page)
+        self.addPage(self._mapping_page)
         self.addPage(self._info_page)
         self.addPage(self._executing_page)
         self.addPage(self._result_page)
@@ -460,7 +610,7 @@ class ImportWizard(QWizard):
         )
         self.button(QWizard.WizardButton.BackButton).setEnabled(
             self.currentPage().isComplete()
-            and self.currentId() not in (0, 3)
+            and self.currentId() not in (0, 4)
         )
 
     # --- 预检 ---
@@ -474,7 +624,11 @@ class ImportWizard(QWizard):
             from doc_tool.domain.errors import DocToolError
 
             try:
-                preview = preflight(self._source_page.source_path())
+                # 宽松扫描：结构性错误仍 fail-closed；未识别到 Heading 1 不阻断，
+                # 交由「样式映射」步骤由用户映射（覆盖自动识别）。
+                preview = preflight(
+                    self._source_page.source_path(), allow_missing_headings=True
+                )
             except DocToolError as exc:
                 return (
                     False,
@@ -489,10 +643,9 @@ class ImportWizard(QWizard):
             text = format_preview_summary(preview)
             if not preview.has_heading1:
                 text += (
-                    "\n\n阻断：未检测到 Heading 1 标题样式，无法导入。\n"
-                    "请在 Word 中为一级标题应用「标题 1」样式后重新导入。"
+                    "\n\n提示：未检测到可自动识别的 Heading 1 标题样式。\n"
+                    "请在「样式映射」步骤把标题段落样式映射到章节级别后继续。"
                 )
-                return False, preview, text
             return True, preview, text
 
         started = self._runner.start(
@@ -519,6 +672,7 @@ class ImportWizard(QWizard):
         target_root = str(
             Path(self._target_parent) / self._project_name
         )
+        heading_map = self._mapping_page.mapping() or None
         request = ImportRequest(
             source_docx=Path(self._source_page.source_path()),
             target_project_root=Path(target_root),
@@ -526,6 +680,8 @@ class ImportWizard(QWizard):
             document_no=self._doc_no,
             document_name=self._doc_name,
             document_version=self._doc_version,
+            require_exact_roundtrip=bool(self._require_exact_roundtrip),
+            heading_style_map=heading_map,
         )
         started = self._runner.start(
             TaskSpec(

@@ -176,7 +176,24 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
+cli_analysis = Analysis(
+    [str(REPO_ROOT / "doc_tool_cli.py")],
+    pathex=[str(REPO_ROOT)],
+    binaries=all_binaries,
+    datas=all_datas,
+    hiddenimports=all_hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=a.excludes,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+cli_pyz = PYZ(cli_analysis.pure, cli_analysis.zipped_data, cipher=block_cipher)
+
+gui_exe = EXE(
     pyz,
     a.scripts,
     [],
@@ -195,8 +212,28 @@ exe = EXE(
     icon=icon_file if os.path.isfile(icon_file) else None,
 )
 
+cli_exe = EXE(
+    cli_pyz,
+    cli_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="doc-tool-cli",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=icon_file if os.path.isfile(icon_file) else None,
+)
+
 coll = COLLECT(
-    exe,
+    gui_exe,
+    cli_exe,
     a.binaries,
     a.zipfiles,
     a.datas,

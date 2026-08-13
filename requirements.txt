@@ -18,3 +18,7 @@ pywin32==312
 
 # 桌面 UI（PySide6 / Qt Widgets）。迁移后不再依赖 tkinter 运行时。
 PySide6==6.8.3
+
+# Review PDF export and verification.
+reportlab==4.4.3
+pypdf==6.0.0

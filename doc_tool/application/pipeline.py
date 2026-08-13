@@ -346,8 +346,12 @@ def _run_pipeline_inner(
     )
     formal_output = paths.output_dir / output_name
     paths.output_dir.mkdir(parents=True, exist_ok=True)
-    # 临时文件与正式输出同目录，保证 os.replace 在同一卷上原子
-    temp_output = paths.output_dir / ("." + output_name + ".tmp")
+    # 临时文件与正式输出同目录，保证 os.replace 在同一卷上原子。
+    # 必须以 ``.docx`` 结尾：validate_pre/post 会经统一安全入口
+    # ``read_docx_package`` 打开它做严格校验，该入口硬校验扩展名（拒绝非
+    # ``.docx``），旧命名 ``.<名>.tmp`` 会让每次校验都报「文件扩展名不是
+    # .docx」，管线永远无法发布。隐藏点前缀 + ``.tmp-`` 标记仍标示临时性。
+    temp_output = paths.output_dir / (".tmp-" + output_name)
 
     # 用于状态元数据的阶段摘要
     stage_summary: list = []
@@ -377,12 +381,20 @@ def _run_pipeline_inner(
     try:
         # 先删除可能残留的临时文件，避免上次失败遗留
         _cleanup_temp()
-        built_path = build_with_project(manifest, paths, output_override=str(temp_output))
+        expression_warnings: List[str] = []
+        built_path = build_with_project(
+            manifest, paths, output_override=str(temp_output),
+            on_warning=expression_warnings.append,
+        )
         if Path(built_path).resolve() != temp_output.resolve() or not temp_output.is_file():
             raise BuildError(
                 "构建内核未按约定生成项目临时输出。",
                 details={"returnedFile": Path(built_path).name},
             )
+        # 不阻断构建的表达式警告（缺失链接目标/未定义脚注）记录并透出到日志。
+        for warning in expression_warnings:
+            log.warn(STAGE_BUILD, "expression_warning", {"message": warning})
+            on_progress(STAGE_BUILD, "warning", warning)
         result.output_path = str(formal_output)  # 返回正式路径，而非临时
         result.events.append(StageEvent(
             STAGE_BUILD, "succeeded",
@@ -694,6 +706,26 @@ def _run_pipeline_inner(
             "formal": is_formal,
             "diagnostic": skip_word_refresh,
         })
+        try:
+            from doc_tool.application.content.history import BuildHistoryStore
+
+            BuildHistoryStore(paths.state_dir).archive(
+                manifest,
+                paths.resolve(manifest.relative_content_root()),
+                paths.resolve(manifest.relative_template_docx()),
+                paths.resolve(manifest.relative_asset_root()),
+                formal_output,
+                diagnostic=skip_word_refresh,
+            )
+        except Exception as exc:
+            log.warn(STAGE_PUBLISH, "history_archive_failed", {
+                "errorType": type(exc).__name__,
+            })
+            # 归档失败不阻断发布，但必须对用户可见，否则追溯链断裂无提示。
+            result.events.append(StageEvent(
+                STAGE_PUBLISH, "warning",
+                detail="历史归档失败（不影响本次发布）：{0}".format(type(exc).__name__),
+            ))
     except CancelledError:
         # 临界区内取消不中断，但这里已经是发布临界区
         _cleanup_temp()

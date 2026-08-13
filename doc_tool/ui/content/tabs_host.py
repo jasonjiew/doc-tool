@@ -27,6 +27,7 @@ class TabsHost(QWidget):
         on_current_changed: Optional[Callable[[Optional[str]], None]] = None,
         assets_root=None,
         writable: bool = True,
+        autosave=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -35,6 +36,7 @@ class TabsHost(QWidget):
         self._on_current_changed = on_current_changed
         self._assets_root = assets_root
         self._writable = writable
+        self._autosave = autosave
 
         self._tabs = QTabWidget(self)
         self._tabs.setTabsClosable(True)
@@ -46,6 +48,10 @@ class TabsHost(QWidget):
         self._save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
         self._save_shortcut.activated.connect(self.save_current)
 
+        # Ctrl+H 文件内替换条（焦点在当前编辑器时激活）。
+        self._replace_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
+        self._replace_shortcut.activated.connect(self.focus_replace_current)
+
         layout = self._make_layout()
         layout.addWidget(self._tabs)
 
@@ -53,6 +59,12 @@ class TabsHost(QWidget):
         self._editors: Dict[str, EditorPanel] = {}
         # rel_path -> 缓存文本（未打开编辑器的文件，如只读预览不适用，暂不缓存）
         self._tab_order: List[str] = []
+
+    def focus_replace_current(self) -> None:
+        """聚焦当前编辑器的文件内替换条（Ctrl+H）。"""
+        editor = self.current_editor()
+        if editor is not None:
+            editor.focus_replace()
 
     def _make_layout(self):
         from PySide6.QtWidgets import QVBoxLayout
@@ -84,6 +96,7 @@ class TabsHost(QWidget):
             assets_root=self._assets_root,
             writable=self._writable,
             on_dirty_changed=lambda dirty: self._on_editor_dirty(editor, dirty),
+            autosave=self._autosave,
         )
         editor.load(rel_path, text)
         self._tabs.addTab(editor, rel_path.rsplit("/", 1)[-1])
@@ -104,6 +117,20 @@ class TabsHost(QWidget):
     def editor_for(self, rel_path: str) -> Optional[EditorPanel]:
         return self._editors.get(rel_path)
 
+    def activate(self, rel_path: str) -> bool:
+        """激活指定文件的已开标签（不打开新标签）。返回是否已打开。"""
+        editor = self._editors.get(rel_path)
+        if editor is None:
+            return False
+        index = self._tabs.indexOf(editor)
+        if index >= 0:
+            self._tabs.setCurrentIndex(index)
+        return True
+
+    def editors(self) -> List[EditorPanel]:
+        """返回全部已打开编辑器（保持打开顺序，供未保存收集）。"""
+        return list(self._editors.values())
+
     def open_rel_paths(self) -> List[str]:
         return list(self._editors.keys())
 
@@ -116,6 +143,46 @@ class TabsHost(QWidget):
         """保存当前标签页。"""
         editor = self.current_editor()
         return editor.save() if editor is not None else False
+
+    def save_all(self) -> List[str]:
+        """保存全部脏标签；返回保存失败的 rel_path 列表（不中断其余标签）。
+
+        只读（不可写）编辑器无法保存，跳过不计入失败——否则只读项目恢复出的
+        脏草稿标签会让「退出/切换时保存」恒失败并中止。
+        """
+        failed: List[str] = []
+        for rel_path, editor in self._editors.items():
+            if editor.is_dirty() and editor.is_writable():
+                if not editor.save():
+                    failed.append(rel_path)
+        return failed
+
+    def open_draft(self, rel_path: str, text: str) -> bool:
+        """以草稿内容打开标签（脏状态、不写正式文件）。
+
+        已打开时切到该标签并重载为草稿；返回是否新开。正式 Markdown 不被
+        写入，用户显式保存才落盘。
+        """
+        existing = self._editors.get(rel_path)
+        if existing is not None:
+            existing.load_draft(rel_path, text)
+            index = self._tabs.indexOf(existing)
+            if index >= 0:
+                self._tabs.setCurrentIndex(index)
+            return False
+        editor = EditorPanel(
+            self._writer,
+            on_saved=self._on_saved,
+            assets_root=self._assets_root,
+            writable=self._writable,
+            on_dirty_changed=lambda dirty: self._on_editor_dirty(editor, dirty),
+            autosave=self._autosave,
+        )
+        editor.load_draft(rel_path, text)
+        self._tabs.addTab(editor, self._tab_label(editor))
+        self._tabs.setCurrentWidget(editor)
+        self._editors[rel_path] = editor
+        return True
 
     def check_external_change_current(self) -> None:
         """标签切换/激活时检测外部修改。"""
@@ -149,12 +216,18 @@ class TabsHost(QWidget):
         widget = self._tabs.widget(index)
         if not isinstance(widget, EditorPanel):
             return
-        if widget.is_dirty() and not self._confirm_close_dirty(widget):
+        was_dirty = widget.is_dirty()
+        if was_dirty and not self._confirm_close_dirty(widget):
             return
         rel_path = widget.current_rel_path()
         if rel_path is not None:
             self._editors.pop(rel_path, None)
+            if was_dirty and self._autosave is not None:
+                # 关闭脏标签 = 显式放弃未保存编辑：清除其草稿，避免下次打开
+                # 在崩溃恢复提示中复活已丢弃的内容。
+                self._autosave.clear(rel_path)
         self._tabs.removeTab(index)
+        widget.stop_autosave()
         widget.deleteLater()
 
     @staticmethod
@@ -177,6 +250,7 @@ class TabsHost(QWidget):
         index = self._tabs.indexOf(editor)
         if index >= 0:
             self._tabs.removeTab(index)
+        editor.stop_autosave()
         editor.deleteLater()
 
     def _on_tab_changed(self, _index: int) -> None:

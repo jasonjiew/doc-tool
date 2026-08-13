@@ -42,6 +42,7 @@ class RefactorPanel(QWidget):
         writer,
         *,
         on_applied: Optional[Callable[[], None]] = None,
+        on_renamed: Optional[Callable[[str], None]] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -49,6 +50,9 @@ class RefactorPanel(QWidget):
         self._service = service
         self._writer = writer
         self._on_applied = on_applied
+        # 重命名成功后回调旧路径：上层据此关闭旧路径标签并清除其草稿，
+        # 避免旧路径标签后续保存时重建已改名的文件。
+        self._on_renamed = on_renamed
         self._writable = writable
         self._plan = None
         self._all_files: List[str] = []
@@ -173,7 +177,11 @@ class RefactorPanel(QWidget):
                 ]
             )
             self._tree.addTopLevelItem(item)
-        if plan.total == 0:
+        if plan.conflicts:
+            self._set_status(
+                "存在冲突，暂不可执行：{0}".format("；".join(plan.conflicts))
+            )
+        elif plan.total == 0:
             self._set_status("无受影响引用（仅重命名文件本身）")
         else:
             self._set_status(
@@ -187,6 +195,11 @@ class RefactorPanel(QWidget):
         if self._plan is None:
             return
         plan = self._plan
+        if not plan.can_apply:
+            self._set_status(
+                "无法执行：存在冲突——{0}".format("；".join(plan.conflicts))
+            )
+            return
         confirmed = QMessageBox.question(
             self,
             "确认执行",
@@ -197,8 +210,24 @@ class RefactorPanel(QWidget):
         )
         if confirmed != QMessageBox.StandardButton.Yes:
             return
-        self._service.apply_rename_plan(plan, self._writer)
-        self._set_status("已执行：{0} 处引用更新 + 文件重命名".format(plan.total))
+        results = self._service.apply_rename_plan(plan, self._writer)
+        if not all(r.written for r in results):
+            failed = [r.rel_path for r in results if not r.written]
+            self._set_status("部分写回失败：{0}".format(", ".join(failed)))
+            return
+        if self._on_renamed is not None and plan.rel_path:
+            self._on_renamed(plan.rel_path)
+        no_backup = [
+            r.rel_path for r in results if getattr(r, "backup_failed", False)
+        ]
+        if no_backup:
+            self._set_status(
+                "已执行：{0} 处引用更新 + 文件重命名（⚠ 部分文件备份失败，回滚不可用：{1}）".format(
+                    plan.total, "、".join(no_backup)
+                )
+            )
+        else:
+            self._set_status("已执行：{0} 处引用更新 + 文件重命名".format(plan.total))
         self._plan = None
         self._tree.clear()
         if self._on_applied is not None:
@@ -206,6 +235,11 @@ class RefactorPanel(QWidget):
         self._update_action_state()
 
     def rollback(self) -> None:
+        if self._rollback_marker is None:
+            # 双保险：按钮禁用之外，直接调用也拒绝——since=None 会回滚整个
+            # 会话改动（含更早的独立编辑/保存），非「本次联动」。
+            self._set_status("请先预览联动，再回滚本次联动")
+            return
         failures = self._writer.rollback(since=self._rollback_marker)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
@@ -220,8 +254,15 @@ class RefactorPanel(QWidget):
         self._update_action_state()
 
     def _update_action_state(self) -> None:
-        self._apply_btn.setEnabled(self._writable and self._plan is not None)
-        self._rollback_btn.setEnabled(self._writable)
+        applyable = (
+            self._writable
+            and self._plan is not None
+            and self._plan.can_apply
+        )
+        self._apply_btn.setEnabled(applyable)
+        # 未预览过联动（无回滚起点）时禁用「回滚本次联动」：旧逻辑在可写时
+        # 恒启用，未预览直接回滚会以 since=None 回滚整个会话改动。
+        self._rollback_btn.setEnabled(self._writable and self._rollback_marker is not None)
 
     def _set_status(self, text: str) -> None:
         self._status_label.setText(text)

@@ -213,9 +213,27 @@ _internal/PySide6/  Qt Widgets 桌面 UI（仅 QtCore/QtGui/QtWidgets）
 $SbomContent | Out-File -FilePath $SbomFile -Encoding utf8
 Write-Host "  依赖清单: $SbomFile" -ForegroundColor Green
 
+$CycloneFile = "$ReleaseDir\KonsungDocTool-$Version.cdx.json"
+$SpdxFile = "$ReleaseDir\KonsungDocTool-$Version.spdx.json"
+Push-Location $RepoRoot
+try {
+    & python packaging\generate_sbom.py `
+        --requirements requirements.txt `
+        --requirements requirements-build.txt `
+        --cyclonedx $CycloneFile `
+        --spdx $SpdxFile
+    if ($LASTEXITCODE -ne 0) { throw "结构化 SBOM 生成失败 (exit $LASTEXITCODE)" }
+} finally {
+    Pop-Location
+}
+Write-Host "  CycloneDX: $CycloneFile" -ForegroundColor Green
+Write-Host "  SPDX: $SpdxFile" -ForegroundColor Green
+
 Write-Host ""
 Write-Host "=== 构建完成 ===" -ForegroundColor Cyan
 if ($SetupExe) {
     Write-Host "安装器: $SetupExe" -ForegroundColor White
 }
 Write-Host "依赖清单: $SbomFile" -ForegroundColor White
+Write-Host "CycloneDX: $CycloneFile" -ForegroundColor White
+Write-Host "SPDX: $SpdxFile" -ForegroundColor White

@@ -32,7 +32,7 @@ sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, SCRIPTS)
 
 from build_docx import build as build_docx  # noqa: E402
-from docx_common import load_config  # noqa: E402
+from docx_common import AutomationError, load_config  # noqa: E402
 from doc_tool.adapters.kernel import (  # noqa: E402
     build_with_project,
     config_from_project,
@@ -161,6 +161,18 @@ class LegacyProjectConsistencyTests(unittest.TestCase):
 
         # 比较字节哈希
         self.assertEqual(_sha256(legacy_output), _sha256(project_output))
+
+    def test_corrupt_template_raises_automation_error(self) -> None:
+        """模板不是合法 DOCX 时映射为 AutomationError（统一入口中性异常）。
+
+        回归：read_docx_package 抛 OOXMLSecurityError 时 build 侧契约映射为
+        AutomationError，不得泄漏裸异常破坏 CLI 错误消息。
+        """
+        legacy_config = load_config("requirement", self.project_root)
+        with open(legacy_config["paths"]["template"], "wb") as handle:
+            handle.write(b"this is not a zip")
+        with self.assertRaises(AutomationError):
+            build_docx(config=legacy_config)
 
     def test_validate_events_are_identical(self) -> None:
         """新旧入口的校验事件流（Heading/正文/表格）一致。"""
@@ -307,7 +319,7 @@ class PipelineServiceTests(unittest.TestCase):
         shutil.rmtree(self._tmp, ignore_errors=True)
 
     def test_skip_word_refresh_pipeline_returns_structured_events(self) -> None:
-        """跳过 Word 刷新的管线返回结构化阶段事件（构建阶段必须成功）。"""
+        """跳过 Word 刷新的管线返回结构化阶段事件（构建与刷新前校验必须成功）。"""
         from doc_tool.application.pipeline import (
             STAGE_BUILD,
             STAGE_VALIDATE_PRE,
@@ -318,16 +330,25 @@ class PipelineServiceTests(unittest.TestCase):
         paths = manifest.resolve_paths(self.project_root)
         result = run_pipeline(manifest, paths, skip_word_refresh=True)
 
-        stages = [(e.stage, e.status) for e in result.events]
+        stage_map = {e.stage: e.status for e in result.events}
         # 构建阶段必须成功
-        self.assertIn((STAGE_BUILD, "succeeded"), stages)
-        # 刷新前校验阶段必须执行（可能因模板已有孤立关系而失败）
-        self.assertIn(STAGE_VALIDATE_PRE, [s for s, _ in stages])
+        self.assertEqual(stage_map[STAGE_BUILD], "succeeded")
+        # 刷新前校验必须通过并发布：管线临时文件必须是 .docx 扩展名，否则安全
+        # 校验入口的扩展名硬校验会让 validate_pre 报「文件扩展名不是 .docx」，
+        # 管线永远无法 publish（回归保护，旧实现把成功断言 mock 掉掩盖了该 bug）。
+        self.assertEqual(stage_map[STAGE_VALIDATE_PRE], "succeeded")
+        self.assertTrue(result.success, "管线应成功发布（临时文件扩展名 bug 回归）")
         self.assertIsNotNone(result.output_path)
         # 每个事件都有阶段名和状态
         for event in result.events:
             self.assertTrue(event.stage)
             self.assertIn(event.status, ("started", "succeeded", "failed", "skipped", "cancelled"))
+        history_files = list(paths.state_dir.joinpath("history").glob("*.json"))
+        self.assertEqual(len(history_files), 1)
+        import json
+        history = json.loads(history_files[0].read_text(encoding="utf-8"))
+        self.assertTrue(history["diagnostic"])
+        self.assertTrue(history["outputSha256"])
 
     def test_build_failure_returns_error_code(self) -> None:
         """构建失败时返回结构化错误码。"""
@@ -343,6 +364,7 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertIsNotNone(result.error_code)
         self.assertTrue(len(result.events) > 0)
         self.assertEqual(result.events[-1].status, "failed")
+        self.assertEqual(list(paths.state_dir.joinpath("history").glob("*.json")), [])
 
 
 if __name__ == "__main__":

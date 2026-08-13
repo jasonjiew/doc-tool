@@ -25,12 +25,15 @@ from lxml import etree
 
 from docx_common import (
     AutomationError,
+    OOXMLSecurityError,
     discover_document_types,
     iter_chapter_entries,
     load_config,
     normalize_business_text,
     parse_image_reference,
     parse_markdown_table,
+    parse_xml_safe,
+    read_docx_package,
     resolve_resource,
     validate_content_tree,
 )
@@ -106,25 +109,40 @@ class Event:
     xml: Optional[bytes] = None
 
 
+def _map_package_error(exc: OOXMLSecurityError) -> AutomationError:
+    """将统一安全入口的中性解析异常映射为校验侧错误，保留既有消息语义。
+
+    CRC 失败报告损坏条目名，非 ZIP 报告底层异常文本，其余（上限/加密/
+    缺失核心部件/扩展名）直接透出中性消息。
+    """
+    if exc.reason == "crc":
+        return AutomationError("DOCX ZIP CRC 失败: {0}".format(exc.part_name))
+    if exc.reason == "zip":
+        return AutomationError("DOCX 不是有效 ZIP: {0}".format(exc.cause or exc))
+    return AutomationError(str(exc))
+
+
 class DocxPackage:
-    def __init__(self, path: str):
+    def __init__(self, path: str, heading_styles: Optional[Dict[int, str]] = None):
         self.path = os.path.abspath(path)
         if not os.path.isfile(self.path):
             raise AutomationError("DOCX 不存在: {0}".format(self.path))
         try:
-            with zipfile.ZipFile(self.path, "r") as package:
-                bad_part = package.testzip()
-                if bad_part:
-                    raise AutomationError("DOCX ZIP CRC 失败: {0}".format(bad_part))
-                self.items = {name: package.read(name) for name in package.namelist()}
-        except zipfile.BadZipFile as exc:
-            raise AutomationError("DOCX 不是有效 ZIP: {0}".format(exc))
+            package = read_docx_package(self.path)
+        except OOXMLSecurityError as exc:
+            raise _map_package_error(exc)
+        try:
+            self.items = package.read_all()
+        except OOXMLSecurityError as exc:
+            raise _map_package_error(exc)
+        finally:
+            package.close()
         self.xml_roots: Dict[str, object] = {}
         for name, data in self.items.items():
             if name.endswith(".xml") or name.endswith(".rels"):
                 try:
-                    self.xml_roots[name] = etree.fromstring(data)
-                except Exception as exc:
+                    self.xml_roots[name] = parse_xml_safe(data, name)
+                except OOXMLSecurityError as exc:
                     raise AutomationError("XML 无法解析 {0}: {1}".format(name, exc))
         required = (
             "[Content_Types].xml",
@@ -140,7 +158,14 @@ class DocxPackage:
         self.styles = self.xml_roots["word/styles.xml"]
         self.settings = self.xml_roots["word/settings.xml"]
         self.relationships = self.xml_roots["word/_rels/document.xml.rels"]
-        self.heading_styles = self._heading_style_map()
+        if heading_styles:
+            # 项目清单的 headingStyles（级别 -> styleId）优先；样式映射导入的
+            # 自定义样式名无法被名称启发式识别，必须按清单映射识别标题。
+            self.heading_styles = {
+                str(style_id): int(level) for level, style_id in heading_styles.items()
+            }
+        else:
+            self.heading_styles = self._heading_style_map()
         self.relationship_map = {relationship.get("Id"): relationship for relationship in self.relationships}
 
     def _heading_style_map(self) -> Dict[str, int]:
@@ -195,10 +220,43 @@ class DocxPackage:
                 if not started:
                     continue
                 image_hashes = self.image_hashes(element)
+                bookmarks = tuple(
+                    node.get(qn("name")) or "" for node in element.iter(qn("bookmarkStart"))
+                )
+                hyperlinks = tuple(
+                    node.get(qn("anchor")) or node.get(R_NS + "id") or ""
+                    for node in element.iter(qn("hyperlink"))
+                )
+                num_pr = element.find(".//" + qn("numPr"))
+                footnotes = tuple(
+                    node.get(qn("id")) or "" for node in element.iter(qn("footnoteReference"))
+                )
                 if level:
                     events.append(Event("H", (level, normalize_business_text(text)), "body[{0}]".format(index)))
                 elif image_hashes:
                     events.append(Event("I", image_hashes, "body[{0}]".format(index)))
+                elif num_pr is not None:
+                    level = num_pr.find(qn("ilvl"))
+                    num_id = num_pr.find(qn("numId"))
+                    events.append(
+                        Event(
+                            "L",
+                            (
+                                normalize_business_text(text),
+                                level.get(qn("val")) if level is not None else "0",
+                                num_id.get(qn("val")) if num_id is not None else "",
+                            ),
+                            "body[{0}]".format(index),
+                        )
+                    )
+                elif hyperlinks or footnotes:
+                    events.append(
+                        Event(
+                            "X",
+                            normalize_business_text(text),
+                            "body[{0}]".format(index),
+                        )
+                    )
                 elif text:
                     events.append(Event("P", normalize_business_text(text), "body[{0}]".format(index)))
             elif local_name == "tbl" and started:
@@ -211,6 +269,39 @@ class DocxPackage:
                     )
                 )
         return events
+
+    def expression_errors(self) -> List[str]:
+        """校验书签唯一性、内部链接、列表实例与脚注目标。"""
+        errors: List[str] = []
+        names = [node.get(qn("name")) for node in self.document.iter(qn("bookmarkStart"))]
+        duplicates = [name for name, count in Counter(names).items() if name and count > 1]
+        for name in sorted(duplicates):
+            errors.append("书签名称重复：{0}".format(name))
+        available = set(names)
+        for node in self.document.iter(qn("hyperlink")):
+            anchor = node.get(qn("anchor"))
+            rid = node.get(R_NS + "id")
+            if anchor and anchor not in available:
+                errors.append("超链接书签目标不存在：{0}".format(anchor))
+            if rid and rid not in self.relationship_map:
+                errors.append("超链接 relationship 不存在：{0}".format(rid))
+        numbering = self.xml_roots.get("word/numbering.xml")
+        num_ids = {
+            node.get(qn("numId")) for node in numbering.findall(qn("num"))
+        } if numbering is not None else set()
+        for node in self.document.iter(qn("numId")):
+            value = node.get(qn("val"))
+            if value not in num_ids:
+                errors.append("列表 numId 不存在：{0}".format(value))
+        footnotes = self.xml_roots.get("word/footnotes.xml")
+        defined = {
+            node.get(qn("id")) for node in footnotes.findall(qn("footnote"))
+        } if footnotes is not None else set()
+        for node in self.document.iter(qn("footnoteReference")):
+            value = node.get(qn("id"))
+            if value not in defined:
+                errors.append("脚注目标不存在：{0}".format(value))
+        return errors
 
     def relationship_errors(self) -> List[str]:
         errors: List[str] = []
@@ -280,8 +371,8 @@ class DocxPackage:
 def _expected_table_xml(path: str):
     try:
         with open(path, "rb") as xml_file:
-            root = etree.fromstring(xml_file.read())
-    except Exception as exc:
+            root = parse_xml_safe(xml_file.read(), os.path.basename(path))
+    except (OOXMLSecurityError, OSError) as exc:
         raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(path, exc))
     if root.tag != qn("tbl"):
         raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(path))
@@ -331,25 +422,39 @@ def expected_markdown_events(path: str, config: Dict) -> List[Event]:
             continue
         heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
         if heading:
-            events.append(Event("H", (len(heading.group(1)), normalize_business_text(heading.group(2))), source))
+            events.append(Event("H", (len(heading.group(1)), markdown_visible_text(heading.group(2))), source))
             index += 1
             continue
-        unordered = re.match(r"^[-*]\s+(.+)$", stripped)
+        unordered = re.match(r"^(\s*)[-*]\s+(.+)$", lines[index])
         if unordered:
-            events.append(Event("P", normalize_business_text(unordered.group(1)), source))
+            events.append(Event("L", (markdown_visible_text(unordered.group(2)), str(min(8, len(unordered.group(1).replace("\t", "    ")) // 2)), "*"), source))
             index += 1
             continue
-        ordered = re.match(r"^(\d{1,3})[.、].*$", stripped)
+        ordered = re.match(r"^(\s*)(\d{1,3})[.、]\s+(.+)$", lines[index])
         if ordered:
-            events.append(Event("P", normalize_business_text(stripped), source))
+            events.append(Event("L", (markdown_visible_text(ordered.group(3)), str(min(8, len(ordered.group(1).replace("\t", "    ")) // 2)), "#"), source))
+            index += 1
+            continue
+        if re.match(r"^\[\^[^\]]+\]:\s*", stripped):
             index += 1
             continue
         if re.fullmatch(r"<!--\s*P:.*?\s*-->", stripped) or stripped == "<EMPTY_PAR/>" or not stripped:
             index += 1
             continue
-        events.append(Event("P", normalize_business_text(stripped), source))
+        kind = "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", stripped) else "P"
+        events.append(Event(kind, markdown_visible_text(stripped), source))
         index += 1
     return events
+
+
+def markdown_visible_text(text: str) -> str:
+    """把支持的 Markdown 行内表达还原为 Word 中的可见正文。"""
+    value = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    value = re.sub(r"\[\^[^\]]+\]", "", value)
+    value = re.sub(r"`([^`\n]+)`", r"\1", value)
+    value = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", value)
+    value = re.sub(r"\*([^*\n]+)\*", r"\1", value)
+    return normalize_business_text(value)
 
 
 def expected_content_events(config: Dict) -> List[Event]:
@@ -376,6 +481,8 @@ def compare_expected_events(
             elif strict_complex_xml and left.xml != right.xml:
                 errors.append("#{0} 复杂表格 OOXML 不一致: {1} / {2}".format(index, left.source, right.source))
         elif left.kind != right.kind or left.value != right.value:
+            if left.kind == right.kind == "L" and left.value[:2] == right.value[:2]:
+                continue
             errors.append(
                 "#{0} 内容/位置不一致: expected {1}={2!r} ({3}); actual {4}={5!r} ({6})".format(
                     index, left.kind, left.value, left.source, right.kind, right.value, right.source
@@ -390,6 +497,11 @@ def compare_baseline_events(source: List[Event], rebuilt: List[Event]) -> List[s
     """Compare business order while treating all tables as their text matrices."""
     def signature(event: Event):
         kind = "T" if event.kind in ("T", "C") else event.kind
+        if kind == "L":
+            # 列表项忽略 numId：源 Word 与重建产物的 numId 是各自独立实例，
+            # 与 ``compare_expected_events`` 的 ``value[:2]`` 容错保持一致，
+            # 否则任何含列表的文档基线校验都会误报内容不一致。
+            return kind, event.value[:2]
         return kind, event.value
 
     errors: List[str] = []
@@ -422,12 +534,15 @@ def template_preservation_errors(template: DocxPackage, output: DocxPackage) -> 
     errors = {"styles": [], "numbering": [], "headers": [], "footers": [], "sections": [], "settings": []}
     for name, category in (
         ("word/styles.xml", "styles"),
-        ("word/numbering.xml", "numbering"),
         ("word/fontTable.xml", "styles"),
         ("word/theme/theme1.xml", "styles"),
     ):
         if normalized_part(template, name) != normalized_part(output, name):
             errors[category].append("模板部件变化: {0}".format(name))
+    template_numbering = _numbering_signature(template)
+    output_numbering = _numbering_signature(output)
+    if template_numbering - output_numbering:
+        errors["numbering"].append("模板原有编号定义缺失或变化")
     for prefix, category in (("word/header", "headers"), ("word/footer", "footers")):
         names = sorted(
             name for name in set(template.items) | set(output.items) if name.startswith(prefix) and name.endswith(".xml")
@@ -463,12 +578,32 @@ def _paragraph_style_names(package: DocxPackage) -> set:
 
 
 def _numbering_signature(package: DocxPackage) -> Counter:
+    """返回被 ``w:num`` 实际引用的 ``abstractNum`` 定义签名（多集）。
+
+    仅统计「使用中」的定义：Word 保存时会裁剪模板中无任何 num 引用的孤立
+    abstractNum 定义（真实 Word 模板常携带），把它们计入签名会在刷新后校验里
+    误报「模板原有编号定义缺失」。被引用的定义必须语义不变，因此裁剪侧差值
+    （template - output）非空仍能捕获真实的丢失/变化。
+    """
     style_names = _style_id_names(package)
     root = package.xml_roots.get("word/numbering.xml")
     if root is None:
         return Counter()
+    used_ids = set()
+    for num in root.findall(qn("num")):
+        # ``abstractNumId`` 两种合法序列化都识别：子元素（``<w:abstractNumId
+        # w:val="0"/>``，构建侧生成）与属性（``w:num w:abstractNumId="0"``，
+        # 真实 Word 常如此写）。
+        child = num.find(qn("abstractNumId"))
+        if child is not None:
+            used_ids.add(child.get(qn("val")))
+        attribute = num.get(qn("abstractNumId"))
+        if attribute:
+            used_ids.add(attribute)
     signatures = []
     for abstract in root.findall(qn("abstractNum")):
+        if abstract.get(qn("abstractNumId")) not in used_ids:
+            continue
         levels = []
         for level in abstract.findall(qn("lvl")):
             def value(tag):
@@ -629,8 +764,8 @@ def word_semantic_preservation_errors(
         errors["styles"].append("Word 刷新后主题字体/颜色定义变化")
     # Word prunes unused duplicate abstract numbering definitions when saving.
     # Every retained definition must still be present with identical semantics.
-    if _numbering_signature(output) - _numbering_signature(template):
-        errors["numbering"].append("Word 刷新后保留的编号级别、格式或标题关联变化")
+    if _numbering_signature(template) - _numbering_signature(output):
+        errors["numbering"].append("Word 刷新后模板原有编号级别、格式或标题关联缺失")
     if _section_geometry(template) != _section_geometry(output):
         errors["sections"].append("Word 刷新后 Section 数量、纸张、方向或页边距变化")
     if _header_footer_signatures(template, "word/header") != _header_footer_signatures(output, "word/header"):
@@ -737,13 +872,18 @@ def validate(
     output_path = os.path.abspath(output_override or config["paths"]["output"])
     report = Report(doc_type, output_path)
 
-    output = DocxPackage(output_path)
-    template = DocxPackage(config["paths"]["template"])
+    output = DocxPackage(output_path, heading_styles=config["headingStyles"])
+    template = DocxPackage(config["paths"]["template"], heading_styles=config["headingStyles"])
     expected = expected_content_events(config)
     actual = output.body_events()
     event_errors = compare_expected_events(expected, actual, strict_complex_xml=not require_refreshed)
 
     relationship_errors = output.relationship_errors()
+    template_relationship_errors = set(template.relationship_errors())
+    relationship_errors = [
+        error for error in relationship_errors if error not in template_relationship_errors
+    ]
+    expression_errors = output.expression_errors()
     media_count, duplicate_media, duplicate_bytes = output.media_metrics()
     illegal_update = list(output.document.findall(qn("updateFields")))
     settings_update = output.settings.findall(qn("updateFields"))
@@ -780,8 +920,8 @@ def validate(
     report.row_check(name="DOCX ZIP 与全部 XML 可解析", ok=True)
     report.row_check(
         name="Relationship Target 与引用完整",
-        ok=not relationship_errors,
-        detail="；".join(relationship_errors[:10]),
+        ok=not relationship_errors and not expression_errors,
+        detail="；".join((relationship_errors + expression_errors)[:10]),
     )
     report.row_check(name="章节编号、层级与必需资源预检", ok=True, detail="章节条目 {0}".format(len(entries)))
     report.row_check(
@@ -851,7 +991,7 @@ def validate(
         if not baseline_path:
             report.row_check(name="迁移基线已配置", ok=False, detail="config.baseline.file 缺失")
         else:
-            source = DocxPackage(baseline_path)
+            source = DocxPackage(baseline_path, heading_styles=config["headingStyles"])
             baseline_errors = compare_baseline_events(source.body_events(), actual)
             report.row_check(
                 name="原 Word 与重建 Word 业务元素顺序/文本严格一致",

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -18,7 +19,23 @@ from lxml import etree
 from PIL import Image
 
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 环境变量存在但为空（CI/环境文件常见写法）时须回退仓库根，否则 ``""`` 会让
+# ``config/`` 相对当前目录解析，CLI 报「未发现配置」。
+BASE = os.environ.get("DOC_TOOL_TEST_BASE") or REPO_BASE
+
+# --- 统一安全 OOXML 解析入口（薄适配） ---
+# doc_tool/domain/ooxml.py 是全链路安全解析单一事实源（包体量上限/CRC/DTD 禁用/
+# 良构校验）；scripts 侧经此处转发，保持自包含。首次导入时把仓库根加入 sys.path
+# （migration 薄壳本已如此），幂等。
+if REPO_BASE not in sys.path:
+    sys.path.insert(0, REPO_BASE)
+
+from doc_tool.domain.ooxml import (  # noqa: E402
+    OOXMLSecurityError,
+    parse_xml_safe,
+    read_docx_package,
+)
 
 
 class AutomationError(RuntimeError):
@@ -286,8 +303,11 @@ def _validate_markdown(path: str, depth: int, config: Dict, errors: List[str]) -
                     errors.append("{0}:{1} 复杂表格 XML 不存在: {2}".format(path, line_number, table_path))
                 else:
                     try:
-                        etree.parse(table_path)
-                    except Exception as exc:  # lxml exposes several parse exception types
+                        with open(table_path, "rb") as table_file:
+                            # 统一安全解析入口：禁止 DTD/实体、良构失败报告，
+                            # 仓库内不保留第二条可被业务代码直接调用的解析路径。
+                            parse_xml_safe(table_file.read(), os.path.basename(table_path))
+                    except (OOXMLSecurityError, OSError) as exc:
                         errors.append("{0}:{1} 复杂表格 XML 无法解析: {2}".format(path, line_number, exc))
 
         image_ref = parse_image_reference(stripped)

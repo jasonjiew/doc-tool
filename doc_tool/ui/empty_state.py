@@ -34,6 +34,7 @@ class EmptyState(QWidget):
         self._on_open_recent = on_open_recent
         self._buttons: List[QPushButton] = []
         self._recent_buttons: List[QPushButton] = []
+        self._empty_label: Optional[QLabel] = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(48, 56, 48, 40)
@@ -90,10 +91,17 @@ class EmptyState(QWidget):
         self._buttons = [b for b in self._buttons if b not in old_recent]
         for button in old_recent:
             button.deleteLater()
+        # 清除上次的空提示标签：它不在 _recent_buttons 里，不清理会在多次刷新
+        # 时叠加，且出现最近项目后旧空标签仍残留。
+        if self._empty_label is not None:
+            self._empty_label.deleteLater()
+            self._empty_label = None
         if not entries:
-            empty = QLabel("暂无有效最近项目，可从上方新建或打开。", self._recent_frame)
-            empty.setObjectName("statusMuted")
-            self._recent_layout.addWidget(empty)
+            self._empty_label = QLabel(
+                "暂无有效最近项目，可从上方新建或打开。", self._recent_frame
+            )
+            self._empty_label.setObjectName("statusMuted")
+            self._recent_layout.addWidget(self._empty_label)
             return
         for entry in entries[:5]:
             label = entry.document_name or entry.name

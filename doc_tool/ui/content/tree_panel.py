@@ -13,9 +13,10 @@ from __future__ import annotations
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
+import json
 from typing import Callable, Dict, List, Optional
 
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractItemModel, QByteArray, QMimeData, QModelIndex, Qt
 from PySide6.QtGui import QAction, QCursor, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -60,9 +61,11 @@ class ChapterTreeModel(QAbstractItemModel):
     """
 
     _ROOT = ""
+    MIME_TYPE = "application/x-doc-tool-chapter-node"
 
-    def __init__(self, items, parent=None, *, status=None) -> None:
+    def __init__(self, items, parent=None, *, status=None, on_drop=None) -> None:
         super().__init__(parent)
+        self._on_drop = on_drop
         self.set_items(items, status)
 
     def set_items(self, items: List[TreeItem], status: Optional[Dict[str, str]] = None) -> None:
@@ -138,8 +141,51 @@ class ChapterTreeModel(QAbstractItemModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
-            return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return Qt.ItemFlag.ItemIsDropEnabled
+        return (
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+            | Qt.ItemFlag.ItemIsDragEnabled
+            | Qt.ItemFlag.ItemIsDropEnabled
+        )
+
+    def mimeTypes(self) -> List[str]:
+        return [self.MIME_TYPE]
+
+    def mimeData(self, indexes) -> QMimeData:
+        mime = QMimeData()
+        valid = [index for index in indexes if index.isValid()]
+        if valid:
+            payload = json.dumps({"nodeId": str(valid[0].internalPointer())})
+            mime.setData(self.MIME_TYPE, QByteArray(payload.encode("utf-8")))
+        return mime
+
+    def supportedDropActions(self):
+        return Qt.DropAction.MoveAction
+
+    def dropMimeData(self, data, action, row, column, parent) -> bool:
+        if action == Qt.DropAction.IgnoreAction:
+            return True
+        if not data.hasFormat(self.MIME_TYPE) or self._on_drop is None:
+            return False
+        try:
+            payload = json.loads(bytes(data.data(self.MIME_TYPE)).decode("utf-8"))
+            source_node = str(payload["nodeId"])
+        except (KeyError, TypeError, ValueError, UnicodeError):
+            return False
+        parent_id = self._node_id(parent)
+        if parent_id == self._ROOT:
+            return False
+        parent_item = self._by_id.get(parent_id)
+        # Qt 把“放到文件节点上”表示为 parent=该文件、row=-1；文件不能容纳
+        # 子节点，因此解释为插入该文件之前。
+        if parent_item is not None and parent_item.is_file:
+            return bool(
+                self._on_drop(source_node, parent_item.parent_id or self._ROOT, parent_id)
+            )
+        children = self._children.get(parent_id, [])
+        before_node = children[row] if 0 <= row < len(children) else None
+        return bool(self._on_drop(source_node, parent_id, before_node))
 
     # --- 辅助 ---
 
@@ -196,6 +242,17 @@ class _ChapterTreeView(QTreeView):
             return
         super().keyPressEvent(event)
 
+    def set_drag_enabled(self, enabled: bool) -> None:
+        self.setDragEnabled(enabled)
+        self.setAcceptDrops(enabled)
+        self.setDropIndicatorShown(enabled)
+        self.setDragDropMode(
+            QTreeView.DragDropMode.InternalMove
+            if enabled
+            else QTreeView.DragDropMode.NoDragDrop
+        )
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+
 
 class ChapterTree(QWidget):
     """章节树面板。
@@ -213,6 +270,7 @@ class ChapterTree(QWidget):
         on_create_file: Optional[Callable[[str], None]] = None,
         on_delete_file: Optional[Callable[[str], None]] = None,
         on_rename_file: Optional[Callable[[str], None]] = None,
+        on_move_node: Optional[Callable[[str, str, Optional[str]], bool]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
         on_open_external: Optional[Callable[[str], None]] = None,
         on_open_directory: Optional[Callable[[str], None]] = None,
@@ -226,6 +284,7 @@ class ChapterTree(QWidget):
         self._on_create_file = on_create_file
         self._on_delete_file = on_delete_file
         self._on_rename_file = on_rename_file
+        self._on_move_node = on_move_node
         self._on_clear_markers = on_clear_markers
         self._on_open_external = on_open_external
         self._on_open_directory = on_open_directory
@@ -235,7 +294,7 @@ class ChapterTree(QWidget):
         self._items: List[TreeItem] = []
         self._visible_items: List[TreeItem] = []
         self._status_map: Dict[str, str] = {}
-        self._model = ChapterTreeModel([], self)
+        self._model = ChapterTreeModel([], self, on_drop=self._handle_drop)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -277,6 +336,7 @@ class ChapterTree(QWidget):
         self._tree.setHeaderHidden(True)
         self._tree.setSelectionMode(QTreeView.SelectionMode.SingleSelection)
         self._tree.setEditTriggers(QTreeView.EditTrigger.NoEditTriggers)
+        self._tree.set_drag_enabled(self._writable)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self._tree, 1)
@@ -314,6 +374,7 @@ class ChapterTree(QWidget):
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
         self._clear_btn.setVisible(writable)
+        self._tree.set_drag_enabled(writable)
 
     def is_writable(self) -> bool:
         return self._writable
@@ -356,6 +417,22 @@ class ChapterTree(QWidget):
     def set_current(self, rel_path: Optional[str]) -> None:
         """记录当前打开的文件，供选中回调去重。"""
         self._current = rel_path
+
+    def expanded_node_ids(self) -> List[str]:
+        """返回当前展开目录 id，供批量移动刷新后恢复。"""
+        return [
+            item.node_id
+            for item in self._visible_items
+            if not item.is_file
+            and self._index_for(item.node_id).isValid()
+            and self._tree.isExpanded(self._index_for(item.node_id))
+        ]
+
+    def restore_expanded(self, node_ids: List[str]) -> None:
+        for node_id in node_ids:
+            index = self._index_for(node_id)
+            if index.isValid():
+                self._tree.expand(index)
 
     # --- 定位联动 ---
 
@@ -406,6 +483,13 @@ class ChapterTree(QWidget):
     def _on_refresh_click(self) -> None:
         if self._on_refresh is not None:
             self._on_refresh()
+
+    def _handle_drop(
+        self, source_node: str, target_parent: str, before_node: Optional[str]
+    ) -> bool:
+        if not self._writable or self._on_move_node is None:
+            return False
+        return bool(self._on_move_node(source_node, target_parent, before_node))
 
     def _handle_tree_key(self, key: int) -> bool:
         """Enter 打开 / F2 重命名 / Del 删除（仅文件节点；写操作需可写）。"""

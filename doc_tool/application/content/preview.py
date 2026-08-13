@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import html
+import base64
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -38,6 +39,10 @@ _EMPHASIS_INLINE_RE = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
 _CODE_INLINE_RE = re.compile(r"`([^`\n]+)`")
 _UNORDERED_LIST_RE = re.compile(r"^[-*+]\s+(.*)$")
 _ORDERED_LIST_RE = re.compile(r"^\d+[.)]\s+(.*)$")
+# 图片尺寸后缀的外部形式：![alt](path) =WxH。
+_IMAGE_OUTER_SIZE_SUFFIX_RE = re.compile(
+    r"(!\[[^\]]*\]\([^\s)]+\))\s+=\d+x\d+"
+)
 
 
 @dataclass
@@ -130,19 +135,32 @@ def normalize_markdown_for_preview(md_text: str) -> str:
     )
 
 
-def render_markdown_html(md_text: str) -> str:
+def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
     """把项目 Markdown 转为 Qt 可稳定渲染的受控 HTML。
 
     Qt 原生 Markdown 解析器在长文档包含大量表格时会丢失后半部分内容。这里
     覆盖本项目使用的标题、段落、列表、表格、图片、链接和常见行内格式，避免该
     限制；正文先 HTML 转义，Markdown 文件中的任意原始 HTML 都不会执行。
+
+    ``use_cli`` 默认 False：实时预览用内置渲染器（mermaid 不启动 mmdc 子进程，
+    避免 UI 线程被最长 30s 的同步 CLI 渲染冻结）。导出等后台路径可传 True
+    以使用 mermaid-cli 的高质量渲染。
+
+    每个标题/段落/图片块把文本内容包进 ``<a name="line-N" href="#line-N">``
+    锚点：预览点击块时 ``anchorClicked`` 携带 ``#line-N``，编辑器据此定位
+    源行（预览点击→编辑）。锚点编号对应原始 Markdown 源行号（构建占位符
+    行被跳过但仍累计行号）。列表/表格/分隔线不做内容包裹（保持结构稳定），
+    仅在块首挂 ``name``/``id`` 锚点供 ``scrollToAnchor`` 使用。
     """
     parts: List[str] = []
     table_rows: List[List[str]] = []
     list_items: List[str] = []
     list_tag: Optional[str] = None
+    list_line: Optional[int] = None
     code_lines: List[str] = []
     in_code = False
+    code_language = ""
+    code_start_line = 0
 
     def inline(text: str) -> str:
         escaped = html.escape(text, quote=True).replace("&lt;br&gt;", "<br/>")
@@ -182,26 +200,72 @@ def render_markdown_html(md_text: str) -> str:
         table_rows = []
 
     def flush_list() -> None:
-        nonlocal list_items, list_tag
+        nonlocal list_items, list_tag, list_line
         if list_tag is not None:
-            parts.append("<{0}>{1}</{0}>".format(list_tag, "".join(list_items)))
+            anchor = (
+                '<a name="line-{0}"></a>'.format(list_line)
+                if list_line is not None
+                else ""
+            )
+            parts.append(
+                "{0}<{1}>{2}</{1}>".format(
+                    anchor, list_tag, "".join(list_items)
+                )
+            )
         list_items = []
         list_tag = None
+        list_line = None
 
     def flush_code() -> None:
-        nonlocal code_lines
+        nonlocal code_lines, code_language, code_start_line
         if code_lines:
-            parts.append("<pre>{0}</pre>".format(html.escape("\n".join(code_lines))))
-        code_lines = []
+            source = "\n".join(code_lines)
+            if code_language == "mermaid":
+                from doc_tool.application.content.mermaid import render
 
-    for raw_line in normalize_markdown_for_preview(md_text).splitlines():
-        stripped = raw_line.strip()
+                result = render(source, use_cli=use_cli)
+                if result.ok and result.png:
+                    encoded = base64.b64encode(result.png).decode("ascii")
+                    parts.append(
+                        '<p><a name="line-{0}" href="#line-{0}">'
+                        '<img src="data:image/png;base64,{1}" alt="Mermaid 图"/></a></p>'.format(
+                            code_start_line, encoded
+                        )
+                    )
+                elif result.svg and result.png is None:
+                    # 有 SVG 但无 PNG（QtSvg 后端缺失或 CLI 栅格化失败）时
+                    # 保守回退源码代码块，不影响普通预览。
+                    parts.append("<pre>{0}</pre>".format(html.escape(source)))
+                else:
+                    parts.append(
+                        '<p><a name="line-{0}" href="#line-{0}"><b>Mermaid 渲染失败：</b> {1}</a></p>'.format(
+                            code_start_line, html.escape(result.error or "未知原因")
+                        )
+                    )
+            else:
+                parts.append("<pre>{0}</pre>".format(html.escape(source)))
+        code_lines = []
+        code_language = ""
+        code_start_line = 0
+
+    for source_line, raw_line in enumerate(md_text.splitlines(), start=1):
+        # 构建占位符行跳过（不渲染），但源行号继续累计。
+        if _EMPTY_PAR_RE.match(raw_line):
+            continue
+        # 移除项目图片尺寸后缀（内外部形式），使 Qt 图片渲染不残留 =WxH。
+        processed = _IMAGE_SIZE_SUFFIX_RE.sub(r"\1\2", raw_line)
+        processed = _IMAGE_OUTER_SIZE_SUFFIX_RE.sub(r"\1", processed)
+        stripped = processed.strip()
         if stripped.startswith("```"):
             flush_table()
             flush_list()
             if in_code:
                 flush_code()
-            in_code = not in_code
+                in_code = False
+            else:
+                in_code = True
+                code_language = stripped[3:].strip().lower()
+                code_start_line = source_line
             continue
         if in_code:
             code_lines.append(raw_line)
@@ -221,7 +285,11 @@ def render_markdown_html(md_text: str) -> str:
         if heading is not None:
             flush_list()
             level = len(heading.group(1))
-            parts.append("<h{0}>{1}</h{0}>".format(level, inline(heading.group(2))))
+            parts.append(
+                '<h{0}><a name="line-{1}" href="#line-{1}">{2}</a></h{0}>'.format(
+                    level, source_line, inline(heading.group(2))
+                )
+            )
             continue
 
         unordered = _UNORDERED_LIST_RE.match(stripped)
@@ -232,16 +300,26 @@ def render_markdown_html(md_text: str) -> str:
             if list_tag is not None and list_tag != tag:
                 flush_list()
             list_tag = tag
+            if list_line is None:
+                list_line = source_line
             list_items.append("<li>{0}</li>".format(inline(item)))
             continue
 
         flush_list()
         if stripped in ("---", "***", "___"):
-            parts.append("<hr/>")
+            parts.append('<hr id="line-{0}"/>'.format(source_line))
         elif stripped.startswith("> "):
-            parts.append("<blockquote>{0}</blockquote>".format(inline(stripped[2:])))
+            parts.append(
+                '<blockquote><a name="line-{0}" href="#line-{0}">{1}</a></blockquote>'.format(
+                    source_line, inline(stripped[2:])
+                )
+            )
         else:
-            parts.append("<p>{0}</p>".format(inline(stripped)))
+            parts.append(
+                '<p><a name="line-{0}" href="#line-{0}">{1}</a></p>'.format(
+                    source_line, inline(stripped)
+                )
+            )
 
     flush_table()
     flush_list()

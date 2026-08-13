@@ -186,7 +186,7 @@ def _image_paragraph(rid="rId1", cx=190500, cy=190500):
     ).format(wp=WP_NS, a=A_NS, pic=PIC_NS, rid=rid, cx=cx, cy=cy)
 
 
-def _build_body_xml(with_cover=True, with_image=True, with_tables=True):
+def _build_body_xml(with_cover=True, with_image=True, with_tables=True, with_comment=False):
     """构造正文：封面 + H1/H2/H3 树 + 父正文 + 图片 + 普通/复杂表格。"""
     parts = []
     if with_cover:
@@ -196,6 +196,12 @@ def _build_body_xml(with_cover=True, with_image=True, with_tables=True):
     parts.append(_body_p("本章父正文，应写入 _index.md 且位于子章节之前。"))
     parts.append(_p("2", "目的"))
     parts.append(_body_p("说明项目目的。"))
+    if with_comment:
+        # 批注特性：正文段落含 commentRangeStart（保真扫描应识别）。
+        parts.append(
+            '<w:p><w:commentRangeStart w:id="1"/><w:comment w:id="1"/>'
+            '<w:r><w:t>有批注的正文</w:t></w:r></w:p>'
+        )
     if with_image:
         parts.append(_image_paragraph())
     if with_tables:
@@ -242,9 +248,15 @@ def write_synthetic_docx(
     with_numbering=True,
     localized_styles=False,
     include_character_heading_styles=False,
+    with_comment=False,
 ):
     """写入结构完整的合成 DOCX，可往返通过导入与试构建。"""
-    body = _build_body_xml(with_cover=with_cover, with_image=with_image, with_tables=with_tables)
+    body = _build_body_xml(
+        with_cover=with_cover,
+        with_image=with_image,
+        with_tables=with_tables,
+        with_comment=with_comment,
+    )
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
         zf.writestr("word/document.xml", _document_xml(body))
@@ -573,6 +585,36 @@ class ImportEndToEndTests(unittest.TestCase):
         loaded = ProjectManifest.load(copy_to)
         self.assertEqual(loaded.documentNo, "KF-TEST-001")
 
+    def test_manifest_heading_styles_float_key_rejected(self):
+        """headingStyles 的浮点键（1.5）必须被拒绝，而非静默截断成级别 1。"""
+        from doc_tool.domain.errors import ProjectManifestError
+        from doc_tool.domain.manifest import ProjectManifest
+
+        base = {
+            "schemaVersion": 1,
+            "documentType": "requirement",
+            "documentNo": "KF-TEST-001",
+            "documentName": "测试",
+            "documentVersion": "1.0",
+            "sourceSha256": "",
+            "paths": {
+                "sourceDocx": "original/source.docx",
+                "templateDocx": "template/template.docx",
+                "contentRoot": "content/requirement",
+                "assetRoot": "assets/requirement",
+                "tableRoot": "assets/requirement/tables",
+            },
+        }
+        with self.assertRaises(ProjectManifestError):
+            ProjectManifest.from_dict(dict(base, headingStyles={"1.5": "Heading1"}))
+        with self.assertRaises(ProjectManifestError):
+            ProjectManifest.from_dict(dict(base, headingStyles={0: "Heading1"}))
+        # 合法字符串/整数键仍可加载，级别不丢失。
+        manifest = ProjectManifest.from_dict(
+            dict(base, headingStyles={"1": "Heading1", "2": "Heading2"})
+        )
+        self.assertEqual(manifest.headingStyles, {1: "Heading1", 2: "Heading2"})
+
     def test_atomic_publish_no_partial_project_on_failure(self):
         """任务 4.5：失败时不会留下半成品项目目录。"""
         src = os.path.join(self._tmp, "noface2.docx")
@@ -585,6 +627,114 @@ class ImportEndToEndTests(unittest.TestCase):
         result = import_first_time(request)
         self.assertFalse(result.success)
         self.assertFalse(os.path.exists(target), "失败时不应创建半成品项目目录")
+
+
+# --- 2.5/4.5 往返差异门禁 ---
+
+
+def _blocking_report():
+    from doc_tool.adapters.roundtrip import RoundtripIssue, RoundtripReport, SEVERITY_BLOCK
+
+    return RoundtripReport(
+        3, 2, (RoundtripIssue(SEVERITY_BLOCK, "正文段落丢失：源 P=正文", "#1"),)
+    )
+
+
+def _warn_report():
+    from doc_tool.adapters.roundtrip import RoundtripIssue, RoundtripReport, SEVERITY_WARN
+
+    return RoundtripReport(
+        2, 2, (RoundtripIssue(SEVERITY_WARN, "表格表示差异：源 单元格A，重建 单元格B", "#0"),)
+    )
+
+
+def _clean_report():
+    from doc_tool.adapters.roundtrip import RoundtripReport
+
+    return RoundtripReport(2, 2, ())
+
+
+class RoundtripGateTests(unittest.TestCase):
+    """任务 2.5/4.5：BLOCK 阻止发布且暂存清理、仅 WARN 放行、严格开关、诊断日志摘要。"""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp(prefix="doc-roundtrip-gate-")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _import(self, report, *, require_exact=False, with_comment=False):
+        src = os.path.join(self._tmp, "gate.docx")
+        write_synthetic_docx(src, with_comment=with_comment)
+        target = os.path.join(self._tmp, "门禁项目")
+        request = ImportRequest(
+            source_docx=Path(src),
+            target_project_root=Path(target),
+            document_type="requirement",
+            document_no="KF-GATE",
+            document_name="门禁",
+            document_version="1.0",
+            require_exact_roundtrip=require_exact,
+        )
+        from unittest import mock
+
+        with mock.patch(
+            "doc_tool.application.import_project._run_roundtrip_check", return_value=report
+        ):
+            result = import_first_time(request)
+        return src, target, result
+
+    def test_block_diff_blocks_publish_and_cleans_staging(self):
+        src, target, result = self._import(_blocking_report())
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E2004")
+        self.assertFalse(os.path.exists(target), "BLOCK 差异时不得发布项目")
+        staging = [d for d in os.listdir(self._tmp) if d.startswith(".门禁项目.import-staging")]
+        self.assertEqual(staging, [], "BLOCK 差异后暂存目录应被清理")
+        roundtrip_events = [e for e in result.events if e.stage == "roundtrip_check"]
+        self.assertEqual(roundtrip_events[-1].status, "failed")
+        self.assertIn("BLOCK", roundtrip_events[-1].detail)
+
+    def test_warn_diff_allowed_by_default(self):
+        src, target, result = self._import(_warn_report())
+        self.assertTrue(result.success, "仅 WARN 差异默认放行")
+        self.assertTrue(os.path.isdir(target))
+        roundtrip_events = [e for e in result.events if e.stage == "roundtrip_check"]
+        self.assertEqual(roundtrip_events[-1].status, "succeeded")
+        self.assertEqual(roundtrip_events[-1].metrics.get("warn"), 1)
+
+    def test_require_exact_roundtrip_blocks_warn(self):
+        src, target, result = self._import(_warn_report(), require_exact=True)
+        self.assertFalse(result.success, "严格往返要求下 WARN 也应阻止")
+        self.assertEqual(result.error_code, "E2004")
+        self.assertFalse(os.path.exists(target))
+
+    def test_diagnostic_log_contains_fidelity_and_roundtrip_summary(self):
+        src, target, result = self._import(_blocking_report(), with_comment=True)
+        self.assertFalse(result.success)
+        logs = [f for f in os.listdir(self._tmp) if f.startswith(".门禁项目.import-failed")]
+        self.assertEqual(len(logs), 1, "失败应写入诊断日志")
+        import json
+        log_data = json.loads(Path(self._tmp, logs[0]).read_text(encoding="utf-8"))
+        # 预检阶段成功事件含保真扫描摘要（含批注）
+        preflight = [e for e in log_data["events"]
+                     if e["stage"] == "preflight" and e["status"] == "succeeded"][-1]
+        self.assertIn("批注", preflight["metrics"]["fidelity"])
+        # 往返阶段 failed 且含差异摘要
+        roundtrip = [e for e in log_data["events"] if e["stage"] == "roundtrip_check"][-1]
+        self.assertEqual(roundtrip["status"], "failed")
+        self.assertIn("BLOCK", roundtrip["detail"])
+
+    def test_success_persists_fidelity_and_roundtrip_reports(self):
+        src, target, result = self._import(_clean_report(), with_comment=True)
+        self.assertTrue(result.success)
+        self.assertTrue(os.path.isfile(os.path.join(target, "logs", "fidelity.md")),
+                        "成功项目应保存保真报告")
+        self.assertTrue(os.path.isfile(os.path.join(target, "logs", "roundtrip.md")),
+                        "成功项目应保存往返差异摘要")
+        text = Path(target, "logs", "fidelity.md").read_text(encoding="utf-8")
+        self.assertIn("批注", text)
 
 
 if __name__ == "__main__":
