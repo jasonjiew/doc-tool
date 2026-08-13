@@ -109,6 +109,20 @@ generate-sbom:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
 
+# 公共发布门禁：净化源码导出 + 品牌/内网/凭据/OOXML 内容扫描（任务 9.1/8.7）。
+validate-public-source:
+  stage: test
+  tags:
+    - windows
+  script:
+    - |
+      $ErrorActionPreference = "Stop"
+      python packaging/export_public_source.py --output "$env:TEMP\doc-public-export-$env:CI_PIPELINE_ID" --scan
+      if ($LASTEXITCODE -ne 0) { throw "净化公开源码导出/扫描失败" }
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
 # --- 阶段 3：PyInstaller 构建 ---
 build-onedir:
   stage: build
@@ -139,6 +153,10 @@ package-installer:
       $ErrorActionPreference = "Stop"
       python packaging/scan_leaks.py --strict
       if ($LASTEXITCODE -ne 0) { throw "生产文档泄漏/允许清单扫描失败" }
+
+      # 公共正式发布授权门禁（任务 9.3）：未决决策阻断 tag 正式发布。
+      python packaging/release_gate.py --public
+      if ($LASTEXITCODE -ne 0) { throw "公共发布授权门禁未通过，仅允许内部测试产物" }
 
       $hasPfx = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PFX)
       $hasPassword = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PASSWORD)

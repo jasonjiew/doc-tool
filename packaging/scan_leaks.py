@@ -79,6 +79,24 @@ def _is_rfc1918_ip(text: str) -> bool:
 
 _IP_TOKEN_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
+# 常见凭据模式（任务 9.1）：云密钥、私钥、令牌、口令赋值。
+_CREDENTIAL_PATTERNS = [
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AWS Access Key"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "私钥"),
+    (re.compile(r"\bghp_[A-Za-z0-9]{36}\b"), "GitHub Token"),
+    (re.compile(r"(?i)\bapi[_-]?key\s*[:=]\s*[\"']?[A-Za-z0-9_\-]{16,}"), "API Key"),
+    (re.compile(r"(?i)\b(?:password|passwd|pwd|secret|token)\s*[:=]\s*\S{8,}"), "口令/密钥赋值"),
+]
+
+
+def scan_credentials(text: str, source: str) -> List[str]:
+    """扫描文本中的常见凭据模式。"""
+    hits: List[str] = []
+    for pattern, label in _CREDENTIAL_PATTERNS:
+        if pattern.search(text):
+            hits.append("{0}: {1} 模式".format(source, label))
+    return hits
+
 
 def scan_text_for_terms(text: str, categories: Dict[str, List[str]], source: str) -> List[str]:
     """扫描文本中的禁止词条（品牌/编号/产品/域名/内网地址）。
@@ -272,6 +290,7 @@ def scan_source_terms(root: Path, categories: Dict[str, List[str]]) -> List[str]
             except OSError:
                 continue
             leaks.extend(scan_text_for_terms(text, categories, rel))
+            leaks.extend(scan_credentials(text, rel))
     return leaks
 
 
@@ -345,6 +364,14 @@ def main() -> int:
         all_leaks.extend(scan_forbidden_files(source_root))
     else:
         print("跳过源码词表扫描（未指定 --source-root）")
+
+    # 2b. 扫描安装器/Release 输出目录（packaging/Output/）
+    release_dir = HERE / "Output"
+    if release_dir.is_dir():
+        print("扫描 Release 输出: {0}".format(release_dir))
+        all_leaks.extend(scan_source_terms(release_dir, vocab))
+        all_leaks.extend(scan_forbidden_dirs(release_dir))
+        all_leaks.extend(scan_forbidden_files(release_dir))
 
     # 3. 扫描 Git 已跟踪文件（内部仓库密钥）
     print("扫描 Git 已跟踪文件: {0}".format(REPO_ROOT))
