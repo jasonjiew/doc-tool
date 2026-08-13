@@ -268,6 +268,8 @@ class ContentWorkspace(QWidget):
         search = SearchPanel(
             SearchService(self._index),
             on_open=self._open_and_locate,
+            # 通用单项目不展示类型筛选；仅旧版多类型布局保留兼容过滤（任务 6.2）。
+            show_type_filter=len(self._index.document_types) > 1,
         )
         self._panels.addTab(search, "搜索")
         self._remove_placeholder("搜索")
@@ -277,6 +279,8 @@ class ContentWorkspace(QWidget):
             self._writer,
             on_applied=self._after_write,
             writable=self._writable,
+            # 通用单项目不展示类型筛选；仅旧版多类型布局保留兼容过滤（任务 6.3）。
+            show_type_filter=len(self._index.document_types) > 1,
         )
         self._panels.addTab(replace, "替换")
         self._remove_placeholder("替换")
@@ -311,6 +315,8 @@ class ContentWorkspace(QWidget):
         issues = IssuesPanel(
             on_open=self.open_file,
             on_status=self._on_status,
+            # 通用单项目 documentType 固定为 general，不作为主要筛选维度（任务 6.3）。
+            show_document_type=len(self._index.document_types) > 1,
         )
         self._panels.addTab(issues, "问题")
         self._remove_placeholder("问题")

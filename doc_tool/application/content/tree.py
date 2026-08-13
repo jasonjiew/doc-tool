@@ -14,8 +14,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 # 文档类型中文标签（与主窗口 DOC_TYPE_LABELS 保持一致的缺省映射）。
 DEFAULT_TYPE_LABELS = {
     "general": "通用大文档",
-    "requirement": "需求文档",
-    "design": "详细设计文档",
+    "requirement": "需求文档（旧版）",
+    "design": "详细设计文档（旧版）",
 }
 
 _NATURAL_PART_RE = re.compile(r"(\d+)")

@@ -30,11 +30,15 @@ class IssuesPanel(QWidget):
         *,
         on_open: Optional[Callable[[str, Optional[int]], None]] = None,
         on_status: Optional[Callable[[str], None]] = None,
+        show_document_type: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._on_open = on_open
         self._on_status = on_status
+        # 通用单项目 documentType 固定为 general，不再作为主要筛选维度；
+        # 仅旧版多类型布局保留兼容过滤（任务 6.3）。
+        self._show_document_type = show_document_type
         self._issues: List[IssueRecord] = []
         # 初始无数据（尚未运行任何检查）；首个任务终态/lint 结果到达前
         # 保持“无当前项目数据”状态，避免误报“当前项目未发现问题”。
@@ -45,6 +49,7 @@ class IssuesPanel(QWidget):
         filters = QHBoxLayout()
         self._type = self._new_filter("类型", filters)
         self._document_type = self._new_filter("文档类型", filters)
+        self._document_type.setVisible(self._show_document_type)
         self._severity = self._new_filter("严重度", filters)
         self._file = self._new_filter("文件", filters)
         filters.addStretch(1)
@@ -56,9 +61,11 @@ class IssuesPanel(QWidget):
 
         self._tree = QTreeWidget(self)
         self._tree.setColumnCount(7)
-        self._tree.setHeaderLabels(
-            ["严重度", "类型", "文档类型", "文件", "行", "消息", "错误码"]
-        )
+        headers = ["严重度", "类型", "文档类型", "文件", "行", "消息", "错误码"]
+        if not self._show_document_type:
+            headers = [h for h in headers if h != "文档类型"]
+            self._tree.setColumnCount(len(headers))
+        self._tree.setHeaderLabels(headers)
         self._tree.setRootIsDecorated(False)
         self._tree.setUniformRowHeights(True)
         self._tree.setColumnWidth(0, 72)
@@ -128,15 +135,17 @@ class IssuesPanel(QWidget):
         )
         self._tree.clear()
         for issue in visible:
-            item = QTreeWidgetItem([
+            columns = [
                 issue.severity,
                 issue.issue_type,
-                issue.document_type,
                 issue.rel_path,
                 "" if issue.line_no is None else str(issue.line_no),
                 issue.message,
                 issue.error_code or "",
-            ])
+            ]
+            if self._show_document_type:
+                columns.insert(2, issue.document_type)
+            item = QTreeWidgetItem(columns)
             item.setData(0, Qt.ItemDataRole.UserRole, issue)
             item.setToolTip(5, issue.suggested_action)
             self._tree.addTopLevelItem(item)

@@ -36,11 +36,11 @@ from doc_tool.application.content.replace import (
     diff_line,
 )
 
-# 文档类型过滤下拉（与搜索面板一致）。
+# 文档类型过滤下拉（与搜索面板一致）；仅旧版多类型布局展示。
 _TYPE_FILTERS = (
     ("全部", None),
-    ("需求文档", "requirement"),
-    ("详细设计文档", "design"),
+    ("需求文档（旧版）", "requirement"),
+    ("详细设计文档（旧版）", "design"),
     ("通用大文档", "general"),
 )
 
@@ -59,6 +59,7 @@ class ReplacePanel(QWidget):
         *,
         on_applied: Optional[Callable[[], None]] = None,
         writable: bool = True,
+        show_type_filter: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -66,6 +67,8 @@ class ReplacePanel(QWidget):
         self._writer = writer
         self._on_applied = on_applied
         self._writable = writable
+        # 通用单项目不展示需求/设计类型筛选；仅旧版多类型布局保留兼容过滤。
+        self._show_type_filter = show_type_filter
         self._matches: List[ReplaceMatch] = []
         self._preview: Optional[ReplacePreview] = None
         # 「回滚本次替换」的起点：本次会话开始前的清单条目数，避免把同会话
@@ -111,6 +114,7 @@ class ReplacePanel(QWidget):
         row2.addWidget(self._word_cb)
         self._type_box = QComboBox(inputs)
         self._type_box.addItems([label for label, _ in _TYPE_FILTERS])
+        self._type_box.setVisible(self._show_type_filter)
         row2.addWidget(self._type_box)
         row2.addStretch(1)
         self._find_btn = QPushButton("查找全部", inputs)
@@ -367,6 +371,9 @@ class ReplacePanel(QWidget):
         self._clear_btn.setEnabled(has_matches)
 
     def _selected_types(self) -> Optional[List[str]]:
+        # 通用单项目默认替换当前项目全部内容，不应用类型过滤。
+        if not self._show_type_filter:
+            return None
         label = self._type_box.currentText()
         value = next((v for l, v in _TYPE_FILTERS if l == label), None)
         return [value] if value else None

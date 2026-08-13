@@ -32,10 +32,11 @@ from doc_tool.application.content.search import (
 )
 
 # 文档类型过滤下拉：显示名 -> 过滤值。
+# 仅旧版多类型布局（同时含 requirement/design）时展示；通用单项目隐藏。
 _TYPE_FILTERS = (
     ("全部", None),
-    ("需求文档", "requirement"),
-    ("详细设计文档", "design"),
+    ("需求文档（旧版）", "requirement"),
+    ("详细设计文档（旧版）", "design"),
     ("通用大文档", "general"),
 )
 
@@ -54,11 +55,14 @@ class SearchPanel(QWidget):
         service: SearchService,
         *,
         on_open: Optional[Callable[[str, int], None]] = None,
+        show_type_filter: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._service = service
         self._on_open = on_open
+        # 通用单项目不展示需求/设计类型筛选；仅旧版多类型布局保留兼容过滤。
+        self._show_type_filter = show_type_filter
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.timeout.connect(self.search_now)
@@ -103,6 +107,8 @@ class SearchPanel(QWidget):
         self._type_box = QComboBox(controls)
         self._type_box.addItems([label for label, _ in _TYPE_FILTERS])
         self._type_box.currentIndexChanged.connect(lambda _i: self.search_now())
+        # 通用单项目不显示类型筛选；旧版多类型布局显示。
+        self._type_box.setVisible(self._show_type_filter)
         layout.addWidget(self._type_box)
 
         self._regex_cb = QCheckBox("正则", controls)
@@ -211,6 +217,16 @@ class SearchPanel(QWidget):
         self._render(result)
 
     def _current_options(self) -> SearchOptions:
+        # 通用单项目默认搜索全部内容，不应用类型过滤。
+        if not self._show_type_filter:
+            return SearchOptions(
+                query=self._query_entry.text(),
+                regex=self._regex_cb.isChecked(),
+                case_sensitive=self._case_cb.isChecked(),
+                whole_word=self._word_cb.isChecked(),
+                document_types=None,
+                limit=self._limit,
+            )
         selected_label = self._type_box.currentText()
         doc_types = next(
             (value for label, value in _TYPE_FILTERS if label == selected_label),

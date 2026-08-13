@@ -655,13 +655,13 @@ class ChapterTreeModelTests(unittest.TestCase):
         return build_tree(self.FILES)
 
     def test_grouped_by_document_type(self):
-        """顶层按文档类型分组，使用中文标签。"""
+        """顶层按文档类型分组，使用兼容标签。"""
         items = self._build()
         type_ids = [i.node_id for i in items if i.parent_id is None]
         self.assertEqual(type_ids, ["design", "requirement"])
         by_id = {i.node_id: i for i in items}
-        self.assertEqual(by_id["design"].text, "详细设计文档")
-        self.assertEqual(by_id["requirement"].text, "需求文档")
+        self.assertEqual(by_id["design"].text, "详细设计文档（旧版）")
+        self.assertEqual(by_id["requirement"].text, "需求文档（旧版）")
 
     def test_directory_hierarchy_nested(self):
         """章节目录按层级嵌套在类型节点下。"""
@@ -853,7 +853,7 @@ class ChapterTreeModelTests(unittest.TestCase):
         req_row = next(
             row
             for row in range(model.rowCount())
-            if model.data(model.index(row, 0)) == "需求文档"
+            if model.data(model.index(row, 0)) == "需求文档（旧版）"
         )
         req_idx = model.index(req_row, 0)
         chapters = [

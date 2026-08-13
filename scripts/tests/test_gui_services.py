@@ -75,6 +75,92 @@ class IssuesPanelTests(unittest.TestCase):
         self.assertEqual(panel._state.text(), "无当前项目数据")
 
 
+class NeutralWorkbenchBehaviorTests(unittest.TestCase):
+    """任务 6.1-6.3/6.6：通用单项目与旧版多类型布局的树/搜索/问题中性化。"""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_general_single_type_tree_has_no_type_root(self):
+        """通用单项目章节树直接展示章节节点，无「通用大文档」类型根。"""
+        from doc_tool.application.content.tree import build_tree
+
+        items = build_tree(["第1章 引言/1.1 目的.md", "第2章 功能/2.1 概述.md"])
+        roots = [i for i in items if i.parent_id is None]
+        texts = [i.text for i in roots]
+        self.assertIn("第1章 引言", texts)
+        self.assertIn("第2章 功能", texts)
+        self.assertNotIn("通用大文档", texts)
+        self.assertNotIn("general", [i.node_id for i in roots])
+
+    def test_legacy_multi_type_tree_keeps_compat_roots(self):
+        """旧版多类型布局保留需求/设计兼容类型根，使用中性兼容标签。"""
+        from doc_tool.application.content.tree import build_tree
+
+        items = build_tree([
+            "requirement/第1章/1.1 需求.md",
+            "design/第2章/2.1 设计.md",
+        ])
+        roots = {i.node_id: i.text for i in items if i.parent_id is None}
+        self.assertEqual(roots["requirement"], "需求文档（旧版）")
+        self.assertEqual(roots["design"], "详细设计文档（旧版）")
+
+    def test_search_panel_hides_type_filter_for_single_type(self):
+        """通用单项目搜索面板不显示类型筛选，默认搜索全部内容。"""
+        from doc_tool.application.content.search import SearchResult
+        from doc_tool.ui.content.search_panel import SearchPanel
+
+        class _FakeService:
+            def search(self, options, cancel_token=None):
+                return SearchResult(query=options.query, total=0, hits=[], file_count=0)
+
+        panel = SearchPanel(_FakeService(), show_type_filter=False)
+        self.assertFalse(panel._type_box.isVisibleTo(panel))
+        options = panel._current_options()
+        self.assertIsNone(options.document_types)
+
+    def test_search_panel_keeps_type_filter_for_multi_type(self):
+        from doc_tool.application.content.search import SearchResult
+        from doc_tool.ui.content.search_panel import SearchPanel
+
+        class _FakeService:
+            def search(self, options, cancel_token=None):
+                return SearchResult(query=options.query, total=0, hits=[], file_count=0)
+
+        panel = SearchPanel(_FakeService(), show_type_filter=True)
+        self.assertTrue(panel._type_box.isVisibleTo(panel))
+        panel._type_box.setCurrentIndex(1)  # 需求文档（旧版）
+        self.assertEqual(panel._current_options().document_types, ["requirement"])
+
+    def test_issues_panel_hides_document_type_filter_for_single_type(self):
+        """通用单项目问题中心隐藏「文档类型」筛选与列。"""
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+
+        panel = IssuesPanel(show_document_type=False)
+        self.assertFalse(panel._document_type.isVisibleTo(panel))
+        headers = [panel._tree.headerItem().text(i) for i in range(panel._tree.columnCount())]
+        self.assertNotIn("文档类型", headers)
+
+        # 填充问题时行数据不含文档类型列
+        from doc_tool.application.issues import IssueRecord
+        panel.set_issues([
+            IssueRecord("pipeline", "build", "general", "error", "a.md", 2, "E2001", "失败", "建议", "t1"),
+        ])
+        item = panel._tree.topLevelItem(0)
+        self.assertEqual(item.text(0), "error")
+        self.assertEqual(item.text(1), "build")
+        self.assertEqual(item.text(2), "a.md")
+
+    def test_issues_panel_keeps_document_type_filter_for_multi_type(self):
+        from doc_tool.ui.content.issues_panel import IssuesPanel
+
+        panel = IssuesPanel(show_document_type=True)
+        self.assertTrue(panel._document_type.isVisibleTo(panel))
+
+
 class TaskRunnerTests(unittest.TestCase):
     """任务 6.8：TaskRunner 后台执行、事件推送与取消。"""
 
