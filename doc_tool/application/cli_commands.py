@@ -144,6 +144,27 @@ def import_command(args) -> CommandResult:
     return CommandResult("import", [item])
 
 
+def migrate_command(args) -> CommandResult:
+    """把旧版专用项目迁移为通用项目（复制到新目录 + 验证后原子发布）。"""
+    from doc_tool.application.migrate_project import migrate_legacy_project
+
+    source = str(Path(args.project).resolve())
+    target = str((Path(args.target)).resolve())
+    result = migrate_legacy_project(source, target)
+    item = ProjectCommandResult(
+        project=source,
+        success=result.success,
+        error_code=result.error_code or "",
+        suggested_action="请查看迁移报告并修正源项目内容后重试。" if not result.success else "",
+        data={
+            "target": str(result.target),
+            "report": str(result.report_path) if result.report_path else None,
+            "events": [to_json_value(event) for event in result.events],
+        },
+    )
+    return CommandResult("migrate", [item])
+
+
 def validate_command(projects: Iterable[str]) -> CommandResult:
     def operation(root: Path) -> ProjectCommandResult:
         from doc_tool.adapters.kernel import validate_with_project

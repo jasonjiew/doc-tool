@@ -72,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="读取一个或多个项目状态")
     _add_projects(status)
     _add_output(status)
+
+    migrate = sub.add_parser("migrate", help="把旧版专用项目迁移为通用大文档项目")
+    migrate.add_argument("--project", required=True, help="源旧版项目目录")
+    migrate.add_argument("--target", required=True, help="目标通用项目目录（必须不存在）")
+    _add_output(migrate)
     return parser
 
 
@@ -120,8 +125,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     from doc_tool.application.cli_commands import (
-        import_command, lint_command, preflight_command, search_command,
-        status_command, validate_command,
+        import_command, lint_command, migrate_command, preflight_command,
+        search_command, status_command, validate_command,
     )
     # 命令执行期间统一把 stdout 重定向到 stderr：validate/import 等会把进度和
     # 校验报告打印到 stdout（如 ``[requirement] 校验报告: ...``），若只在机器
@@ -139,6 +144,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = search_command(args.project, args.query, args)
         elif args.command == "status":
             result = status_command(args.project)
+        elif args.command == "migrate":
+            result = migrate_command(args)
         else:
             parser.error("未知命令")
 

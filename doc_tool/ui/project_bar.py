@@ -26,8 +26,8 @@ from doc_tool.ui.workbench_state import WorkbenchState
 # 文档类型中文映射（与菜单一致）。
 DOC_TYPE_LABELS = {
     "general": "通用大文档",
-    "requirement": "需求文档",
-    "design": "详细设计文档",
+    "requirement": "需求文档（旧版专用）",
+    "design": "详细设计文档（旧版专用）",
 }
 
 
