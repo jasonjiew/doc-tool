@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 
 def format_diagnostic_info(info: dict, report) -> str:
     """生成可复制的纯文本环境诊断信息。"""
+    from doc_tool.domain.branding import APP_DISPLAY_NAME
+
     labels = [
         ("应用版本", "appVersion"),
         ("提交标识", "commit"),
@@ -25,7 +27,7 @@ def format_diagnostic_info(info: dict, report) -> str:
         ("平台", "platform"),
         ("架构", "machine"),
     ]
-    lines = ["康尚文档工具 - 环境诊断"]
+    lines = ["{0} - 环境诊断".format(APP_DISPLAY_NAME)]
     lines.extend(
         "{0}：{1}".format(label, info.get(key, "—"))
         for label, key in labels
@@ -57,6 +59,7 @@ def show_about_dialog(parent) -> None:
     """显示关于/环境诊断对话框。"""
     from PySide6.QtGui import QGuiApplication
 
+    from doc_tool.domain.branding import APP_DISPLAY_NAME
     from doc_tool.domain.version import APP_VERSION, get_build_info
 
     dialog = QDialog(parent)
@@ -68,7 +71,7 @@ def show_about_dialog(parent) -> None:
     layout.setContentsMargins(16, 16, 16, 16)
     layout.setSpacing(8)
 
-    title = QLabel("康尚文档工具", dialog)
+    title = QLabel(APP_DISPLAY_NAME, dialog)
     title.setObjectName("welcomeTitle")
     layout.addWidget(title)
     version = QLabel("版本 {0}".format(APP_VERSION), dialog)

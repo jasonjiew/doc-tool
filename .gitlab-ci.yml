@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# GitLab CI/CD 配置：康尚文档工具 Windows 构建与 Release
+# GitLab CI/CD 配置：Doc Tool Windows 构建与 Release
 #
 # 任务 9.3/9.4：Windows CI，校验标签/版本一致，串联全部测试。
 # 任务 9.5：生产文档泄漏扫描。
@@ -122,7 +122,7 @@ build-onedir:
     - python scripts\tests\test_frozen_smoke.py
   artifacts:
     paths:
-      - dist/KonsungDocTool/
+      - dist/DocTool/
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG
@@ -150,7 +150,7 @@ package-installer:
       if ($signingEnabled) {
         $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
         if (-not $signtool) { throw "已配置代码签名，但 signtool.exe 不可用" }
-        $appExe = "dist\KonsungDocTool\KonsungDocTool.exe"
+        $appExe = "dist\DocTool\DocTool.exe"
         & $signtool.Source sign /fd SHA256 /f $env:CODE_SIGNING_PFX /p $env:CODE_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $appExe
         if ($LASTEXITCODE -ne 0) { throw "应用程序代码签名失败" }
         & $signtool.Source verify /pa /all $appExe
@@ -170,7 +170,7 @@ package-installer:
         Pop-Location
       }
 
-      $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
+      $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test_installer_smoke.ps1 -InstallerPath $exe
       if ($LASTEXITCODE -ne 0) { throw "安装级冒烟测试失败" }
 
@@ -183,14 +183,14 @@ package-installer:
 
       # 哈希必须在所有签名完成之后生成，否则发布的校验值会失效。
       $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
-      "$hash  KonsungDocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
+      "$hash  DocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
 
-      $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
-      "康尚文档工具 $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
+      $sbom = "packaging\Output\DocTool-$env:APP_VERSION-sbom.txt"
+      "Doc Tool $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
       "生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $sbom -Append -Encoding utf8
       "PyYAML 6.0.3 (MIT), lxml 6.1.1 (BSD), Pillow 12.3.0 (MIT-CMU), pywin32 312 (PSF), Python 3.13 (PSF)" | Out-File $sbom -Append -Encoding utf8
-      Copy-Item sbom.cdx.json "packaging\Output\KonsungDocTool-$env:APP_VERSION.cdx.json"
-      Copy-Item sbom.spdx.json "packaging\Output\KonsungDocTool-$env:APP_VERSION.spdx.json"
+      Copy-Item sbom.cdx.json "packaging\Output\DocTool-$env:APP_VERSION.cdx.json"
+      Copy-Item sbom.spdx.json "packaging\Output\DocTool-$env:APP_VERSION.spdx.json"
   artifacts:
     paths:
       - packaging/Output/
@@ -207,16 +207,16 @@ release-upload:
   script:
     - |
       # 使用 GitLab Release CLI 上传安装器
-      $exe = "packaging\Output\KonsungDocTool-Setup-$env:APP_VERSION.exe"
+      $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
       $sha = "$exe.sha256"
-      $sbom = "packaging\Output\KonsungDocTool-$env:APP_VERSION-sbom.txt"
-      $cyclone = "packaging\Output\KonsungDocTool-$env:APP_VERSION.cdx.json"
-      $spdx = "packaging\Output\KonsungDocTool-$env:APP_VERSION.spdx.json"
+      $sbom = "packaging\Output\DocTool-$env:APP_VERSION-sbom.txt"
+      $cyclone = "packaging\Output\DocTool-$env:APP_VERSION.cdx.json"
+      $spdx = "packaging\Output\DocTool-$env:APP_VERSION.spdx.json"
 
       # 生成发布说明
       $notes = "packaging\Output\release-notes.md"
-      "# 康尚文档工具 v$env:APP_VERSION`n`n" | Out-File $notes -Encoding utf8
-      "## 安装`n- 下载 KonsungDocTool-Setup-$env:APP_VERSION.exe`n- 双击运行，按提示安装`n- 默认安装到 %LOCALAPPDATA%\Konsung\DocTool（无需管理员权限）`n`n" | Out-File $notes -Append -Encoding utf8
+      "# Doc Tool v$env:APP_VERSION`n`n" | Out-File $notes -Encoding utf8
+      "## 安装`n- 下载 DocTool-Setup-$env:APP_VERSION.exe`n- 双击运行，按提示安装`n- 默认安装到 %LOCALAPPDATA%\DocTool（无需管理员权限）`n`n" | Out-File $notes -Append -Encoding utf8
       "## 验证`n- SHA-256: $(Get-Content $sha)`n`n" | Out-File $notes -Append -Encoding utf8
       "## 构建来源`n- 标签: $env:CI_COMMIT_TAG`n- 提交: $env:CI_COMMIT_SHA`n`n" | Out-File $notes -Append -Encoding utf8
       "## 本版变更`n- 自包含桌面应用与事务化 Word 项目导入`n- 受保护的校验、Word 刷新和原子发布管线`n- 按用户安装、升级与非破坏性卸载`n`n" | Out-File $notes -Append -Encoding utf8
@@ -244,13 +244,13 @@ release-upload:
     tag_name: "$CI_COMMIT_TAG"
     assets:
       links:
-        - name: "KonsungDocTool-Setup-$APP_VERSION.exe"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-Setup-$APP_VERSION.exe"
+        - name: "DocTool-Setup-$APP_VERSION.exe"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-Setup-$APP_VERSION.exe"
         - name: "SHA-256"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-Setup-$APP_VERSION.exe.sha256"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-Setup-$APP_VERSION.exe.sha256"
         - name: "SBOM"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION-sbom.txt"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-$APP_VERSION-sbom.txt"
         - name: "CycloneDX SBOM"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION.cdx.json"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-$APP_VERSION.cdx.json"
         - name: "SPDX SBOM"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/KonsungDocTool-$APP_VERSION.spdx.json"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-$APP_VERSION.spdx.json"

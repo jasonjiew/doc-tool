@@ -4,7 +4,7 @@
 任务 6.4/6.6 的服务层：为 GUI 提供「打开已有项目」「最近项目列表」
 「项目校验」「打开目录」等操作的统一入口。
 
-最近项目列表存储在用户目录 ``~/.konsung-doc-tool/recent.json``，
+最近项目列表存储在用户目录 ``~/.doctool/recent.json``，
 仅记录项目绝对路径和最后打开时间，不存储项目内容。
 """
 
@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
+from doc_tool.domain.branding import USER_CONFIG_DIR_NAME
 from doc_tool.domain.errors import (
     IncompatibleSchemaError,
     ProjectManifestError,
@@ -34,14 +35,14 @@ MAX_RECENT_PROJECTS = 20
 def _recent_file() -> Path:
     """返回最近项目列表文件路径（用户目录下）。"""
     home = Path.home()
-    config_dir = home / ".konsung-doc-tool"
+    config_dir = home / ".{0}".format(USER_CONFIG_DIR_NAME)
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir / "recent.json"
 
 
 def _config_dir() -> Path:
     """返回用户级配置目录（与最近项目列表同目录）。"""
-    config_dir = Path.home() / ".konsung-doc-tool"
+    config_dir = Path.home() / ".{0}".format(USER_CONFIG_DIR_NAME)
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 

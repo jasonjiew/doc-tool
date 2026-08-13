@@ -107,7 +107,7 @@ class InstallerConfigTests(unittest.TestCase):
 
     def test_output_filename_versioned(self):
         """输出文件名包含版本号。"""
-        self.assertIn("OutputBaseFilename=KonsungDocTool-Setup-", self.iss)
+        self.assertIn("OutputBaseFilename={#MyAppNameEn}-Setup-{#MyAppVersion}", self.iss)
 
     def test_kill_app_on_uninstall(self):
         """卸载前关闭应用进程。"""
@@ -124,7 +124,7 @@ class InstallerArtifactTests(unittest.TestCase):
     def test_setup_exe_exists(self):
         """当前版本的安装器 EXE 已生成。"""
         exe = os.path.join(REPO_ROOT, "packaging", "Output",
-                           "KonsungDocTool-Setup-{0}.exe".format(APP_VERSION))
+                           "DocTool-Setup-{0}.exe".format(APP_VERSION))
         if not os.path.isfile(exe):
             self.skipTest("安装器未构建，先运行 ISCC.exe")
         self.assertGreater(os.path.getsize(exe), 1024 * 1024,
@@ -133,7 +133,7 @@ class InstallerArtifactTests(unittest.TestCase):
     def test_sha256_exists(self):
         """SHA-256 哈希文件已生成。"""
         sha = os.path.join(REPO_ROOT, "packaging", "Output",
-                           "KonsungDocTool-Setup-{0}.exe.sha256".format(APP_VERSION))
+                           "DocTool-Setup-{0}.exe.sha256".format(APP_VERSION))
         if not os.path.isfile(sha):
             self.skipTest("SHA-256 文件未生成")
         with open(sha, encoding="ascii") as f:

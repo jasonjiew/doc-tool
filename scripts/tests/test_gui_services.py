@@ -364,7 +364,7 @@ class ProjectServiceTests(unittest.TestCase):
                 load_window_geometry(),
                 {"geometry": "900x700+10+20", "maximized": True},
             )
-            geometry_file = home / ".konsung-doc-tool" / "geometry.json"
+            geometry_file = home / ".doctool" / "geometry.json"
             geometry_file.write_text("{broken", encoding="utf-8")
             self.assertIsNone(load_window_geometry())
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""康尚文档工具：将大型 Word 拆分为 Markdown 维护并重建的 Windows 应用。
+"""大型 Word 文档工作台：将大型 Word 拆分为 Markdown 维护并重建的 Windows 应用。
 
 分层架构：
 - ``domain``      项目清单、路径、版本与错误模型（纯逻辑，无 IO 副作用）

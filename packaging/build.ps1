@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
-    康尚文档工具安装包构建脚本
+    Doc Tool 安装包构建脚本
 
 .DESCRIPTION
     任务 8.8：完整的安装包构建流水线。
@@ -42,7 +42,7 @@ if ($Version -ne $AppVersion -or $Version -ne $InstallerVersion) {
     throw "版本不一致: build=$Version app=$AppVersion installer=$InstallerVersion"
 }
 
-Write-Host "=== 康尚文档工具安装包构建 ===" -ForegroundColor Cyan
+Write-Host "=== Doc Tool 安装包构建 ===" -ForegroundColor Cyan
 Write-Host "版本: $Version"
 Write-Host "仓库根: $RepoRoot"
 Write-Host ""
@@ -80,7 +80,7 @@ if (-not $SkipPyInstaller) {
 # 构建后必须扫描本次产物；只在构建前扫描旧 dist 无法阻断本次意外打包。
 Push-Location $RepoRoot
 try {
-    & python packaging\scan_leaks.py --strict --dist-dir "dist\KonsungDocTool"
+    & python packaging\scan_leaks.py --strict --dist-dir "dist\DocTool"
     if ($LASTEXITCODE -ne 0) {
         throw "构建产物允许清单/泄漏扫描失败 (exit $LASTEXITCODE)"
     }
@@ -136,7 +136,7 @@ if ($SkipInstaller) {
     } finally {
         Pop-Location
     }
-    $SetupExe = "$RepoRoot\packaging\Output\KonsungDocTool-Setup-$Version.exe"
+    $SetupExe = "$RepoRoot\packaging\Output\DocTool-Setup-$Version.exe"
     if (Test-Path $SetupExe) {
         $Size = [math]::Round((Get-Item $SetupExe).Length / 1MB, 1)
         Write-Host "  安装器构建完成: $SetupExe ($Size MB)" -ForegroundColor Green
@@ -157,7 +157,7 @@ if ($SkipInstaller) {
 # --- 阶段 5：生成 SHA-256 和依赖清单 ---
 Write-Host "[5/5] 生成 SHA-256 和依赖清单..." -ForegroundColor Yellow
 
-$DistDir = "$RepoRoot\dist\KonsungDocTool"
+$DistDir = "$RepoRoot\dist\DocTool"
 $ReleaseDir = "$RepoRoot\packaging\Output"
 if (-not (Test-Path $ReleaseDir)) {
     New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
@@ -173,9 +173,9 @@ if ($SetupExe -and (Test-Path $SetupExe)) {
 }
 
 # 依赖清单（SBOM）
-$SbomFile = "$ReleaseDir\KonsungDocTool-$Version-sbom.txt"
+$SbomFile = "$ReleaseDir\DocTool-$Version-sbom.txt"
 $SbomContent = @"
-康尚文档工具 $Version 依赖清单（SBOM）
+Doc Tool $Version 依赖清单（SBOM）
 =====================================
 生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
@@ -195,7 +195,7 @@ Inno Setup 6        Inno Setup License
 
 应用文件清单
 ------------
-入口: KonsungDocTool.exe (GUI)
+入口: DocTool.exe (GUI)
 内核: _internal/scripts/*.py
 模板: _internal/templates/*.docx
 配置: _internal/config/*.yml
@@ -213,8 +213,8 @@ _internal/PySide6/  Qt Widgets 桌面 UI（仅 QtCore/QtGui/QtWidgets）
 $SbomContent | Out-File -FilePath $SbomFile -Encoding utf8
 Write-Host "  依赖清单: $SbomFile" -ForegroundColor Green
 
-$CycloneFile = "$ReleaseDir\KonsungDocTool-$Version.cdx.json"
-$SpdxFile = "$ReleaseDir\KonsungDocTool-$Version.spdx.json"
+$CycloneFile = "$ReleaseDir\DocTool-$Version.cdx.json"
+$SpdxFile = "$ReleaseDir\DocTool-$Version.spdx.json"
 Push-Location $RepoRoot
 try {
     & python packaging\generate_sbom.py `

@@ -20,9 +20,11 @@ def _add_projects(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from doc_tool.domain.branding import CLI_NAME, PRODUCT_DESCRIPTION
+
     parser = argparse.ArgumentParser(
-        prog="doc-tool",
-        description="康尚文档工具：将大型 Word 拆分为 Markdown 维护并可靠合并。",
+        prog=CLI_NAME,
+        description=PRODUCT_DESCRIPTION,
     )
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")

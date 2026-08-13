@@ -25,9 +25,14 @@ def dependencies(paths):
 def generate(requirements, cyclone_path, spdx_path):
     deps = dependencies(requirements)
     timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    sbom_id = "urn:uuid:{0}".format(uuid.uuid4())
+    # 公共产品名/命名空间从集中元数据读取；documentNamespace 使用 URN，
+    # 避免在公共 URL 未定前猜测域名。
+    from doc_tool.domain.branding import APP_PROGRAM_ID
+
     cyclone = {
-        "bomFormat": "CycloneDX", "specVersion": "1.5", "serialNumber": "urn:uuid:{0}".format(uuid.uuid4()),
-        "version": 1, "metadata": {"timestamp": timestamp, "component": {"type": "application", "name": "KonsungDocTool"}},
+        "bomFormat": "CycloneDX", "specVersion": "1.5", "serialNumber": sbom_id,
+        "version": 1, "metadata": {"timestamp": timestamp, "component": {"type": "application", "name": APP_PROGRAM_ID}},
         "components": [
             {"type": "library", "name": name, "version": version, "purl": "pkg:pypi/{0}@{1}".format(name.lower(), version), "properties": [{"name": "scopeFile", "value": source}]}
             for name, version, source in deps
@@ -35,7 +40,7 @@ def generate(requirements, cyclone_path, spdx_path):
     }
     spdx = {
         "spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
-        "name": "KonsungDocTool-SBOM", "documentNamespace": "https://konsung.example/sbom/{0}".format(timestamp.replace(":", "-")),
+        "name": "{0}-SBOM".format(APP_PROGRAM_ID), "documentNamespace": sbom_id,
         "creationInfo": {"created": timestamp, "creators": ["Tool: doc-tool-generate-sbom"]},
         "packages": [
             {"name": name, "SPDXID": "SPDXRef-Package-{0}".format(re.sub(r"[^A-Za-z0-9.-]", "-", name)), "versionInfo": version,

@@ -112,7 +112,7 @@ def build_tree(
 def filter_tree_items(items: List[TreeItem], query: str) -> List[TreeItem]:
     """筛选章节树，保留命中文件及其父级目录。
 
-    目录自身命中时保留其完整子树，便于按模块名（如 ``KSOA``）浏览；文件命中时
+    目录自身命中时保留其完整子树，便于按模块名（如 ``Accounts``）浏览；文件命中时
     仅显示该文件和从文档类型到章节的祖先路径。
     """
     needle = query.strip().casefold()
@@ -397,7 +397,7 @@ def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> st
     """返回新章节文件 rel_path：递增最大兄弟编号；无编号从目录编号 .1 起；兜底标题。
 
     1) 只统计 dir 下的直接子文件，取数字前缀最大者的最后一段 +1（3.7.2→3.7.3）。
-    2) 无编号兄弟时，用目录名数字段起 .1（3.7 KSOA → 3.7.1）。
+    2) 无编号兄弟时，用目录名数字段起 .1（3.7 Accounts → 3.7.1）。
     3) 目录名也无数字段时，直接用标题做文件名。
     """
     prefix = dir_rel_path + "/"

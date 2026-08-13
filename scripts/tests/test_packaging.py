@@ -140,11 +140,11 @@ class PackageAllowlistTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="doc-allowlist-") as tmp:
             root = Path(tmp)
-            (root / "KonsungDocTool.exe").write_bytes(b"exe")
+            (root / "DocTool.exe").write_bytes(b"exe")
             (root / "customer-data.txt").write_text("secret", encoding="utf-8")
             leaks = scan_leaks.scan_allowlist(root)
             self.assertTrue(any("customer-data.txt" in item for item in leaks))
-            self.assertFalse(any("KonsungDocTool.exe" in item for item in leaks))
+            self.assertFalse(any("DocTool.exe" in item for item in leaks))
 
 
 class ReleasePipelineTests(unittest.TestCase):

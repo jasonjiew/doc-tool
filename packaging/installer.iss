@@ -1,29 +1,34 @@
 ; -*- coding: utf-8 -*-
-; Inno Setup 脚本：康尚文档工具 Windows 安装器
+; Inno Setup 脚本：Doc Tool Windows 安装器
 ;
 ; 任务 8.5：稳定 AppId、按用户安装、开始菜单和可选桌面快捷方式。
 ; 任务 8.6：静默安装、覆盖升级、修复和卸载只管理应用文件。
 ; 任务 8.7：升级/卸载不删除外部项目。
+; 任务 2.4：公共身份（AppName/Publisher/URL/AppId/安装目录），与内部版可并存。
 ;
 ; 构建命令：
 ;   iscc.exe packaging/installer.iss
 ;
 ; 产出：
-;   packaging/Output/KonsungDocTool-Setup-<version>.exe
+;   packaging/Output/DocTool-Setup-<version>.exe
 ;
-; 安装目录：%LOCALAPPDATA%\Konsung\DocTool（无需管理员权限）
+; 安装目录：%LOCALAPPDATA%\DocTool（无需管理员权限），与内部版旧安装目录隔离
 ; 用户项目目录：由用户选择，不在安装目录下，卸载不删除。
+;
+; 发布决策（见 docs/release/02-release-decisions.md）：
+;   Publisher 与 URL 为 UNRESOLVED；正式公开前必须由权利人确认，此处仅用
+;   中性 WORKING 占位值，避免进入公司信息。
 
-#define MyAppName "康尚文档工具"
-#define MyAppNameEn "KonsungDocTool"
+#define MyAppName "Doc Tool"
+#define MyAppNameEn "DocTool"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "康尚医疗"
-#define MyAppURL "http://www.konsung.com"
-#define MyAppExeName "KonsungDocTool.exe"
+#define MyAppPublisher "Doc Tool Project"
+#define MyAppURL ""
+#define MyAppExeName "DocTool.exe"
 
-; 稳定 AppId：基于 DNS 命名空间生成的 UUID5，跨版本保持一致
-; 升级和卸载依赖此 ID 识别同一应用
-#define MyAppId "F6D0000F-13F0-50D9-8743-5B42D68FF071"
+; 稳定 AppId：公共产品专用 UUID5（不复用内部版旧 AppId，见 docs/release 基线）。
+; 升级和卸载依赖此 ID 识别同一应用；值在正式发布前须经发布负责人复核。
+#define MyAppId "8C61369A-D7C7-51D4-BD14-5B555EF93E52"
 
 [Setup]
 AppId={{{#MyAppId}}
@@ -34,7 +39,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={localappdata}\Konsung\DocTool
+DefaultDirName={localappdata}\{#MyAppNameEn}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 ; 按用户安装，不需要管理员权限
@@ -48,7 +53,7 @@ UsePreviousAppDir=yes
 UninstallFilesDir={app}\uninst
 ; 输出文件名包含版本号
 OutputDir=Output
-OutputBaseFilename=KonsungDocTool-Setup-{#MyAppVersion}
+OutputBaseFilename={#MyAppNameEn}-Setup-{#MyAppVersion}
 ; 安装器与卸载器图标
 SetupIconFile=app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -73,8 +78,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "附加图标:"; Flags: unchecked
 
 [Files]
-; PyInstaller onedir 产出（dist/KonsungDocTool/* -> 安装目录/*）
-Source: "..\dist\KonsungDocTool\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; PyInstaller onedir 产出（dist/DocTool/* -> 安装目录/*）
+Source: "..\dist\{#MyAppNameEn}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; 开始菜单快捷方式

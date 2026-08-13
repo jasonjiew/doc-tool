@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $installer = (Resolve-Path $InstallerPath).Path
 $tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
-$testRoot = Join-Path $tempBase ("konsung-installer-smoke-" + [guid]::NewGuid().ToString("N"))
+$testRoot = Join-Path $tempBase ("doctool-installer-smoke-" + [guid]::NewGuid().ToString("N"))
 $installDir = Join-Path $testRoot "app"
 $externalProject = Join-Path $testRoot "external-project"
 $sentinel = Join-Path $externalProject "project-data.keep"
@@ -37,7 +37,7 @@ try {
     )
     Invoke-CheckedProcess -FilePath $installer -Arguments $installArgs
 
-    $appExe = Join-Path $installDir "KonsungDocTool.exe"
+    $appExe = Join-Path $installDir "DocTool.exe"
     if (-not (Test-Path -LiteralPath $appExe -PathType Leaf)) {
         throw "Installed application executable is missing: $appExe"
     }

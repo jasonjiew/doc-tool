@@ -168,7 +168,9 @@ class MainWindow(QMainWindow):
     # --- UI 构建 ---
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("康尚文档工具 v{0}".format(APP_VERSION))
+        from doc_tool.domain.branding import APP_DISPLAY_NAME
+
+        self.setWindowTitle("{0} v{1}".format(APP_DISPLAY_NAME, APP_VERSION))
         self.setMinimumSize(720, 480)
         self._restore_geometry()
 

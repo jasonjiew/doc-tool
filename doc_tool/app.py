@@ -27,9 +27,15 @@ def main() -> int:
         return 1
 
     app = QApplication(sys.argv)
-    app.setApplicationName("康尚文档工具")
-    app.setApplicationDisplayName("康尚文档工具")
-    app.setOrganizationName("Konsung")
+    from doc_tool.domain.branding import (
+        APP_DISPLAY_NAME,
+        APP_SETTINGS_APPLICATION_KEY,
+        ORGANIZATION_SETTINGS_KEY,
+    )
+
+    app.setApplicationName(APP_SETTINGS_APPLICATION_KEY)
+    app.setApplicationDisplayName(APP_DISPLAY_NAME)
+    app.setOrganizationName(ORGANIZATION_SETTINGS_KEY)
 
     from doc_tool.domain.version import APP_VERSION
     from doc_tool.ui.main_window import MainWindow

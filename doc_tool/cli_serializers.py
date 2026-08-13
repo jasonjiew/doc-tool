@@ -10,6 +10,13 @@ from xml.etree import ElementTree as ET
 from doc_tool.application.cli_commands import CommandResult
 
 
+def _sarif_driver_name() -> str:
+    """SARIF 工具驱动名（公共显示名）。"""
+    from doc_tool.domain.branding import APP_DISPLAY_NAME
+
+    return APP_DISPLAY_NAME
+
+
 def serialize_json(result: CommandResult) -> str:
     return json.dumps(result.to_dict(), ensure_ascii=False, indent=2)
 
@@ -89,7 +96,7 @@ def serialize_sarif(result: CommandResult) -> str:
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
         "runs": [{
-            "tool": {"driver": {"name": "Konsung Doc Tool", "rules": list(rules.values())}},
+            "tool": {"driver": {"name": _sarif_driver_name(), "rules": list(rules.values())}},
             "results": findings,
         }],
     }

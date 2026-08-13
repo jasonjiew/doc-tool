@@ -4,7 +4,7 @@
 任务 9.5：扫描打包产出，发现未允许的 DOCX 或 projects/output/logs 目录时阻断打包。
 
 扫描范围：
-1. onedir 产出目录（dist/KonsungDocTool/）
+1. onedir 产出目录（dist/DocTool/）
 2. Git 仓库工作树（防止生产文档进入源码 Release）
 
 阻断条件：
@@ -30,7 +30,7 @@ from typing import List, Set, Tuple
 # scripts/tests/ -> scripts/ -> doc-automation/
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
-DIST_DIR = REPO_ROOT / "dist" / "KonsungDocTool"
+DIST_DIR = REPO_ROOT / "dist" / "DocTool"
 ALLOWLIST_FILE = HERE / "allowlist.txt"
 
 # 允许的 DOCX 文件（净化模板和测试夹具）

@@ -31,9 +31,9 @@ sys.path.insert(0, SCRIPTS)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-DIST_DIR = os.path.join(REPO_ROOT, "dist", "KonsungDocTool")
+DIST_DIR = os.path.join(REPO_ROOT, "dist", "DocTool")
 INTERNAL_DIR = os.path.join(DIST_DIR, "_internal")
-EXE_PATH = os.path.join(DIST_DIR, "KonsungDocTool.exe")
+EXE_PATH = os.path.join(DIST_DIR, "DocTool.exe")
 CLI_EXE_PATH = os.path.join(DIST_DIR, "doc-tool-cli.exe")
 
 
@@ -47,7 +47,7 @@ class FrozenAppStructureTests(unittest.TestCase):
     """任务 8.4：冻结应用目录结构验证。"""
 
     def test_exe_exists(self):
-        """KonsungDocTool.exe 存在。"""
+        """DocTool.exe 存在。"""
         self.assertTrue(os.path.isfile(EXE_PATH))
         # EXE 至少 1MB
         self.assertGreater(os.path.getsize(EXE_PATH), 1024 * 1024)

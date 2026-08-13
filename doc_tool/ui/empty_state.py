@@ -40,7 +40,9 @@ class EmptyState(QWidget):
         layout.setContentsMargins(48, 56, 48, 40)
         layout.setSpacing(10)
 
-        title = QLabel("康尚文档工作台", self)
+        from doc_tool.domain.branding import PRODUCT_DESCRIPTION_UI
+
+        title = QLabel(PRODUCT_DESCRIPTION_UI, self)
         title.setObjectName("welcomeTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(title)

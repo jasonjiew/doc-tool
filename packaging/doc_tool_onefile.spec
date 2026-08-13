@@ -1,19 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec：将康尚文档工具打包为 Windows onefile 应用（PySide6）。
+"""PyInstaller spec：将 Doc Tool 打包为 Windows onefile 应用（PySide6）。
 
 任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets，排除未用的
 QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积。
 
 构建命令：
-    pyinstaller packaging/doc_tool.spec --noconfirm --clean
+    pyinstaller packaging/doc_tool_onefile.spec --noconfirm --clean
 
 产出：
-    dist/KonsungDocTool/KonsungDocTool.exe        (GUI 入口)
-    dist/KonsungDocTool/doc_tool-cli.exe           (CLI 入口，可选)
-    dist/KonsungDocTool/scripts/                   (内核脚本)
-    dist/KonsungDocTool/templates/                 (公司 Word 模板)
-    dist/KonsungDocTool/config/                    (文档配置)
-    dist/KonsungDocTool/doc_tool/resources/        (默认配置、许可、图标)
+    dist/DocTool/DocTool.exe                   (GUI 入口，单文件)
+    dist/DocTool/scripts/                      (内核脚本)
+    dist/DocTool/THIRD_PARTY_LICENSES.txt      (第三方许可)
+    dist/DocTool/doc_tool/resources/           (默认配置、许可、图标)
 """
 
 import os
@@ -181,7 +179,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     exclude_binaries=False,
-    name="KonsungDocTool",
+    name="DocTool",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
