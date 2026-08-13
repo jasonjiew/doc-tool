@@ -58,34 +58,16 @@ pywin32_hiddenimports = collect_submodules("win32com") + collect_submodules("pyt
 # --- 收集本应用资源 ---
 # scripts/ 目录：内核脚本（build_docx, validate_docx, refresh_fields, docx_common 等）
 # 打包后位于 _MEIPASS/scripts/，kernel.py 的 ensure_kernel_importable() 会定位它
+# 注意：不再收集 scripts/migration/（内部一次性迁移脚本，含公司文件名，不入公共产物）。
 scripts_dir = str(REPO_ROOT / "scripts")
 script_datas = []
 for name in os.listdir(scripts_dir):
     full = os.path.join(scripts_dir, name)
     if name.endswith(".py") and os.path.isfile(full):
         script_datas.append((full, "scripts"))
-# migration/ 也需要打包（首次导入功能）
-migration_dir = os.path.join(scripts_dir, "migration")
-if os.path.isdir(migration_dir):
-    script_datas.append((migration_dir, "scripts/migration"))
 
-# templates/ 目录：公司 Word 模板
-templates_dir = str(REPO_ROOT / "templates")
-template_datas = []
-if os.path.isdir(templates_dir):
-    for name in os.listdir(templates_dir):
-        full = os.path.join(templates_dir, name)
-        if os.path.isfile(full):
-            template_datas.append((full, "templates"))
-
-# config/ 目录：文档配置
-config_dir = str(REPO_ROOT / "config")
-config_datas = []
-if os.path.isdir(config_dir):
-    for name in os.listdir(config_dir):
-        full = os.path.join(config_dir, name)
-        if os.path.isfile(full):
-            config_datas.append((full, "config"))
+# 运行必需资源只来自 doc_tool/resources/（默认配置、图标、许可）；仓库根
+# templates/、config/、content/、assets/ 等公司材料绝不隐式打包（任务 8.2）。
 
 # 第三方许可文件
 license_file = str(REPO_ROOT / "THIRD_PARTY_LICENSES.txt")
@@ -102,8 +84,6 @@ all_datas = (
     lxml_datas
     + pywin32_datas
     + script_datas
-    + template_datas
-    + config_datas
     + license_datas
     + icon_datas
     + [

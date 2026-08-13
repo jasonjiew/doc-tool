@@ -1508,7 +1508,7 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         from doc_tool.application.content.tree import build_tree
 
         self.content_root = Path(tempfile.mkdtemp(prefix="doc-tool-tree-"))
-        self.rel = "requirement/第3章/3.7 KSOA/3.7.1 设备管理.md"
+        self.rel = "requirement/第3章/3.7 GXOA/3.7.1 设备管理.md"
         path = self.content_root / self.rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("# 3.7.1 设备管理\n", encoding="utf-8")
@@ -1603,7 +1603,7 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         tree = self._make_tree()
         source = tree._model.index_for_id(self.rel)
         mime = tree._model.mimeData([source])
-        parent_id = "requirement/第3章/3.7 KSOA"
+        parent_id = "requirement/第3章/3.7 GXOA"
         parent = tree._model.index_for_id(parent_id)
         accepted = tree._model.dropMimeData(
             mime, Qt.DropAction.MoveAction, 0, 0, parent
@@ -1624,7 +1624,7 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         self.assertTrue(accepted)
         self.assertEqual(
             self.moves,
-            [(self.rel, "requirement/第3章/3.7 KSOA", self.rel)],
+            [(self.rel, "requirement/第3章/3.7 GXOA", self.rel)],
         )
         tree.close()
 

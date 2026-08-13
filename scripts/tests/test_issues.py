@@ -59,7 +59,7 @@ class IssueNormalizationTests(unittest.TestCase):
     def test_lint_mapping_filter_and_summary(self):
         raw = [
             SimpleNamespace(rule="todo_residual", rel_path="a.md", line_no=2, message="TODO"),
-            SimpleNamespace(rule="term_case", rel_path="b.md", line_no=4, message="kshc"),
+            SimpleNamespace(rule="term_case", rel_path="b.md", line_no=4, message="gxpc"),
         ]
         records = issues_from_lint(raw, "design")
         self.assertEqual(severity_summary(records), {"error": 0, "warning": 1, "info": 1})

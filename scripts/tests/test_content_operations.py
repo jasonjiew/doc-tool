@@ -58,7 +58,7 @@ class ContentIndexTests(unittest.TestCase):
                 "# 1.1 目的\n"
                 "本功能用于实现健康档案管理。\n"
             ),
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": (
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md": (
                 "# 3.1.4 居民信息\n"
                 "包含居民档案、健康档案。\n"
             ),
@@ -81,12 +81,12 @@ class ContentIndexTests(unittest.TestCase):
         index = self._build()
         self.assertEqual(len(index.files), 3)
         self.assertIn(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md",
             index.files,
         )
         self.assertEqual(
             index.files[
-                "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+                "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
             ].document_type,
             "requirement",
         )
@@ -105,7 +105,7 @@ class ContentIndexTests(unittest.TestCase):
         content_root = project_root / "content" / "requirement"
         files = {
             "第1章 引言/1.1 目的.md": "# 1.1 目的\n正文。\n",
-            "第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": "# 3.1.4 居民信息\n正文。\n",
+            "第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md": "# 3.1.4 居民信息\n正文。\n",
         }
         for rel, text in files.items():
             path = content_root / rel
@@ -118,7 +118,7 @@ class ContentIndexTests(unittest.TestCase):
         self.assertIn("第1章 引言/1.1 目的.md", index.files)
         # 布局 B 下文档类型由 content_root 目录名推断
         self.assertEqual(
-            index.files["第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"].document_type,
+            index.files["第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"].document_type,
             "requirement",
         )
         self.assertEqual(index.document_types, {"requirement"})
@@ -133,7 +133,7 @@ class ContentIndexTests(unittest.TestCase):
     def test_build_indexes_headings(self):
         """标题清单解析行号、级别与锚点 id。"""
         index = self._build()
-        rel = "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+        rel = "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         headings = index.headings[rel]
         self.assertEqual(len(headings), 1)
         self.assertEqual(headings[0].level, 1)
@@ -196,7 +196,7 @@ class ContentIndexTests(unittest.TestCase):
         index = service.build()
         # 删除一个、新增一个、修改一个
         (self.content_root / "design/第1章 引言/1.1 目的.md").unlink()
-        new_file = self.content_root / "requirement/第3章 功能需求/3.1 KSHC/3.9.9 新增.md"
+        new_file = self.content_root / "requirement/第3章 功能需求/3.1 GXPC/3.9.9 新增.md"
         new_file.parent.mkdir(parents=True, exist_ok=True)
         new_file.write_text("# 3.9.9 新增\n内容\n", encoding="utf-8")
         changed = self.content_root / "requirement/第1章 引言/1.1 目的.md"
@@ -207,7 +207,7 @@ class ContentIndexTests(unittest.TestCase):
         # 删除的条目被移除
         self.assertNotIn("design/第1章 引言/1.1 目的.md", index.files)
         # 新增的条目已收录
-        self.assertIn("requirement/第3章 功能需求/3.1 KSHC/3.9.9 新增.md", index.files)
+        self.assertIn("requirement/第3章 功能需求/3.1 GXPC/3.9.9 新增.md", index.files)
         # 变更内容已重建
         self.assertEqual(
             index.lines["requirement/第1章 引言/1.1 目的.md"][1],
@@ -245,7 +245,7 @@ class ReferenceScannerTests(unittest.TestCase):
             "![业务图](images/img_0001.png =642x269)\n"
             "见 [居民信息](3.1.4 居民信息.md) 章节。\n"
         ),
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": (
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md": (
             "# 3.1.4 居民信息\n"
             "## 设备管理\n"
             "包含居民档案。\n"
@@ -256,7 +256,7 @@ class ReferenceScannerTests(unittest.TestCase):
             "锚点缺失 [y](#不存在的锚点)。\n"
             "外部链接 [官网](https://example.com)。\n"
         ),
-        "requirement/第3章 功能需求/3.5 KSAT/3.5.1 呼吸睡眠报告.md": (
+        "requirement/第3章 功能需求/3.5 GXAM/3.5.1 呼吸睡眠报告.md": (
             "# 3.5.1 呼吸睡眠报告\n"
             "## 3.5.1.6.4.1 各治疗模式展示的参数\n"
             "展示各治疗模式参数。\n"
@@ -293,7 +293,7 @@ class ReferenceScannerTests(unittest.TestCase):
         link = next(r for r in refs if r.kind == "link")
         self.assertEqual(
             link.target_rel_path,
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md",
         )
         self.assertFalse(link.dangling)
 
@@ -301,7 +301,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """指向不存在 .md 的链接标记为确定缺失悬空。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         link = next(r for r in refs if r.kind == "link" and r.dangling)
         self.assertEqual(link.dangling_kind, "confirmed")
@@ -311,7 +311,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """章节号匹配文件级章节为确认引用。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         section = next(
             r for r in refs if r.kind == "section" and r.target == "3.5.1.6.4.1"
@@ -319,7 +319,7 @@ class ReferenceScannerTests(unittest.TestCase):
         # 3.5.1.6.4.1 是 3.5.1 文件内的标题编号
         self.assertEqual(
             section.target_rel_path,
-            "requirement/第3章 功能需求/3.5 KSAT/3.5.1 呼吸睡眠报告.md",
+            "requirement/第3章 功能需求/3.5 GXAM/3.5.1 呼吸睡眠报告.md",
         )
         self.assertFalse(section.dangling)
 
@@ -327,7 +327,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """版本号（无上下文关键词）不构成悬空引用。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         self.assertFalse(
             any(r.kind == "section" and r.target == "2.3.0" for r in refs)
@@ -337,7 +337,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """未命中章节但带上下文关键词的标记为疑似悬空。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         suspects = [r for r in refs if r.dangling and r.dangling_kind == "suspect"]
         # "填写说明见 3.5.1.6.4.1 ..." 已匹配文件内标题，因此无疑似；
@@ -348,7 +348,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """纯锚点链接匹配当前文件标题。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         anchor = next(r for r in refs if r.kind == "anchor" and not r.dangling)
         self.assertEqual(anchor.target, "设备管理")
@@ -358,7 +358,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """缺失锚点链接标记为确定缺失悬空。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         anchor = next(r for r in refs if r.kind == "anchor" and r.dangling)
         self.assertEqual(anchor.dangling_kind, "confirmed")
@@ -377,7 +377,7 @@ class ReferenceScannerTests(unittest.TestCase):
         """外部 URL 链接不生成引用。"""
         index = self._scan()
         refs = self._refs_of(
-            index, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            index, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         )
         self.assertFalse(any("example.com" in r.target for r in refs))
 
@@ -396,10 +396,10 @@ class ReferenceScannerTests(unittest.TestCase):
         from doc_tool.application.content.references import ReferenceScanner
 
         self.content_root.joinpath(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         ).write_text(
             self.FILES[
-                "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+                "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
             ]
             + "补充说明见 8.8.8。\n",
             encoding="utf-8",
@@ -409,7 +409,7 @@ class ReferenceScannerTests(unittest.TestCase):
             index, assets_root=self.project_root / "assets"
         ).scan_all()
         refs = index.references[
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
         ]
         suspect = next(
             r for r in refs if r.kind == "section" and r.target == "8.8.8"
@@ -645,7 +645,7 @@ class ChapterTreeModelTests(unittest.TestCase):
     FILES = [
         "requirement/第1章 引言/1.1 目的.md",
         "requirement/第1章 引言/1.2 范围.md",
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md",
         "design/第1章 引言/1.1 目的.md",
     ]
 
@@ -674,7 +674,7 @@ class ChapterTreeModelTests(unittest.TestCase):
         section = next(
             i
             for i in dir_items
-            if i.node_id == "requirement/第3章 功能需求/3.1 KSHC"
+            if i.node_id == "requirement/第3章 功能需求/3.1 GXPC"
         )
         self.assertEqual(section.parent_id, "requirement/第3章 功能需求")
 
@@ -682,14 +682,14 @@ class ChapterTreeModelTests(unittest.TestCase):
         """文件叶子挂在最深目录节点下，rel_path 正确。"""
         items = self._build()
         by_id = {i.node_id: i for i in items}
-        file_item = by_id["requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"]
+        file_item = by_id["requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"]
         self.assertTrue(file_item.is_file)
         self.assertEqual(
-            file_item.parent_id, "requirement/第3章 功能需求/3.1 KSHC"
+            file_item.parent_id, "requirement/第3章 功能需求/3.1 GXPC"
         )
         self.assertEqual(
             file_item.rel_path,
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md",
         )
 
     def test_ancestors_root_to_parent(self):
@@ -698,14 +698,14 @@ class ChapterTreeModelTests(unittest.TestCase):
 
         items = self._build()
         chain = ancestors(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md", items
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md", items
         )
         self.assertEqual(
             chain,
             [
                 "requirement",
                 "requirement/第3章 功能需求",
-                "requirement/第3章 功能需求/3.1 KSHC",
+                "requirement/第3章 功能需求/3.1 GXPC",
             ],
         )
 
@@ -721,9 +721,9 @@ class ChapterTreeModelTests(unittest.TestCase):
 
         items = build_tree(
             [
-                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md",
-                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
+                "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md",
+                "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",
             ]
         )
         files = [item.text for item in items if item.is_file]
@@ -738,16 +738,16 @@ class ChapterTreeModelTests(unittest.TestCase):
 
         items = build_tree(
             [
-                "requirement/第3章/KSOA/3.7.1 租户管理.md",
-                "requirement/第3章/KSOA/3.7.2 产品管理.md",
-                "requirement/第3章/KSHC/3.1.1 居民信息.md",
+                "requirement/第3章/GXOA/3.7.1 租户管理.md",
+                "requirement/第3章/GXOA/3.7.2 产品管理.md",
+                "requirement/第3章/GXPC/3.1.1 居民信息.md",
             ]
         )
         tenant = filter_tree_items(items, "租户")
         self.assertEqual(
             [item.text for item in tenant if item.is_file], ["3.7.1 租户管理.md"]
         )
-        module = filter_tree_items(items, "ksoa")
+        module = filter_tree_items(items, "gxoa")
         self.assertEqual(
             [item.text for item in module if item.is_file],
             ["3.7.1 租户管理.md", "3.7.2 产品管理.md"],
@@ -776,38 +776,38 @@ class ChapterTreeModelTests(unittest.TestCase):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
-            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
-            "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md",
         ]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.11 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.11 权限管理.md"
         )
 
     def test_next_from_dir_number_when_no_numeric_siblings(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/3.7 KSOA/概述.md"]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        files = ["requirement/第3章/3.7 GXOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.1 权限管理.md"
         )
 
     def test_next_fallback_title_when_dir_unnumbered(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/KSOA/概述.md"]
-        result = next_chapter_rel_path("requirement/第3章/KSOA", files, "权限管理")
-        self.assertEqual(result, "requirement/第3章/KSOA/权限管理.md")
+        files = ["requirement/第3章/GXOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/GXOA", files, "权限管理")
+        self.assertEqual(result, "requirement/第3章/GXOA/权限管理.md")
 
     def test_next_ignores_subdirectory_files_as_siblings(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/3.7 KSOA/3.7.1 租户管理/3.7.1.1 详情.md"]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        files = ["requirement/第3章/3.7 GXOA/3.7.1 租户管理/3.7.1.1 详情.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.1 权限管理.md"
         )
 
     def test_qt_model_parent_invariant_and_full_hierarchy(self):
@@ -868,16 +868,16 @@ class SearchServiceTests(unittest.TestCase):
     """任务 5.x：全文搜索服务。"""
 
     FILES = {
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": (
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md": (
             "# 3.1.4 居民信息\n"
             "健康档案管理功能。\n"
             "管理员可查看。\n"
-            "KSHC 平台。\n"
+            "GXPC 平台。\n"
         ),
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.5 健康档案.md": (
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.5 健康档案.md": (
             "# 3.1.5 健康档案\n"
             "档案管理。\n"
-            "kshc 小写。\n"
+            "gxpc 小写。\n"
         ),
         "design/第1章 引言/1.1 目的.md": (
             "# 1.1 目的\n"
@@ -903,7 +903,7 @@ class SearchServiceTests(unittest.TestCase):
         self.assertEqual(result.total, 2)
         self.assertEqual(result.file_count, 2)
         hit = next(h for h in result.hits if "功能" in h.text)
-        self.assertEqual(hit.rel_path, "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md")
+        self.assertEqual(hit.rel_path, "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md")
         self.assertEqual(hit.line_no, 2)
 
     def test_no_match(self):
@@ -922,12 +922,12 @@ class SearchServiceTests(unittest.TestCase):
         self.assertGreater(result.total, 0)
 
     def test_case_sensitive(self):
-        """区分大小写时 KSHC 不匹配 kshc。"""
+        """区分大小写时 GXPC 不匹配 gxpc。"""
         from doc_tool.application.content.search import SearchOptions
 
-        insensitive = self.service.search(SearchOptions(query="KSHC"))
+        insensitive = self.service.search(SearchOptions(query="GXPC"))
         sensitive = self.service.search(
-            SearchOptions(query="KSHC", case_sensitive=True)
+            SearchOptions(query="GXPC", case_sensitive=True)
         )
         self.assertGreater(insensitive.total, sensitive.total)
 
@@ -1211,12 +1211,12 @@ class RefactorServiceTests(unittest.TestCase):
     """任务 8.x：章节重命名/重编号联动。"""
 
     FILES = {
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md": (
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md": (
             "# 3.1.3 团队管理\n"
             "详见 3.1.4 居民信息。\n"
             "链接 [居民信息](3.1.4 居民信息.md)。\n"
         ),
-        "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md": (
+        "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md": (
             "# 3.1.4 居民信息\n"
             "居民档案内容。\n"
         ),
@@ -1242,7 +1242,7 @@ class RefactorServiceTests(unittest.TestCase):
     def _read(self, rel):
         return (self.content_root / rel).read_text(encoding="utf-8")
 
-    OLD = "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md"
+    OLD = "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md"
 
     def test_plan_detects_section_link_and_title(self):
         """重编号时检出章节引用、链接与自身标题。"""
@@ -1259,11 +1259,11 @@ class RefactorServiceTests(unittest.TestCase):
         plan = self.service.compute_rename_plan(self.OLD, "3.1.5 居民信息.md")
         self.service.apply_rename_plan(plan, self.writer)
 
-        new_rel = "requirement/第3章 功能需求/3.1 KSHC/3.1.5 居民信息.md"
+        new_rel = "requirement/第3章 功能需求/3.1 GXPC/3.1.5 居民信息.md"
         self.assertTrue((self.content_root / new_rel).exists())
         self.assertFalse((self.content_root / self.OLD).exists())
 
-        ref_file = self._read("requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md")
+        ref_file = self._read("requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md")
         self.assertIn("详见 3.1.5 居民信息。", ref_file)
         self.assertIn("[居民信息](3.1.5 居民信息.md)", ref_file)
 
@@ -1293,8 +1293,8 @@ class RefactorServiceTests(unittest.TestCase):
         self.assertTrue((self.content_root / self.OLD).exists())
         self.assertEqual(self._read(self.OLD), self.FILES[self.OLD])
         self.assertEqual(
-            self._read("requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"),
-            self.FILES["requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"],
+            self._read("requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"),
+            self.FILES["requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"],
         )
 
     def test_unknown_target_returns_none(self):
@@ -1311,7 +1311,7 @@ class RefactorServiceTests(unittest.TestCase):
         生成指向不存在章节的 ``3.1.50``。
         """
         self.content_root.joinpath(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"
         ).write_text(
             "# 3.1.3 团队管理\n"
             "详见 3.1.4 与 3.1.40 相关章节。\n"
@@ -1319,7 +1319,7 @@ class RefactorServiceTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.content_root.joinpath(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.40 深层.md"
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.40 深层.md"
         ).write_text("# 3.1.40 深层\n", encoding="utf-8")
         from doc_tool.application.content.index import ContentIndexService
         from doc_tool.application.content.references import ReferenceScanner
@@ -1329,13 +1329,13 @@ class RefactorServiceTests(unittest.TestCase):
         ReferenceScanner(self.index).scan_all()
         service = RefactorService(self.index)
         plan = service.compute_rename_plan(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.4 居民信息.md",
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.4 居民信息.md",
             "3.1.5 居民信息.md",
         )
         self.assertIsNotNone(plan)
         service.apply_rename_plan(plan, self.writer)
         text = self._read(
-            "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+            "requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"
         )
         self.assertIn("详见 3.1.5 与 3.1.40", text)
         self.assertIn("[居民信息](3.1.5 居民信息.md)", text)
@@ -1343,7 +1343,7 @@ class RefactorServiceTests(unittest.TestCase):
 
     def test_batch_swap_uses_transaction_staging(self):
         """同目录交换编号时先腾挪全部源文件，不因目标占用失败。"""
-        first = "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"
+        first = "requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"
         second = self.OLD
         plan = self.service.compute_batch_rename_plan(
             [
@@ -1359,7 +1359,7 @@ class RefactorServiceTests(unittest.TestCase):
 
     def test_batch_target_conflict_blocks_apply(self):
         plan = self.service.compute_batch_rename_plan(
-            [(self.OLD, "requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md")]
+            [(self.OLD, "requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md")]
         )
         self.assertFalse(plan.can_apply)
         self.assertTrue(any("目标文件已存在" in item for item in plan.conflicts))
@@ -1384,8 +1384,8 @@ class RefactorServiceTests(unittest.TestCase):
             self.service.apply_rename_plan(plan, self.writer)
         self.assertTrue((self.content_root / self.OLD).exists())
         self.assertEqual(
-            self._read("requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"),
-            self.FILES["requirement/第3章 功能需求/3.1 KSHC/3.1.3 团队管理.md"],
+            self._read("requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"),
+            self.FILES["requirement/第3章 功能需求/3.1 GXPC/3.1.3 团队管理.md"],
         )
 
 
@@ -1395,7 +1395,7 @@ class LintTests(unittest.TestCase):
     FILES = {
         "requirement/第1章 引言/1.1 目的.md": (
             "# 1.1 目的\n"
-            "KSHC 平台，kshc 小写出现。\n"
+            "GXPC 平台，gxpc 小写出现。\n"
             "TODO 待办残留。\n"
         ),
         "design/第1章 引言/1.1 目的.md": (
@@ -1437,23 +1437,23 @@ class LintTests(unittest.TestCase):
 
     def test_term_case_detected(self):
         """术语大小写不一致被标记，规范拼写不标记。"""
-        issues = self.linter.check_terms(["KSHC"])
+        issues = self.linter.check_terms(["GXPC"])
         term_issues = [i for i in issues if i.rule == "term_case"]
-        # 只有 kshc（小写）被标记，KSHC 规范出现不标记
+        # 只有 gxpc（小写）被标记，GXPC 规范出现不标记
         self.assertEqual(len(term_issues), 1)
-        self.assertIn("kshc", term_issues[0].message)
+        self.assertIn("gxpc", term_issues[0].message)
 
     def test_check_all_sorted(self):
         """check_all 汇总并排序。"""
-        issues = self.linter.check_all(["KSHC"])
+        issues = self.linter.check_all(["GXPC"])
         self.assertEqual(
             issues, sorted(issues, key=lambda i: (i.rel_path, i.line_no))
         )
 
     def test_term_store_roundtrip(self):
         """术语清单保存/读取往返一致。"""
-        self.store.save(["KSHC", "KSHC", "", "API"])
-        self.assertEqual(self.store.load(), ["KSHC", "API"])
+        self.store.save(["GXPC", "GXPC", "", "API"])
+        self.assertEqual(self.store.load(), ["GXPC", "API"])
 
     def test_term_store_missing_returns_empty(self):
         """无清单文件时返回空列表。"""
@@ -1801,16 +1801,16 @@ class ChapterTreeStatusTests(unittest.TestCase):
 
         items = build_tree(
             [
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",  # added
-                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",  # modified
-                "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md",  # 未标记
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",  # added
+                "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",  # modified
+                "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md",  # 未标记
             ]
         )
         return ChapterTreeModel(
             items,
             status={
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "added",
-                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md": "modified",
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md": "added",
+                "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md": "modified",
             },
         )
 
@@ -1819,13 +1819,13 @@ class ChapterTreeStatusTests(unittest.TestCase):
 
         model = self._model()
         added = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md"
         )
         modified = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md"
         )
         unmarked = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md"
         )
         self.assertFalse(model.data(added, Qt.ItemDataRole.DecorationRole).isNull())
         self.assertFalse(
@@ -1839,7 +1839,7 @@ class ChapterTreeStatusTests(unittest.TestCase):
         from PySide6.QtCore import Qt
 
         model = self._model()
-        dir_index = model.index_for_id("requirement/第3章/3.7 KSOA")
+        dir_index = model.index_for_id("requirement/第3章/3.7 GXOA")
         self.assertTrue(dir_index.isValid())
         self.assertIsNone(model.data(dir_index, Qt.ItemDataRole.DecorationRole))
 
@@ -1863,15 +1863,15 @@ class ChapterTreeStatusTests(unittest.TestCase):
         model.modelReset.connect(lambda: resets.append(True))
 
         target = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md"
         )
         self.assertTrue(target.isValid())
         self.assertIsNone(model.data(target, Qt.ItemDataRole.DecorationRole))
 
         model.set_status(
             {
-                "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md": "added",
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "modified",
+                "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md": "added",
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md": "modified",
             }
         )
         self.assertEqual(resets, [])  # 未重建模型
@@ -1889,19 +1889,19 @@ class ChapterTreeStatusTests(unittest.TestCase):
         tree.set_items(
             build_tree(
                 [
-                    "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
-                    "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
+                    "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",
+                    "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",
                 ]
             )
         )
-        dir_index = tree._model.index_for_id("requirement/第3章/3.7 KSOA")
+        dir_index = tree._model.index_for_id("requirement/第3章/3.7 GXOA")
         self.assertTrue(dir_index.isValid())
         # set_items 默认展开全部目录，先折叠验证状态保留
         tree._tree.collapse(dir_index)
         self.assertFalse(tree._tree.isExpanded(dir_index))
 
         tree.set_status(
-            {"requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "added"}
+            {"requirement/第3章/3.7 GXOA/3.7.1 租户管理.md": "added"}
         )
         self.assertTrue(dir_index.isValid())
         self.assertFalse(tree._tree.isExpanded(dir_index))
@@ -1909,7 +1909,7 @@ class ChapterTreeStatusTests(unittest.TestCase):
         # 展开后再次增量刷新，展开状态也保留
         tree._tree.expand(dir_index)
         tree.set_status(
-            {"requirement/第3章/3.7 KSOA/3.7.2 产品管理.md": "modified"}
+            {"requirement/第3章/3.7 GXOA/3.7.2 产品管理.md": "modified"}
         )
         self.assertTrue(tree._tree.isExpanded(dir_index))
 
@@ -1936,10 +1936,10 @@ class TreeRenameTests(unittest.TestCase):
             self.skipTest("PySide6 不可用")
         self.content_root = make_project(
             {
-                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md": (
+                "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md": (
                     "# 3.7.10 设备管理\n正文。\n"
                 ),
-                "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md": (
+                "requirement/第3章/3.7 GXOA/3.7.9 相关章节.md": (
                     "# 3.7.9 相关章节\n"
                     "见 3.7.10 设备管理。\n"
                     "链接 [设备管理](3.7.10 设备管理.md)。\n"
@@ -1968,8 +1968,8 @@ class TreeRenameTests(unittest.TestCase):
 
         from doc_tool.ui.content.workspace import ContentWorkspace
 
-        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
-        new = "requirement/第3章/3.7 KSOA/3.7.11 设备管理.md"
+        old = "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md"
+        new = "requirement/第3章/3.7 GXOA/3.7.11 设备管理.md"
 
         ws = ContentWorkspace(
             self.content_root, state_dir=self.project_root / ".state"
@@ -1986,7 +1986,7 @@ class TreeRenameTests(unittest.TestCase):
         self.assertFalse((self.content_root / old).exists())
         self.assertTrue((self.content_root / new).exists())
         ref_text = self._read(
-            "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md"
+            "requirement/第3章/3.7 GXOA/3.7.9 相关章节.md"
         )
         self.assertIn("见 3.7.11 设备管理", ref_text)
         self.assertIn("[设备管理](3.7.11 设备管理.md)", ref_text)
@@ -1998,7 +1998,7 @@ class TreeRenameTests(unittest.TestCase):
         self.assertEqual(status.get(new), "modified")
         self.assertNotIn(old, status)
         self.assertEqual(
-            status.get("requirement/第3章/3.7 KSOA/3.7.9 相关章节.md"), "modified"
+            status.get("requirement/第3章/3.7 GXOA/3.7.9 相关章节.md"), "modified"
         )
 
     def test_on_rename_file_same_name_is_noop(self):
@@ -2009,7 +2009,7 @@ class TreeRenameTests(unittest.TestCase):
 
         from doc_tool.ui.content.workspace import ContentWorkspace
 
-        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        old = "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md"
         ws = ContentWorkspace(
             self.content_root, state_dir=self.project_root / ".state"
         )
@@ -2036,13 +2036,13 @@ class TreeRenameTests(unittest.TestCase):
         self.assertEqual(ws._tree._model._status, {})
         target = (
             self.content_root
-            / "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+            / "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md"
         )
         target.write_text("# 3.7.10 设备管理\n外部改写的正文。\n", encoding="utf-8")
         ws._rebuild_index()
         self.assertEqual(
             ws._tree._model._status.get(
-                "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+                "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md"
             ),
             "modified",
         )
@@ -2059,11 +2059,11 @@ class TreeRenameTests(unittest.TestCase):
             self.content_root, state_dir=self.project_root / ".state"
         )
         ws._index = self._build_index()
-        old = "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md"
+        old = "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md"
         # 工具写一次 → 产生改动清单（回滚账本）+ 磁盘内容变化
         ws._writer.write_text(old, "# 3.7.10 设备管理\n工具改写。\n")
         # 外部编辑另一文件
-        (self.content_root / "requirement/第3章/3.7 KSOA/3.7.9 相关章节.md").write_text(
+        (self.content_root / "requirement/第3章/3.7 GXOA/3.7.9 相关章节.md").write_text(
             "# 3.7.9 相关章节\n外部改写。\n", encoding="utf-8"
         )
         ws._rebuild_index()
@@ -2304,23 +2304,23 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import renumber_plan_after_delete
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.4 甲.md",
-            "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
-            "requirement/第3章/3.7 KSOA/3.7.7 丙.md",
+            "requirement/第3章/3.7 GXOA/3.7.4 甲.md",
+            "requirement/第3章/3.7 GXOA/3.7.6 乙.md",
+            "requirement/第3章/3.7 GXOA/3.7.7 丙.md",
         ]
         plan = renumber_plan_after_delete(
-            "requirement/第3章/3.7 KSOA/3.7.5 待删.md", files
+            "requirement/第3章/3.7 GXOA/3.7.5 待删.md", files
         )
         self.assertEqual(
             plan,
             [
                 (
-                    "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
-                    "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.6 乙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.5 乙.md",
                 ),
                 (
-                    "requirement/第3章/3.7 KSOA/3.7.7 丙.md",
-                    "requirement/第3章/3.7 KSOA/3.7.6 丙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.7 丙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.6 丙.md",
                 ),
             ],
         )
@@ -2329,20 +2329,20 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import renumber_plan_after_delete
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.4 甲.md",
-            "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+            "requirement/第3章/3.7 GXOA/3.7.4 甲.md",
+            "requirement/第3章/3.7 GXOA/3.7.5 乙.md",
         ]
         plan = renumber_plan_after_delete(
-            "requirement/第3章/3.7 KSOA/3.7.5 乙.md", files
+            "requirement/第3章/3.7 GXOA/3.7.5 乙.md", files
         )
         self.assertEqual(plan, [])
 
     def test_renumber_plan_unnumbered_empty(self):
         from doc_tool.application.content.tree import renumber_plan_after_delete
 
-        files = ["requirement/第3章/3.7 KSOA/概述.md"]
+        files = ["requirement/第3章/3.7 GXOA/概述.md"]
         plan = renumber_plan_after_delete(
-            "requirement/第3章/3.7 KSOA/概述.md", files
+            "requirement/第3章/3.7 GXOA/概述.md", files
         )
         self.assertEqual(plan, [])
 
@@ -2350,18 +2350,18 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import renumber_plan_after_delete
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
-            "requirement/第3章/3.7 KSOA/3.7.6 乙/3.7.6.1 子.md",
+            "requirement/第3章/3.7 GXOA/3.7.6 乙.md",
+            "requirement/第3章/3.7 GXOA/3.7.6 乙/3.7.6.1 子.md",
         ]
         plan = renumber_plan_after_delete(
-            "requirement/第3章/3.7 KSOA/3.7.5 待删.md", files
+            "requirement/第3章/3.7 GXOA/3.7.5 待删.md", files
         )
         self.assertEqual(
             plan,
             [
                 (
-                    "requirement/第3章/3.7 KSOA/3.7.6 乙.md",
-                    "requirement/第3章/3.7 KSOA/3.7.5 乙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.6 乙.md",
+                    "requirement/第3章/3.7 GXOA/3.7.5 乙.md",
                 )
             ],
         )
@@ -2370,18 +2370,18 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import chapter_move_renumber_plan
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
-            "requirement/第3章/3.7 KSOA/3.7.2 乙.md",
-            "requirement/第3章/3.7 KSOA/3.7.3 丙.md",
+            "requirement/第3章/3.7 GXOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 乙.md",
+            "requirement/第3章/3.7 GXOA/3.7.3 丙.md",
         ]
         plan = chapter_move_renumber_plan(
-            files[1], "requirement/第3章/3.7 KSOA", files, before_node=files[0]
+            files[1], "requirement/第3章/3.7 GXOA", files, before_node=files[0]
         )
         self.assertEqual(
             plan,
             [
-                (files[1], "requirement/第3章/3.7 KSOA/3.7.1 乙.md"),
-                (files[0], "requirement/第3章/3.7 KSOA/3.7.2 甲.md"),
+                (files[1], "requirement/第3章/3.7 GXOA/3.7.1 乙.md"),
+                (files[0], "requirement/第3章/3.7 GXOA/3.7.2 甲.md"),
             ],
         )
 
@@ -2389,35 +2389,35 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import chapter_move_renumber_plan
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
-            "requirement/第3章/3.7 KSOA/3.7.2 乙.md",
+            "requirement/第3章/3.7 GXOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 乙.md",
             "requirement/第5章/5.1 附录/5.1.1 丁.md",
         ]
         plan = chapter_move_renumber_plan(
             files[0], "requirement/第5章/5.1 附录", files
         )
-        self.assertIn((files[1], "requirement/第3章/3.7 KSOA/3.7.1 乙.md"), plan)
+        self.assertIn((files[1], "requirement/第3章/3.7 GXOA/3.7.1 乙.md"), plan)
         self.assertIn((files[0], "requirement/第5章/5.1 附录/5.1.2 甲.md"), plan)
 
     def test_move_plan_rewrites_directory_subtree_prefix(self):
         from doc_tool.application.content.tree import chapter_move_renumber_plan
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.1 甲.md",
-            "requirement/第3章/3.7 KSOA/3.7.2 子目录/3.7.2.1 子.md",
+            "requirement/第3章/3.7 GXOA/3.7.1 甲.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 子目录/3.7.2.1 子.md",
             "requirement/第5章/5.1 附录/5.1.1 丁.md",
         ]
         plan = chapter_move_renumber_plan(
-            "requirement/第3章/3.7 KSOA", "requirement/第5章/5.1 附录", files
+            "requirement/第3章/3.7 GXOA", "requirement/第5章/5.1 附录", files
         )
         mapping = dict(plan)
         self.assertEqual(
             mapping[files[0]],
-            "requirement/第5章/5.1 附录/5.1.2 KSOA/5.1.2.1 甲.md",
+            "requirement/第5章/5.1 附录/5.1.2 GXOA/5.1.2.1 甲.md",
         )
         self.assertEqual(
             mapping[files[1]],
-            "requirement/第5章/5.1 附录/5.1.2 KSOA/5.1.2.2 子目录/5.1.2.2.1 子.md",
+            "requirement/第5章/5.1 附录/5.1.2 GXOA/5.1.2.2 子目录/5.1.2.2.1 子.md",
         )
 
     def test_move_plan_rejects_descendant_and_cross_type(self):
@@ -2452,14 +2452,14 @@ class DeleteRenumberTests(unittest.TestCase):
             self.skipTest("PySide6 不可用")
         self.content_root = make_project(
             {
-                "requirement/第3章/3.7 KSOA/3.7.4 甲.md": "# 3.7.4 甲\n",
-                "requirement/第3章/3.7 KSOA/3.7.5 乙.md": "# 3.7.5 乙\n",
-                "requirement/第3章/3.7 KSOA/3.7.6 丙.md": (
+                "requirement/第3章/3.7 GXOA/3.7.4 甲.md": "# 3.7.4 甲\n",
+                "requirement/第3章/3.7 GXOA/3.7.5 乙.md": "# 3.7.5 乙\n",
+                "requirement/第3章/3.7 GXOA/3.7.6 丙.md": (
                     "# 3.7.6 丙\n"
                     "见 3.7.5 乙。\n"
                     "链接 [乙](3.7.5 乙.md)。\n"
                 ),
-                "requirement/第3章/3.7 KSOA/3.7.7 丁.md": "# 3.7.7 丁\n",
+                "requirement/第3章/3.7 GXOA/3.7.7 丁.md": "# 3.7.7 丁\n",
             }
         )
         self.project_root = self.content_root.parent
@@ -2484,7 +2484,7 @@ class DeleteRenumberTests(unittest.TestCase):
             self.content_root, state_dir=self.project_root / ".state"
         )
         ws._index = self._build_index()
-        mid = "requirement/第3章/3.7 KSOA/3.7.5 乙.md"
+        mid = "requirement/第3章/3.7 GXOA/3.7.5 乙.md"
         with mock.patch.object(
             QMessageBox, "question",
             return_value=QMessageBox.StandardButton.Yes,
@@ -2493,15 +2493,15 @@ class DeleteRenumberTests(unittest.TestCase):
 
         # 被删文件消失，后续同级重编号：3.7.6 丙→3.7.5 丙，3.7.7 丁→3.7.6 丁
         self.assertFalse((self.content_root / mid).exists())
-        new_c = "requirement/第3章/3.7 KSOA/3.7.5 丙.md"
-        new_d = "requirement/第3章/3.7 KSOA/3.7.6 丁.md"
+        new_c = "requirement/第3章/3.7 GXOA/3.7.5 丙.md"
+        new_d = "requirement/第3章/3.7 GXOA/3.7.6 丁.md"
         self.assertTrue((self.content_root / new_c).exists())
         self.assertTrue((self.content_root / new_d).exists())
         self.assertFalse(
-            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.6 丙.md").exists()
+            (self.content_root / "requirement/第3章/3.7 GXOA/3.7.6 丙.md").exists()
         )
         self.assertFalse(
-            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.7 丁.md").exists()
+            (self.content_root / "requirement/第3章/3.7 GXOA/3.7.7 丁.md").exists()
         )
         # 标题行联动更新
         self.assertIn(
@@ -2528,7 +2528,7 @@ class DeleteRenumberTests(unittest.TestCase):
             self.content_root, state_dir=self.project_root / ".state"
         )
         ws._index = self._build_index()
-        last = "requirement/第3章/3.7 KSOA/3.7.7 丁.md"
+        last = "requirement/第3章/3.7 GXOA/3.7.7 丁.md"
         with mock.patch.object(
             QMessageBox, "question",
             return_value=QMessageBox.StandardButton.Yes,
@@ -2537,10 +2537,10 @@ class DeleteRenumberTests(unittest.TestCase):
         # 删除最后一个：其余文件不改名
         self.assertFalse((self.content_root / last).exists())
         self.assertTrue(
-            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.5 乙.md").exists()
+            (self.content_root / "requirement/第3章/3.7 GXOA/3.7.5 乙.md").exists()
         )
         self.assertTrue(
-            (self.content_root / "requirement/第3章/3.7 KSOA/3.7.6 丙.md").exists()
+            (self.content_root / "requirement/第3章/3.7 GXOA/3.7.6 丙.md").exists()
         )
 
 

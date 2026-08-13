@@ -41,8 +41,8 @@ from doc_tool.domain.version import (  # noqa: E402
 def _make_manifest(**overrides):
     base = dict(
         documentType="requirement",
-        documentNo="KF-2090-1-001",
-        documentName="康尚健康云软件需求说明书",
+        documentNo="GX-2090-1-001",
+        documentName="星河云软件需求说明书",
         documentVersion="3.8",
         sourceSha256="abc123",
     )
@@ -105,7 +105,7 @@ class ProjectPathsTests(unittest.TestCase):
 
     def test_chinese_space_bracket_ampersand_paths(self):
         """中文、空格、括号、& 等合法 Windows 路径字符。"""
-        special = "content/requirement/第3章 功能需求 (JD & 外发)/3.1 KSHC.md"
+        special = "content/requirement/第3章 功能需求 (JD & 外发)/3.1 GXPC.md"
         resolved = self.paths.resolve(special)
         self.assertTrue(resolved.is_absolute())
         self.assertTrue(self.paths.is_inside(resolved))
@@ -151,7 +151,7 @@ class ProjectManifestTests(unittest.TestCase):
 
         loaded = ProjectManifest.load(self.root)
         self.assertEqual(loaded.documentType, "requirement")
-        self.assertEqual(loaded.documentNo, "KF-2090-1-001")
+        self.assertEqual(loaded.documentNo, "GX-2090-1-001")
         self.assertEqual(loaded.sourceSha256, "abc123")
         self.assertEqual(loaded.schemaVersion, PROJECT_SCHEMA_VERSION)
         self.assertEqual(loaded.refreshTimeoutSeconds, 900)
@@ -333,7 +333,7 @@ class WorkspacePortabilityTests(unittest.TestCase):
         root_a = Path(self.tmp_a) / "需求文档项目 (测试)"
         paths_a = ProjectPaths(root_a)
         paths_a.ensure_directories("design")
-        manifest = _make_manifest(documentType="design", documentNo="KF-2090-1-006")
+        manifest = _make_manifest(documentType="design", documentNo="GX-2090-1-006")
         manifest.paths = {
             "sourceDocx": "original/source.docx",
             "templateDocx": "template/template.docx",

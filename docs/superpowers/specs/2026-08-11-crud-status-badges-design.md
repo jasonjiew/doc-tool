@@ -92,7 +92,7 @@ def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> st
     """返回新章节文件 rel_path：递增最大编号；无兄弟时从目录编号 .1 起；兜底标题。
 
     1) 取 dir 下兄弟文件名数字前缀 X.Y.Z，取最大 Z 段 +1（如 3.7.3）
-    2) 无兄弟且目录名带数字段（3.7 KSOA）→ 3.7.1 起
+    2) 无兄弟且目录名带数字段（3.7 GXOA）→ 3.7.1 起
     3) 兜底：title 直接做文件名
     """
 ```

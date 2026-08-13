@@ -67,7 +67,7 @@ class MachineCliTests(unittest.TestCase):
             root = Path(tmp)
             content = root / "content" / "requirement"
             content.mkdir(parents=True)
-            (content / "1.1 intro.md").write_text("# 标题\nTODO KSHC\n", encoding="utf-8")
+            (content / "1.1 intro.md").write_text("# 标题\nTODO GXPC\n", encoding="utf-8")
             manifest = ProjectManifest(
                 documentType="requirement", documentNo="REQ-1", documentName="测试",
                 documentVersion="1.0", sourceSha256="x",

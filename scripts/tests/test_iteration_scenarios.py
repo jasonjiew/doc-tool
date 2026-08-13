@@ -84,7 +84,7 @@ def copy_project(destination):
         os.makedirs(base_chapter, exist_ok=True)
         with open(os.path.join(base_chapter, "{0}.1 基线.md".format(chapter_no)), "w", encoding="utf-8") as handle:
             handle.write("基线正文 {0}\n".format(chapter_no))
-    chapter = os.path.join(content_root, "第3章 功能需求", "3.1 KSHC")
+    chapter = os.path.join(content_root, "第3章 功能需求", "3.1 GXPC")
     os.makedirs(chapter, exist_ok=True)
     for number in range(1, 14):
         with open(os.path.join(chapter, "3.1.{0} 基线{0}.md".format(number)), "w", encoding="utf-8") as handle:
@@ -102,7 +102,7 @@ def main():
         copy_project(project)
         config = load_config("requirement", project)
         output = config["paths"]["output"]
-        chapter = os.path.join(config["paths"]["content_root"], "第3章 功能需求", "3.1 KSHC")
+        chapter = os.path.join(config["paths"]["content_root"], "第3章 功能需求", "3.1 GXPC")
         test_md = os.path.join(chapter, "3.1.14 注册.md")
         test_png = os.path.join(config["paths"]["asset_root"], "images", "iteration-natural.png")
 

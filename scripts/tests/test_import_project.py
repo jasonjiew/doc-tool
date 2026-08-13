@@ -190,7 +190,7 @@ def _build_body_xml(with_cover=True, with_image=True, with_tables=True, with_com
     """构造正文：封面 + H1/H2/H3 树 + 父正文 + 图片 + 普通/复杂表格。"""
     parts = []
     if with_cover:
-        parts.append(_cover_table("KF-TEST-001", "1.0"))
+        parts.append(_cover_table("GX-TEST-001", "1.0"))
     # 第1章 引言：父正文 + H2 叶子
     parts.append(_p("1", "引言"))
     parts.append(_body_p("本章父正文，应写入 _index.md 且位于子章节之前。"))
@@ -383,7 +383,7 @@ class ImportEndToEndTests(unittest.TestCase):
         import shutil
         shutil.rmtree(self._tmp, ignore_errors=True)
 
-    def _import(self, docx_name="KF-TEST-001 测试文档(1.0).docx", doc_type="general",
+    def _import(self, docx_name="GX-TEST-001 测试文档(1.0).docx", doc_type="general",
                 with_cover=True, with_image=True, with_tables=True,
                 project_name="测试项目"):
         src = os.path.join(self._tmp, docx_name)
@@ -394,7 +394,7 @@ class ImportEndToEndTests(unittest.TestCase):
             source_docx=Path(src),
             target_project_root=Path(target),
             document_type=doc_type,
-            document_no="KF-TEST-001",
+            document_no="GX-TEST-001",
             document_name="测试文档",
             document_version="1.0",
         )
@@ -442,7 +442,7 @@ class ImportEndToEndTests(unittest.TestCase):
             self.assertIn("通用", result.events[-1].detail)
 
     def test_general_docx_without_company_cover_full_import(self):
-        """通用大文档不要求康尚封面、文档编号或版本。"""
+        """通用大文档不要求星河封面、文档编号或版本。"""
         src = os.path.join(self._tmp, "运维手册.docx")
         write_synthetic_docx(
             src,
@@ -481,7 +481,7 @@ class ImportEndToEndTests(unittest.TestCase):
         self.assertTrue(validate_with_project(loaded, paths))
         self.assertTrue(
             validate_with_project(loaded, paths, require_refreshed=True),
-            "通用模式的后校验不应强制康尚 TOC/NUMPAGES 规则",
+            "通用模式的后校验不应强制星河 TOC/NUMPAGES 规则",
         )
 
         # 兼容早期导入器生成的清单：55..60 是“标题 N Char”字符样式，
@@ -599,7 +599,7 @@ class ImportEndToEndTests(unittest.TestCase):
         import shutil
         shutil.copytree(target, copy_to)
         loaded = ProjectManifest.load(copy_to)
-        self.assertEqual(loaded.documentNo, "KF-TEST-001")
+        self.assertEqual(loaded.documentNo, "GX-TEST-001")
 
     def test_manifest_heading_styles_float_key_rejected(self):
         """headingStyles 的浮点键（1.5）必须被拒绝，而非静默截断成级别 1。"""

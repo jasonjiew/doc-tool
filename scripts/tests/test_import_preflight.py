@@ -516,7 +516,7 @@ class PreviewModelTests(unittest.TestCase):
     def test_business_keyword_does_not_change_project_type(self):
         """标题/正文含「需求」「详细设计」关键字仍通过预检且不产生类型建议（任务 4.3）。"""
         paras = (
-            build_paragraph("1", "康尚健康云软件需求说明书")
+            build_paragraph("1", "星河云软件需求说明书")
             + build_paragraph("2", "1.1 背景")
         )
         path = os.path.join(self._tmp, "req.docx")
@@ -529,7 +529,7 @@ class PreviewModelTests(unittest.TestCase):
     def test_design_keyword_document_passes_preflight(self):
         """含「详细设计」关键字的大文档仍可通过预检（公共版统一为通用项目）。"""
         paras = (
-            build_paragraph("1", "康尚健康云系统详细设计说明书")
+            build_paragraph("1", "星河云系统详细设计说明书")
             + build_paragraph("2", "2.1 架构")
         )
         path = os.path.join(self._tmp, "design.docx")
@@ -571,7 +571,7 @@ class RenamedAndSpecialPathTests(unittest.TestCase):
         """中文长路径下的 DOCX 通过预检。"""
         deep_dir = os.path.join(
             self._tmp,
-            "康尚健康云项目",
+            "星河云项目",
             "需求文档",
             "2.3.0版本",
             "JD接入改造",

@@ -509,38 +509,38 @@ EOF
         from doc_tool.application.content.tree import next_chapter_rel_path
 
         files = [
-            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",
-            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",
-            "requirement/第3章/3.7 KSOA/3.7.10 设备管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.10 设备管理.md",
         ]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.11 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.11 权限管理.md"
         )
 
     def test_next_from_dir_number_when_no_numeric_siblings(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/3.7 KSOA/概述.md"]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        files = ["requirement/第3章/3.7 GXOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.1 权限管理.md"
         )
 
     def test_next_fallback_title_when_dir_unnumbered(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/KSOA/概述.md"]
-        result = next_chapter_rel_path("requirement/第3章/KSOA", files, "权限管理")
-        self.assertEqual(result, "requirement/第3章/KSOA/权限管理.md")
+        files = ["requirement/第3章/GXOA/概述.md"]
+        result = next_chapter_rel_path("requirement/第3章/GXOA", files, "权限管理")
+        self.assertEqual(result, "requirement/第3章/GXOA/权限管理.md")
 
     def test_next_ignores_subdirectory_files_as_siblings(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
-        files = ["requirement/第3章/3.7 KSOA/3.7.1 租户管理/3.7.1.1 详情.md"]
-        result = next_chapter_rel_path("requirement/第3章/3.7 KSOA", files, "权限管理")
+        files = ["requirement/第3章/3.7 GXOA/3.7.1 租户管理/3.7.1.1 详情.md"]
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
         self.assertEqual(
-            result, "requirement/第3章/3.7 KSOA/3.7.1 权限管理.md"
+            result, "requirement/第3章/3.7 GXOA/3.7.1 权限管理.md"
         )
 ```
 
@@ -572,7 +572,7 @@ def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> st
     """返回新章节文件 rel_path：递增最大兄弟编号；无编号从目录编号 .1 起；兜底标题。
 
     1) 只统计 dir 下的直接子文件，取数字前缀最大者的最后一段 +1（3.7.2→3.7.3）。
-    2) 无编号兄弟时，用目录名数字段起 .1（3.7 KSOA → 3.7.1）。
+    2) 无编号兄弟时，用目录名数字段起 .1（3.7 GXOA → 3.7.1）。
     3) 目录名也无数字段时，直接用标题做文件名。
     """
     prefix = dir_rel_path + "/"
@@ -662,16 +662,16 @@ class ChapterTreeStatusTests(unittest.TestCase):
 
         items = build_tree(
             [
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md",  # added
-                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md",  # modified
-                "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md",  # 未标记
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",  # added
+                "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",  # modified
+                "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md",  # 未标记
             ]
         )
         return ChapterTreeModel(
             items,
             status={
-                "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md": "added",
-                "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md": "modified",
+                "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md": "added",
+                "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md": "modified",
             },
         )
 
@@ -680,13 +680,13 @@ class ChapterTreeStatusTests(unittest.TestCase):
 
         model = self._model()
         added = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.1 租户管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md"
         )
         modified = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.2 产品管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md"
         )
         unmarked = model.index_for_id(
-            "requirement/第3章/3.7 KSOA/3.7.3 权限管理.md"
+            "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md"
         )
         self.assertFalse(model.data(added, Qt.ItemDataRole.DecorationRole).isNull())
         self.assertFalse(
@@ -700,7 +700,7 @@ class ChapterTreeStatusTests(unittest.TestCase):
         from PySide6.QtCore import Qt
 
         model = self._model()
-        dir_index = model.index_for_id("requirement/第3章/3.7 KSOA")
+        dir_index = model.index_for_id("requirement/第3章/3.7 GXOA")
         self.assertTrue(dir_index.isValid())
         self.assertIsNone(model.data(dir_index, Qt.ItemDataRole.DecorationRole))
 ```

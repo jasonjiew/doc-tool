@@ -145,7 +145,7 @@ class OutputStateTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = tempfile.mkdtemp(prefix="doc-state-")
-        self.output_path = os.path.join(self._tmp, "KF-001 文档(1.0).docx")
+        self.output_path = os.path.join(self._tmp, "GX-001 文档(1.0).docx")
         # 写入占位 DOCX
         with open(self.output_path, "wb") as handle:
             handle.write(b"fake docx content for hashing")
@@ -179,7 +179,7 @@ class OutputStateTests(unittest.TestCase):
         self.assertEqual(state.appVersion, "1.0.0")
         self.assertEqual(state.commit, "abc123")
         self.assertEqual(state.schemaVersion, 1)
-        self.assertEqual(state.outputFile, "KF-001 文档(1.0).docx")
+        self.assertEqual(state.outputFile, "GX-001 文档(1.0).docx")
         # SHA-256 应为完整 64 位指纹
         self.assertEqual(len(state.outputSha256), 64)
         self.assertEqual(state.outputSha256, _sha256(self.output_path))
@@ -264,7 +264,7 @@ class OutputStateTests(unittest.TestCase):
         from doc_tool.domain.output_state import state_file_for
 
         state_path = state_file_for(self.output_path)
-        self.assertEqual(state_path.name, "KF-001 文档(1.0).docx.state.json")
+        self.assertEqual(state_path.name, "GX-001 文档(1.0).docx.state.json")
         self.assertEqual(state_path.parent, Path(self.output_path).parent)
 
 

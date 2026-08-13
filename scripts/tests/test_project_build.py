@@ -52,7 +52,7 @@ REQUIREMENT_TEMPLATE = os.path.join(REPO_ROOT, "templates", "requirement-templat
 
 LEGACY_CONFIG_BODY = """\
 documentType: requirement
-documentNo: KF-TEST-001
+documentNo: GX-TEST-001
 documentName: 项目化构建测试
 documentVersion: "1.0"
 template:
@@ -122,7 +122,7 @@ def _make_manifest(project_root: str) -> ProjectManifest:
     """为临时项目构造清单。"""
     return ProjectManifest(
         documentType="requirement",
-        documentNo="KF-TEST-001",
+        documentNo="GX-TEST-001",
         documentName="项目化构建测试",
         documentVersion="1.0",
         sourceSha256="",
@@ -294,7 +294,7 @@ class SpecialPathRegressionTests(unittest.TestCase):
         try:
             manifest = ProjectManifest(
                 documentType="requirement",
-                documentNo="KF-TEST",
+                documentNo="GX-TEST",
                 documentName="测试",
                 documentVersion="1.0",
                 sourceSha256="",

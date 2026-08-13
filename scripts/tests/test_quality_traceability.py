@@ -44,7 +44,7 @@ from doc_tool.domain.manifest import ProjectManifest, increment_version
 
 class QualityRulesTests(unittest.TestCase):
     def _index(self, root: Path):
-        (root / "1.1 范围.md").write_text("# 范围\n文档编号: RQ-1\n手机号 13800138000\nTODO kshc\n", encoding="utf-8")
+        (root / "1.1 范围.md").write_text("# 范围\n文档编号: RQ-1\n手机号 13800138000\nTODO gxpc\n", encoding="utf-8")
         (root / "1.2 重复.md").write_text("# 1.1 重复\n", encoding="utf-8")
         return ContentIndexService(root).build()
 
@@ -78,7 +78,7 @@ class QualityRulesTests(unittest.TestCase):
                 QualityRule("numbering_uniqueness", True, "error"),
                 QualityRule("sensitive_info", True, "warning", {"patterns": [{"name": "手机", "regex": r"1[3-9]\d{9}"}]}),
             ])
-            issues = ContentLinter(index, config).check_all(["KSHC"])
+            issues = ContentLinter(index, config).check_all(["GXPC"])
             by_rule = {issue.rule_id for issue in issues}
             self.assertTrue({"todo_residual", "term_case", "required_section", "field_completeness", "numbering_uniqueness", "sensitive_info"}.issubset(by_rule))
             self.assertTrue(all(issue.severity in ("error", "warning", "info") for issue in issues))
@@ -256,7 +256,7 @@ class SettingsAndBaselineTests(unittest.TestCase):
     def _manifest(self):
         return ProjectManifest(
             documentType="requirement",
-            documentNo="KF-1",
+            documentNo="GX-1",
             documentName="test",
             documentVersion="1.0.1",
             sourceSha256="abc",

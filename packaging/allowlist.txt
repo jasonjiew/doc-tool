@@ -48,13 +48,6 @@ _internal/doc_tool/**
 
 # === 内核脚本 ===
 _internal/scripts/*.py
-_internal/scripts/migration/**
-
-# === 公司 Word 模板 ===
-_internal/templates/*.docx
-
-# === 文档配置 ===
-_internal/config/*.yml
 
 # === 许可文件 ===
 _internal/THIRD_PARTY_LICENSES.txt
