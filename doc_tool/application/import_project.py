@@ -50,7 +50,11 @@ from doc_tool.domain.errors import (
     RoundtripCheckError,
     TargetProjectExistsError,
 )
-from doc_tool.domain.manifest import ProjectManifest, DOCUMENT_TYPES
+from doc_tool.domain.manifest import (
+    ProjectManifest,
+    READABLE_DOCUMENT_TYPES,
+    is_creatable_document_type,
+)
 from doc_tool.domain.paths import ProjectPaths
 
 
@@ -161,9 +165,19 @@ def import_first_time(
             heading_style_map=request.heading_style_map,
         )
         fidelity_report = getattr(preview, "fidelity", None)
-        if request.document_type not in DOCUMENT_TYPES:
+        if request.document_type not in READABLE_DOCUMENT_TYPES:
             raise InvalidDocxError(
                 "未知的文档类型：{0}".format(request.document_type),
+                details={"documentType": request.document_type},
+            )
+        if not is_creatable_document_type(request.document_type):
+            # 公共版不再新建 requirement/design 项目；旧项目请走兼容读取或迁移。
+            raise InvalidDocxError(
+                "公共版只能创建通用大文档项目（documentType=general）。",
+                suggested_action=(
+                    "旧的需求/详细设计项目可继续读取与构建；如需改为通用项目，"
+                    "请使用项目迁移功能。"
+                ),
                 details={"documentType": request.document_type},
             )
         preflight_metrics = {

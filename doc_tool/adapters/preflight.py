@@ -9,8 +9,10 @@
 - 3.2 关系目标完整性及正文资源引用预检。
 - 3.3 ``styles.xml`` 的 styleId 到 Heading 1~6 映射和标题树解析。
 - 3.4 无 Heading 1、标题层级跳跃和无法闭合树的 fail-closed 校验。
-- 3.5 通用模式为默认，需求/详细设计只作为可选的公司文档预设。
 - 3.6 导入预览模型：标题级别计数、首尾标题、图片/表格数量和告警。
+
+公共版只创建通用大文档项目；预检不再基于「需求/详细设计」关键词给出文档
+类型建议。业务关键词不影响项目类型（任务 4.3）。
 """
 
 from __future__ import annotations
@@ -84,18 +86,6 @@ class HeadingInfo:
 
 
 @dataclass(frozen=True)
-class DocumentTypeSuggestion:
-    """文档类型建议。
-
-    低置信度时 ``confidence`` 为 ``"low"``，调用方不得据此自动决定类型。
-    """
-
-    document_type: str
-    confidence: str  # "high" | "low"
-    reason: str
-
-
-@dataclass(frozen=True)
 class StyleCensus:
     """一个段落样式的普查信息（供样式映射向导展示）。"""
 
@@ -126,7 +116,6 @@ class ImportPreview:
     media_count: int = 0
     relationship_count: int = 0
     warnings: List[str] = field(default_factory=list)
-    document_type_suggestion: Optional[DocumentTypeSuggestion] = None
     fidelity: Optional[FidelityReport] = None
     style_census: Dict[str, StyleCensus] = field(default_factory=dict)
 
@@ -218,8 +207,7 @@ def preflight(
             if len(media_names) == 0 and image_count > 0:
                 warnings.append("正文引用了图片但 media 目录为空。")
 
-            # --- 3.5 文档类型建议 ---
-            suggestion = _suggest_document_type(headings, parts)
+            # --- 3.5 文档类型建议：公共版不再做基于业务关键词的类型建议 ---
 
             return ImportPreview(
                 file_name=file_name,
@@ -238,7 +226,6 @@ def preflight(
                 media_count=len(media_names),
                 relationship_count=len(rel_map),
                 warnings=warnings,
-                document_type_suggestion=suggestion,
                 fidelity=fidelity_report,
                 style_census=style_census,
             )
@@ -632,62 +619,6 @@ def _validate_heading_hierarchy(headings: List[HeadingInfo]) -> None:
                 },
             )
         previous_level = heading.level
-
-
-# --- 3.5 文档类型建议 ---
-
-
-def _suggest_document_type(
-    headings: List[HeadingInfo], parts: Dict[str, bytes]
-) -> DocumentTypeSuggestion:
-    """根据标题和封面关键字给出文档预设建议。
-
-    低置信度时返回 ``confidence="low"``，调用方不得自动决定类型。
-    """
-    # 检查标题文本中是否包含"需求"/"设计"关键字
-    all_text = " ".join(h.text for h in headings[:20])
-    has_requirement = bool(re.search(r"需求", all_text))
-    has_design = bool(re.search(r"(详细设计|系统设计|设计说明书)", all_text))
-
-    # 检查封面文本（document.xml 前 2000 字符的纯文本）
-    document_xml = parts.get("word/document.xml", b"")
-    cover_text = ""
-    try:
-        root = parse_xml_safe(document_xml, "word/document.xml")
-        body = root.find(_qn("body"))
-        if body is not None:
-            for elem in list(body)[:30]:
-                cover_text += _para_text(elem) + " "
-    except OOXMLSecurityError:
-        pass  # 解析失败不影响类型建议（正文良构已由预检先行校验）
-    cover_has_requirement = bool(re.search(r"需求", cover_text))
-    cover_has_design = bool(re.search(r"(详细设计|系统设计|设计说明书)", cover_text))
-
-    requirement_score = (1 if has_requirement else 0) + (1 if cover_has_requirement else 0)
-    design_score = (1 if has_design else 0) + (1 if cover_has_design else 0)
-
-    if design_score > requirement_score and design_score >= 1:
-        confidence = "high" if design_score >= 2 else "low"
-        return DocumentTypeSuggestion(
-            document_type="design",
-            confidence=confidence,
-            reason='标题和封面关键字倾向「详细设计说明书」。' if confidence == "high"
-            else '封面或标题中检测到「设计」关键字，但置信度不足，请用户确认。',
-        )
-    if requirement_score > design_score and requirement_score >= 1:
-        confidence = "high" if requirement_score >= 2 else "low"
-        return DocumentTypeSuggestion(
-            document_type="requirement",
-            confidence=confidence,
-            reason='标题和封面关键字倾向「需求说明书」。' if confidence == "high"
-            else '封面或标题中检测到「需求」关键字，但置信度不足，请用户确认。',
-        )
-    # 不是可明确识别的公司需求/设计文档时，安全地回落到通用模式。
-    return DocumentTypeSuggestion(
-        document_type="general",
-        confidence="high",
-        reason="未检测到需求/详细设计特征，建议使用「通用大文档」模式。",
-    )
 
 
 # --- 3.6 统计辅助 ---

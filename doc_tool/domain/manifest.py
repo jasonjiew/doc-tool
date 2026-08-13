@@ -48,7 +48,27 @@ from doc_tool.domain.version import (
 )
 
 
-DOCUMENT_TYPES = ("general", "requirement", "design")
+# 可新建的文档类型：公共版只允许创建通用大文档项目。
+CREATABLE_DOCUMENT_TYPES = ("general",)
+
+# 旧版专用文档类型：schema v1 兼容读取/构建，公共版不再新建。
+SUPPORTED_LEGACY_DOCUMENT_TYPES = ("requirement", "design")
+
+# 可读取的文档类型（新类型 + 旧兼容类型）。
+READABLE_DOCUMENT_TYPES = CREATABLE_DOCUMENT_TYPES + SUPPORTED_LEGACY_DOCUMENT_TYPES
+
+# 兼容别名：完整集合（含已可读类型）。schema v1 继续接受 general/requirement/design。
+DOCUMENT_TYPES = READABLE_DOCUMENT_TYPES
+
+
+def is_creatable_document_type(value: str) -> bool:
+    """公共版是否允许新建该文档类型。"""
+    return value in CREATABLE_DOCUMENT_TYPES
+
+
+def is_legacy_document_type(value: str) -> bool:
+    """是否为旧版专用文档类型（仅兼容读取/构建，不再新建）。"""
+    return value in SUPPORTED_LEGACY_DOCUMENT_TYPES
 
 # 默认刷新超时（秒），与现有 config 保持一致。
 DEFAULT_REFRESH_TIMEOUT_SECONDS = 900

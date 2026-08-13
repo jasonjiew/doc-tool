@@ -85,6 +85,38 @@ class MachineCliTests(unittest.TestCase):
                 self.assertIn(code, (0, 1))
                 json.loads(out.getvalue())
 
+    def test_import_parser_rejects_legacy_document_type(self):
+        """任务 4.4/4.7：公共 CLI import 只接受 general，旧类型参数被拒绝。"""
+        from doc_tool.cli import build_parser
+
+        parser = build_parser()
+        # 显式旧类型参数 → argparse 拒绝（invalid choice），不进入导入流程。
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            parser.parse_args(
+                ["import", "--docx", "x.docx", "--name", "n", "--document-type", "requirement"]
+            )
+        self.assertEqual(raised.exception.code, 2)
+        # 省略或显式 general 均可解析，且默认版本/编号为空（可选元数据）。
+        args = parser.parse_args(["import", "--docx", "x.docx", "--name", "n"])
+        self.assertEqual(args.document_type, "general")
+        self.assertEqual(args.document_version, "")
+        args2 = parser.parse_args(
+            ["import", "--docx", "x.docx", "--name", "n", "--document-type", "general"]
+        )
+        self.assertEqual(args2.document_type, "general")
+
+    def test_cli_help_does_not_list_legacy_document_types(self):
+        """任务 4.4：import 帮助不再把 requirement/design 列为可创建类型。"""
+        from doc_tool.cli import build_parser
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            build_parser().parse_args(["import", "--help"])
+        import_help = out.getvalue()
+        self.assertIn("--document-type", import_help)
+        self.assertNotIn("requirement", import_help)
+        self.assertNotIn("design", import_help)
+
 
 if __name__ == "__main__":
     unittest.main()

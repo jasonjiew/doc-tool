@@ -513,8 +513,8 @@ class PreviewModelTests(unittest.TestCase):
         preview = preflight(path)
         self.assertEqual(preview.table_count, 1)
 
-    def test_requirement_type_suggestion_high_confidence(self):
-        """包含"需求"关键字的文档高置信度建议为 requirement。"""
+    def test_business_keyword_does_not_change_project_type(self):
+        """标题/正文含「需求」「详细设计」关键字仍通过预检且不产生类型建议（任务 4.3）。"""
         paras = (
             build_paragraph("1", "康尚健康云软件需求说明书")
             + build_paragraph("2", "1.1 背景")
@@ -522,12 +522,12 @@ class PreviewModelTests(unittest.TestCase):
         path = os.path.join(self._tmp, "req.docx")
         write_docx(path, paras)
         preview = preflight(path)
-        self.assertIsNotNone(preview.document_type_suggestion)
-        self.assertEqual(preview.document_type_suggestion.document_type, "requirement")
-        self.assertEqual(preview.document_type_suggestion.confidence, "high")
+        # 预检不再基于业务关键词给出文档类型建议
+        self.assertFalse(hasattr(preview, "document_type_suggestion"))
+        self.assertEqual(preview.heading_level_counts.get(1), 1)
 
-    def test_design_type_suggestion_high_confidence(self):
-        """包含"详细设计"关键字的文档高置信度建议为 design。"""
+    def test_design_keyword_document_passes_preflight(self):
+        """含「详细设计」关键字的大文档仍可通过预检（公共版统一为通用项目）。"""
         paras = (
             build_paragraph("1", "康尚健康云系统详细设计说明书")
             + build_paragraph("2", "2.1 架构")
@@ -535,18 +535,16 @@ class PreviewModelTests(unittest.TestCase):
         path = os.path.join(self._tmp, "design.docx")
         write_docx(path, paras)
         preview = preflight(path)
-        self.assertIsNotNone(preview.document_type_suggestion)
-        self.assertEqual(preview.document_type_suggestion.document_type, "design")
-        self.assertEqual(preview.document_type_suggestion.confidence, "high")
+        self.assertFalse(hasattr(preview, "document_type_suggestion"))
+        self.assertEqual(preview.heading_level_counts.get(1), 1)
 
-    def test_unclassified_document_uses_general_mode(self):
-        """无需求/设计特征的文档建议通用大文档模式。"""
+    def test_generic_document_preflight_no_suggestion(self):
+        """无需求/设计特征的文档预检成功，且不产生类型建议。"""
         paras = build_paragraph("1", "第一章 概述")
         path = os.path.join(self._tmp, "generic.docx")
         write_docx(path, paras)
         preview = preflight(path)
-        self.assertEqual(preview.document_type_suggestion.document_type, "general")
-        self.assertEqual(preview.document_type_suggestion.confidence, "high")
+        self.assertFalse(hasattr(preview, "document_type_suggestion"))
 
 
 class RenamedAndSpecialPathTests(unittest.TestCase):

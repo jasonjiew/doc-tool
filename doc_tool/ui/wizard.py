@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QRadioButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -51,13 +50,6 @@ from doc_tool.ui.task_bridge import (
 )
 
 PREFLIGHT_TIMEOUT_SECONDS = 90
-
-# 文档类型预设标签。
-_DOC_TYPE_LABELS = {
-    "general": "通用大文档",
-    "requirement": "需求文档预设",
-    "design": "详细设计预设",
-}
 
 
 def format_preview_summary(preview) -> str:
@@ -90,17 +82,6 @@ def format_preview_summary(preview) -> str:
             lines.append("  [{0}] {1}: {2}{3}".format(tag, finding.label, finding.count, sample))
         if fidelity.has_block:
             lines.append("  ⛔ 存在阻断特性：默认阻止导入，可在确认风险后勾选「仍然导入」。")
-    suggestion = getattr(preview, "document_type_suggestion", None)
-    if suggestion is not None:
-        lines.extend([
-            "",
-            "建议模式：{0}".format(
-                _DOC_TYPE_LABELS.get(
-                    suggestion.document_type, suggestion.document_type
-                )
-            ),
-            "原因：{0}".format(suggestion.reason),
-        ])
     return "\n".join(lines)
 
 
@@ -214,10 +195,6 @@ class _PreflightPage(QWizardPage):
             else:
                 self._confirm_block.hide()
                 self._confirm_block.setChecked(False)
-            if ok and preview is not None and preview.document_type_suggestion is not None:
-                suggestion = preview.document_type_suggestion
-                if suggestion.confidence == "high":
-                    wizard._doc_type = suggestion.document_type
         self._status_label.setText("预检完成" if self._preview_ok else "预检未通过")
         self.completeChanged.emit()
 
@@ -340,19 +317,11 @@ class _ProjectInfoPage(QWizardPage):
         form = QHBoxLayout()
         left = QVBoxLayout()
 
-        self._type_radios: dict = {}
-        type_label = QLabel("文档类型：", self)
-        left.addWidget(type_label)
-        for value, text in _DOC_TYPE_LABELS.items():
-            radio = QRadioButton(text, self)
-            radio.setProperty("docType", value)
-            left.addWidget(radio)
-            self._type_radios[value] = radio
-        self._type_radios["general"].setChecked(True)
+        # 公共版只创建通用大文档项目，不再提供需求/详细设计类型单选（任务 4.2）。
 
-        self._doc_no_entry = self._field_row(left, "文档编号（通用可选）：")
+        self._doc_no_entry = self._field_row(left, "文档编号（可选）：")
         self._doc_name_entry = self._field_row(left, "文档名称：")
-        self._doc_version_entry = self._field_row(left, "文档版本（通用可选）：")
+        self._doc_version_entry = self._field_row(left, "文档版本（可选）：")
         self._project_name_entry = self._field_row(left, "项目目录名：")
 
         target_row = QHBoxLayout()
@@ -389,7 +358,6 @@ class _ProjectInfoPage(QWizardPage):
 
     def initializePage(self) -> None:
         wizard = self.wizard()
-        self._type_radios.get(wizard._doc_type, self._type_radios["general"]).setChecked(True)
         self._doc_no_entry.setText(wizard._doc_no)
         self._doc_name_entry.setText(wizard._doc_name)
         self._doc_version_entry.setText(wizard._doc_version)
@@ -399,9 +367,7 @@ class _ProjectInfoPage(QWizardPage):
 
     def validatePage(self) -> bool:
         wizard = self.wizard()
-        wizard._doc_type = next(
-            (v for v, r in self._type_radios.items() if r.isChecked()), "general"
-        )
+        wizard._doc_type = "general"
         wizard._doc_no = self._doc_no_entry.text().strip()
         wizard._doc_name = self._doc_name_entry.text().strip()
         wizard._doc_version = self._doc_version_entry.text().strip()
@@ -551,7 +517,7 @@ class ImportWizard(QWizard):
         self._doc_type = "general"
         self._doc_no = ""
         self._doc_name = ""
-        self._doc_version = "1.0"
+        self._doc_version = ""
         self._project_name = ""
         self._target_parent = ""
         self._heading_style_map: Optional[dict] = None
@@ -713,12 +679,8 @@ class ImportWizard(QWizard):
 
     def _validate_project_info(self) -> str:
         """验证项目信息字段；返回错误文本（空串表示通过）。"""
-        if self._doc_type in ("requirement", "design") and not self._doc_no:
-            return "需求/详细设计预设必须填写文档编号。"
         if not self._doc_name:
             return "请填写文档名称。"
-        if self._doc_type in ("requirement", "design") and not self._doc_version:
-            return "需求/详细设计预设必须填写文档版本。"
         if not self._project_name:
             return "请填写项目目录名。"
         if not self._target_parent:

@@ -34,7 +34,7 @@ from doc_tool.application.import_project import (  # noqa: E402
     import_first_time,
 )
 from doc_tool.domain.cancellation import CancellationToken  # noqa: E402
-from doc_tool.domain.errors import TargetProjectExistsError  # noqa: E402
+from doc_tool.domain.errors import BuildError, TargetProjectExistsError  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -294,9 +294,9 @@ class ExtractionRegressionTests(unittest.TestCase):
         self._tmp = tempfile.mkdtemp(prefix="doc-import-reg-")
         self._docx = os.path.join(self._tmp, "source.docx")
         write_synthetic_docx(self._docx)
-        self._content = os.path.join(self._tmp, "content", "requirement")
-        self._images = os.path.join(self._tmp, "assets", "requirement", "images")
-        self._tables = os.path.join(self._tmp, "assets", "requirement", "tables")
+        self._content = os.path.join(self._tmp, "content", "general")
+        self._images = os.path.join(self._tmp, "assets", "general", "images")
+        self._tables = os.path.join(self._tmp, "assets", "general", "tables")
 
     def tearDown(self):
         import shutil
@@ -304,7 +304,7 @@ class ExtractionRegressionTests(unittest.TestCase):
 
     def test_parent_body_writes_index_md_before_children(self):
         """父章节自身正文写入 _index.md 且目录树在子章节之前。"""
-        extract_content(self._docx, self._content, self._images, self._tables, "requirement")
+        extract_content(self._docx, self._content, self._images, self._tables, "general")
         split_into_tree(self._content)
         chapter1 = os.path.join(self._content, "第1章 引言")
         self.assertTrue(os.path.isdir(chapter1), "第1章应为目录")
@@ -317,7 +317,7 @@ class ExtractionRegressionTests(unittest.TestCase):
 
     def test_simple_table_extracted_as_markdown(self):
         """普通表格提取为 Markdown 表格（带 TBL 头）。"""
-        result = extract_content(self._docx, self._content, self._images, self._tables, "requirement")
+        result = extract_content(self._docx, self._content, self._images, self._tables, "general")
         self.assertGreaterEqual(result.simple_table_count, 1)
         found = False
         for name in os.listdir(self._content):
@@ -329,7 +329,7 @@ class ExtractionRegressionTests(unittest.TestCase):
 
     def test_complex_table_extracted_as_xml(self):
         """复杂表格（gridSpan）提取为 XML 资源。"""
-        result = extract_content(self._docx, self._content, self._images, self._tables, "requirement")
+        result = extract_content(self._docx, self._content, self._images, self._tables, "general")
         self.assertGreaterEqual(result.complex_table_count, 1)
         xmls = [f for f in os.listdir(self._tables) if f.endswith(".xml")]
         self.assertGreaterEqual(len(xmls), 1, "应生成复杂表格 XML 文件")
@@ -344,7 +344,7 @@ class ExtractionRegressionTests(unittest.TestCase):
 
     def test_image_extracted_with_dimensions(self):
         """图片提取并保留尺寸标注。"""
-        result = extract_content(self._docx, self._content, self._images, self._tables, "requirement")
+        result = extract_content(self._docx, self._content, self._images, self._tables, "general")
         self.assertEqual(result.image_count, 1)
         imgs = os.listdir(self._images)
         self.assertEqual(len(imgs), 1)
@@ -354,7 +354,7 @@ class ExtractionRegressionTests(unittest.TestCase):
 
     def test_event_order_preserved(self):
         """正文/图片/表格按源文档顺序提取，事件顺序保持一致。"""
-        result = extract_content(self._docx, self._content, self._images, self._tables, "requirement")
+        result = extract_content(self._docx, self._content, self._images, self._tables, "general")
         # 第1章 Markdown 中应按顺序出现：父正文 -> H2 -> 图片 -> 普通表格 -> 复杂表格
         names = sorted(os.listdir(self._content))
         chap1 = [n for n in names if n.startswith("01-")][0]
@@ -383,7 +383,7 @@ class ImportEndToEndTests(unittest.TestCase):
         import shutil
         shutil.rmtree(self._tmp, ignore_errors=True)
 
-    def _import(self, docx_name="KF-TEST-001 测试文档(1.0).docx", doc_type="requirement",
+    def _import(self, docx_name="KF-TEST-001 测试文档(1.0).docx", doc_type="general",
                 with_cover=True, with_image=True, with_tables=True,
                 project_name="测试项目"):
         src = os.path.join(self._tmp, docx_name)
@@ -400,8 +400,8 @@ class ImportEndToEndTests(unittest.TestCase):
         )
         return src, src_sha, target, import_first_time(request)
 
-    def test_requirement_docx_full_import(self):
-        """需求类 DOCX 完整首次导入：预检->提取->拆分->结构校验->试构建->原子发布。"""
+    def test_general_docx_full_import(self):
+        """通用大文档完整首次导入：预检->提取->拆分->结构校验->试构建->原子发布。"""
         src, src_sha, target, result = self._import()
         self.assertTrue(result.success, "导入应成功；失败事件: {0}".format(
             [(e.stage, e.status, e.detail) for e in result.events]))
@@ -411,25 +411,35 @@ class ImportEndToEndTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(target, "project.yml")))
         self.assertTrue(os.path.isfile(os.path.join(target, "original", "source.docx")))
         self.assertTrue(os.path.isfile(os.path.join(target, "template", "template.docx")))
-        self.assertTrue(os.path.isdir(os.path.join(target, "content", "requirement")))
-        self.assertTrue(os.path.isdir(os.path.join(target, "assets", "requirement", "images")))
-        self.assertTrue(os.path.isdir(os.path.join(target, "assets", "requirement", "tables")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "content", "general")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "assets", "general", "images")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "assets", "general", "tables")))
         # 章节目录树已生成
-        self.assertTrue(os.path.isdir(os.path.join(target, "content", "requirement", "第1章 引言")))
-        self.assertTrue(os.path.isdir(os.path.join(target, "content", "requirement", "第2章 详细设计")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "content", "general", "第1章 引言")))
+        self.assertTrue(os.path.isdir(os.path.join(target, "content", "general", "第2章 详细设计")))
         # 所有阶段成功
         stages = {e.stage: e.status for e in result.events}
         self.assertEqual(stages.get("publish"), "succeeded")
 
-    def test_design_docx_full_import(self):
-        """详细设计类 DOCX 完整首次导入。"""
-        src, src_sha, target, result = self._import(
-            docx_name="KF-TEST-006 详细设计(2.0).docx", doc_type="design",
-            project_name="详细设计项目")
-        self.assertTrue(result.success, "导入应成功；失败: {0}".format(
-            [(e.stage, e.detail) for e in result.events if e.status == "failed"]))
-        self.assertTrue(os.path.isdir(os.path.join(target, "content", "design")))
-        self.assertTrue(os.path.isfile(os.path.join(target, "project.yml")))
+    def test_legacy_document_type_import_rejected(self):
+        """任务 4.4：公共版拒绝新建 requirement/design 项目且不创建目录。"""
+        for legacy_type in ("requirement", "design"):
+            src = os.path.join(self._tmp, "legacy-{0}.docx".format(legacy_type))
+            write_synthetic_docx(src)
+            target = os.path.join(self._tmp, "legacy-{0}-项目".format(legacy_type))
+            request = ImportRequest(
+                source_docx=Path(src),
+                target_project_root=Path(target),
+                document_type=legacy_type,
+                document_no="LEG-1",
+                document_name="旧类型文档",
+                document_version="1.0",
+            )
+            result = import_first_time(request)
+            self.assertFalse(result.success, "legacy {0} 导入应被拒绝".format(legacy_type))
+            self.assertEqual(result.error_code, "E1001")
+            self.assertFalse(os.path.exists(target), "不应创建半成品目录")
+            self.assertIn("通用", result.events[-1].detail)
 
     def test_general_docx_without_company_cover_full_import(self):
         """通用大文档不要求康尚封面、文档编号或版本。"""
@@ -482,7 +492,7 @@ class ImportEndToEndTests(unittest.TestCase):
         self.assertTrue(validate_with_project(loaded, paths))
 
     def test_renamed_docx_import(self):
-        """改名公司风格 DOCX（文件名与基线不同）仍能完整导入。"""
+        """改名 DOCX（文件名与基线不同）仍能完整导入。"""
         renamed = "公司内部文档-需求说明书(v9).docx"
         src, src_sha, target, result = self._import(docx_name=renamed, project_name="改名项目")
         self.assertTrue(result.success, "改名 DOCX 应能导入；失败: {0}".format(
@@ -498,7 +508,7 @@ class ImportEndToEndTests(unittest.TestCase):
         request = ImportRequest(
             source_docx=Path(src2),
             target_project_root=Path(os.path.join(self._tmp, "已有项目A")),
-            document_type="requirement", document_no="KF-2", document_name="二", document_version="2.0",
+            document_type="general", document_no="", document_name="二", document_version="2.0",
         )
         result = import_first_time(request)
         self.assertFalse(result.success)
@@ -511,25 +521,31 @@ class ImportEndToEndTests(unittest.TestCase):
 
     def test_failure_isolation_cleans_staging_and_logs(self):
         """任务 4.7：试构建失败后暂存隔离清理并写诊断日志，源文档与正式项目不受影响。"""
-        # 无封面表 -> update_cover 失败 -> 试构建失败
-        src = os.path.join(self._tmp, "noface.docx")
-        write_synthetic_docx(src, with_cover=False)
+        from unittest import mock
+
+        src = os.path.join(self._tmp, "buildfail.docx")
+        write_synthetic_docx(src)
         src_sha = _sha256(src)
-        target = os.path.join(self._tmp, "无封面项目")
+        target = os.path.join(self._tmp, "构建失败项目")
         request = ImportRequest(
             source_docx=Path(src), target_project_root=Path(target),
-            document_type="requirement", document_no="KF-X", document_name="无封面", document_version="1.0",
+            document_type="general", document_no="", document_name="构建失败", document_version="1.0",
         )
-        result = import_first_time(request)
-        self.assertFalse(result.success, "无封面表应导致试构建失败")
+        # 模拟内核构建后端失败，触发试构建阶段的隔离清理。
+        with mock.patch(
+            "doc_tool.application.import_project._trial_build",
+            side_effect=BuildError("试构建失败：模拟"),
+        ):
+            result = import_first_time(request)
+        self.assertFalse(result.success, "试构建失败应导致导入失败")
         self.assertEqual(result.error_code, "E2001")
         # 暂存目录已清理
-        staging = [d for d in os.listdir(self._tmp) if d.startswith(".无封面项目.import-staging")]
+        staging = [d for d in os.listdir(self._tmp) if d.startswith(".构建失败项目.import-staging")]
         self.assertEqual(staging, [], "失败后暂存目录应被清理")
         # 正式项目未创建
         self.assertFalse(os.path.exists(target), "失败时正式项目不应被创建")
         # 诊断日志已写入
-        logs = [f for f in os.listdir(self._tmp) if f.startswith(".无封面项目.import-failed")]
+        logs = [f for f in os.listdir(self._tmp) if f.startswith(".构建失败项目.import-failed")]
         self.assertEqual(len(logs), 1, "应写入一份诊断日志")
         import json
         log_data = json.loads(Path(self._tmp, logs[0]).read_text(encoding="utf-8"))
@@ -547,8 +563,8 @@ class ImportEndToEndTests(unittest.TestCase):
         request = ImportRequest(
             source_docx=Path(src),
             target_project_root=Path(target),
-            document_type="requirement",
-            document_no="KF-CANCEL",
+            document_type="general",
+            document_no="",
             document_name="取消测试",
             document_version="1.0",
         )
@@ -573,7 +589,7 @@ class ImportEndToEndTests(unittest.TestCase):
         import yaml
         manifest = yaml.safe_load(Path(target, "project.yml").read_text(encoding="utf-8"))
         self.assertEqual(manifest["sourceSha256"], src_sha)
-        self.assertEqual(manifest["documentType"], "requirement")
+        self.assertEqual(manifest["documentType"], "general")
         for key, rel in manifest["paths"].items():
             self.assertFalse(os.path.isabs(rel), "{0} 应为相对路径".format(key))
             self.assertFalse(rel.startswith(".."), "{0} 不应越界".format(key))
@@ -592,17 +608,17 @@ class ImportEndToEndTests(unittest.TestCase):
 
         base = {
             "schemaVersion": 1,
-            "documentType": "requirement",
-            "documentNo": "KF-TEST-001",
+            "documentType": "general",
+            "documentNo": "",
             "documentName": "测试",
             "documentVersion": "1.0",
             "sourceSha256": "",
             "paths": {
                 "sourceDocx": "original/source.docx",
                 "templateDocx": "template/template.docx",
-                "contentRoot": "content/requirement",
-                "assetRoot": "assets/requirement",
-                "tableRoot": "assets/requirement/tables",
+                "contentRoot": "content/general",
+                "assetRoot": "assets/general",
+                "tableRoot": "assets/general/tables",
             },
         }
         with self.assertRaises(ProjectManifestError):
@@ -617,14 +633,20 @@ class ImportEndToEndTests(unittest.TestCase):
 
     def test_atomic_publish_no_partial_project_on_failure(self):
         """任务 4.5：失败时不会留下半成品项目目录。"""
-        src = os.path.join(self._tmp, "noface2.docx")
-        write_synthetic_docx(src, with_cover=False)
+        from unittest import mock
+
+        src = os.path.join(self._tmp, "atomic-fail.docx")
+        write_synthetic_docx(src)
         target = os.path.join(self._tmp, "原子性项目")
         request = ImportRequest(
             source_docx=Path(src), target_project_root=Path(target),
-            document_type="requirement", document_no="KF-Y", document_name="原子", document_version="1.0",
+            document_type="general", document_no="", document_name="原子", document_version="1.0",
         )
-        result = import_first_time(request)
+        with mock.patch(
+            "doc_tool.application.import_project._trial_build",
+            side_effect=BuildError("试构建失败：模拟"),
+        ):
+            result = import_first_time(request)
         self.assertFalse(result.success)
         self.assertFalse(os.path.exists(target), "失败时不应创建半成品项目目录")
 
@@ -671,8 +693,8 @@ class RoundtripGateTests(unittest.TestCase):
         request = ImportRequest(
             source_docx=Path(src),
             target_project_root=Path(target),
-            document_type="requirement",
-            document_no="KF-GATE",
+            document_type="general",
+            document_no="",
             document_name="门禁",
             document_version="1.0",
             require_exact_roundtrip=require_exact,

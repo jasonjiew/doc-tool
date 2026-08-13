@@ -453,17 +453,13 @@ class ImportWizardPresentationTests(unittest.TestCase):
             image_count=4,
             table_count=5,
             warnings=[],
-            document_type_suggestion=SimpleNamespace(
-                document_type="general",
-                confidence="high",
-                reason="通用模式",
-            ),
         )
         text = format_preview_summary(preview)
         self.assertIn("Heading 1: 2", text)
         self.assertIn("Heading 2: 3", text)
         self.assertIn("图片数量：4", text)
-        self.assertIn("建议模式：通用大文档", text)
+        # 公共版不再渲染文档类型「建议模式」
+        self.assertNotIn("建议模式", text)
 
     def test_wizard_exposes_six_qwizard_pages(self):
         _ensure_qapp()
@@ -480,18 +476,23 @@ class ImportWizardPresentationTests(unittest.TestCase):
         wizard.close()
 
     def test_project_info_validation_rules(self):
+        """文档名/项目名必填，文档编号与版本可选（任务 4.2）。"""
         from doc_tool.ui.wizard import ImportWizard
 
         wizard = ImportWizard.__new__(ImportWizard)
-        wizard._doc_type = "requirement"
+        wizard._doc_type = "general"
         wizard._doc_no = ""
-        wizard._doc_name = "文档"
-        wizard._doc_version = "1.0"
+        wizard._doc_name = ""
+        wizard._doc_version = ""
         wizard._project_name = "proj"
         wizard._target_parent = "C:/x"
-        self.assertIn("文档编号", wizard._validate_project_info())
+        # 文档名必填
+        self.assertIn("文档名称", wizard._validate_project_info())
 
-        wizard._doc_no = "KSHC-001"
+        wizard._doc_name = "文档"
+        # 文档编号/版本为空不报错（可选元数据）
+        self.assertEqual(wizard._validate_project_info(), "")
+
         wizard._project_name = "a:b"
         self.assertIn("不允许的字符", wizard._validate_project_info())
 
@@ -538,9 +539,6 @@ class WizardFidelityAndMappingTests(unittest.TestCase):
             image_count=1,
             table_count=0,
             warnings=[],
-            document_type_suggestion=SimpleNamespace(
-                document_type="general", confidence="high", reason="通用"
-            ),
             fidelity=FidelityReport(findings=(
                 FidelityFinding("comment", "批注", SEVERITY_BLOCK, 1, ("body[3]",)),
             )),

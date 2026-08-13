@@ -42,10 +42,14 @@ def build_parser() -> argparse.ArgumentParser:
     import_p.add_argument("--docx", required=True)
     import_p.add_argument("--name", required=True)
     import_p.add_argument("--target-dir", default=".")
-    import_p.add_argument("--document-type", choices=("general", "requirement", "design"), default="general")
+    # 公共版只创建通用大文档项目；requirement/design 仅旧项目兼容读取，不再可新建。
+    import_p.add_argument(
+        "--document-type", choices=("general",), default="general",
+        help="项目文档类型（公共版固定为 general）",
+    )
     import_p.add_argument("--document-no", default="")
     import_p.add_argument("--document-name", default="")
-    import_p.add_argument("--document-version", default="1.0")
+    import_p.add_argument("--document-version", default="")
     _add_output(import_p)
 
     validate = sub.add_parser("validate", help="校验一个或多个项目")
