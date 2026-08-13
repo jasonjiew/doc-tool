@@ -95,6 +95,18 @@ class ScanVocabularyTests(unittest.TestCase):
         )
         self.assertEqual(hits, [])
 
+    def test_credentials_detected(self):
+        """凭据模式（云密钥/私钥/口令赋值）被检出。"""
+        dirty = (
+            "aws AKIAABCDEFGHIJKLMNOP\n"
+            "key = \"supersecretvalue123\"\n"
+            "token: \"ghp_abcdefghijklmnopqrstuvwxyz0123456789ab\"\n"
+        )
+        clean = "token: Optional[CancellationToken]\n"
+        self.assertTrue(self.sl.scan_credentials(dirty, "test"))
+        # 类型标注/变量名不应误报
+        self.assertEqual(self.sl.scan_credentials(clean, "test"), [])
+
 
 class OoxmlContentScanTests(unittest.TestCase):
     """任务 8.5：DOCX/OOXML 内部内容扫描正负测试。"""

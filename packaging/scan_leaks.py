@@ -80,12 +80,13 @@ def _is_rfc1918_ip(text: str) -> bool:
 _IP_TOKEN_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
 # 常见凭据模式（任务 9.1）：云密钥、私钥、令牌、口令赋值。
+# 赋值类模式要求字面引号值，避免误报 `token: Optional[...]` 类型标注。
 _CREDENTIAL_PATTERNS = [
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AWS Access Key"),
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "私钥"),
     (re.compile(r"\bghp_[A-Za-z0-9]{36}\b"), "GitHub Token"),
-    (re.compile(r"(?i)\bapi[_-]?key\s*[:=]\s*[\"']?[A-Za-z0-9_\-]{16,}"), "API Key"),
-    (re.compile(r"(?i)\b(?:password|passwd|pwd|secret|token)\s*[:=]\s*\S{8,}"), "口令/密钥赋值"),
+    (re.compile(r"(?i)\bapi[_-]?key\s*[:=]\s*[\"'][^\"']{12,}[\"']"), "API Key 赋值"),
+    (re.compile(r"(?i)\b(?:password|passwd|pwd|secret|token)\s*[:=]\s*[\"'][^\"']{8,}[\"']"), "口令/密钥赋值"),
 ]
 
 

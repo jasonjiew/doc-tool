@@ -77,11 +77,11 @@
 ## 10. 开源治理文件
 
 - [ ] 10.1 在权利人确认后添加标准 `LICENSE` 全文，并统一 README、包元数据和 SBOM 中的 SPDX 标识
-- [ ] 10.2 添加 `CONTRIBUTING.md`，说明开发环境、测试、提交规范、版权贡献约定和禁止敏感数据规则
-- [ ] 10.3 添加 `CODE_OF_CONDUCT.md` 及执行/联系信息
-- [ ] 10.4 添加 `SECURITY.md`，说明支持版本、私密报告渠道、响应流程和恶意文档样本处理要求
-- [ ] 10.5 添加 GitHub/GitLab Issue 模板、Pull Request 模板和必要的贡献者检查项
-- [ ] 10.6 更新 `THIRD_PARTY_LICENSES.txt`，确保安装包携带适用通知并与锁定依赖一致
+- [x] 10.2 添加 `CONTRIBUTING.md`，说明开发环境、测试、提交规范、版权贡献约定和禁止敏感数据规则
+- [x] 10.3 添加 `CODE_OF_CONDUCT.md` 及执行/联系信息
+- [x] 10.4 添加 `SECURITY.md`，说明支持版本、私密报告渠道、响应流程和恶意文档样本处理要求
+- [x] 10.5 添加 GitHub/GitLab Issue 模板、Pull Request 模板和必要的贡献者检查项
+- [x] 10.6 更新 `THIRD_PARTY_LICENSES.txt`，确保安装包携带适用通知并与锁定依赖一致
 
 ## 11. 文档、品牌资产与发布验收
 

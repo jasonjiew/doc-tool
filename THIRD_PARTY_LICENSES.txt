@@ -26,7 +26,14 @@
    用途：Microsoft Word COM 自动化 (win32com.client.DispatchEx)
    https://pypi.org/project/pywin32/
 
-5. Python 3.13
+5. PySide6 6.8.3
+   许可：LGPL-3.0-only / GPL-3.0-only (Qt for Python)
+   用途：桌面界面（Qt Widgets；仅 QtCore/QtGui/QtWidgets 运行时）
+   https://pypi.org/project/PySide6/
+   注：本应用通过动态链接使用 Qt；按 LGPL-3.0 义务，已允许用户替换
+       Qt 库副本并动态链接，未静态链接 Qt 专有代码。
+
+6. Python 3.13
    许可：PSF-2.0 License (Python Software Foundation License)
    用途：应用运行时（由 PyInstaller 冻结分发）
    https://www.python.org/

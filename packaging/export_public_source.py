@@ -117,8 +117,10 @@ def export_public_source(output: Path) -> tuple[list[str], list[str]]:
     return copied, excluded
 
 
-# 导出中允许的隐藏文件（Git 元数据、CI 配置与 OpenSpec 变更元数据）。
-ALLOWED_HIDDEN_FILES = {".gitignore", ".gitattributes", ".gitlab-ci.yml", ".openspec.yaml"}
+# 导出中允许的隐藏文件/目录（Git 元数据、CI 配置、OpenSpec 元数据与社区模板）。
+ALLOWED_HIDDEN_FILES = {
+    ".gitignore", ".gitattributes", ".gitlab-ci.yml", ".openspec.yaml", ".github",
+}
 
 
 def validate_export(output: Path) -> list[str]:

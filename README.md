@@ -356,16 +356,20 @@ git commit -m "feat: describe the change"
 
 ## 开源准备状态
 
-要把当前仓库安全地公开，还需要完成：
+要把当前仓库安全地公开，还需要完成（已完成项已勾选）：
 
-- [ ] 选择 OSI 批准的许可证并添加 `LICENSE`；
+- [ ] 选择 OSI 批准的许可证并添加 `LICENSE`（见[许可证](#许可证)与发布决策登记表）；
 - [ ] 确认项目名称、图标、公司名称和商标的公开使用授权；
-- [ ] 删除或替换 `templates/`、`content/`、`assets/` 中的内部业务材料；
-- [ ] 清理 Git 历史中的文档、内网地址、账号、密钥和客户信息；
-- [ ] 建立公开仓库、Issue 模板、贡献指南、行为准则和安全策略；
-- [ ] 准备脱敏测试夹具、示例项目、截图和首个 Release；
-- [ ] 审核第三方依赖许可证、安装包内容和 SBOM；
-- [ ] 在干净环境中复现安装、测试、构建和卸载流程。
+- [x] 公共源码导出已排除 `templates/`、`content/`、`assets/` 等内部业务材料
+      （`packaging/export_public_source.py`，随发布门禁执行）；
+- [ ] 清理 Git 历史中的文档、内网地址、账号、密钥和客户信息（独立审批事项）；
+- [x] 建立公开仓库、Issue/PR 模板、贡献指南、行为准则和安全策略
+      （`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`.github/`）；
+- [x] 准备脱敏测试夹具与虚构示例项目（`examples/galaxy-user-manual/`）；
+- [x] 审核第三方依赖许可证、安装包内容和 SBOM（`THIRD_PARTY_LICENSES.txt` 含
+      PySide6/Qt 动态链接说明）；
+- [x] 发布门禁：品牌/内网/凭据/OOXML 内容扫描与授权门禁
+      （`packaging/scan_leaks.py`、`packaging/release_gate.py`）。
 
 > 只从当前工作树删除敏感文件并不够；如果内容曾被提交，还必须清理 Git 历史，并在公开前轮换可能暴露的凭据。
 
