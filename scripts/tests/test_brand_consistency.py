@@ -214,5 +214,61 @@ class BrandConsistencyArtifactTests(unittest.TestCase):
             self.fail("dist 中发现含旧产品名的文件: {0}".format(path))
 
 
+class PublicLauncherTests(unittest.TestCase):
+    """任务 7.1-7.4：公共启动脚本中性、纯 ASCII；旧品牌/.cmd 兼容入口退出。"""
+
+    def test_public_launcher_exists_and_is_ascii_only(self):
+        """公共启动脚本使用中性文件名且内容纯 ASCII。"""
+        launcher = Path(REPO_ROOT) / "start-doc-tool.cmd"
+        self.assertTrue(launcher.is_file(), "公共启动脚本 start-doc-tool.cmd 缺失")
+        data = launcher.read_bytes()
+        non_ascii = [b for b in data if b > 0x7F]
+        self.assertEqual(non_ascii, [], "公共启动脚本必须保持纯 ASCII 字节")
+        text = data.decode("ascii")
+        self.assertNotIn("Konsung", text)
+        self.assertNotIn("康尚", text)
+        self.assertIn("Doc Tool", text)
+
+    def test_public_launcher_preserves_probe_and_bootstrap_semantics(self):
+        """公共启动脚本保留 PySide6 探测、vendor 路径与引导安装语义。"""
+        launcher = (Path(REPO_ROOT) / "start-doc-tool.cmd").read_bytes().decode("ascii")
+        self.assertIn("PySide6.QtWidgets import QApplication", launcher)
+        self.assertIn(".vendor\\site-packages", launcher)
+        self.assertIn("setup_pyside6.py", launcher)
+        self.assertIn("python -m doc_tool.app", launcher)
+
+    def test_legacy_cmd_launchers_not_tracked_for_public(self):
+        """旧品牌启动脚本与需求/设计/全部生成 .cmd 兼容入口不被 Git 跟踪。"""
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+        )
+        tracked = set(result.stdout.splitlines())
+        for legacy in (
+            "启动康尚文档工具.cmd",
+            "全部生成.cmd",
+            "生成需求说明书.cmd",
+            "生成详细设计说明书.cmd",
+        ):
+            self.assertNotIn(
+                legacy, tracked,
+                "旧品牌/专用构建 .cmd 不得进入公共仓库跟踪清单: {0}".format(legacy),
+            )
+
+    def test_cli_build_requires_project(self):
+        """公共 CLI build 只接受 --project，旧 requirement/design/all 入口已删除。"""
+        from doc_tool.cli import build_parser
+
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["build", "requirement"])
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["build", "design"])
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["build", "all"])
+        args = build_parser().parse_args(["build", "--project", "x"])
+        self.assertEqual(args.project, "x")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -28,10 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")
-    build_p = sub.add_parser("build", help="构建并校验文档（兼容入口）")
-    build_p.add_argument("document", choices=("general", "requirement", "design", "all"), nargs="?", default="all")
+    # 公共 CLI 只提供项目上下文构建（通用与旧版专用项目均可）；
+    # 仓库内置 `build requirement|design|all` 旧入口已退出公共产品面（任务 7.3）。
+    build_p = sub.add_parser("build", help="构建并校验文档（项目上下文）")
     build_p.add_argument("--skip-word-refresh", action="store_true")
-    build_p.add_argument("--project", help="项目目录（使用新项目上下文）")
+    build_p.add_argument("--project", required=True, help="项目目录")
     sub.add_parser("info", help="显示环境诊断信息")
 
     preflight = sub.add_parser("preflight", help="导入预检")
@@ -88,30 +89,23 @@ def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
         return 0
     if args.command != "build":
         return None
-    if args.project:
-        from doc_tool.adapters.kernel import ensure_kernel_importable
-        ensure_kernel_importable()
-        from doc_tool.application.pipeline import run_pipeline
-        from doc_tool.domain.manifest import ProjectManifest
-        manifest = ProjectManifest.load(args.project)
-        result = run_pipeline(manifest, manifest.resolve_paths(args.project), skip_word_refresh=args.skip_word_refresh)
-        for event in result.events:
-            line = "[{0}] {1}".format(event.status.upper(), event.stage)
-            if event.detail:
-                line += ": {0}".format(event.detail)
-            if event.error_code:
-                line += " ({0})".format(event.error_code)
-            print(line)
-        return 0 if result.success else 1
-    if args.document == "general":
-        parser.error("general 必须与 --project <项目目录> 一起使用")
-    import os
-    import subprocess
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cmd = [sys.executable, os.path.join(base, "scripts", "run_pipeline.py"), args.document]
-    if args.skip_word_refresh:
-        cmd.append("--skip-word-refresh")
-    return subprocess.run(cmd, cwd=base, check=False).returncode
+    # 公共 CLI 只支持基于项目目录的构建（通用与旧版专用项目均可）。
+    if not args.project:
+        parser.error("build 需要 --project <项目目录>")
+    from doc_tool.adapters.kernel import ensure_kernel_importable
+    ensure_kernel_importable()
+    from doc_tool.application.pipeline import run_pipeline
+    from doc_tool.domain.manifest import ProjectManifest
+    manifest = ProjectManifest.load(args.project)
+    result = run_pipeline(manifest, manifest.resolve_paths(args.project), skip_word_refresh=args.skip_word_refresh)
+    for event in result.events:
+        line = "[{0}] {1}".format(event.status.upper(), event.stage)
+        if event.detail:
+            line += ": {0}".format(event.detail)
+        if event.error_code:
+            line += " ({0})".format(event.error_code)
+        print(line)
+    return 0 if result.success else 1
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
