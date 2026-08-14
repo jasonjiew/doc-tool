@@ -21,7 +21,7 @@
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL ""
 #define MyAppExeName "DocTool.exe"
