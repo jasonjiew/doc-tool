@@ -42,8 +42,8 @@ USER_CONFIG_DIR_NAME = "doctool"
 PRODUCT_DESCRIPTION = "将大型 Word 文档转换为可维护的 Markdown 章节项目，并可靠重建为 Word。"
 PRODUCT_DESCRIPTION_UI = "大型 Word 文档工作台"
 
-# 公共 URL（仓库 / 主页）。未定前保持空串；正式 Release 门禁要求非空。
-PUBLIC_URL = ""
+# 公共 URL（仓库 / 主页）。公开托管仓库地址，已登记为发布决策。
+PUBLIC_URL = "https://github.com/wangjie0721666-web/doc-tool"
 
 # --- 内部版遗留标识（只读迁移/兼容用，禁止出现在公共产物面向用户处） ---
 

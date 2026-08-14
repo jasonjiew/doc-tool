@@ -19,7 +19,7 @@
 | 安装目录段 | `DocTool`（`%LOCALAPPDATA%\DocTool` 或类似） | — | WORKING | 与内部版 `Konsung\DocTool` 隔离 |
 | 安装器稳定 AppId | `8C61369A-D7C7-51D4-BD14-5B555EF93E52`（公共专用 UUID5） | wangjie | DECIDED | 2026-08-14 采用 installer.iss 已实现的公共专用 UUID5，不复用内部版；依据=packaging/installer.iss 任务 8.5/2.4 |
 | 图标 | 中性图标（`packaging/app.ico` / `doc_tool/resources/app.ico`） | wangjie | DECIDED | 2026-08-14 采用 scripts/make_icon.py 生成的中性图标，无公司元素，权利人授权 |
-| 公共域名 / 仓库地址 | 内部 GitLab 托管；本期不宣称公共域名 | wangjie | DECIDED | 2026-08-14 决策：本期发布托管于内部 GitLab（基线见 01-baseline-internal.md）；正式公共 URL 确定后更新 branding.PUBLIC_URL 并复签 |
+| 公共域名 / 仓库地址 | `https://github.com/wangjie0721666-web/doc-tool`（公开托管） | wangjie | DECIDED | 2026-08-14 复签：公共仓库已托管于 GitHub（wangjie0721666-web/doc-tool），branding.PUBLIC_URL 已同步；内部 GitLab 仍为开发基线（见 01-baseline-internal.md） |
 | 著作权主体 | `Doc Tool Project`（中性公共发布主体；作者 wangjie 受托确认） | wangjie | DECIDED | 2026-08-14 权利人委托确认；正式公司/个人主体名称确定后一次性更名并同步 LICENSE 与检查单 |
 | 主许可证 | MIT（OSI 批准） | wangjie | DECIDED | 2026-08-14 权利人选择 MIT；`LICENSE` 全文已加入；与依赖许可（PySide6 LGPL-3.0、lxml BSD、PyYAML MIT、Pillow MIT-CMU、pywin32 PSF）兼容 |
 | 安全/维护联系邮箱 | `wangjie@konsung.com` | wangjie | DECIDED | 2026-08-14 维护者真实邮箱；SECURITY.md 私密报告渠道已同步 |
@@ -36,3 +36,5 @@
 - 2026-08-13：建立登记表；按 design.md 决策 3 填入 WORKING 占位值；未知项保持 UNRESOLVED。
 - 2026-08-14：权利人（wangjie）委托确认，6 项未决项全部转为 DECIDED；新增 LICENSE（MIT），
   SECURITY.md 更新私密报告邮箱；公共发布门禁放行。
+- 2026-08-14：公共仓库地址复签为 GitHub（wangjie0721666-web/doc-tool），
+  branding.PUBLIC_URL 与安装器 URL 已同步。

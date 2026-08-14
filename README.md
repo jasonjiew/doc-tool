@@ -12,7 +12,7 @@
 ![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-[功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md)
+[功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md) · [GitHub](https://github.com/wangjie0721666-web/doc-tool)
 
 </div>
 
@@ -330,7 +330,7 @@ openspec/                     功能规格、设计和变更任务
 
 ## 参与贡献
 
-欢迎提交缺陷报告、功能建议、文档改进和代码贡献。正式开放贡献前，项目会补充独立的 `CONTRIBUTING.md` 和行为准则。
+欢迎通过 [GitHub 仓库](https://github.com/wangjie0721666-web/doc-tool) 提交缺陷报告、功能建议、文档改进和代码贡献（见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）。
 
 建议的贡献流程：
 
@@ -350,7 +350,7 @@ git commit -m "feat: describe the change"
 
 ## 安全
 
-请不要在公开 Issue 中披露可利用的安全漏洞、恶意 DOCX 样本或敏感文档。公开托管平台确定后，请使用仓库提供的私密安全报告渠道；项目发布前会增加 `SECURITY.md`，说明支持版本和响应流程。
+请不要在公开 Issue 中披露可利用的安全漏洞、恶意 DOCX 样本或敏感文档。请通过仓库的私密安全报告渠道提交（见 [SECURITY.md](SECURITY.md)，说明支持版本与响应流程）。
 
 处理不可信 Word 文件存在解析和资源消耗风险。虽然项目包含路径约束、OOXML 安全检查和构建隔离，但在安全报告流程完善前，不建议把它部署为接收匿名公网文件的无人值守服务。
 
@@ -363,7 +363,8 @@ git commit -m "feat: describe the change"
       （`docs/release/02-release-decisions.md`；最终商标检索随正式公共 URL 确定前复签）；
 - [x] 公共源码导出已排除 `templates/`、`content/`、`assets/` 等内部业务材料
       （`packaging/export_public_source.py`，随发布门禁执行）；
-- [ ] 清理 Git 历史中的文档、内网地址、账号、密钥和客户信息（独立审批事项）；
+- [x] 公开仓库使用全新净化导出历史（`packaging/export_public_source.py`），
+      不携带内部提交与敏感数据；内部仓库历史清理仍为独立审批事项；
 - [x] 建立公开仓库、Issue/PR 模板、贡献指南、行为准则和安全策略
       （`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`、`.github/`）；
 - [x] 准备脱敏测试夹具与虚构示例项目（`examples/galaxy-user-manual/`）；
@@ -395,4 +396,4 @@ git commit -m "feat: describe the change"
 
 ---
 
-如果这个项目对你有帮助，公开仓库上线后欢迎提交 Issue、参与讨论或贡献代码。
+如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/wangjie0721666-web/doc-tool) 提交 Issue、参与讨论或贡献代码。

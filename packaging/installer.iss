@@ -23,7 +23,7 @@
 #define MyAppNameEn "DocTool"
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "Doc Tool Project"
-#define MyAppURL ""
+#define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"
 
 ; 稳定 AppId：公共产品专用 UUID5（不复用内部版旧 AppId，见 docs/release 基线）。
