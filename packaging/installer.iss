@@ -16,8 +16,8 @@
 ; 用户项目目录：由用户选择，不在安装目录下，卸载不删除。
 ;
 ; 发布决策（见 docs/release/02-release-decisions.md）：
-;   Publisher 与 URL 为 UNRESOLVED；正式公开前必须由权利人确认，此处仅用
-;   中性 WORKING 占位值，避免进入公司信息。
+;   Publisher 采用中性「Doc Tool Project」，URL 本期为空（公共域名未定）；
+;   决策已登记为 DECIDED，正式公开前如需更名按决策登记表一次性调整。
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"

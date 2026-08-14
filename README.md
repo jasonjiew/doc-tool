@@ -10,14 +10,14 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.1.0-blue)
-![Status](https://img.shields.io/badge/open--source-preparing-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md)
 
 </div>
 
 > [!IMPORTANT]
-> 本仓库正在进行公开开源前的整理。目前尚未添加开源许可证；在 `LICENSE` 文件正式加入前，源代码默认仍受著作权保护，不能视为已获得开源使用授权。公开发布前还需要替换内部模板、业务示例和内网地址。详见[开源准备状态](#开源准备状态)。
+> 本仓库已以 **MIT** 许可开源（见 [LICENSE](LICENSE) 与[许可证](#许可证)）。公开仓库导出仍排除内部模板、业务示例与内网地址（见 `packaging/export_public_source.py`）；发布决策登记见 `docs/release/`。
 
 ## 为什么需要 Doc Tool？
 
@@ -358,8 +358,9 @@ git commit -m "feat: describe the change"
 
 要把当前仓库安全地公开，还需要完成（已完成项已勾选）：
 
-- [ ] 选择 OSI 批准的许可证并添加 `LICENSE`（见[许可证](#许可证)与发布决策登记表）；
-- [ ] 确认项目名称、图标、公司名称和商标的公开使用授权；
+- [x] 已选择 MIT 许可证并添加 `LICENSE`（见[许可证](#许可证)与发布决策登记表）；
+- [x] 项目名称、图标、公司名称和商标的公开使用授权已登记决策
+      （`docs/release/02-release-decisions.md`；最终商标检索随正式公共 URL 确定前复签）；
 - [x] 公共源码导出已排除 `templates/`、`content/`、`assets/` 等内部业务材料
       （`packaging/export_public_source.py`，随发布门禁执行）；
 - [ ] 清理 Git 历史中的文档、内网地址、账号、密钥和客户信息（独立审批事项）；
@@ -384,7 +385,7 @@ git commit -m "feat: describe the change"
 
 ## 许可证
 
-**待确定。** 当前仓库尚未包含开源许可证，因此不授予复制、修改、分发或再许可代码的权利。公开发布前请根据预期生态选择合适的 OSI 批准许可证，并在仓库根目录添加 `LICENSE`。
+**MIT License。** 本仓库以 [MIT](LICENSE) 许可开源（Copyright (c) 2026 Doc Tool Project），允许复制、修改、分发与再许可，需保留版权与许可声明。许可证与著作权主体的选择记录在[发布决策登记表](docs/release/02-release-decisions.md)。
 
 第三方依赖的许可证信息见 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt)。第三方组件仍分别受其原始许可证约束。
 

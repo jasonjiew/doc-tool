@@ -52,3 +52,10 @@
 - 门禁脚本：`packaging/`（`export_public_source.py`、`scan_leaks.py`、
   `release_gate.py`、`generate_release_notes.py`、`generate_sbom.py`）。
 - 发布决策/检查单：`docs/release/`。
+
+## 后续更新
+
+- 2026-08-14：6 项未决发布决策已由权利人（wangjie）确认并转为 DECIDED
+  （`docs/release/02-release-decisions.md`）；`LICENSE`（MIT）与 `SECURITY.md`
+  私密报告邮箱已补齐；`release_gate.py --public` 改为放行，正式公共 Release
+  门禁通过。

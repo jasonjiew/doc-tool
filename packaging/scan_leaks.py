@@ -271,11 +271,14 @@ def scan_source_terms(root: Path, categories: Dict[str, List[str]]) -> List[str]
         if path.name in ("scan_vocabulary.txt", "allowlist.txt"):
             continue
         rel_export = path.relative_to(root).as_posix()
+        # SECURITY.md 有意包含维护者官方联系邮箱（决策见 docs/release/02），
+        # 属官方联系渠道，不视为品牌泄漏。
         if rel_export in (
             "doc_tool/domain/branding.py",
             "scripts/tests/test_brand_consistency.py",
             "scripts/tests/test_public_export.py",
             "packaging/export_public_source.py",
+            "SECURITY.md",
         ):
             continue
         rel = path.relative_to(root).as_posix()
