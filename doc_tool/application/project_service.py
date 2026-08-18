@@ -206,8 +206,22 @@ def load_recent_projects() -> List[RecentEntry]:
         entries = [RecentEntry.from_dict(item) for item in data if isinstance(item, dict)]
     except (json.JSONDecodeError, OSError):
         return []
-    # 过滤掉不存在的路径
-    return [e for e in entries if Path(e.path).exists()]
+    # 过滤掉不存在的路径；单条坏路径只跳过该条，不让整表加载失败。
+    kept: List[RecentEntry] = []
+    for entry in entries:
+        try:
+            if Path(entry.path).exists():
+                kept.append(entry)
+        except (OSError, ValueError):
+            continue
+    # 有陈旧条目被过滤时，把清理结果写回文件（尽力而为），避免脏数据
+    # 长期滞留，导致界面始终显示「暂无有效最近项目」。
+    if len(kept) != len(entries):
+        try:
+            _save_recent_projects(kept)
+        except OSError:
+            pass
+    return kept
 
 
 def add_recent_project(project_root: str, manifest: ProjectManifest) -> None:

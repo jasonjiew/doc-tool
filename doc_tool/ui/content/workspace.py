@@ -35,6 +35,10 @@ from doc_tool.application.content.snapshot import (
     overlay_rename_status,
 )
 from doc_tool.application.content.tree import build_tree
+from doc_tool.application.content.vcs_changes import (
+    ChangeDetectionService,
+    rollback_all,
+)
 from doc_tool.application.content.unsaved import (
     UnsavedChoice,
     UnsavedResolver,
@@ -45,6 +49,7 @@ from doc_tool.application.content.workspace_state import (
     WorkspaceStateStore,
 )
 from doc_tool.application.content.writer import (
+    OP_CREATE,
     OP_DELETE,
     OP_RENAME,
     ContentWriter,
@@ -93,6 +98,7 @@ class ContentWorkspace(QWidget):
         self,
         content_root: Path,
         *,
+        project_root: Optional[Path] = None,
         state_dir: Path,
         assets_root: Optional[Path] = None,
         writable: bool = True,
@@ -107,6 +113,14 @@ class ContentWorkspace(QWidget):
         super().__init__(parent)
         self._content_root = Path(content_root).resolve()
         self._state_dir = Path(state_dir).resolve()
+        if project_root is None:
+            project_root = self._content_root.parent
+        self._project_root = Path(project_root).resolve()
+        # 窗口级变更检测器：Git > SVN > 本地快照（Project Context 隔离）。
+        self._vcs = ChangeDetectionService(
+            self._project_root, self._content_root
+        )
+        self._change_source = "local"
         self._assets_root = Path(assets_root) if assets_root else None
         self._writable = writable
         self._on_status = on_status
@@ -128,6 +142,14 @@ class ContentWorkspace(QWidget):
         self._writer = ContentWriter(
             self._content_root, self._state_dir, assets_root=self._assets_root
         )
+        # VCS 管理下的项目不生成 .md.bak（版本控制已提供恢复能力），
+        # 避免 .bak 污染 git/svn 工作树；本地项目保持原备份/回滚行为。
+        self._vcs_managed = False
+        try:
+            self._vcs_managed = self._vcs.detect().source in ("git", "svn")
+        except Exception:  # noqa: BLE001  # 检测失败不阻断打开
+            self._vcs_managed = False
+        self._writer.set_backup_enabled(not self._vcs_managed)
         self._term_store = TermStore(self._state_dir)
         self._autosave = AutoSaveStore(self._state_dir)
         self._session_store = WorkspaceStateStore(self._state_dir)
@@ -163,6 +185,7 @@ class ContentWorkspace(QWidget):
             on_create_file=self._on_create_file,
             on_delete_file=self._on_delete_file,
             on_rename_file=self._on_rename_file,
+            on_renumber_dir=self._on_renumber_dir,
             on_move_node=self._on_move_node,
             on_clear_markers=self._on_clear_markers,
             on_open_external=self._on_open_external,
@@ -339,6 +362,7 @@ class ContentWorkspace(QWidget):
             content_root=self._content_root,
             on_restored=self._after_restore,
             writable=self._writable,
+            rollback_all=self._rollback_all_changes,
         )
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
@@ -461,9 +485,27 @@ class ContentWorkspace(QWidget):
     # --- 写后联动 ---
 
     def _status_map(self) -> Dict[str, str]:
-        """快照 diff + 改动清单 rename 叠加 → 徽标状态（需索引已就绪）。"""
+        """Git > SVN > 本地快照 → 徽标状态（需索引已就绪）。
+
+        Git/SVN 报告由窗口级检测器按 project_root 过滤后映射到内容路径；
+        本地兜底沿用快照 diff。两种来源都会叠加改动清单 rename 语义，
+        保证改动面板的恢复能力与展示一致。
+        """
         self._writer.manifest.load()
-        status = self._snapshot.diff(self._content_root, self._index.all_files())
+        report = self._vcs.detect()
+        if report.source in ("git", "svn"):
+            status = self._vcs.status_map(
+                report, self._index.all_files()
+            )
+            self._change_source = report.source
+            self._vcs_managed = True
+        else:
+            status = self._snapshot.diff(
+                self._content_root, self._index.all_files()
+            )
+            self._change_source = "local"
+            self._vcs_managed = False
+        self._writer.set_backup_enabled(not self._vcs_managed)
         status = overlay_rename_status(status, self._writer.manifest.entries)
         # 资源不属于 content 快照，但软删除仍需出现在改动面板，供单项恢复。
         for entry in self._writer.manifest.entries:
@@ -494,7 +536,78 @@ class ContentWorkspace(QWidget):
             for e in entries
             if e.operation == OP_DELETE and e.trash_path
         }
-        return build_change_items(status, rename_map=rename_map, trash_map=trash_map)
+        non_restorable = (
+            ["project.yml"] if self._change_source in ("git", "svn") else []
+        )
+        return build_change_items(
+            status,
+            rename_map=rename_map,
+            trash_map=trash_map,
+            non_restorable=non_restorable,
+        )
+
+    def change_source(self) -> str:
+        """当前变更检测来源（git/svn/local），供面板标注。"""
+        return self._change_source
+
+    def changed_chapters(self):
+        """章节级变更列表（Git/SVN 来源），为后续影响分析预留接口。
+
+        本地兜底（无版本控制）返回空列表——本地快照语义与版本控制变化
+        不同，章节级变化仍由改动面板/树徽标表达。
+        """
+        if self._index is None:
+            return []
+        report = self._vcs.detect()
+        if report.source not in ("git", "svn"):
+            return []
+        return self._vcs.chapters(report, self._index.all_files())
+
+    def _rollback_all_changes(self) -> List[str]:
+        """改动面板「回滚全部」：VCS 模式用版本控制恢复，否则本地清单回滚。
+
+        VCS 模式下（git/svn）不再依赖 .bak：恢复被跟踪文件到 HEAD/BASE，
+        仅删除本会话由工具创建（清单 OP_CREATE）的未跟踪文件，其它未跟踪
+        文件保留并提示，避免误删用户手动新建的内容。
+        """
+        report = self._vcs.detect()
+        if report.source not in ("git", "svn"):
+            return self._writer.rollback()
+        # 未跟踪文件不在此处删除：由下方按改动清单判定（只删本会话创建的）。
+        failures = rollback_all(report, delete_untracked=False)
+        notices: List[str] = []
+        # 未跟踪新增文件：仅删除本会话工具创建的（清单 OP_CREATE），
+        # 其它保留并提示（notices，不算失败），避免误删用户手动新建的文件。
+        self._writer.manifest.load()
+        created_abs = set()
+        for entry in self._writer.manifest.entries:
+            if entry.operation != OP_CREATE:
+                continue
+            try:
+                created_abs.add(str(self._writer.resolve(entry.rel_path).resolve()))
+            except Exception:  # noqa: BLE001
+                continue
+        for item in report.files:
+            if not item.untracked:
+                continue
+            if item.abs_path and str(Path(item.abs_path).resolve()) in created_abs:
+                try:
+                    Path(item.abs_path).unlink(missing_ok=True)
+                except OSError as exc:
+                    failures.append("{0}：{1}".format(item.path, exc))
+            else:
+                notices.append(
+                    "未跟踪文件（非本会话创建）已保留：{0}".format(item.path)
+                )
+        self._vcs.invalidate_cache()
+        if not failures:
+            # 版本控制已整体恢复：清空会话改动清单，避免陈旧条目影响徽标/面板。
+            try:
+                self._writer.manifest.load()
+                self._writer.manifest.clear()
+            except OSError:
+                pass
+        return failures + notices
 
     def _refresh_changes_panel(self, status: Optional[Dict[str, str]] = None) -> None:
         """刷新改动面板（status 缺省时重新推导）。"""
@@ -503,10 +616,12 @@ class ContentWorkspace(QWidget):
             return
         if status is None:
             status = self._status_map()
+        panel.set_source(self._change_source)
         panel.set_items(self._change_items(status))
 
     def _after_restore(self) -> None:
         """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
+        self._vcs.invalidate_cache()
         if self._index is None:
             return
         self._index_service.refresh(self._index)
@@ -541,6 +656,7 @@ class ContentWorkspace(QWidget):
 
     def _on_file_saved(self, rel_path: str) -> None:
         """编辑器保存后失效并重建该文件索引，增量刷新徽标（不重建树模型）。"""
+        self._vcs.invalidate_cache()
         if self._index is None:
             return
         self._index.invalidate(rel_path)
@@ -574,6 +690,7 @@ class ContentWorkspace(QWidget):
                 self, "新增失败", result.error or "写入失败"
             )
             return
+        self._vcs.invalidate_cache()
         self._index_service.rebuild_file(self._index, rel_path)
         items = build_tree(self._index.all_files())
         self._tree.set_items(items)
@@ -606,6 +723,7 @@ class ContentWorkspace(QWidget):
                 self, "删除失败", result.error or "删除失败"
             )
             return
+        self._vcs.invalidate_cache()
         # 文件已入回收站：清除其草稿（草稿无意义）。
         self._autosave.clear(rel_path)
         self.tabs_host.close_file(rel_path)
@@ -690,6 +808,87 @@ class ContentWorkspace(QWidget):
                 "以下章节重编号失败，请检查文件状态：\n" + "\n".join(failures),
             )
         return True
+
+    def _on_renumber_dir(self, dir_rel_path: str) -> None:
+        """一键把目录下已编号子节点重排为连续编号（预览确认后联动应用）。
+
+        手动新增文件导致编号断档（如 4.7.1..4.7.24 后新增 4.7.28/29/30）时，
+        右键章节目录选择本操作：预览全部 ``旧 → 新``，确认后经 RefactorService
+        重命名并联动更新引用与标题。
+        """
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.application.content.refactor import RefactorService
+        from doc_tool.application.content.tree import (
+            ChapterMoveError,
+            renumber_plan,
+        )
+
+        if not self._writable:
+            QMessageBox.information(self, "无法重编号", "当前项目为只读模式")
+            return
+        if self._index is None:
+            QMessageBox.information(self, "无法重编号", "内容索引尚未就绪")
+            return
+        try:
+            renames = renumber_plan(dir_rel_path, self._index.all_files())
+        except ChapterMoveError as exc:
+            QMessageBox.warning(self, "无法重编号", str(exc))
+            return
+        if not renames:
+            QMessageBox.information(
+                self, "重新编号", "该目录编号已连续，无需调整。"
+            )
+            return
+        preview = "\n".join(
+            "  {0} → {1}".format(old, new) for old, new in renames
+        )
+        answer = QMessageBox.question(
+            self,
+            "重新编号本目录",
+            "将按自然顺序把 {0} 个已编号子节点重排为连续编号：\n{1}\n\n"
+            "将自动重命名并联动更新引用与标题。确认？".format(
+                len(renames), preview
+            ),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        # 未保存保护：目标旧路径有未保存编辑时先确认，避免重编号静默丢弃编辑。
+        for old, _new in renames:
+            if self._editor_is_dirty(old):
+                choice = self._unsaved_resolver([old], "rename")
+                if choice == UnsavedChoice.CANCEL:
+                    return  # 取消 → 中止整个重编号
+                if choice == UnsavedChoice.SAVE:
+                    editor = self.tabs_host.editor_for(old)
+                    if editor is not None and not editor.save():
+                        QMessageBox.warning(
+                            self, "重编号中止", "保存失败，已中止重编号：{0}".format(old)
+                        )
+                        return
+        service = RefactorService(self._index)
+        plan = service.compute_batch_rename_plan(renames)
+        if plan is None:
+            QMessageBox.warning(
+                self, "重编号失败", "目标文件不在内容索引中，请刷新后重试"
+            )
+            return
+        if plan.conflicts:
+            QMessageBox.warning(self, "重编号冲突", "\n".join(plan.conflicts))
+            return
+        results = service.apply_rename_plan(plan, self._writer)
+        if not all(r.written for r in results):
+            QMessageBox.warning(
+                self, "重编号失败", "部分写回失败，请查看备份与改动清单"
+            )
+            return
+        # 旧路径已改名：关闭其标签并清除草稿，避免旧路径标签保存时
+        # 重建已改名的文件、或崩溃恢复复活旧路径的废弃内容。
+        for old, _new in renames:
+            self.tabs_host.close_file(old)
+            self._autosave.clear(old)
+        self._mark_review_association({old: new for old, new in renames})
+        self._after_write()
 
     def _on_rename_file(self, rel_path: str) -> None:
         """内联重命名文件并联动更新引用（复用 RefactorService）。"""
@@ -872,6 +1071,7 @@ class ContentWorkspace(QWidget):
             [rel for rel, _ in self._index_service.discover_files()],
         )
         self._snapshot.save()
+        self._vcs.invalidate_cache()
         self._apply_status_map()
 
     def _on_open_external(self, rel_path: str) -> None:
@@ -910,6 +1110,7 @@ class ContentWorkspace(QWidget):
 
     def _after_write(self) -> None:
         """替换/重命名写回后：刷新索引并请求校验管线。"""
+        self._vcs.invalidate_cache()
         if self._index is not None:
             self._index_service.refresh(self._index)
             ReferenceScanner(self._index, assets_root=self._assets_root).scan_all()

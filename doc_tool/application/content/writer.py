@@ -51,6 +51,20 @@ def _backup_path_for(file_path: Path) -> Path:
     return file_path.with_name(file_path.name + BACKUP_SUFFIX)
 
 
+def _rename_with_fallback(source: Path, target: Path) -> None:
+    """重命名文件；同卷 rename 失败时回退“复制+删除”。
+
+    与 ``atomic_write`` 的跨卷回退同一套路：部分公司 PC 的 DLP 会拦截
+    ``os.rename``（WinError 17，目标为点前缀/.tmp 等临时名时尤甚），但允许
+    写入新文件后删除旧文件。``shutil.move`` 内部先试 rename，失败自动回退
+    copy2 + unlink，因此对这类环境天然免疫。
+    """
+    try:
+        source.rename(target)
+    except OSError:
+        shutil.move(str(source), str(target))
+
+
 def _resolve_inside(content_root: Path, rel_path: str) -> Path:
     """把 rel_path 解析为 contentRoot 内绝对路径，越界抛错。"""
     target = (content_root / rel_path).resolve()
@@ -226,6 +240,7 @@ class ContentWriter:
         content_root: Path,
         state_dir: Path,
         assets_root: Optional[Path] = None,
+        backup_enabled: bool = True,
     ) -> None:
         self._content_root: Path = Path(content_root).resolve()
         self._manifest = ChangeManifest(state_dir)
@@ -233,6 +248,9 @@ class ContentWriter:
         self._assets_root: Optional[Path] = (
             Path(assets_root).resolve() if assets_root is not None else None
         )
+        # VCS 管理下的项目不生成 .md.bak（版本控制已提供恢复能力），
+        # 避免 .bak 污染 git/svn 工作树；非 VCS 项目保持原备份行为。
+        self._backup_enabled = backup_enabled
 
     @property
     def manifest(self) -> ChangeManifest:
@@ -266,6 +284,10 @@ class ContentWriter:
             return self._assets_root, rel_path[len(ASSET_PREFIX):]
         return self._content_root, rel_path
 
+    def set_backup_enabled(self, enabled: bool) -> None:
+        """切换本地 .bak 备份开关（VCS 模式下由版本控制承担恢复）。"""
+        self._backup_enabled = bool(enabled)
+
     def _backup(self, file_path: Path) -> Tuple[Optional[str], bool]:
         """写前备份。
 
@@ -273,6 +295,9 @@ class ContentWriter:
             (备份绝对路径, 是否预期备份但失败)。文件不存在时无需备份 →
             ``(None, False)``；复制失败 → ``(None, True)``（回滚不可用）。
         """
+        if not self._backup_enabled:
+            # 版本控制模式下不建 .bak（git/svn 可恢复写前内容）。
+            return None, False
         if not file_path.exists():
             return None, False
         backup_path = _backup_path_for(file_path)
@@ -364,7 +389,7 @@ class ContentWriter:
         )
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            source.rename(target)
+            _rename_with_fallback(source, target)
         except OSError as exc:
             return WriteResult(
                 rel_path=rel_path,
@@ -459,7 +484,7 @@ class ContentWriter:
                 # 上次软删除未回滚时槽位已被占用：先清掉旧回收站副本，
                 # 保证"删除→重建→再删除"等重复删除能成功而非静默失败。
                 trash_target.unlink()
-            source.rename(trash_target)
+            _rename_with_fallback(source, trash_target)
         except OSError as exc:
             return WriteResult(
                 rel_path=rel_path,
@@ -588,7 +613,7 @@ class ContentWriter:
             if trash_path and Path(trash_path).exists():
                 try:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    Path(trash_path).rename(target)
+                    _rename_with_fallback(Path(trash_path), target)
                 except OSError as exc:
                     return WriteResult(
                         rel_path=rel_path,
@@ -667,7 +692,7 @@ class ContentWriter:
             original = _resolve_inside(self._content_root, entry.original_path)
             if current.exists():
                 original.parent.mkdir(parents=True, exist_ok=True)
-                current.rename(original)
+                _rename_with_fallback(current, original)
                 self._discard_backup(entry.backup_path)
             elif entry.backup_path and Path(entry.backup_path).exists():
                 # 新名文件已不存在（被外部删除/崩溃）：从备份恢复原内容，
@@ -689,6 +714,12 @@ class ContentWriter:
                 raise OSError(
                     "编辑回滚失败：备份文件缺失：{0}".format(entry.backup_path)
                 )
+            elif not self._backup_enabled:
+                # VCS 模式写前不建 .bak：本地清单无法恢复，需用版本控制。
+                raise OSError(
+                    "无本地备份（版本控制模式下由 git/svn 管理），"
+                    "回滚请使用版本控制恢复：{0}".format(entry.rel_path)
+                )
             # backup_path 为空（写入时原文件不存在）时无可恢复内容，静默成功。
         elif entry.operation == OP_CREATE:
             target = _resolve_inside(self._content_root, entry.rel_path)
@@ -699,4 +730,4 @@ class ContentWriter:
             target = _resolve_inside(root, inner)
             if entry.trash_path and Path(entry.trash_path).exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
-                Path(entry.trash_path).rename(target)
+                _rename_with_fallback(Path(entry.trash_path), target)

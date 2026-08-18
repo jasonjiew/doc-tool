@@ -133,9 +133,21 @@ class MermaidDialog(QDialog):
             self.source_edit.setFocus()
 
     def _finish(self, action: str) -> None:
-        self.refresh_preview()
-        if self.render_result is None or not self.render_result.ok or not self.render_result.png:
-            self.status.setText("请先修复语法或渲染错误")
+        """导出动作：重新用 mermaid-cli（若可用）渲染，保证与官方效果一致。"""
+        source = self.source()
+        issues = validate(source)
+        if issues:
+            self.status.setText("请先修复语法错误")
             return
+        # 实时预览用内置渲染器（快），导出用 mermaid-cli 官方渲染；未安装时自动回退。
+        result = render(source, use_cli=True)
+        if not result.ok or not result.png:
+            self.status.setText("渲染失败：{0}".format(result.error or "未知原因"))
+            return
+        self.render_result = result
+        if result.backend == "mermaid-cli":
+            self.status.setText("已用 mermaid-cli 渲染，可插入 Word")
+        else:
+            self.status.setText("未检测到 mermaid-cli，已用内置渲染器（近似效果）；安装 mermaid-cli 后导出自动升级为官方渲染")
         self.action = action
         self.accept()

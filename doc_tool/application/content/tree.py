@@ -415,6 +415,80 @@ def renumber_plan_after_delete(
     return renames
 
 
+def renumber_plan(dir_rel_path: str, files: Sequence[str]) -> List[Tuple[str, str]]:
+    """把目录下已编号的直接子节点按自然顺序重排为连续编号。
+
+    用于“一键重编号”：手动新增/移动文件导致编号断档（如 4.7.1..4.7.24 后
+    新增 4.7.28/29/30）时，把全部已编号直接子节点重排为 ``父编号 + 序号``
+    的连续序列；原有编号已连续的文件不受影响（位置即编号）。
+
+    规则：
+    - 目录名必须带数字前缀（如 ``4.7 示例模块`` → (4,7)），否则无法推断编号
+      体系，返回空计划。
+    - 只处理带数字前缀的直接子节点（文件或子目录）；无编号子节点保持原位，
+      也不占用序号。
+    - 按自然排序分配 ``父编号 + 序号``（1 起）；子目录重编号会重写整棵子树
+      的编号前缀。
+    - 返回值按目标路径自然排序，且仅包含实际变化。
+
+    ``files`` 通常来自 ``index.all_files()``（已稳定排序）。
+    """
+    normalized = sorted({str(path).replace("\\", "/") for path in files})
+    dir_rel_path = dir_rel_path.replace("\\", "/").rstrip("/")
+    parent_number = _numeric_prefix(Path(dir_rel_path).name) if dir_rel_path else None
+    if parent_number is None:
+        return []
+    children = _direct_child_nodes(dir_rel_path, normalized)
+    numbered = [
+        node
+        for node in children
+        if _numeric_prefix(Path(node).name) is not None
+    ]
+    if not numbered:
+        return []
+
+    node_mapping: Dict[str, str] = {}
+    for position, node in enumerate(numbered, start=1):
+        number = parent_number + (position,)
+        new_node = _join_rel(dir_rel_path, _renumbered_name(Path(node).name, number))
+        if new_node != node:
+            node_mapping[node] = new_node
+    if not node_mapping:
+        return []
+
+    result: Dict[str, str] = {}
+    for rel_path in normalized:
+        matching = [
+            node
+            for node in node_mapping
+            if rel_path == node or rel_path.startswith(node + "/")
+        ]
+        if not matching:
+            continue
+        old_node = max(matching, key=len)
+        new_node = node_mapping[old_node]
+        old_prefix = _numeric_prefix(Path(old_node).name)
+        new_prefix = _numeric_prefix(Path(new_node).name)
+        new_path = (
+            new_node
+            if rel_path == old_node
+            else _rewrite_descendant_path(
+                rel_path, old_node, new_node, old_prefix, new_prefix
+            )
+        )
+        if new_path != rel_path:
+            result[rel_path] = new_path
+
+    targets = list(result.values())
+    if len(targets) != len(set(targets)):
+        raise ChapterMoveError("重编号计划产生重复目标路径")
+    occupied = set(normalized) - set(result)
+    conflicts = sorted(set(targets) & occupied)
+    if conflicts:
+        raise ChapterMoveError("目标路径已存在：{0}".format(conflicts[0]))
+    return sorted(result.items(), key=lambda pair: _path_sort_key(pair[1]))
+
+
 def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> str:
     """返回新章节文件 rel_path：递增最大兄弟编号；无编号从目录编号 .1 起；兜底标题。
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,7 @@ class ChangeItem:
     baseline_rel_path: str  # diff 基线路径（rename 为旧路径，其它同 rel_path）
     trash_path: Optional[str] = None  # 仅 deleted：回收站内绝对路径
     is_rename: bool = False  # 由改动清单 rename 条目叠加而来，不做单文件恢复
+    restorable: bool = True  # False：仅展示（如 project.yml），不做单文件恢复
 
 
 _STATUS_ORDER = {"added": 0, "modified": 1, "deleted": 2}
@@ -30,16 +31,19 @@ def build_change_items(
     *,
     rename_map: Optional[Dict[str, str]] = None,
     trash_map: Optional[Dict[str, str]] = None,
+    non_restorable: Optional[Sequence[str]] = None,
 ) -> List[ChangeItem]:
     """把快照状态映射转成排序后的改动项列表。
 
     ``status_map`` 来自 ``snapshot.diff`` + ``overlay_rename_status``（新路径
     标 modified）。``rename_map``（新路径→旧路径）与 ``trash_map``（deleted
-    路径→回收站绝对路径）由调用方从改动清单推导。排序：added → modified →
-    deleted，同状态按 rel_path 自然排序。
+    路径→回收站绝对路径）由调用方从改动清单推导。``non_restorable`` 中的
+    路径仅展示、禁用单文件恢复（如 Git/SVN 检测出的 ``project.yml`` 变更）。
+    排序：added → modified → deleted，同状态按 rel_path 自然排序。
     """
     rename_map = rename_map or {}
     trash_map = trash_map or {}
+    non_restorable = set(non_restorable or ())
     items: List[ChangeItem] = []
     for rel_path, status in status_map.items():
         old = rename_map.get(rel_path)
@@ -51,6 +55,7 @@ def build_change_items(
                 baseline_rel_path=old if is_rename else rel_path,
                 trash_path=trash_map.get(rel_path),
                 is_rename=is_rename,
+                restorable=rel_path not in non_restorable,
             )
         )
     return sorted(

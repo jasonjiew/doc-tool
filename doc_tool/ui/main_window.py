@@ -132,10 +132,16 @@ class MainWindow(QMainWindow):
         self,
         parent: Optional[QWidget] = None,
         unsaved_resolver: Optional[UnsavedResolver] = None,
+        window_registry=None,
+        window_factory=None,
     ) -> None:
         super().__init__(parent)
         self.runner = TaskRunner()
         self._unsaved_resolver = unsaved_resolver or confirm_unsaved_dialog
+        # 多窗口：注册表保存强引用；工厂回调用于「在新窗口打开项目」。
+        self._window_registry = window_registry
+        self._window_factory = window_factory
+        self._closed = False
         self._pending_session: Optional[SessionState] = None
         self._project_summary = None  # ProjectSummary
         self._word_available: Optional[bool] = None
@@ -250,6 +256,10 @@ class MainWindow(QMainWindow):
         self._open_action.setShortcut(QKeySequence("Ctrl+O"))
         self._open_action.triggered.connect(self._on_open_project)
         file_menu.addAction(self._open_action)
+        self._open_new_action = QAction("在新窗口打开项目…", self)
+        self._open_new_action.setShortcut(QKeySequence("Ctrl+Shift+O"))
+        self._open_new_action.triggered.connect(self._on_open_project_new_window)
+        file_menu.addAction(self._open_new_action)
         self._recent_menu = file_menu.addMenu("最近打开")
         file_menu.addSeparator()
         self._save_all_action = QAction("保存全部", self)
@@ -416,6 +426,8 @@ class MainWindow(QMainWindow):
         running = bool(self.runner.is_running)
         self._new_action.setEnabled(not running)
         self._open_action.setEnabled(not running)
+        if hasattr(self, "_open_new_action"):
+            self._open_new_action.setEnabled(not running)
         self._validate_action.setEnabled(state.actions["validate"].enabled)
         self._merge_action.setEnabled(state.actions["merge"].enabled)
         self._diag_action.setEnabled(state.actions["diag_build"].enabled)
@@ -535,6 +547,13 @@ class MainWindow(QMainWindow):
     def _open_project_path(self, path: str) -> None:
         if self.runner.is_running:
             return
+        # 重复打开保护：同一项目已在其它窗口打开 → 激活已有窗口。
+        registry = self._window_registry
+        if registry is not None:
+            existing = registry.window_for_project(path)
+            if existing is not None and existing is not self:
+                self._activate_window(existing)
+                return
         from doc_tool.application.project_service import open_project
         from doc_tool.domain.errors import DocToolError
 
@@ -576,6 +595,7 @@ class MainWindow(QMainWindow):
         self._content_current_file = None
         self._content_workspace = ContentWorkspace(
             summary.paths.content_root,
+            project_root=summary.project_root,
             state_dir=summary.paths.state_dir,
             assets_root=summary.paths.assets_root,
             writable=summary.is_writable,
@@ -750,6 +770,63 @@ class MainWindow(QMainWindow):
         path = QFileDialog.getExistingDirectory(self, "选择项目目录")
         if path:
             self._open_project_path(path)
+
+    def _on_open_project_new_window(self) -> None:
+        """「在新窗口打开项目…」：项目已打开则激活已有窗口。"""
+        if self.runner.is_running:
+            return
+        path = QFileDialog.getExistingDirectory(self, "选择项目目录（新窗口）")
+        if path:
+            self._open_project_in_new_window(path)
+
+    def _open_project_in_new_window(self, path: str) -> None:
+        """在新窗口打开项目：同一项目已在其它窗口打开时，激活已有窗口。
+
+        不允许两个可写窗口无保护地同时打开同一项目（需求第十一条）；
+        窗口级任务锁（build/validate）继续作为第二道防线。
+        """
+        if self.runner.is_running:
+            return
+        registry = self._window_registry
+        if registry is None or self._window_factory is None:
+            # 单窗口环境（测试/无注册表）：退回当前窗口打开。
+            self._open_project_path(path)
+            return
+        existing = registry.window_for_project(path)
+        if existing is not None:
+            if existing is not self:
+                # 其它窗口已打开同一项目：激活已有窗口，不新建可写窗口。
+                self._activate_window(existing)
+            else:
+                self.raise_()
+                self.activateWindow()
+            return
+        from doc_tool.application.project_service import open_project
+        from doc_tool.domain.errors import DocToolError
+
+        try:
+            summary = open_project(path)
+        except DocToolError as exc:
+            self._show_error("打开项目失败", exc.user_message, exc.suggested_action)
+            return
+        except Exception as exc:  # noqa: BLE001
+            self._show_error("打开项目失败", str(exc)[:200])
+            return
+        new_window = self._window_factory()
+        new_window.show_project(summary)
+        new_window.show()
+        new_window.raise_()
+        new_window.activateWindow()
+
+    def _activate_window(self, window) -> None:
+        """激活已有窗口并提示（重复打开保护）。"""
+        try:
+            window.show()
+            window.raise_()
+            window.activateWindow()
+        except RuntimeError:
+            return
+        self._status_label.setText("该项目已在另一个窗口打开，已切换到该窗口")
 
     # --- 任务执行 ---
 
@@ -1739,6 +1816,10 @@ class MainWindow(QMainWindow):
     def _persist_geometry(self) -> None:
         from doc_tool.application.project_service import save_window_geometry
 
+        # 多窗口时不写全局几何，避免后关窗口覆盖先关窗口的位置。
+        registry = self._window_registry
+        if registry is not None and registry.count() > 1:
+            return
         if self.isMaximized():
             # 最大化态不写回几何，避免覆盖用户期望的「正常态」尺寸。
             save_window_geometry("", True)
@@ -1767,6 +1848,11 @@ class MainWindow(QMainWindow):
                 return
             self._persist_workspace_session()
             self._persist_geometry()
+            # 关闭后从注册表移除：避免已关闭窗口继续占用项目、
+            # 也避免重复打开保护命中已关闭窗口。
+            self._closed = True
+            if self._window_registry is not None:
+                self._window_registry.unregister(self)
             event.accept()
             return
         if self._close_after_task:

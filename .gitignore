@@ -64,3 +64,11 @@ coverage.xml
 coverage.json
 tmp/
 .claude/memories/
+
+# mermaid-cli 本地安装（免管理员）
+tools/mermaid-cli/node_modules/
+tmp/npm-cache/
+
+# DeepSeek Harness 本地工具（不属于产品代码）
+dsh-patches/
+start-dsh-web.cmd

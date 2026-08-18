@@ -3,6 +3,10 @@
 
 主窗口已迁移到 PySide6（Qt Widgets）；高 DPI 由 Qt 原生处理。
 业务层（domain/application/adapters）不引入 Qt 依赖。
+
+多窗口：``WindowRegistry`` 持有全部主窗口强引用（避免顶层窗口被 GC）；
+「在新窗口打开项目」由主窗口经 ``window_factory`` 回调创建新窗口。
+关闭最后一个窗口时应用退出（Qt 默认行为）。
 """
 
 from __future__ import annotations
@@ -49,12 +53,24 @@ def main() -> int:
     from doc_tool.domain.version import APP_VERSION
     from doc_tool.ui.main_window import MainWindow
     from doc_tool.ui.styles import apply_theme, set_window_icon
+    from doc_tool.ui.window_registry import WindowRegistry
 
     # 默认浅色主题（深色可经菜单「工具 → 切换深色主题」启用）。
     apply_theme(app, dark=False)
 
-    window = MainWindow()
-    set_window_icon(window)
+    registry = WindowRegistry()
+
+    def create_window() -> MainWindow:
+        """创建并注册一个主窗口（供「在新窗口打开项目」回调复用）。"""
+        window = MainWindow(
+            window_registry=registry,
+            window_factory=create_window,
+        )
+        registry.register(window)
+        set_window_icon(window)
+        return window
+
+    window = create_window()
     window.show()
     return app.exec()
 

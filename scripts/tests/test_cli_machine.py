@@ -85,6 +85,66 @@ class MachineCliTests(unittest.TestCase):
                 self.assertIn(code, (0, 1))
                 json.loads(out.getvalue())
 
+    def test_renumber_dry_run_then_apply(self):
+        from doc_tool.domain.manifest import ProjectManifest
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            content = root / "content" / "requirement"
+            prefix = "第3章/3.7 GXOA"
+            for number, title in ((1, "甲"), (2, "乙"), (5, "丙"), (6, "丁")):
+                path = content / prefix / "3.7.{0} {1}.md".format(number, title)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "# 3.7.{0} {1}\n".format(number, title), encoding="utf-8"
+                )
+            manifest = ProjectManifest(
+                documentType="requirement", documentNo="REQ-1", documentName="测试",
+                documentVersion="1.0", sourceSha256="x",
+                paths={"contentRoot": "content/requirement"},
+            )
+            manifest.save(root, backup=False)
+            # dry-run：预览且不写盘
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = main(["renumber", "--project", str(root), "--output", "json"])
+            self.assertEqual(code, 0)
+            data = json.loads(out.getvalue())
+            item = data["results"][0]
+            self.assertFalse(item["data"]["applied"])
+            self.assertEqual(item["data"]["renamed"], 2)
+            self.assertTrue(
+                (content / prefix / "3.7.5 丙.md").exists(), "dry-run 不应写盘"
+            )
+            # human 模式必须能看到 old → new 清单
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = main(["renumber", "--project", str(root)])
+            self.assertEqual(code, 0)
+            self.assertIn(
+                "第3章/3.7 GXOA/3.7.5 丙.md → 第3章/3.7 GXOA/3.7.3 丙.md",
+                out.getvalue(),
+            )
+            # apply：写盘并联动更新
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = main(
+                    ["renumber", "--project", str(root), "--apply", "--output", "json"]
+                )
+            self.assertEqual(code, 0)
+            data = json.loads(out.getvalue())
+            self.assertTrue(data["results"][0]["data"]["applied"])
+            self.assertTrue((content / prefix / "3.7.3 丙.md").exists())
+            self.assertTrue((content / prefix / "3.7.4 丁.md").exists())
+            self.assertFalse((content / prefix / "3.7.5 丙.md").exists())
+            self.assertFalse((content / prefix / "3.7.6 丁.md").exists())
+            # 再次运行：已连续 → 0 项
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = main(["renumber", "--project", str(root), "--output", "json"])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(out.getvalue())["results"][0]["data"]["renamed"], 0)
+
     def test_import_parser_rejects_legacy_document_type(self):
         """任务 4.4/4.7：公共 CLI import 只接受 general，旧类型参数被拒绝。"""
         from doc_tool.cli import build_parser

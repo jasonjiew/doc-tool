@@ -21,6 +21,7 @@ DEFAULT_TESTS = [
     "test_roundtrip.py", "test_style_mapping.py", "test_authoring_services.py",
     "test_issues.py", "test_cli_machine.py", "test_quality_gates.py", "test_quality_traceability.py",
     "test_gui_services.py", "test_content_operations.py", "test_safety_recovery.py",
+    "test_vcs_changes.py", "test_multi_window.py",
     "test_lock_log_cancel.py", "test_word_release.py", "test_packaging.py",
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
     "test_migration.py", "test_public_export.py",
@@ -48,7 +49,16 @@ def run_one(name: str, coverage: bool) -> dict:
     env["PYTHONUTF8"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     existing_pythonpath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = str(ROOT) + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
+    # 与启动脚本保持一致：若 PySide6 以 .vendor/site-packages 内嵌提供
+    # （部分公司 PC 的 DLP 阻止 pip 原子重命名），把它前置到 PYTHONPATH，
+    # 仓库根保持在路径中保证 doc_tool 可导入。
+    paths = [str(ROOT)]
+    vendor = ROOT / ".vendor" / "site-packages"
+    if vendor.is_dir():
+        paths.insert(0, str(vendor))
+    if existing_pythonpath:
+        paths.append(existing_pythonpath)
+    env["PYTHONPATH"] = os.pathsep.join(paths)
     started = time.monotonic()
     completed = subprocess.run(
         command, cwd=str(ROOT), env=env, stdout=subprocess.PIPE,

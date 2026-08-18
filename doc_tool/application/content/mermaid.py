@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Mermaid 图形工作台纯服务。
 
-支持围栏 `````mermaid`` 与历史裸 ``flowchart``/``sequenceDiagram`` 段落，
+支持反引号/波浪号围栏 `````mermaid``/``~~~mermaid`` 与历史裸 ``flowchart``/``sequenceDiagram`` 段落，
 提供带源行号的子集校验、可选 mermaid-cli + 内置 SVG 渲染、QtSvg PNG
 栅格化，以及将裸源码批量替换成图片引用的纯函数编排。
 """
@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 import shutil
 import subprocess
@@ -20,13 +21,22 @@ from typing import Callable, List, Optional, Tuple
 _QT_APP_REF = None
 
 _KIND_RE = re.compile(r"^\s*(flowchart|sequenceDiagram)\b")
+_FENCE_OPEN_RE = re.compile(r"^(?:`{3,}|~{3,})\s*mermaid\s*$", re.I)
+_FENCE_CHAR_RE = re.compile(r"^(?P<char>`{3,}|~{3,})")
 _FLOW_HEADER_RE = re.compile(r"^flowchart\s+(TD|TB|BT|LR|RL)\s*$", re.I)
 _SEQ_HEADER_RE = re.compile(r"^sequenceDiagram\s*$")
 _NODE_RE = re.compile(
-    r"(?P<id>[A-Za-z_][\w-]*)(?:\[\[(?P<sub>.*?)\]\]|\[(?P<box>.*?)\]|\((?P<round>.*?)\)|\{(?P<diamond>.*?)\})?"
+    r"(?P<id>[A-Za-z_][\w-]*)"
+    r"(?:\[\[(?P<sub>.*?)\]\]"
+    r"|\(\((?P<circle>.*?)\)\)"
+    r"|\[\((?P<cyl>.*?)\)\]"
+    r"|\[(?P<box>.*?)\]"
+    r"|\((?P<round>.*?)\)"
+    r"|\{(?P<diamond>.*?)\})?"
 )
 _EDGE_RE = re.compile(
-    r"^(?P<left>.+?)\s*(?:--(?:\|(?P<label>.*?)\|)?>|---|-.->|==>)\s*(?P<right>.+?)\s*$"
+    r"^(?P<left>.+?)\s*(?:--(?:\|(?P<label>.*?)\|)?>|---|-.->|==>)"
+    r"(?:\|(?P<label2>.*?)\|)?\s*(?P<right>.+?)\s*$"
 )
 _SEQ_MESSAGE_RE = re.compile(
     r"^\s*([A-Za-z_][\w-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
@@ -85,11 +95,15 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
     index = 0
     while index < len(lines):
         stripped = lines[index].strip()
-        if stripped.lower().startswith("```mermaid"):
+        if _FENCE_OPEN_RE.match(stripped):
             start = index
+            fence_char = stripped[0]
             body: List[str] = []
             index += 1
-            while index < len(lines) and not lines[index].strip().startswith("```"):
+            while index < len(lines):
+                candidate = lines[index].strip()
+                if candidate.startswith(fence_char * 3):
+                    break
                 body.append(lines[index])
                 index += 1
             end = index if index < len(lines) else max(start, len(lines) - 1)
@@ -106,7 +120,7 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
             index += 1
             while index < len(lines):
                 candidate = lines[index]
-                if not candidate.strip() or candidate.strip().startswith("```"):
+                if not candidate.strip() or _FENCE_CHAR_RE.match(candidate.strip()):
                     break
                 if candidate.lstrip().startswith("#"):
                     break
@@ -215,9 +229,100 @@ def _parse_node(text: str):
     match = _NODE_RE.fullmatch(text.strip())
     if match is None:
         return None
-    label = next((value for value in (match.group("sub"), match.group("box"), match.group("round"), match.group("diamond")) if value is not None), match.group("id"))
-    shape = "diamond" if match.group("diamond") is not None else "round" if match.group("round") is not None else "box"
+    shape = "box"
+    label = match.group("id")
+    for name in ("sub", "circle", "cyl", "box", "round", "diamond"):
+        value = match.group(name)
+        if value is not None:
+            label = value
+            shape = name
+            break
     return match.group("id"), label, shape
+
+
+_FONT_SIZE = 14
+_LABEL_FONT_SIZE = 12
+_NODE_PAD_X = 14
+_NODE_PAD_Y = 10
+_LINE_HEIGHT = 17
+_RANK_GAP = 80
+_NODE_GAP = 26
+_TEXT_MAX_WIDTH = 230
+
+
+def _text_width(text: str, size: int = _FONT_SIZE) -> float:
+    """估算文本宽度：CJK 全宽，ASCII/数字约半宽。"""
+    return sum(size if ord(ch) > 0x2E7F else size * 0.58 for ch in text)
+
+
+def _wrap_text(text: str, max_width: float, size: int = _FONT_SIZE) -> List[str]:
+    """按估算宽度折行，返回行列表。"""
+    lines: List[str] = []
+    current = ""
+    current_w = 0.0
+    for ch in text:
+        w = _text_width(ch, size)
+        if current and current_w + w > max_width:
+            lines.append(current)
+            current = ch
+            current_w = w
+        else:
+            current += ch
+            current_w += w
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
+def _node_size(label: str, shape: str) -> Tuple[float, float]:
+    """根据文本内容与形状计算节点尺寸。"""
+    target = min(_text_width(label), _TEXT_MAX_WIDTH)
+    lines = _wrap_text(label, target)
+    text_w = max(_text_width(line) for line in lines)
+    width = max(120.0, text_w + 2 * _NODE_PAD_X)
+    height = len(lines) * _LINE_HEIGHT + 2 * _NODE_PAD_Y
+    if shape == "diamond":
+        width += 40
+        height += 36
+    elif shape == "cyl":
+        width += 12
+        height += 10
+    elif shape == "circle":
+        width = height = max(width, height)
+    return width, height
+
+
+def _shape_svg(shape: str, x: float, y: float, w: float, h: float) -> str:
+    """绘制节点外框（矩形/圆角/菱形/圆柱/圆形），返回 SVG 片段。"""
+    if shape == "diamond":
+        points = "{0},{1} {2},{3} {0},{4} {5},{3}".format(
+            x + w / 2, y, x + w, y + h / 2, x + w / 2, y + h, x, y + h / 2
+        )
+        return '<polygon points="{0}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(points)
+    if shape == "cyl":
+        rx = 8.0
+        cx = x + w / 2
+        top_y = y + rx
+        bot_y = y + h - rx
+        side = '<path d="M {0} {1} L {0} {2} A {3} {3} 0 0 0 {4} {2} L {4} {1} A {3} {3} 0 0 0 {0} {1} Z" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(
+            x, top_y, bot_y, rx, x + w
+        )
+        top = '<ellipse cx="{0}" cy="{1}" rx="{2}" ry="{3}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(
+            cx, top_y, w / 2, rx
+        )
+        bottom = '<ellipse cx="{0}" cy="{1}" rx="{2}" ry="{3}" fill="#ffffff" stroke="#3b82b8" stroke-width="2"/>'.format(
+            cx, bot_y, w / 2, rx
+        )
+        return side + top + bottom
+    if shape == "circle":
+        cx, cy = x + w / 2, y + h / 2
+        return '<ellipse cx="{0}" cy="{1}" rx="{2}" ry="{3}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(
+            cx, cy, w / 2, h / 2
+        )
+    rx = h / 2 if shape == "round" else 5
+    return '<rect x="{0}" y="{1}" width="{2}" height="{3}" rx="{4}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(
+        x, y, w, h, rx
+    )
 
 
 def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
@@ -236,41 +341,167 @@ def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
             if left and right:
                 nodes[left[0]] = left
                 nodes[right[0]] = right
-                edges.append((left[0], right[0], edge.group("label") or ""))
+                edges.append((left[0], right[0], edge.group("label") or edge.group("label2") or ""))
         else:
             node = _parse_node(line)
             if node:
                 nodes[node[0]] = node
     if not nodes:
         raise ValueError("flowchart 中没有可渲染节点")
-    ordered = list(nodes.values())
+
+    # 1) 按最长路径分层（单调递增，天然防环）
+    rank = {nid: 0 for nid in nodes}
+    for _ in range(len(nodes)):
+        changed = False
+        for nid in nodes:
+            best = rank[nid]
+            for u, v, _ in edges:
+                if v == nid and rank[u] + 1 > best:
+                    best = rank[u] + 1
+            if best != rank[nid]:
+                rank[nid] = best
+                changed = True
+        if not changed:
+            break
+    ranks: Dict[int, List[str]] = {}
+    for nid in nodes:
+        ranks.setdefault(rank[nid], []).append(nid)
+    rank_list = sorted(ranks)
+
+    # 2) 层内排序：前驱中位数（barycenter）迭代，减少边交叉
+    for _ in range(5):
+        for r in rank_list:
+            items = ranks[r]
+
+            def _key(nid, items=items, r=r):
+                pos = items.index(nid)
+                preds = []
+                for u, v, _ in edges:
+                    if v == nid:
+                        preds.append(ranks[rank[u]].index(u))
+                if not preds:
+                    return (0.0, pos)
+                preds.sort()
+                return (preds[len(preds) // 2], pos)
+
+            ranks[r] = sorted(items, key=_key)
+
+    # 3) 坐标：LR/RL 按列分层，TD/TB/BT 按行分层
+    sizes = {nid: _node_size(label, shape) for nid, (_, label, shape) in nodes.items()}
     horizontal = direction in ("LR", "RL")
-    width = max(360, (len(ordered) * 180 + 40) if horizontal else 520)
-    height = max(220, 180 if horizontal else len(ordered) * 110 + 60)
     positions = {}
-    for i, node in enumerate(ordered):
-        x = 110 + i * 180 if horizontal else width // 2
-        y = height // 2 if horizontal else 70 + i * 110
-        if direction in ("RL", "BT"):
-            x = width - x if horizontal else x
-            y = height - y if not horizontal else y
-        positions[node[0]] = (x, y)
+    if horizontal:
+        rank_widths = [max(sizes[n][0] for n in ranks[r]) for r in rank_list]
+        x_offsets = {}
+        x = 30.0
+        for r, rw in zip(rank_list, rank_widths):
+            x_offsets[r] = x
+            x += rw + _RANK_GAP
+        total_w = x - _RANK_GAP + 30
+        max_col_h = max(
+            sum(sizes[n][1] for n in ranks[r]) + _NODE_GAP * (len(ranks[r]) - 1)
+            for r in rank_list
+        )
+        for r in rank_list:
+            items = ranks[r]
+            col_h = sum(sizes[n][1] for n in items) + _NODE_GAP * (len(items) - 1)
+            y = (max_col_h - col_h) / 2 + 30
+            rw = rank_widths[rank_list.index(r)]
+            for nid in items:
+                w, h = sizes[nid]
+                positions[nid] = (x_offsets[r] + (rw - w) / 2, y)
+                y += h + _NODE_GAP
+        total_h = max_col_h + 60
+    else:
+        rank_heights = [max(sizes[n][1] for n in ranks[r]) for r in rank_list]
+        y_offsets = {}
+        y = 30.0
+        for r, rh in zip(rank_list, rank_heights):
+            y_offsets[r] = y
+            y += rh + _RANK_GAP
+        total_h = y - _RANK_GAP + 30
+        max_row_w = max(
+            sum(sizes[n][0] for n in ranks[r]) + _NODE_GAP * (len(ranks[r]) - 1)
+            for r in rank_list
+        )
+        for r in rank_list:
+            items = ranks[r]
+            row_w = sum(sizes[n][0] for n in items) + _NODE_GAP * (len(items) - 1)
+            x = (max_row_w - row_w) / 2 + 30
+            rh = rank_heights[rank_list.index(r)]
+            for nid in items:
+                w, h = sizes[nid]
+                positions[nid] = (x, y_offsets[r] + (rh - h) / 2)
+                x += w + _NODE_GAP
+        total_w = max_row_w + 60
+    if direction == "RL":
+        for nid in positions:
+            px, py = positions[nid]
+            positions[nid] = (total_w - px - sizes[nid][0], py)
+    elif direction == "BT":
+        for nid in positions:
+            px, py = positions[nid]
+            positions[nid] = (px, total_h - py - sizes[nid][1])
+
     body = []
+    # 4) 先画边线，再画边标签（白底防压线、避让节点），最后画节点（覆盖穿越线）
     for left, right, label in edges:
         x1, y1 = positions[left]
         x2, y2 = positions[right]
-        body.append('<line x1="{0}" y1="{1}" x2="{2}" y2="{3}" stroke="#53657a" stroke-width="2" marker-end="url(#arrow)"/>'.format(x1, y1, x2, y2))
-        if label:
-            body.append('<text x="{0}" y="{1}" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#334155">{2}</text>'.format((x1+x2)//2, (y1+y2)//2-7, html.escape(label)))
-    for node_id, label, shape in ordered:
-        x, y = positions[node_id]
-        if shape == "diamond":
-            points = "{0},{1} {2},{3} {0},{4} {5},{3}".format(x, y-35, x+65, y, y+35, x-65)
-            body.append('<polygon points="{0}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(points))
+        w1, h1 = sizes[left]
+        w2, h2 = sizes[right]
+        if horizontal:
+            sx, sy = x1 + w1, y1 + h1 / 2
+            tx, ty = x2, y2 + h2 / 2
         else:
-            rx = 18 if shape == "round" else 4
-            body.append('<rect x="{0}" y="{1}" width="140" height="58" rx="{2}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(x-70, y-29, rx))
-        body.append('<text x="{0}" y="{1}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="14" fill="#172033">{2}</text>'.format(x, y, html.escape(label)))
+            sx, sy = x1 + w1 / 2, y1 + h1
+            tx, ty = x2 + w2 / 2, y2
+        body.append(
+            '<line x1="{0}" y1="{1}" x2="{2}" y2="{3}" stroke="#53657a" stroke-width="2" marker-end="url(#arrow)"/>'.format(
+                sx, sy, tx, ty
+            )
+        )
+        if label:
+            lw = _text_width(label, _LABEL_FONT_SIZE)
+            mx, my = (sx + tx) / 2, (sy + ty) / 2
+            offset = 0.0
+            while offset < 90:
+                lx0, ly0 = mx - lw / 2 - 5, my + offset - 9
+                lx1, ly1 = lx0 + lw + 10, ly0 + 18
+                hit = False
+                for nid in positions:
+                    px, py = positions[nid]
+                    pw, ph = sizes[nid]
+                    if lx0 < px + pw and lx1 > px and ly0 < py + ph and ly1 > py:
+                        hit = True
+                        break
+                if not hit:
+                    break
+                offset += 18
+            body.append(
+                '<rect x="{0}" y="{1}" width="{2}" height="18" rx="3" fill="#ffffff" stroke="#d7dee8"/>'.format(
+                    mx - lw / 2 - 5, my + offset - 9, lw + 10
+                )
+            )
+            body.append(
+                '<text x="{0}" y="{1}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="12" fill="#334155">{2}</text>'.format(
+                    mx, my + offset, html.escape(label)
+                )
+            )
+    for nid, (_, label, shape) in nodes.items():
+        x, y = positions[nid]
+        w, h = sizes[nid]
+        body.append(_shape_svg(shape, x, y, w, h))
+        text_lines = _wrap_text(label, min(_text_width(label), _TEXT_MAX_WIDTH))
+        ty = y + h / 2 - (len(text_lines) - 1) * _LINE_HEIGHT / 2
+        for line in text_lines:
+            body.append(
+                '<text x="{0}" y="{1}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="14" fill="#172033">{2}</text>'.format(
+                    x + w / 2, ty, html.escape(line)
+                )
+            )
+            ty += _LINE_HEIGHT
+    width, height = int(round(total_w)), int(round(total_h))
     return _svg_document(width, height, "".join(body)), width, height
 
 
@@ -340,20 +571,59 @@ def svg_to_png(svg: bytes, width: int, height: int) -> bytes:
     return bytes(buffer.data())
 
 
-def _render_with_cli(source: str) -> Optional[RenderResult]:
+def _repo_root() -> Path:
+    """doc_tool/application/content/mermaid.py -> 仓库根目录。"""
+    return Path(__file__).resolve().parents[3]
+
+
+def _find_mmdc() -> Optional[str]:
+    """定位 mermaid-cli：优先 PATH，其次项目本地 tools/mermaid-cli（免管理员安装）。"""
     executable = shutil.which("mmdc")
+    if executable:
+        return executable
+    root = _repo_root()
+    for candidate in (
+        root / "tools" / "mermaid-cli" / "node_modules" / ".bin" / "mmdc.cmd",
+        root / "tools" / "mermaid-cli" / "node_modules" / ".bin" / "mmdc",
+        root / "node_modules" / ".bin" / "mmdc.cmd",
+    ):
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _cli_puppeteer_config() -> Optional[str]:
+    """项目本地 mermaid-cli 的 puppeteer 配置（指向系统浏览器），供 mmdc -p 使用。"""
+    candidate = _repo_root() / "tools" / "mermaid-cli" / "puppeteer-config.json"
+    return str(candidate) if candidate.is_file() else None
+
+
+def cli_available() -> bool:
+    """mermaid-cli 是否可用（PATH 或项目本地）。"""
+    return _find_mmdc() is not None
+
+
+def _render_with_cli(source: str) -> Optional[RenderResult]:
+    executable = _find_mmdc()
     if not executable:
         return None
     with tempfile.TemporaryDirectory(prefix="doc-tool-mermaid-") as temp:
         input_path = Path(temp) / "diagram.mmd"
         output_path = Path(temp) / "diagram.svg"
         input_path.write_text(source, encoding="utf-8")
+        command = [executable, "-i", str(input_path), "-o", str(output_path), "-b", "white"]
+        puppeteer_config = _cli_puppeteer_config()
+        if puppeteer_config:
+            command += ["-p", puppeteer_config]
+        # Windows 上 npm 安装的 mmdc 是 .cmd 脚本，须经 cmd.exe 启动。
+        if executable.lower().endswith((".cmd", ".bat")):
+            command = [os.environ.get("COMSPEC", "cmd.exe"), "/c"] + command
         try:
             completed = subprocess.run(
-                [executable, "-i", str(input_path), "-o", str(output_path), "-b", "white"],
+                command,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=60,
                 check=False,
             )
         except (OSError, subprocess.SubprocessError):

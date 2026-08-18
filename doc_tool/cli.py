@@ -78,6 +78,18 @@ def build_parser() -> argparse.ArgumentParser:
     migrate.add_argument("--project", required=True, help="源旧版项目目录")
     migrate.add_argument("--target", required=True, help="目标通用项目目录（必须不存在）")
     _add_output(migrate)
+
+    renumber_p = sub.add_parser("renumber", help="把章节目录编号重排为连续（默认预览，--apply 才写盘）")
+    renumber_p.add_argument("--project", required=True, help="项目目录")
+    renumber_p.add_argument(
+        "--dir", default="",
+        help="仅重编号该内容相对目录（相对 contentRoot，如 第4章 WEB端功能设计/4.7 示例模块）；缺省扫描整个内容根",
+    )
+    renumber_p.add_argument(
+        "--apply", action="store_true",
+        help="确认并应用重编号（缺省仅预览，不写盘）",
+    )
+    _add_output(renumber_p)
     return parser
 
 
@@ -120,7 +132,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     from doc_tool.application.cli_commands import (
         import_command, lint_command, migrate_command, preflight_command,
-        search_command, status_command, validate_command,
+        renumber_command, search_command, status_command, validate_command,
     )
     # 命令执行期间统一把 stdout 重定向到 stderr：validate/import 等会把进度和
     # 校验报告打印到 stdout（如 ``[requirement] 校验报告: ...``），若只在机器
@@ -140,6 +152,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = status_command(args.project)
         elif args.command == "migrate":
             result = migrate_command(args)
+        elif args.command == "renumber":
+            result = renumber_command(args)
         else:
             parser.error("未知命令")
 

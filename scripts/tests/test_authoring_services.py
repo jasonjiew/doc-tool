@@ -105,6 +105,12 @@ class SpellCheckTests(unittest.TestCase):
         hits = [hit.word for hit in checker.check(text)]
         self.assertEqual(hits, [])
 
+    def test_tilde_mermaid_fence_skipped(self):
+        checker = self._checker()
+        text = "~~~mermaid\nflowchart TD\n  A[zzz] --> B[worl]\n~~~\nhelloo"
+        hits = [hit.word for hit in checker.check(text)]
+        self.assertEqual(hits, ["helloo"])
+
     def test_user_word_not_flagged(self):
         checker = self._checker(user=("termstore",))
         hits = [hit.word for hit in checker.check("termstore wrold")]
@@ -415,6 +421,43 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertFalse(blocks[1].fenced)
         self.assertEqual(blocks[1].kind, "sequenceDiagram")
 
+    def test_extracts_tilde_fenced_blocks(self):
+        """CommonMark 波浪号围栏 ~~~mermaid 同样识别为围栏块。"""
+        from doc_tool.application.content.mermaid import extract_blocks
+
+        text = "前文\n~~~mermaid\n{0}\n~~~\n后文".format(self.FLOW)
+        blocks = extract_blocks(text)
+        self.assertEqual(len(blocks), 1)
+        self.assertTrue(blocks[0].fenced)
+        self.assertEqual(blocks[0].kind, "flowchart")
+        self.assertEqual(blocks[0].source, self.FLOW)
+
+    def test_tilde_fenced_preview_renders_png(self):
+        """~~~mermaid 围栏在 HTML 预览中渲染为 PNG 图片。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        rendered = render_markdown_html(
+            "# 标题\n\n~~~mermaid\n{0}\n~~~\n".format(self.FLOW),
+            use_cli=False,
+        )
+        self.assertIn("data:image/png;base64,", rendered)
+        self.assertNotIn("Mermaid 渲染失败", rendered)
+
+    def test_tilde_fenced_blocks_excluded_from_batch_convert(self):
+        """~~~mermaid 围栏块与反引号围栏一致，不在裸源码批量转换范围。"""
+        from doc_tool.application.content.mermaid import (
+            batch_convert,
+            image_reference,
+        )
+
+        def exporter(_block, result):
+            return image_reference("images/mermaid_0001.png", result)
+
+        text = "前文\n~~~mermaid\n{0}\n~~~\n".format(self.FLOW)
+        converted = batch_convert(text, exporter, use_cli=False)
+        self.assertEqual(converted.success_count, 0)
+        self.assertEqual(converted.text, text)
+
     def test_validate_reports_line_for_unbalanced_and_illegal_edge(self):
         from doc_tool.application.content.mermaid import validate
 
@@ -430,6 +473,36 @@ class MermaidServiceTests(unittest.TestCase):
         errors = validate("gantt\n  title demo")
         self.assertIn("不支持", errors[0].message)
 
+    def test_validate_arrow_edge_labels(self):
+        """标准 Mermaid 边标签 ``-->|label|`` 应通过校验并渲染。"""
+        from doc_tool.application.content.mermaid import render, validate
+
+        source = (
+            "flowchart LR\n"
+            "  UI[共享日志页面] -->|分页/详情/概览/重推| API[前端API封装]\n"
+            "  M -->|安全分页VO| UI\n"
+            "  TARGET -->|响应或异常| RETRY\n"
+            "  UI -->|已加载安全行| CSV[浏览器CSV生成]\n"
+        )
+        self.assertEqual(validate(source), [])
+        result = render(source, use_cli=False)
+        self.assertTrue(result.ok, result.error)
+        self.assertEqual(result.backend, "builtin")
+        self.assertTrue(result.svg.startswith(b"<svg"))
+        self.assertTrue(result.png.startswith(b"\x89PNG"))
+
+    def test_validate_legacy_inline_label_and_other_arrow_styles(self):
+        """旧式 ``--|label|>`` 及 ``-.->|label|``/``==>|label|`` 仍受支持。"""
+        from doc_tool.application.content.mermaid import validate
+
+        source = (
+            "flowchart LR\n"
+            "  A --|旧式|> B\n"
+            "  B -.->|点线| C\n"
+            "  C ==>|粗线| D\n"
+        )
+        self.assertEqual(validate(source), [])
+
     def test_builtin_flowchart_and_sequence_render_png(self):
         from doc_tool.application.content.mermaid import render
 
@@ -441,6 +514,116 @@ class MermaidServiceTests(unittest.TestCase):
             self.assertTrue(result.png.startswith(b"\x89PNG"))
             self.assertGreater(result.width, 0)
             self.assertGreater(result.height, 0)
+
+    def test_flowchart_renders_cylinder_shape(self):
+        """数据库节点 [(..)] 应渲染为圆柱（SVG 含 ellipse），而非普通矩形。"""
+        from doc_tool.application.content.mermaid import render
+
+        result = render(
+            "flowchart LR\n  A[服务] --> P[(device_third_party)]", use_cli=False
+        )
+        self.assertTrue(result.ok, result.error)
+        self.assertIn(b"<ellipse", result.svg)
+
+    def test_flowchart_layered_layout_groups_ranks(self):
+        """布局按最长路径分层：B/C 同级并排，D 在下一层。"""
+        import re as _re
+        from doc_tool.application.content.mermaid import render
+
+        result = render(
+            "flowchart TD\n  A --> B\n  A --> C\n  B --> D\n  C --> D",
+            use_cli=False,
+        )
+        self.assertTrue(result.ok, result.error)
+        svg = result.svg.decode("utf-8")
+        rects = [
+            tuple(float(g) for g in m.groups())
+            for m in _re.finditer(
+                r'<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#eef6ff"',
+                svg,
+            )
+        ]
+        self.assertEqual(len(rects), 4)
+        # 每层一行：A 单独一行，B/C 同层并排，D 单独一行
+        rows = sorted({round(y + h / 2, 0) for x, y, w, h in rects})
+        self.assertEqual(len(rows), 3)
+        row_sizes = sorted(
+            sum(1 for x, y, w, h in rects if round(y + h / 2, 0) == row)
+            for row in rows
+        )
+        self.assertEqual(row_sizes, [1, 1, 2])
+
+    def test_wrap_text_splits_long_labels(self):
+        from doc_tool.application.content.mermaid import _wrap_text
+
+        lines = _wrap_text("这是一个非常长的中文标签需要折行显示", 120)
+        self.assertGreater(len(lines), 1)
+        self.assertEqual("".join(lines), "这是一个非常长的中文标签需要折行显示")
+
+    def test_flowchart_no_text_overflow(self):
+        """长标签折行后必须落在节点框内；边标签不得压节点。"""
+        import re as _re
+        from doc_tool.application.content.mermaid import render
+
+        result = render(
+            "flowchart LR\n"
+            "  UI[共享日志页面] -->|分页/详情/概览/重推| API[前端API封装]\n"
+            "  S --> M[DeviceThirdLogMapper/XML]\n"
+            "  M --> LOG[(device_third_log)]\n"
+            "  LOG -->|完整日志| DETAIL[DeviceThirdLogVo详情映射]",
+            use_cli=False,
+        )
+        self.assertTrue(result.ok, result.error)
+        svg = result.svg.decode("utf-8")
+        boxes = []
+        for m in _re.finditer(
+            r'<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#eef6ff"',
+            svg,
+        ):
+            boxes.append(tuple(float(g) for g in m.groups()))
+        for m in _re.finditer(
+            r'<path d="M ([\d.]+) ([\d.]+) L ([\d.]+) ([\d.]+) A [\d.]+ [\d.]+ 0 0 0 ([\d.]+)',
+            svg,
+        ):
+            x, top_y, _x2, bot_y, xw = (float(g) for g in m.groups())
+            boxes.append((x, top_y, xw - x, bot_y - top_y))
+        texts = [
+            (float(m.group(1)), float(m.group(2)), m.group(3))
+            for m in _re.finditer(
+                r'<text x="([\d.]+)" y="([\d.]+)" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="14" fill="#172033">([^<]+)</text>',
+                svg,
+            )
+        ]
+        self.assertTrue(texts)
+        for tx, ty, label in texts:
+            inside = any(
+                bx <= tx <= bx + bw and by - 4 <= ty <= by + bh + 4
+                for bx, by, bw, bh in boxes
+            )
+            self.assertTrue(inside, "文本溢出节点框: {0}".format(label))
+
+    def test_render_with_cli_falls_back_to_builtin(self):
+        """use_cli=True 时，mmdc 缺失/失败自动回退内置渲染器，结果始终可用。"""
+        from doc_tool.application.content.mermaid import cli_available, render
+
+        result = render("flowchart LR\n  A --> B", use_cli=True)
+        self.assertTrue(result.ok, result.error)
+        self.assertIn(result.backend, ("builtin", "mermaid-cli"))
+        self.assertTrue(result.png.startswith(b"\x89PNG"))
+        self.assertIsInstance(cli_available(), bool)
+
+    def test_mmdc_discovery_paths(self):
+        """本地 mmdc 发现逻辑定位仓库根目录与 puppeteer 配置。"""
+        from doc_tool.application.content.mermaid import (
+            _cli_puppeteer_config,
+            _repo_root,
+        )
+
+        root = _repo_root()
+        self.assertTrue((root / "doc_tool" / "app.py").is_file())
+        config = _cli_puppeteer_config()
+        if config is not None:
+            self.assertTrue(config.endswith("puppeteer-config.json"))
 
     def test_render_failure_is_explicit(self):
         from doc_tool.application.content.mermaid import render

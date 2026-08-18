@@ -270,6 +270,7 @@ class ChapterTree(QWidget):
         on_create_file: Optional[Callable[[str], None]] = None,
         on_delete_file: Optional[Callable[[str], None]] = None,
         on_rename_file: Optional[Callable[[str], None]] = None,
+        on_renumber_dir: Optional[Callable[[str], None]] = None,
         on_move_node: Optional[Callable[[str, str, Optional[str]], bool]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
         on_open_external: Optional[Callable[[str], None]] = None,
@@ -284,6 +285,7 @@ class ChapterTree(QWidget):
         self._on_create_file = on_create_file
         self._on_delete_file = on_delete_file
         self._on_rename_file = on_rename_file
+        self._on_renumber_dir = on_renumber_dir
         self._on_move_node = on_move_node
         self._on_clear_markers = on_clear_markers
         self._on_open_external = on_open_external
@@ -569,6 +571,12 @@ class ChapterTree(QWidget):
         elif item.parent_id is not None:
             # 目录节点（非类型根）→ 新增章节/文件 + 在文件管理器打开
             if self._writable:
+                renumber_action = QAction("重新编号本目录（连续）…", menu)
+                renumber_action.triggered.connect(
+                    lambda: self._on_renumber_dir
+                    and self._on_renumber_dir(item.node_id)
+                )
+                menu.addAction(renumber_action)
                 create_action = QAction("新增章节/文件…", menu)
                 create_action.triggered.connect(
                     lambda: self._on_create_file

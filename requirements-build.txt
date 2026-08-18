@@ -4,7 +4,9 @@
 # 这些工具仅在构建安装包时使用，最终用户机器不需要。
 
 # -r requirements.txt          # 运行依赖（构建前必须先安装）
-pyinstaller==6.14.0
+# 6.14.0 在 Python 3.13/Windows 上存在冻结应用扩展模块加载失败
+# （"DLL load failed while importing _socket/_ctypes"）问题，需使用修复版本。
+pyinstaller==6.22.1
 coverage==7.10.2
 pip-audit==2.9.0
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 from doc_tool.application.issues import IssueRecord, issues_from_validation_report
 from doc_tool.domain.errors import DocToolError
@@ -261,3 +261,99 @@ def status_command(projects: Iterable[str]) -> CommandResult:
         })
 
     return run_per_project("status", projects, operation)
+
+
+def renumber_command(args) -> CommandResult:
+    """一键重编号：把章节目录下已编号子节点重排为连续编号。
+
+    缺省仅 dry-run 预览（不写盘）；``--apply`` 才经 RefactorService 联动
+    更新引用与标题后写盘。``--dir`` 限定时只扫描该内容相对目录（相对
+    contentRoot，如 ``第4章 WEB端功能设计/4.7 示例模块``），否则扫描整个
+    内容根下全部带编号的章节目录。
+    """
+
+    def operation(root: Path) -> ProjectCommandResult:
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.refactor import RefactorService
+        from doc_tool.application.content.tree import (
+            ChapterMoveError,
+            renumber_plan,
+        )
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.domain.manifest import ProjectManifest
+
+        manifest = ProjectManifest.load(root)
+        paths = manifest.resolve_paths(root)
+        content_root = paths.resolve(manifest.relative_content_root())
+        index = ContentIndexService(content_root).build()
+        service = RefactorService(index)
+        target = (getattr(args, "dir", "") or "").strip().replace("\\", "/").strip("/")
+        if target:
+            directories = [target]
+        else:
+            directories = sorted(
+                {str(Path(rel).parent.as_posix()) for rel in index.files}
+            )
+        renamed: List[Tuple[str, str]] = []
+        for directory in directories:
+            if not directory or directory == ".":
+                continue
+            try:
+                renamed.extend(renumber_plan(directory, index.files))
+            except ChapterMoveError as exc:
+                return ProjectCommandResult(
+                    str(root), False, "E2003",
+                    "重编号计划冲突：{0}".format(exc),
+                    data={"message": str(exc)},
+                )
+        preview = [{"old": old, "new": new} for old, new in renamed]
+        if not renamed:
+            return ProjectCommandResult(
+                str(root), True,
+                data={
+                    "renamed": 0, "preview": [], "applied": False,
+                    "directories": [],
+                },
+            )
+        batch = service.compute_batch_rename_plan(renamed)
+        if batch is None:
+            return ProjectCommandResult(
+                str(root), False, "E2003",
+                "内容索引与文件不一致，请刷新后重试。",
+                data={"message": "无法生成重命名计划", "preview": preview},
+            )
+        if batch.conflicts:
+            return ProjectCommandResult(
+                str(root), False, "E2003",
+                "重编号计划存在冲突，请检查目标路径占用。",
+                data={"message": "；".join(batch.conflicts), "preview": preview},
+            )
+        directories = sorted(
+            {str(Path(old).parent.as_posix()) for old, _new in renamed}
+        )
+        if not args.apply:
+            return ProjectCommandResult(
+                str(root), True,
+                data={
+                    "renamed": len(renamed), "preview": preview,
+                    "applied": False, "directories": directories,
+                },
+            )
+        writer = ContentWriter(content_root, paths.state_dir)
+        results = service.apply_rename_plan(batch, writer)
+        if not all(r.written for r in results):
+            failures = [r.error or r.rel_path for r in results if not r.written]
+            return ProjectCommandResult(
+                str(root), False, "E2003",
+                "部分重编号写回失败，请查看备份与改动清单。",
+                data={"message": "；".join(failures), "preview": preview},
+            )
+        return ProjectCommandResult(
+            str(root), True,
+            data={
+                "renamed": len(renamed), "preview": preview,
+                "applied": True, "directories": directories,
+            },
+        )
+
+    return run_per_project("renumber", [args.project], operation)

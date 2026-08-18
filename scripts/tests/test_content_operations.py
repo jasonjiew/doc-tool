@@ -513,6 +513,30 @@ class WriteSafetyTests(unittest.TestCase):
         self.assertEqual(entry.operation, "rename")
         self.assertEqual(entry.original_path, "requirement/第1章 引言/1.1 目的.md")
 
+    def test_rename_falls_back_to_copy_when_os_rename_blocked(self):
+        """DLP/跨卷环境 rename 报 OSError（如 WinError 17）时回退复制+删除。"""
+        from unittest import mock
+
+        writer = self._writer()
+        old = "requirement/第1章 引言/1.1 目的.md"
+        new = "requirement/第1章 引言/1.1 目标.md"
+        # 模拟部分公司 PC 的 DLP 拦截 os.rename（目标为点前缀/.tmp 临时名尤甚）
+        with mock.patch(
+            "doc_tool.application.content.writer.Path.rename",
+            side_effect=OSError(17, "not same device"),
+        ):
+            result = writer.rename(old, new)
+        self.assertTrue(result.written, result.error)
+        self.assertFalse((self.content_root / old).exists())
+        self.assertTrue((self.content_root / new).exists())
+        self.assertEqual(
+            (self.content_root / new).read_text(encoding="utf-8"),
+            "# 1.1 目的\n原始正文\n",
+        )
+        writer.manifest.load()
+        ops = [e.operation for e in writer.manifest.entries]
+        self.assertIn("rename", ops)
+
     def test_rollback_restores_edit_content(self):
         """回滚用 .bak 恢复编辑内容。"""
         writer = self._writer()
@@ -2366,6 +2390,127 @@ class TreeInteractionPureTests(unittest.TestCase):
             ],
         )
 
+    def test_renumber_plan_appended_gap_fills_consecutive(self):
+        """4.7.1..4.7.24 后新增 4.7.28/29/30 → 顺延为 4.7.25/26/27。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "design/第4章 WEB端功能设计/4.7 KSOA"
+        files = [
+            "{0}/4.7.{1} 子模块.md".format(prefix, index) for index in range(1, 25)
+        ] + [
+            "{0}/4.7.28 客户信息管理.md".format(prefix),
+            "{0}/4.7.29 第三方绑定关系.md".format(prefix),
+            "{0}/4.7.30 共享日志.md".format(prefix),
+        ]
+        plan = renumber_plan(prefix, files)
+        self.assertEqual(
+            plan,
+            [
+                ("{0}/4.7.28 客户信息管理.md".format(prefix), "{0}/4.7.25 客户信息管理.md".format(prefix)),
+                ("{0}/4.7.29 第三方绑定关系.md".format(prefix), "{0}/4.7.26 第三方绑定关系.md".format(prefix)),
+                ("{0}/4.7.30 共享日志.md".format(prefix), "{0}/4.7.27 共享日志.md".format(prefix)),
+            ],
+        )
+
+    def test_renumber_plan_mid_gap(self):
+        """中间断号：3.7.1/2/5/6 → 5→3、6→4。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "requirement/第3章/3.7 GXOA"
+        files = [
+            "{0}/3.7.1 甲.md".format(prefix),
+            "{0}/3.7.2 乙.md".format(prefix),
+            "{0}/3.7.5 丙.md".format(prefix),
+            "{0}/3.7.6 丁.md".format(prefix),
+        ]
+        plan = renumber_plan(prefix, files)
+        self.assertEqual(
+            plan,
+            [
+                ("{0}/3.7.5 丙.md".format(prefix), "{0}/3.7.3 丙.md".format(prefix)),
+                ("{0}/3.7.6 丁.md".format(prefix), "{0}/3.7.4 丁.md".format(prefix)),
+            ],
+        )
+
+    def test_renumber_plan_consecutive_empty(self):
+        """编号已连续 → 空计划。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "requirement/第3章/3.7 GXOA"
+        files = [
+            "{0}/3.7.1 甲.md".format(prefix),
+            "{0}/3.7.2 乙.md".format(prefix),
+            "{0}/3.7.3 丙.md".format(prefix),
+        ]
+        self.assertEqual(renumber_plan(prefix, files), [])
+
+    def test_renumber_plan_unnumbered_parent_empty(self):
+        """父目录名无数字前缀（如 第4章 WEB端功能设计）→ 空计划。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        files = [
+            "design/第4章 WEB端功能设计/4.1 KSHC/4.1.1 甲.md",
+            "design/第4章 WEB端功能设计/4.7 KSOA/4.7.5 乙.md",
+        ]
+        self.assertEqual(renumber_plan("design/第4章 WEB端功能设计", files), [])
+
+    def test_renumber_plan_skips_unnumbered_children(self):
+        """无编号子节点保持原位，不占用序号。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "requirement/第3章/3.7 GXOA"
+        files = [
+            "{0}/3.7.1 甲.md".format(prefix),
+            "{0}/3.7.4 乙.md".format(prefix),
+            "{0}/说明.md".format(prefix),
+        ]
+        plan = renumber_plan(prefix, files)
+        self.assertEqual(
+            plan,
+            [("{0}/3.7.4 乙.md".format(prefix), "{0}/3.7.2 乙.md".format(prefix))],
+        )
+
+    def test_renumber_plan_rewrites_subdirectory_prefix(self):
+        """子目录重编号时整棵子树编号前缀联动重写。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "requirement/第3章/3.7 GXOA"
+        files = [
+            "{0}/3.7.1 甲.md".format(prefix),
+            "{0}/3.7.4 子目录/3.7.4.1 子.md".format(prefix),
+        ]
+        plan = renumber_plan(prefix, files)
+        # 目录本身不在文件清单中：计划只含文件路径，子树前缀随目录一起重写。
+        self.assertEqual(
+            plan,
+            [
+                (
+                    "{0}/3.7.4 子目录/3.7.4.1 子.md".format(prefix),
+                    "{0}/3.7.2 子目录/3.7.2.1 子.md".format(prefix),
+                ),
+            ],
+        )
+
+    def test_renumber_plan_ignores_deeper_files_as_siblings(self):
+        """深层文件不参与同级序号分配（只统计直接子节点）。"""
+        from doc_tool.application.content.tree import renumber_plan
+
+        prefix = "requirement/第3章/3.7 GXOA"
+        files = [
+            "{0}/3.7.1 甲.md".format(prefix),
+            "{0}/3.7.5 乙/3.7.5.1 子.md".format(prefix),
+            "{0}/3.7.6 丙.md".format(prefix),
+        ]
+        mapping = dict(renumber_plan(prefix, files))
+        self.assertEqual(
+            mapping["{0}/3.7.5 乙/3.7.5.1 子.md".format(prefix)],
+            "{0}/3.7.2 乙/3.7.2.1 子.md".format(prefix),
+        )
+        self.assertEqual(
+            mapping["{0}/3.7.6 丙.md".format(prefix)],
+            "{0}/3.7.3 丙.md".format(prefix),
+        )
+
     def test_move_plan_reorders_same_directory(self):
         from doc_tool.application.content.tree import chapter_move_renumber_plan
 
@@ -2542,6 +2687,128 @@ class DeleteRenumberTests(unittest.TestCase):
         self.assertTrue(
             (self.content_root / "requirement/第3章/3.7 GXOA/3.7.6 丙.md").exists()
         )
+
+
+class RenumberDirTests(unittest.TestCase):
+    """一键重编号：目录下已编号子节点重排为连续编号（联动引用与标题）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        vendor = Path(REPO_ROOT) / ".vendor" / "site-packages"
+        if vendor.is_dir():
+            sys.path.insert(0, str(vendor))
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            cls._app = QApplication.instance() or QApplication([])
+            cls._qt_available = True
+        except Exception:
+            cls._qt_available = False
+
+    def setUp(self) -> None:
+        if not getattr(self, "_qt_available", False):
+            self.skipTest("PySide6 不可用")
+        self.content_root = make_project(
+            {
+                "requirement/第3章/3.7 GXOA/3.7.1 甲.md": "# 3.7.1 甲\n",
+                "requirement/第3章/3.7 GXOA/3.7.2 乙.md": "# 3.7.2 乙\n",
+                "requirement/第3章/3.7 GXOA/3.7.5 丙.md": (
+                    "# 3.7.5 丙\n"
+                    "见 3.7.2 乙。\n"
+                    "链接 [乙](3.7.2 乙.md)。\n"
+                ),
+                "requirement/第3章/3.7 GXOA/3.7.6 丁.md": (
+                    "# 3.7.6 丁\n"
+                    "见 3.7.5 丙。\n"
+                    "链接 [丙](3.7.5 丙.md)。\n"
+                ),
+            }
+        )
+        self.project_root = self.content_root.parent
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def _build_index(self):
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.references import ReferenceScanner
+
+        index = ContentIndexService(self.content_root).build()
+        ReferenceScanner(index).scan_all()
+        return index
+
+    def test_renumber_dir_fills_gap_and_updates_refs(self):
+        from unittest import mock
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            self.content_root, state_dir=self.project_root / ".state"
+        )
+        ws._index = self._build_index()
+        base = "requirement/第3章/3.7 GXOA"
+        with mock.patch.object(
+            QMessageBox, "question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
+            ws._on_renumber_dir(base)
+        # 3.7.5 丙 → 3.7.3 丙；3.7.6 丁 → 3.7.4 丁
+        self.assertFalse((self.content_root / "{0}/3.7.5 丙.md".format(base)).exists())
+        self.assertFalse((self.content_root / "{0}/3.7.6 丁.md".format(base)).exists())
+        new_c = self.content_root / "{0}/3.7.3 丙.md".format(base)
+        new_d = self.content_root / "{0}/3.7.4 丁.md".format(base)
+        self.assertTrue(new_c.exists())
+        self.assertTrue(new_d.exists())
+        # 标题行与内部引用联动更新（指向未改动文件的引用保持不变）
+        text_c = new_c.read_text(encoding="utf-8")
+        self.assertIn("# 3.7.3 丙", text_c)
+        self.assertIn("链接 [乙](3.7.2 乙.md)", text_c)
+        text_d = new_d.read_text(encoding="utf-8")
+        self.assertIn("# 3.7.4 丁", text_d)
+        self.assertIn("见 3.7.3 丙。", text_d)
+        self.assertIn("链接 [丙](3.7.3 丙.md)。", text_d)
+        # 改动清单含 rename 条目（可回滚）
+        ws._writer.manifest.load()
+        ops = [e.operation for e in ws._writer.manifest.entries]
+        self.assertIn("rename", ops)
+
+    def test_renumber_dir_consecutive_informs_no_change(self):
+        from unittest import mock
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        content_root = make_project(
+            {
+                "requirement/第3章/3.7 GXOA/3.7.1 甲.md": "# 3.7.1 甲\n",
+                "requirement/第3章/3.7 GXOA/3.7.2 乙.md": "# 3.7.2 乙\n",
+                "requirement/第3章/3.7 GXOA/3.7.3 丙.md": "# 3.7.3 丙\n",
+            }
+        )
+        self.addCleanup(shutil.rmtree, content_root, ignore_errors=True)
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.references import ReferenceScanner
+
+        index = ContentIndexService(content_root).build()
+        ReferenceScanner(index).scan_all()
+        ws = ContentWorkspace(
+            content_root, state_dir=content_root.parent / ".state"
+        )
+        ws._index = index
+        base = "requirement/第3章/3.7 GXOA"
+        with mock.patch.object(
+            QMessageBox, "information",
+            return_value=QMessageBox.StandardButton.Ok,
+        ) as info:
+            with mock.patch.object(
+                QMessageBox, "question",
+                return_value=QMessageBox.StandardButton.Yes,
+            ) as question:
+                ws._on_renumber_dir(base)
+        question.assert_not_called()
+        info.assert_called_once()
 
 
 if __name__ == "__main__":

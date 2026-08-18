@@ -49,6 +49,19 @@ def serialize_human(result: CommandResult) -> str:
                 lines.append("  … 共 {0} 条命中（仅显示前 {1} 条，加 --limit 提高上限）".format(total, shown))
             elif total:
                 lines.append("  （共 {0} 条命中）".format(total))
+        # 重编号预览/结果：human 模式必须能看到 old → new 清单。
+        preview = data.get("preview") if isinstance(data, dict) else None
+        if preview is not None:
+            applied = data.get("applied") if isinstance(data, dict) else False
+            lines.append(
+                "{0} {1} 项：".format(
+                    "已重编号" if applied else "将重编号", len(preview)
+                )
+            )
+            for entry in preview[:50]:
+                lines.append("  {0} → {1}".format(entry.get("old"), entry.get("new")))
+            if len(preview) > 50:
+                lines.append("  … 共 {0} 项".format(len(preview)))
         if item.suggested_action:
             lines.append("  建议：{0}".format(item.suggested_action))
         if item.issues:

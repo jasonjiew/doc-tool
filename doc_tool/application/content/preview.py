@@ -43,6 +43,8 @@ _ORDERED_LIST_RE = re.compile(r"^\d+[.)]\s+(.*)$")
 _IMAGE_OUTER_SIZE_SUFFIX_RE = re.compile(
     r"(!\[[^\]]*\]\([^\s)]+\))\s+=\d+x\d+"
 )
+# 围栏行：3 个及以上反引号或波浪号（CommonMark 两种围栏均合法）。
+_FENCE_LINE_RE = re.compile(r"^(?:`{3,}|~{3,})")
 
 
 @dataclass
@@ -256,7 +258,8 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
         processed = _IMAGE_SIZE_SUFFIX_RE.sub(r"\1\2", raw_line)
         processed = _IMAGE_OUTER_SIZE_SUFFIX_RE.sub(r"\1", processed)
         stripped = processed.strip()
-        if stripped.startswith("```"):
+        fence = _FENCE_LINE_RE.match(stripped)
+        if fence:
             flush_table()
             flush_list()
             if in_code:
@@ -264,7 +267,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
                 in_code = False
             else:
                 in_code = True
-                code_language = stripped[3:].strip().lower()
+                code_language = stripped[fence.end():].strip().lower()
                 code_start_line = source_line
             continue
         if in_code:

@@ -397,7 +397,15 @@ class ProjectServiceTests(unittest.TestCase):
     """任务 6.4：打开项目与最近项目列表。"""
 
     def setUp(self):
+        from unittest.mock import patch
+
         self._tmp = tempfile.mkdtemp(prefix="doc-gui-svc-")
+        # 隔离用户配置目录：最近项目/窗口几何相关测试必须写入临时 home，
+        # 绝不能读写真实用户目录下的 ~/.doctool/recent.json（否则跑一次测试
+        # 套件就会清空用户真实的「最近项目」列表）。
+        self._fake_home = Path(tempfile.mkdtemp(prefix="doc-gui-home-"))
+        self._home_patcher = patch("pathlib.Path.home", return_value=self._fake_home)
+        self._home_patcher.start()
         # 复用 test_project_build 的项目夹具
         from test_project_build import _setup_project, _make_manifest
 
@@ -412,6 +420,8 @@ class ProjectServiceTests(unittest.TestCase):
         manifest.save(self._tmp)
 
     def tearDown(self):
+        self._home_patcher.stop()
+        shutil.rmtree(self._fake_home, ignore_errors=True)
         shutil.rmtree(self._tmp, ignore_errors=True)
 
     def test_open_project_returns_summary(self):

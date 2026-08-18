@@ -9,6 +9,11 @@ restore_file）与「回滚全部会话改动」。已删除文件从快照 diff
 ``snapshot``：``ContentSnapshot``（基线内容副本，diff 原文来源）。
 ``writer``：``ContentWriter``（改动清单 + 单文件恢复）。
 ``on_restored()``：单文件恢复/回滚全部成功后回调（上层重建索引与树）。
+
+顶部计数行同时展示检测来源（``set_source``）：Git / SVN / 本地快照。
+非可恢复条目（如 Git/SVN 检测出的 ``project.yml`` 变更）仅展示，禁用恢复。
+``rollback_all``：可选的「回滚全部」实现；VCS 模式下由上层用
+git restore / svn revert 恢复，而不是本地 .bak 清单。
 """
 
 from __future__ import annotations
@@ -34,12 +39,20 @@ from doc_tool.application.content.changes import ChangeItem
 
 _ITEM_LABELS = {"added": "新增", "modified": "已修改", "deleted": "已删除"}
 
+# 检测来源 → 展示文本。
+_SOURCE_LABELS = {
+    "git": "Git",
+    "svn": "SVN",
+    "local": "本地快照",
+}
+
 
 class ChangesPanel(QWidget):
     """改动汇总面板。
 
     ``set_items(items)``：由上层（工作区）推送改动项并渲染；选中项由面板
     直接读 ``snapshot`` / ``content_root`` 计算 diff。只读时隐藏写操作。
+    ``set_source(source)``：标注变更检测来源（git/svn/local）。
     """
 
     def __init__(
@@ -50,6 +63,7 @@ class ChangesPanel(QWidget):
         content_root,
         on_restored: Optional[Callable[[], None]] = None,
         writable: bool = True,
+        rollback_all: Optional[Callable[[], List[str]]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -58,18 +72,24 @@ class ChangesPanel(QWidget):
         self._content_root = Path(content_root).resolve()
         self._on_restored = on_restored
         self._writable = writable
+        # VCS 模式下由上层提供版本控制回滚实现（否则用本地 .bak 清单）。
+        self._rollback_all = rollback_all
         self._items: List[ChangeItem] = []
+        self._source = "local"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
         outer.setSpacing(4)
 
-        # 计数行
+        # 计数行 + 检测来源
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         self._counts_label = QLabel("无改动", self)
         self._counts_label.setObjectName("statusMuted")
         top.addWidget(self._counts_label)
+        self._source_label = QLabel("", self)
+        self._source_label.setObjectName("statusMuted")
+        top.addWidget(self._source_label)
         top.addStretch(1)
         self._rollback_all_btn = QPushButton("回滚全部会话改动", self)
         self._rollback_all_btn.setProperty("btnRole", "secondary")
@@ -106,6 +126,15 @@ class ChangesPanel(QWidget):
 
     # --- 数据 ---
 
+    def set_source(self, source: str) -> None:
+        """标注变更检测来源（git/svn/local），显示在计数行。"""
+        self._source = source or "local"
+        self._render_source_label()
+
+    def _render_source_label(self) -> None:
+        label = _SOURCE_LABELS.get(self._source, self._source)
+        self._source_label.setText("检测来源：{0}".format(label))
+
     def set_items(self, items: List[ChangeItem]) -> None:
         """推送改动项并渲染列表与计数（保留当前选中不动）。"""
         self._items = list(items)
@@ -131,6 +160,7 @@ class ChangesPanel(QWidget):
                     counts["added"], counts["modified"], counts["deleted"]
                 )
             )
+        self._render_source_label()
         self._update_action_state()
 
     def set_writable(self, writable: bool) -> None:
@@ -177,13 +207,19 @@ class ChangesPanel(QWidget):
     def _update_action_state(self) -> None:
         item = self._selected_item()
         restorable = bool(
-            self._writable and item is not None and not item.is_rename
+            self._writable
+            and item is not None
+            and not item.is_rename
+            and item.restorable
         )
         self._restore_btn.setEnabled(restorable)
         self._rollback_all_btn.setEnabled(self._writable and bool(self._items))
         if item is None:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("")
+        elif not item.restorable:
+            self._restore_btn.setText("恢复到基线")
+            self._status_label.setText("该条目仅展示，不提供单文件恢复")
         elif item.is_rename:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("重命名文件请使用「回滚全部会话改动」")
@@ -199,7 +235,12 @@ class ChangesPanel(QWidget):
 
     def _on_restore_clicked(self) -> None:
         item = self._selected_item()
-        if item is None or item.is_rename or not self._writable:
+        if (
+            item is None
+            or item.is_rename
+            or not item.restorable
+            or not self._writable
+        ):
             return
         baseline = None
         if item.status == "modified":
@@ -225,16 +266,21 @@ class ChangesPanel(QWidget):
     def _on_rollback_all(self) -> None:
         if not self._writable or not self._items:
             return
+        if self._rollback_all is not None:
+            scope = "将用版本控制恢复当前项目的全部未提交改动（{0} 项）。"
+        else:
+            scope = "将回滚本次会话的全部改动（{0} 项：编辑 / 重命名 / 新增 / 删除）。"
         answer = QMessageBox.question(
             self,
-            "回滚全部会话改动",
-            "将回滚本次会话的全部改动（{0} 项：编辑 / 重命名 / 新增 / 删除）。\n\n确认？".format(
-                len(self._items)
-            ),
+            "回滚全部改动",
+            scope.format(len(self._items)) + "\n\n确认？",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        failures = self._writer.rollback()
+        if self._rollback_all is not None:
+            failures = self._rollback_all()
+        else:
+            failures = self._writer.rollback()
         if failures:
             self._status_label.setText(
                 "回滚失败：{0}".format(", ".join(failures))

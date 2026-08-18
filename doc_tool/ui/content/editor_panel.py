@@ -932,10 +932,11 @@ class EditorPanel(QWidget):
             return image_reference(target, result)
 
         # 仅转换历史遗留的裸 flowchart/sequenceDiagram 源码（围栏块属现代写法，
-        # 阅读预览已渲染，不在批量转换范围内）。内置渲染器（use_cli=False）：
-        # 批量 N 块逐个跑 mmdc 会在 UI 线程冻结最多 N×30s。
+        # 阅读预览已渲染，不在批量转换范围内）。批量优先 mermaid-cli（若已安装，
+        # 单块约 1~3s，用户主动触发可接受）；未安装 mmdc 时自动回退内置渲染器，
+        # 行为与之前完全一致。
         converted = batch_convert(
-            self._editor.toPlainText(), exporter, include_fenced=False, use_cli=False
+            self._editor.toPlainText(), exporter, include_fenced=False, use_cli=True
         )
         if converted.success_count:
             cursor = self._editor.textCursor()

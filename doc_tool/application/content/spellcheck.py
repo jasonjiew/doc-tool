@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Set
 # 英文词 token：至少一个字母开头，后续可含字母、撇号、连字符（≥2 字符）。
 _TOKEN_RE = re.compile(r"\b[a-zA-Z][a-zA-Z'-]{1,}\b")
 # 围栏代码块起始/结束行。
-_FENCE_RE = re.compile(r"^```")
+_FENCE_RE = re.compile(r"^(?:`{3,}|~{3,})")
 # 有效词典词（小写）。
 _VALID_DICT_WORD_RE = re.compile(r"^[a-z][a-z'-]*$")
 
@@ -75,7 +75,7 @@ class SpellChecker:
     def check(self, text: str) -> List[Misspelling]:
         """扫描整段文本返回拼写错误；start/end 为相对 ``text`` 起点的绝对偏移。
 
-        跳过 ``` 围栏代码块。供全文档检查与单测使用；编辑器按可见行增量
+        跳过 ```/~~~ 围栏代码块。供全文档检查与单测使用；编辑器按可见行增量
         检查使用 ``check_range``。
         """
         misspellings: List[Misspelling] = []
