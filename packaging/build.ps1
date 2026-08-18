@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 # fallback corrupting captured output in PowerShell-driven release builds.
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "1.1.0"
+$Version = "1.2.0"
 
 $AppVersion = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
 $InstallerMatch = Select-String -Path "$PSScriptRoot\installer.iss" -Pattern '#define\s+MyAppVersion\s+"([^"]+)"'

@@ -14,8 +14,8 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：1.1.0 为开源化通用化与 UI 交互优化发布。
-APP_VERSION = "1.1.0"
+# 应用语义版本：1.2.0 为多窗口、版本控制变更、mermaid-cli 渲染与机器可读 CLI 发布。
+APP_VERSION = "1.2.0"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
 PROJECT_SCHEMA_VERSION = 1
