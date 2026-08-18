@@ -569,7 +569,13 @@ class MainWindow(QMainWindow):
         self._append_log("已打开项目：{0}".format(summary.project_root.name))
 
     def _on_open_recent(self, path: str) -> None:
-        self._open_project_path(path)
+        """最近项目点击：在新窗口打开，不在当前窗口切换项目。
+
+        菜单「最近打开」与空状态「最近项目」按钮都经此回调；
+        重复打开保护（同一项目已在其它窗口打开 → 激活已有窗口）由
+        ``_open_project_in_new_window`` 承担。
+        """
+        self._open_project_in_new_window(path)
 
     # --- 内容工作区 ---
 

@@ -423,6 +423,44 @@ class MultiWindowIsolationTests(BaseWindowCase):
             pb.resolve(),
         )
 
+    def test_on_open_recent_opens_in_new_window(self):
+        """最近项目点击：在新窗口打开，不在当前窗口切换项目。
+
+        菜单「最近打开」与空状态「最近项目」按钮都经 _on_open_recent，
+        行为应与「在新窗口打开项目」一致：新项目进新窗口，当前窗口
+        保留原项目；同一项目重复点击则激活已有窗口、不新建。
+        """
+        repo = self._tmp / "repo"
+        repo.mkdir()
+        init_repo(repo)
+        pa = make_project(repo, "proj_a", {"content/a.md": "a"})
+        commit_all(repo, "init")
+        factory = self._factory()
+        wA = factory()
+        self._open_in_window(wA, pa)
+        before = self.registry.count()  # = 1（只有 A）
+
+        # 点击另一个项目的最近条目 → 新窗口打开，A 保留原项目
+        pb = make_project(repo, "proj_b", {"content/b.md": "b"})
+        commit_all(repo, "init")
+        wA._on_open_recent(str(pb))
+        QApplication.processEvents()
+        self.assertEqual(self.registry.count(), before + 1)
+        # 当前窗口 A 的项目保持不变
+        self.assertEqual(
+            wA._project_summary.project_root.resolve(), pa.resolve()
+        )
+        new_windows = [w for w in self.registry.windows() if w is not wA]
+        self.assertEqual(len(new_windows), 1)
+        self.assertEqual(
+            new_windows[0]._project_summary.project_root.resolve(),
+            pb.resolve(),
+        )
+
+        # 重复点击当前窗口已打开的项目 → 不新建窗口
+        wA._on_open_recent(str(pa))
+        QApplication.processEvents()
+        self.assertEqual(self.registry.count(), before + 1)
     def test_session_drafts_autosave_stores_are_per_project(self):
         """draft/session/autosave 的 state_dir 按项目隔离。"""
         repo = self._tmp / "repo"
