@@ -640,19 +640,8 @@ def _render_with_cli(source: str) -> Optional[RenderResult]:
         return RenderResult(True, svg, png, width, height, "mermaid-cli", None)
 
 
-def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True, use_web: bool = False) -> RenderResult:
-    """渲染 Mermaid；后端优先级 CLI > web(官方 mermaid.js) > 内置子集渲染器。
-
-    - ``use_cli=True``（默认）：mermaid-cli 可用时优先用之（官方渲染，适合导出）。
-    - ``use_web=False``（默认）：进程内 QtWebEngine 跑官方 mermaid.min.js，单帧
-      几十~几百 ms，适合实时预览。web 不可用（无 bundle / 无 QtWebEngine /
-      初始化失败 / 永久禁用）时静默回退，永不抛异常。
-    - 两者都关或都不可用时走内置子集 SVG 渲染器（永远可用，alt/loop/Note 等
-      结构不渲染）。
-
-    语法先用项目子集校验器把关：不支持的图类型在进任何后端前即报错，确保
-    回退路径行为可预测（web/CLI 不被子集外的输入拖入不可控分支）。
-    """
+def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True) -> RenderResult:
+    """渲染 Mermaid；CLI 可用时优先，否则使用内置子集渲染器。"""
     actual = kind or detect_kind(source)
     errors = validate(source, actual)
     if errors:
@@ -662,13 +651,6 @@ def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True, use
         cli_result = _render_with_cli(source)
         if cli_result is not None:
             return cli_result
-    if use_web:
-        from doc_tool.application.content.mermaid_web import render_web
-
-        web_result = render_web(source)
-        if web_result is not None:
-            # web 端 ok 或编译错误都直接回传（编译错误信息更准，便于用户改源码）。
-            return web_result
     try:
         if actual == "flowchart":
             svg, width, height = _render_flowchart_svg(source)
