@@ -21,6 +21,12 @@
 .PARAMETER OneFile
     构建单文件 exe（使用 packaging\doc_tool_onefile.spec）。
 
+.PARAMETER Portable
+    在 onedir 构建之后额外打出团队分发便携包
+    dist\DocTool-<版本>-portable.zip（DocTool\ + 启动DocTool.cmd）。
+    启动脚本每次把整个目录复制到 %TEMP% 下全新随机目录再启动，绕开安全软件
+    对「未签名 exe 从 %TEMP% 之外加载 DLL」的拦截与路径信誉拖黑。
+
 .PARAMETER SkipTests
     跳过冻结冒烟测试与产物内容校验。
 
@@ -31,12 +37,14 @@
 .EXAMPLE
     .\build_exe.ps1
     .\build_exe.ps1 -OneFile
+    .\build_exe.ps1 -Portable
     .\build_exe.ps1 -InstallDeps
 #>
 
 [CmdletBinding()]
 param(
     [switch]$OneFile,
+    [switch]$Portable,
     [switch]$SkipTests,
     [switch]$InstallDeps
 )
@@ -234,3 +242,35 @@ if ($OneFile) {
     Write-Host "  1) 双击 dist\启动DocTool.cmd（自动复制到 %TEMP% 全新目录再启动，实测可用）；或" -ForegroundColor DarkGray
     Write-Host "  2) 请 IT 在火绒终端安全管理中心把本目录加入信任区/执行控制白名单，或对 exe 做代码签名。" -ForegroundColor DarkGray
 }
+
+# --- 便携包（团队分发）---
+# 安全软件（火绒企业版）拦截未签名 exe 从 %TEMP% 之外加载 DLL，且同一路径反复
+# 运行会把该路径的信誉拖黑。便携包把 onedir 产物和启动脚本打成一个 zip：同事解压
+# 到任意位置，双击脚本即可（脚本每次复制到 %TEMP% 下全新随机目录再启动）。
+if ($Portable) {
+    if ($OneFile) {
+        throw "-Portable 需要 onedir 布局（便携包依赖 DocTool\ 目录），请去掉 -OneFile。"
+    }
+    Write-Host ""
+    Write-Host "=== 生成便携包 ===" -ForegroundColor Cyan
+    $Launcher = Join-Path $RepoRoot "packaging\portable\启动DocTool.cmd"
+    if (-not (Test-Path $Launcher)) { throw "缺少启动脚本: $Launcher" }
+    Push-Location $RepoRoot
+    try {
+        $AppVersion = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
+    } finally {
+        Pop-Location
+    }
+    if (-not $AppVersion) { throw "无法读取 APP_VERSION" }
+    Copy-Item $Launcher (Join-Path $RepoRoot "dist") -Force
+    $Zip = Join-Path $RepoRoot "dist\DocTool-$AppVersion-portable.zip"
+    if (Test-Path $Zip) { Remove-Item $Zip -Force }
+    Compress-Archive -Path @(
+        (Join-Path $RepoRoot "dist\DocTool"),
+        (Join-Path $RepoRoot "dist\启动DocTool.cmd")
+    ) -DestinationPath $Zip -CompressionLevel Optimal
+    $SizeMb = [math]::Round((Get-Item $Zip).Length / 1MB, 1)
+    Write-Host "便携包: $Zip（$SizeMb MB）" -ForegroundColor White
+    Write-Host "分发说明：整包发给同事，解压后双击「启动DocTool.cmd」，不要单独取出 DocTool.exe。" -ForegroundColor White
+}
+

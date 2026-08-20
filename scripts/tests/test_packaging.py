@@ -222,5 +222,45 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("CI_COMMIT_SHA", ci)
 
 
+class PortablePackageTests(unittest.TestCase):
+    """团队分发便携包：启动脚本入库且可复现打包。
+
+    安全软件（火绒企业版）会拦截未签名 exe 从 %TEMP% 之外加载 DLL，并把反复运行
+    的同一路径信誉拖黑。便携包的启动脚本每次把整个目录复制到 %TEMP% 下的全新随机
+    目录再启动，绕开这两点。脚本此前只存在于 gitignore 的 dist\\ 下、手工维护，
+    清一次 dist 就没了——必须入库并由构建脚本产出。
+    """
+
+    LAUNCHER = Path(REPO_ROOT) / "packaging" / "portable" / "启动DocTool.cmd"
+
+    def test_launcher_is_tracked_in_repo(self):
+        self.assertTrue(self.LAUNCHER.is_file(), "便携包启动脚本必须入库")
+
+    def test_launcher_is_ascii_only(self):
+        """cmd.exe 按系统 ANSI 代码页解析批处理，非 ASCII 字节会破坏解析。"""
+        raw = self.LAUNCHER.read_bytes()
+        offenders = [
+            (index, byte) for index, byte in enumerate(raw) if byte > 0x7F
+        ]
+        self.assertEqual(offenders, [], "启动脚本出现非 ASCII 字节")
+
+    def test_launcher_copies_to_fresh_temp_dir(self):
+        text = self.LAUNCHER.read_text(encoding="ascii")
+        # 相对自身定位 DocTool\，解压到任意路径都能用。
+        self.assertIn("%~dp0DocTool", text)
+        # 每次全新随机目录（名字不含 DocTool），复制后再启动。
+        self.assertIn("%TEMP%\\dt_run_", text)
+        self.assertIn("robocopy", text)
+        self.assertIn("start \"\" \"%TGT%\\DocTool.exe\"", text)
+
+    def test_build_script_exposes_portable_switch(self):
+        script = (Path(REPO_ROOT) / "build_exe.ps1").read_text(encoding="utf-8")
+        self.assertIn("[switch]$Portable", script)
+        # 便携包必须由 onedir 产出，且 zip 里同时包含目录与启动脚本。
+        self.assertIn("packaging\\portable\\启动DocTool.cmd", script)
+        self.assertIn("Compress-Archive", script)
+        self.assertIn("DocTool-$AppVersion-portable.zip", script)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
