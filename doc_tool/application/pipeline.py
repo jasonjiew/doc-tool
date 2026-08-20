@@ -47,15 +47,18 @@ from doc_tool.domain.project_lock import TASK_BUILD, acquire_lock, release_lock
 from doc_tool.domain.runtime_log import RuntimeLog
 
 
+STAGE_REVISION = "revision"
 STAGE_BUILD = "build"
 STAGE_VALIDATE_PRE = "validate_pre"
 STAGE_WORD_REFRESH = "word_refresh"
 STAGE_VALIDATE_POST = "validate_post"
 STAGE_PUBLISH = "publish"
 
-# 管线阶段顺序：用于把阶段名映射为确定性进度百分比。诊断模式跳过
-# word_refresh 和 validate_post，进度跨度保持一致（按 4 段计算）。
+# 管线阶段顺序：用于把阶段名映射为确定性进度百分比。修订记录（同步文档
+# 版本号）在正式合并与诊断构建下都会执行；诊断模式跳过 word_refresh 和
+# validate_post。
 PIPELINE_STAGE_ORDER = (
+    STAGE_REVISION,
     STAGE_BUILD,
     STAGE_VALIDATE_PRE,
     STAGE_WORD_REFRESH,
@@ -65,6 +68,7 @@ PIPELINE_STAGE_ORDER = (
 
 # 阶段中文标签：用于进度文本与日志。
 PIPELINE_STAGE_LABELS = {
+    STAGE_REVISION: "修订记录",
     STAGE_BUILD: "构建",
     STAGE_VALIDATE_PRE: "前校验",
     STAGE_WORD_REFRESH: "Word 刷新",
@@ -152,10 +156,156 @@ def _map_exception(exc: Exception) -> DocToolError:
     return BuildError(user_message=msg)
 
 
+def _refresh_error(reason: str, timeout_seconds: int) -> DocToolError:
+    """把 Word 刷新结果的原因键映射为稳定错误类型。
+
+    旧实现把 ``refresh`` 返回 False 一律映射为 ``WordNotAvailableError``
+    （E3001「未检测到可用的 Microsoft Word」）：真实超时/保存失败被误报为
+    Word 不可用，误导排障。现在按 supervise 透传的原因键区分
+    E3002（超时）/ E3003（保存失败）/ E3001（其余）。
+    """
+    if reason == "timeout":
+        return WordRefreshTimeoutError(
+            user_message="Word 刷新超过 {0} 秒，已终止本次专用进程。".format(
+                timeout_seconds
+            ),
+        )
+    if reason == "save_failed":
+        return WordSaveFailedError(
+            user_message="Word 刷新过程中保存文档失败。",
+            suggested_action="请关闭其他 Word 进程后重试；上次有效输出已保留。",
+        )
+    return WordNotAvailableError(
+        user_message="Word 刷新失败，请查看日志中的详细错误",
+        suggested_action="请确认 Microsoft Word 可用且文档未损坏后重试。",
+    )
+
+
 def _current_stage(result: PipelineResult) -> str:
     """返回最近一个 started 阶段的名称（用于取消事件归属）。"""
     started = [e for e in result.events if e.status == "started"]
     return started[-1].stage if started else STAGE_BUILD
+
+
+def _prepare_revision_sync(
+    manifest: ProjectManifest,
+    paths: ProjectPaths,
+) -> Optional[dict]:
+    """按 ``_revision_record.md`` 末行版本号算出文档版本号同步计划（锁内只读）。
+
+    修订记录是作者手工维护的唯一维护点：表格末行就是本次要发布的版本，构建
+    内核 ``update_revision_record`` 会用该文件的数据行整表覆盖 Word 修订记录表。
+    这里只把末行版本号取出来，写清单由 ``_sync_revision_version`` 负责。
+
+    旧项目缺少 ``_revision_record.md`` 时先从项目模板初始化（仅在缺失时创建，
+    从不覆盖用户内容）。取不到版本号（无修订记录表 / 表里还没有数据行 / 末行
+    版本号写坏）时 ``new_version`` 为 None：沿用清单现有版本号，合并照常进行。
+    读取整体失败返回 None，绝不阻断合并。
+    """
+    try:
+        from doc_tool.application.content.revision_record import (
+            document_version_from_record,
+            ensure_revision_record,
+            has_revision_table,
+        )
+
+        md_path = paths.resolve(manifest.relative_content_root()) / "_revision_record.md"
+        ensure_revision_record(
+            md_path=md_path,
+            template_path=paths.resolve(manifest.relative_template_docx()),
+            document_type=manifest.documentType,
+        )
+        return {
+            "md_path": md_path,
+            "new_version": document_version_from_record(md_path),
+            "original_version": manifest.documentVersion,
+            "has_table": has_revision_table(md_path),
+            "applied": False,
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _revision_skip_detail(revision_sync: Optional[dict]) -> str:
+    """修订记录阶段跳过原因（沿用清单版本号时给出可排障的说明）。"""
+    if revision_sync is None:
+        return "修订记录读取失败，沿用项目版本号"
+    if not revision_sync.get("has_table"):
+        return "_revision_record.md 中没有修订记录表，沿用项目版本号"
+    return "_revision_record.md 修订记录表还没有数据行，沿用项目版本号"
+
+
+def _sync_revision_version(
+    revision_sync: Optional[dict],
+    manifest: ProjectManifest,
+    result: PipelineResult,
+    log: RuntimeLog,
+) -> str:
+    """把修订记录末行版本号同步到清单版本号（锁内执行），返回阶段状态。
+
+    版本号决定封面「版本号」与输出文件名，因此必须在构建之前完成。取不到
+    版本号只降级为 skipped：修订记录同步不了不影响本次构建本身。
+    """
+    version = (revision_sync or {}).get("new_version")
+    if not version:
+        detail = _revision_skip_detail(revision_sync)
+        result.events.append(StageEvent(STAGE_REVISION, "skipped", detail=detail))
+        log.info(STAGE_REVISION, "skipped")
+        return "skipped"
+    result.events.append(StageEvent(STAGE_REVISION, "started"))
+    log.info(STAGE_REVISION, "started")
+    original = str(revision_sync.get("original_version") or "")
+    if version == original:
+        detail = "文档版本号已与 _revision_record.md 末行一致：{0}".format(version)
+    else:
+        manifest.documentVersion = version
+        revision_sync["applied"] = True
+        detail = "已按 _revision_record.md 末行同步文档版本号：{0} → {1}".format(
+            original or "（空）", version
+        )
+    result.events.append(StageEvent(STAGE_REVISION, "succeeded", detail=detail))
+    log.info(STAGE_REVISION, "succeeded", {"version": version})
+    return "succeeded"
+
+
+def _rollback_revision_sync(
+    revision_sync: Optional[dict],
+    manifest: ProjectManifest,
+    log: RuntimeLog,
+) -> None:
+    """构建失败时还原同步过的文档版本号（锁内调用）。
+
+    修订记录文件本身从未被改写，只需回退内存中的清单版本号；清单只在发布
+    成功后落盘，因此回退后不会有中途版本号进入 ``project.yml``。
+    """
+    if not (revision_sync or {}).get("applied"):
+        return
+    try:
+        manifest.documentVersion = revision_sync["original_version"]
+        revision_sync["applied"] = False
+        log.info(STAGE_REVISION, "rollback", {
+            "version": revision_sync["original_version"],
+        })
+    except Exception as exc:  # noqa: BLE001
+        log.warn(STAGE_REVISION, "rollback_failed", {
+            "errorType": type(exc).__name__,
+        })
+
+
+def _refresh_content_baseline(paths: ProjectPaths) -> int:
+    """正式发布成功后，以当前 content/ 重新建立会话基线。
+
+    基线必须与内容工作区使用同一根目录和 rel_path 规则，否则下一次合并
+    会把整棵 ``design/`` 或 ``requirement/`` 目录误判为新增/删除。
+    """
+    from doc_tool.application.content.index import ContentIndexService
+    from doc_tool.application.content.snapshot import ContentSnapshot
+
+    files = [rel for rel, _ in ContentIndexService(paths.content_root).discover_files()]
+    snapshot = ContentSnapshot(paths.state_dir)
+    snapshot.take(paths.content_root, files)
+    snapshot.save()
+    return len(files)
 
 
 def run_pipeline(
@@ -184,6 +334,10 @@ def run_pipeline(
     任务 7.3：构建产物先写入临时文件，前校验、Word 刷新、后校验全部在
     临时文件上进行；只有后校验通过后才原子发布到正式输出路径。
     任务 7.4：发布完成后写入输出状态元数据，标注是否为正式成功。
+
+    修订记录由作者手工维护 ``_revision_record.md``：管线开始处只把该文件的末行
+    版本号同步到 ``manifest.documentVersion``（决定封面「版本号」与输出文件名），
+    表格内容由构建内核整表覆盖进 Word 修订记录表。工具不再生成修订内容。
     """
     from doc_tool.adapters.kernel import (
         build_with_project,
@@ -242,6 +396,9 @@ def run_pipeline(
             })
             return result
 
+    # --- 修订记录 → 文档版本号同步计划（锁内计算） ---
+    revision_sync = None
+
     # --- 获取项目锁 ---
     try:
         acquire_lock(paths, TASK_BUILD, effective_app_version)
@@ -254,11 +411,18 @@ def run_pipeline(
         return result
 
     try:
-        return _run_pipeline_inner(
+        # 诊断构建也同步：版本号是 _revision_record.md 的派生值，预览产物的
+        # 封面与文件名必须和正式合并一致，否则改完修订记录先诊断一次会看到
+        # 旧版本号。清单只在发布成功后落盘。
+        revision_sync = _prepare_revision_sync(manifest, paths)
+        result = _run_pipeline_inner(
             manifest, paths, skip_word_refresh, baseline, cancel_token,
             result, log, build_with_project, refresh_with_project,
-            validate_with_project, on_progress,
+            validate_with_project, on_progress, revision_sync,
         )
+        if not result.success:
+            _rollback_revision_sync(revision_sync, manifest, log)
+        return result
     except CancelledError as exc:
         result.error_code = exc.code
         result.events.append(StageEvent(
@@ -266,6 +430,7 @@ def run_pipeline(
             detail=exc.user_message, error_code=exc.code,
         ))
         log.error(_current_stage(result), status="cancelled", exception=exc)
+        _rollback_revision_sync(revision_sync, manifest, log)
         return result
     except Exception as exc:
         err = _map_exception(exc)
@@ -275,6 +440,7 @@ def run_pipeline(
             detail=err.user_message, error_code=err.code,
         ))
         log.error(_current_stage(result), exception=exc)
+        _rollback_revision_sync(revision_sync, manifest, log)
         return result
     finally:
         release_lock(paths)
@@ -292,6 +458,7 @@ def _run_pipeline_inner(
     refresh_with_project,
     validate_with_project,
     on_progress: ProgressCallback = _noop_progress,
+    revision_sync: Optional[dict] = None,
 ) -> PipelineResult:
     """管线内部执行（锁已获取），分离以便 finally 释放锁。
 
@@ -337,6 +504,19 @@ def _run_pipeline_inner(
 
     result.events = _EmitList()
 
+    # 用于状态元数据的阶段摘要
+    stage_summary: list = []
+
+    def _record_stage(stage: str, status: str) -> None:
+        stage_summary.append({"stage": stage, "status": status})
+
+    # --- 阶段 0：按 _revision_record.md 末行同步文档版本号（锁内执行） ---
+    # 必须在构建之前：版本号决定封面「版本号」与输出文件名。
+    _record_stage(
+        STAGE_REVISION,
+        _sync_revision_version(revision_sync, manifest, result, log),
+    )
+
     # --- 计算正式输出路径与临时输出路径 ---
     output_name = build_output_filename(
         manifest.documentNo,
@@ -352,12 +532,6 @@ def _run_pipeline_inner(
     # ``.docx``），旧命名 ``.<名>.tmp`` 会让每次校验都报「文件扩展名不是
     # .docx」，管线永远无法发布。隐藏点前缀 + ``.tmp-`` 标记仍标示临时性。
     temp_output = paths.output_dir / (".tmp-" + output_name)
-
-    # 用于状态元数据的阶段摘要
-    stage_summary: list = []
-
-    def _record_stage(stage: str, status: str) -> None:
-        stage_summary.append({"stage": stage, "status": status})
 
     def _cleanup_temp() -> None:
         try:
@@ -394,7 +568,9 @@ def _run_pipeline_inner(
         # 不阻断构建的表达式警告（缺失链接目标/未定义脚注）记录并透出到日志。
         for warning in expression_warnings:
             log.warn(STAGE_BUILD, "expression_warning", {"message": warning})
-            on_progress(STAGE_BUILD, "warning", warning)
+            # 与 _emit 一致：进度回调异常不得影响管线主流程（否则 UI 桥在
+            # 窗口销毁/任务取消竞态下抛异常会被误判为构建失败 E2001）。
+            _emit(STAGE_BUILD, "warning", warning)
         result.output_path = str(formal_output)  # 返回正式路径，而非临时
         result.events.append(StageEvent(
             STAGE_BUILD, "succeeded",
@@ -497,7 +673,7 @@ def _run_pipeline_inner(
         try:
             # Word 保存是临界区：取消在保存完成前不中断
             with token.critical_section():
-                ok = refresh_with_project(
+                ok, refresh_reason = refresh_with_project(
                     manifest, paths, output_override=str(temp_output),
                 )
             if ok:
@@ -508,9 +684,7 @@ def _run_pipeline_inner(
                 log.info(STAGE_WORD_REFRESH, "succeeded")
                 _record_stage(STAGE_WORD_REFRESH, "succeeded")
             else:
-                err = WordNotAvailableError(
-                    user_message="Word 刷新失败，请查看日志中的详细错误",
-                )
+                err = _refresh_error(refresh_reason, manifest.refreshTimeoutSeconds)
                 result.events.append(StageEvent(
                     STAGE_WORD_REFRESH, "failed",
                     detail=err.user_message, error_code=err.code,
@@ -634,6 +808,9 @@ def _run_pipeline_inner(
     previous_state = paths.output_dir / ("." + formal_state.name + ".previous.bak")
     had_previous_output = formal_output.exists()
     had_previous_state = formal_state.exists()
+    # 发布回滚失败时保留上一版快照：否则 finally 会清掉唯一可恢复的
+    # 上一版状态元数据（旧 DOCX + 新/无状态的不一致就永久固化了）。
+    publish_restore_failed = False
 
     def _cleanup_publish_backups() -> None:
         for backup in (previous_output, previous_state):
@@ -706,6 +883,22 @@ def _run_pipeline_inner(
             "formal": is_formal,
             "diagnostic": skip_word_refresh,
         })
+        if not skip_word_refresh:
+            try:
+                baseline_count = _refresh_content_baseline(paths)
+                log.info(STAGE_PUBLISH, "content_baseline_refreshed", {
+                    "files": baseline_count,
+                })
+            except Exception as exc:
+                log.warn(STAGE_PUBLISH, "content_baseline_refresh_failed", {
+                    "errorType": type(exc).__name__,
+                })
+                result.events.append(StageEvent(
+                    STAGE_PUBLISH, "warning",
+                    detail="内容基线刷新失败（不影响本次发布）：{0}".format(
+                        type(exc).__name__
+                    ),
+                ))
         try:
             from doc_tool.application.content.history import BuildHistoryStore
 
@@ -735,7 +928,18 @@ def _run_pipeline_inner(
             with token.critical_section():
                 _restore_previous_publish()
         except OSError as restore_exc:
+            publish_restore_failed = True
             log.error(STAGE_PUBLISH, status="rollback_failed", exception=restore_exc)
+            # 恢复失败时保留 .previous.bak 快照（finally 不再清理），
+            # 并透出可见提示，供用户手动恢复上一版状态元数据。
+            result.events.append(StageEvent(
+                STAGE_PUBLISH, "warning",
+                detail=(
+                    "发布回滚失败，已保留上一版快照：{0} / {1}。".format(
+                        previous_output.name, previous_state.name
+                    )
+                ),
+            ))
         err = _map_exception(exc)
         result.events.append(StageEvent(
             STAGE_PUBLISH, "failed", detail=err.user_message, error_code=err.code,
@@ -756,6 +960,7 @@ def _run_pipeline_inner(
             compute_hash=False,
         )
     finally:
-        _cleanup_publish_backups()
+        if not publish_restore_failed:
+            _cleanup_publish_backups()
 
     return result

@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from doc_tool.domain.manifest import ProjectManifest
 from doc_tool.domain.paths import ProjectPaths, build_output_filename
@@ -155,6 +155,7 @@ def config_from_project(
             "content_root": str(paths.resolve(manifest.relative_content_root())),
             "asset_root": str(paths.resolve(manifest.relative_asset_root())),
             "table_root": str(paths.resolve(manifest.relative_table_root())),
+            "revision_record": str(paths.resolve(manifest.relative_content_root()) / "_revision_record.md"),
             "output": str(output_path),
         },
         "headingStyles": heading_styles,
@@ -222,8 +223,12 @@ def refresh_with_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
-) -> bool:
-    """以项目上下文调用 ``refresh_fields.supervise``，返回是否刷新成功。
+) -> Tuple[bool, str]:
+    """以项目上下文调用 ``refresh_fields.supervise``。
+
+    返回 ``(是否成功, 原因键)``（``ok/timeout/word_unavailable/save_failed/
+    refresh_failed``），由管线按原因映射稳定错误码——旧实现只返回 bool，
+    超时/保存失败被上层一律当作「Word 不可用」（E3001）误报。
 
     任务 7.2：刷新由专用 ``DispatchEx("Word.Application")`` 进程完成，
     不复用、不关闭、不终止用户已打开的 Word。超时只 kill 本次专用进程树。

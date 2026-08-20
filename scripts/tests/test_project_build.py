@@ -32,7 +32,13 @@ sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, SCRIPTS)
 
 from build_docx import build as build_docx  # noqa: E402
-from docx_common import AutomationError, load_config  # noqa: E402
+from build_docx import _find_revision_record_table, qn  # noqa: E402
+from docx_common import (  # noqa: E402
+    AutomationError,
+    load_config,
+    parse_xml_safe,
+    read_docx_package,
+)
 from doc_tool.adapters.kernel import (  # noqa: E402
     build_with_project,
     config_from_project,
@@ -42,6 +48,7 @@ from doc_tool.adapters.kernel import (  # noqa: E402
 from doc_tool.domain.errors import PathEscapeError  # noqa: E402
 from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
 from doc_tool.domain.paths import ProjectPaths  # noqa: E402
+from extract_revision_record import extract_revision_rows  # noqa: E402
 from validate_docx import DocxPackage, validate as validate_docx  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -83,6 +90,17 @@ MINIMAL_CONTENT = {
     "2 详细设计/2.1 架构.md": "系统架构说明。\n",
 }
 
+# 修订记录 Markdown：第 2 行摘要含 ``\|`` 转义，验证构建侧还原成裸竖线。
+REVISION_RECORD_MD = r"""<!-- 修订记录（自动提取自模板，可手动编辑） -->
+
+# 修订记录 - requirement
+
+| 版本 | 修订摘要 | 修订时间 | 修订人 |
+|------|----------|----------|--------|
+| V1.0 | 初始版本 | 2026-01-01 | 张三 |
+| V1.1 | 新增模块：3.7产品管理->3.7.9呼吸机应用升级 \| 边界说明 | 2026-08-20 | 李四 |
+"""
+
 
 def _sha256(path: str) -> str:
     digest = hashlib.sha256()
@@ -90,6 +108,54 @@ def _sha256(path: str) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _revision_table_rows(docx_path: str) -> list:
+    """修订记录表的全部 ``w:tr``（前 2 行是表头）。"""
+    with read_docx_package(docx_path) as package:
+        items = package.read_all()
+    root = parse_xml_safe(items["word/document.xml"], "word/document.xml")
+    table = _find_revision_record_table(root.find(qn("body")))
+    return table.findall(qn("tr")) if table is not None else []
+
+
+def _row_format_signature(row) -> tuple:
+    """行排版签名：行属性 + 每个单元格的宽度/边框/对齐/字符格式。
+
+    模板数据行靠 ``w:trPr`` 的 ``gridBefore``（整行右移一个网格列）、``pct``
+    宽度和逐单元格 ``tcBorders`` 定位；重建行必须逐项保持一致，否则在 Word
+    里表现为无边框、与表头错开一列、列宽不对。
+    """
+    row_properties = row.find(qn("trPr"))
+
+    def value_of(parent, *path):
+        node = parent
+        for name in path:
+            if node is None:
+                return None
+            node = node.find(qn(name))
+        return node.get(qn("val")) if node is not None else None
+
+    cells = []
+    for cell in row.findall(qn("tc")):
+        cell_properties = cell.find(qn("tcPr"))
+        width = cell_properties.find(qn("tcW")) if cell_properties is not None else None
+        paragraph = cell.find(qn("p"))
+        run = paragraph.find(qn("r")) if paragraph is not None else None
+        cells.append((
+            width.get(qn("w")) if width is not None else None,
+            width.get(qn("type")) if width is not None else None,
+            cell_properties is not None and cell_properties.find(qn("tcBorders")) is not None,
+            value_of(cell_properties, "vAlign"),
+            value_of(paragraph, "pPr", "jc"),
+            run is not None and run.find(qn("rPr")) is not None,
+        ))
+    return (
+        value_of(row_properties, "gridBefore"),
+        value_of(row_properties, "trHeight"),
+        row_properties is not None and row_properties.find(qn("cantSplit")) is not None,
+        tuple(cells),
+    )
 
 
 def _setup_project(root: str) -> str:
@@ -365,6 +431,188 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertTrue(len(result.events) > 0)
         self.assertEqual(result.events[-1].status, "failed")
         self.assertEqual(list(paths.state_dir.joinpath("history").glob("*.json")), [])
+
+
+class RevisionRecordBuildTests(unittest.TestCase):
+    """回归：``_revision_record.md`` 的数据行必须出现在产物 DOCX 的修订记录表里。
+
+    历史缺陷：``update_revision_record`` 自行解析 ``items["word/document.xml"]``
+    并写回 ``items``，随后 ``build()`` 末尾又用自己的 ``document_root`` 整份序列化
+    覆盖同一个键，修订记录改动被静默丢弃——正式合并写进了 Markdown、构建也报
+    成功，但产物里的修订表始终停留在模板原样。原有测试只覆盖 Markdown 侧，
+    所以这个缺陷一直没被拦住；本类断言最终 DOCX 的表格内容。
+
+    注意：``paths.revision_record`` 只由新入口 ``config_from_project`` 注入，旧
+    入口 ``load_config`` 不提供该键。``_setup_project`` 故意不创建修订记录文件，
+    别为了这里的用例给它补上，否则会打破新旧入口字节一致的用例。
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.mkdtemp(prefix="doc-revision-build-")
+        self.project_root = _setup_project(self._tmp)
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _revision_md_path(self) -> Path:
+        return Path(self.project_root) / "content" / "requirement" / "_revision_record.md"
+
+    def test_markdown_rows_reach_output_document(self) -> None:
+        """Markdown 表格的数据行原样落到产物修订表（含 ``\\|`` 转义还原）。"""
+        self._revision_md_path().write_text(REVISION_RECORD_MD, encoding="utf-8")
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        output = build_with_project(manifest, paths)
+
+        rows = extract_revision_rows(output)
+        self.assertEqual([row[0] for row in rows], ["V1.0", "V1.1"])
+        self.assertEqual(
+            rows[1][1],
+            "新增模块：3.7产品管理->3.7.9呼吸机应用升级 | 边界说明",
+        )
+        self.assertEqual(rows[1][2], "2026-08-20")
+        self.assertEqual(rows[1][3], "李四")
+
+    def test_template_rows_are_replaced_not_appended(self) -> None:
+        """模板自带的数据行被 Markdown 全量替换，不与新行并存。"""
+        template_rows = extract_revision_rows(
+            os.path.join(self.project_root, "template", "template.docx")
+        )
+        self.assertGreater(len(template_rows), 2, "模板应自带多行修订记录")
+        self._revision_md_path().write_text(REVISION_RECORD_MD, encoding="utf-8")
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        rows = extract_revision_rows(build_with_project(manifest, paths))
+
+        self.assertEqual(len(rows), 2)
+        self.assertNotIn(template_rows[-1][0], [row[0] for row in rows])
+
+    def test_missing_markdown_keeps_template_rows(self) -> None:
+        """没有 ``_revision_record.md`` 时保留模板原表，不清空、不报错。"""
+        self.assertFalse(self._revision_md_path().exists())
+        template_rows = extract_revision_rows(
+            os.path.join(self.project_root, "template", "template.docx")
+        )
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        rows = extract_revision_rows(build_with_project(manifest, paths))
+
+        self.assertEqual(rows, template_rows)
+
+    def test_rebuilt_rows_keep_template_row_formatting(self) -> None:
+        """重建的数据行沿用模板数据行排版（行高/网格偏移/边框/宽度单位/对齐）。
+
+        回归：原实现自建单元格，丢掉 ``w:trPr``（含 ``gridBefore``）与
+        ``tcBorders``，并把 ``pct`` 宽度写成 ``dxa``，在 Word 里表现为修订表
+        数据行无边框、比表头错开一列、列宽全不对——这就是「模板修订摘要排版
+        有问题」的实际成因。新增行（超出模板行数的部分）沿用最后一行排版。
+        """
+        template_docx = os.path.join(self.project_root, "template", "template.docx")
+        template_rows = _revision_table_rows(template_docx)
+        self.assertGreater(len(template_rows), 2, "模板应自带数据行作为排版原型")
+        expected = _row_format_signature(template_rows[2])
+        # 两条数据行：第 1 条对应模板第 1 条数据行，第 2 条也在模板范围内。
+        self._revision_md_path().write_text(REVISION_RECORD_MD, encoding="utf-8")
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        output_rows = _revision_table_rows(build_with_project(manifest, paths))
+
+        self.assertEqual(len(output_rows), 4, "2 行表头 + 2 行数据")
+        self.assertEqual(_row_format_signature(output_rows[2]), expected)
+        # 表头两行必须原样保留。
+        self.assertEqual(
+            _row_format_signature(output_rows[1]),
+            _row_format_signature(template_rows[1]),
+        )
+        # 排版签名里必须真的带上原实现丢掉的那些属性，否则断言等于什么都没查
+        # （自建单元格没有 trPr/tcBorders/rPr）。用户模板另有 gridBefore，
+        # 同样由整体签名比对覆盖。
+        self.assertIsNotNone(expected[1], "模板数据行应带行高 trHeight")
+        self.assertTrue(expected[2], "模板数据行应带 cantSplit")
+        self.assertTrue(expected[3][0][2], "模板数据行首列应带 tcBorders")
+        self.assertTrue(expected[3][0][5], "模板数据行首列应带字符格式 rPr")
+
+    def test_extra_rows_follow_last_template_row_formatting(self) -> None:
+        """Markdown 行数超过模板数据行时，多出来的行沿用模板最后一行排版。"""
+        template_docx = os.path.join(self.project_root, "template", "template.docx")
+        template_rows = _revision_table_rows(template_docx)
+        data_count = len(template_rows) - 2
+        expected_last = _row_format_signature(template_rows[-1])
+        lines = [
+            "| 版本 | 修订摘要 | 修订时间 | 修改人 |",
+            "|------|----------|----------|--------|",
+        ]
+        for index in range(data_count + 2):  # 比模板多两行
+            lines.append("| V9.{0} | 摘要{0} | 2026-08-20 | 张三 |".format(index))
+        self._revision_md_path().write_text("\n".join(lines) + "\n", encoding="utf-8")
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        output_rows = _revision_table_rows(build_with_project(manifest, paths))
+
+        self.assertEqual(len(output_rows), 2 + data_count + 2)
+        self.assertEqual(_row_format_signature(output_rows[-1]), expected_last)
+        self.assertEqual(_row_format_signature(output_rows[-2]), expected_last)
+
+    def test_pipeline_syncs_document_version_from_last_row(self) -> None:
+        """管线按修订记录末行版本号定产物版本号，且从不改写该文件。
+
+        ``_revision_record.md`` 是唯一维护点：作者改完就该看到产物文件名与封面
+        版本号跟着走。旧实现在合并时自动追加一行并递增清单版本号，现已撤除，
+        因此这里同时断言该文件字节不变。
+        """
+        from doc_tool.application.pipeline import STAGE_REVISION, run_pipeline
+
+        self._revision_md_path().write_text(REVISION_RECORD_MD, encoding="utf-8")
+        before = self._revision_md_path().read_text(encoding="utf-8")
+        manifest = _make_manifest(self.project_root)  # documentVersion=1.0
+        paths = manifest.resolve_paths(self.project_root)
+
+        result = run_pipeline(manifest, paths, skip_word_refresh=True)
+
+        self.assertTrue(
+            result.success,
+            [(e.stage, e.status, e.detail) for e in result.events],
+        )
+        self.assertEqual(manifest.documentVersion, "V1.1")
+        self.assertTrue(
+            Path(result.output_path).name.endswith("(V1.1).docx"), result.output_path
+        )
+        details = [
+            event.detail
+            for event in result.events
+            if event.stage == STAGE_REVISION and event.status == "succeeded"
+        ]
+        self.assertTrue(any("1.0 → V1.1" in text for text in details), details)
+        # 工具不再往修订记录里写任何东西
+        self.assertEqual(self._revision_md_path().read_text(encoding="utf-8"), before)
+        # 产物修订表就是该文件的数据行
+        self.assertEqual(
+            [row[0] for row in extract_revision_rows(result.output_path)],
+            ["V1.0", "V1.1"],
+        )
+
+    def test_multiline_summary_becomes_line_breaks(self) -> None:
+        """摘要里的 ``<br>`` 转成 ``w:br`` 换行，而不是塞进单个 ``w:t``。"""
+        self._revision_md_path().write_text(
+            "| 版本 | 修订摘要 | 修订时间 | 修改人 |\n"
+            "|------|----------|----------|--------|\n"
+            "| V1.0 | 第一行<br>第二行 | 2026-08-20 | 张三 |\n",
+            encoding="utf-8",
+        )
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+
+        rows = _revision_table_rows(build_with_project(manifest, paths))
+
+        summary_cell = rows[2].findall(qn("tc"))[1]
+        self.assertEqual(len(list(summary_cell.iter(qn("br")))), 1)
+        texts = [node.text for node in summary_cell.iter(qn("t"))]
+        self.assertEqual(texts, ["第一行", "第二行"])
 
 
 if __name__ == "__main__":

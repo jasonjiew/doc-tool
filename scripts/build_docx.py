@@ -34,6 +34,7 @@ from docx_common import (
     discover_document_types,
     iter_chapter_entries,
     load_config,
+    neutralize_hyperlink_fields,
     parse_image_reference,
     parse_markdown_table,
     parse_xml_safe,
@@ -469,10 +470,38 @@ class NumberingManager:
         etree.SubElement(num, qn("abstractNumId")).set(qn("val"), str(abstract_id))
         return num_id
 
+    def has_num(self, num_id: int) -> bool:
+        """``numbering.xml`` 里是否定义了该 ``w:num``（编号实例）。
+
+        引用未定义的 numId 会产出非法文档（Word 里编号不显示，校验器报
+        「列表 numId 不存在」），所以套用模板既有编号前必须先问一句。
+        """
+        target = str(num_id)
+        return any(
+            node.get(qn("numId")) == target for node in self.root.findall(qn("num"))
+        )
+
     def save(self) -> None:
         self.items["word/numbering.xml"] = etree.tostring(
             self.root, xml_declaration=True, encoding="UTF-8", standalone=True
         )
+
+
+# 模板标题自动编号约定：numId 1 是与标题样式关联的多级列表
+# （``第%1章`` / ``%1.%2`` …，各级 ``w:pStyle`` 指向标题样式）。
+HEADING_NUM_ID = 1
+
+
+def _heading_num_id(numbering: Optional[NumberingManager]) -> Optional[int]:
+    """标题该套用的编号实例；模板没有该定义时返回 None（不发 ``w:numPr``）。
+
+    模板不含 numId 1 时（例如没有任何列表的极简模板）硬套编号，会让每个标题
+    都引用不存在的编号实例，产出非法文档且校验直接失败。这种模板一般自带
+    标题样式编号或压根不需要编号，跳过即可。
+    """
+    if numbering is None or not numbering.has_num(HEADING_NUM_ID):
+        return None
+    return HEADING_NUM_ID
 
 
 def parse_list_line(line: str):
@@ -486,11 +515,11 @@ def parse_list_line(line: str):
 
 
 def make_heading(
-    style_map: Dict[int, str], text: str, level: int, *, expressions=None, bookmark_key: str = ""
+    style_map: Dict[int, str], text: str, level: int, *, num_id: Optional[int] = None, list_level: int = 0, expressions=None, bookmark_key: str = ""
 ):
     if level not in style_map:
         raise AutomationError("缺少 Heading {0} 的 Word 样式映射".format(level))
-    paragraph = make_paragraph(style_map[level], text, expressions=expressions)
+    paragraph = make_paragraph(style_map[level], text, expressions=expressions, num_id=num_id, list_level=list_level)
     if expressions is not None and bookmark_key:
         expressions.wrap_bookmark(paragraph, bookmark_key)
     return paragraph
@@ -907,6 +936,210 @@ def update_cover(root, config: Dict) -> None:
         raise AutomationError("模板封面缺少字段: {0}".format(", ".join(missing)))
 
 
+
+
+def update_headers(items, config):
+    """Automatically update document number and version in page headers."""
+    doc_no = str(config.get("documentNo", ""))
+    doc_ver = str(config.get("documentVersion", ""))
+    doc_no_pattern = re.compile(r"^[a-zA-Z0-9_-]+-\d+-\d+-\d+$")
+    ver_pattern = re.compile(r"^\d+\.\d+$")
+    header_names = sorted(
+        name for name in items
+        if name.startswith("word/header") and name.endswith(".xml")
+    )
+    if not header_names:
+        return
+    for hdr_name in header_names:
+        hdr_root = _parse_xml_safe(items[hdr_name], hdr_name)
+        modified = False
+        for t_node in hdr_root.iter(qn("t")):
+            if t_node.text is None:
+                continue
+            text = t_node.text.strip()
+            if not text:
+                continue
+            if doc_no_pattern.match(text) and doc_no:
+                t_node.text = doc_no
+                modified = True
+            elif ver_pattern.match(text) and doc_ver:
+                t_node.text = doc_ver
+                modified = True
+        if modified:
+            items[hdr_name] = etree.tostring(
+                hdr_root, xml_declaration=True, encoding="UTF-8", standalone=True
+            )
+
+
+def _find_revision_record_table(body):
+    """Find the revision record table in the document body."""
+    for tbl in body.iter(qn("tbl")):
+        rows = tbl.findall(qn("tr"))
+        if len(rows) < 2:
+            continue
+        header_row = rows[1]
+        header_texts = []
+        for cell in header_row.findall(qn("tc")):
+            ct = "".join(t_node.text or "" for t_node in cell.iter(qn("t"))).strip()
+            header_texts.append(ct)
+        combined = "".join(header_texts)
+        if "版本" in combined and ("修订" in combined or "更新摘要" in combined):
+            return tbl
+    return None
+
+
+def _parse_revision_markdown(file_path):
+    """Parse revision record markdown table, return data rows."""
+    from docx_common import parse_markdown_table
+    with open(file_path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    table_lines = []
+    in_table = False
+    for line in lines:
+        if line.strip().startswith("|"):
+            in_table = True
+            table_lines.append(line)
+        elif in_table:
+            break
+    if not table_lines:
+        return []
+    rows = parse_markdown_table(table_lines)
+    data_rows = rows[1:] if len(rows) > 1 else []
+    # parse_markdown_table 已跳过分隔行（|---|），rows[0] 是表头、rows[1:] 是
+    # 数据行；按 rows[2:] 会丢掉第一条数据（如 V1.0）。
+    return data_rows
+
+
+def _make_revision_cell(cell_index, text):
+    """无原型可用时的兜底单元格（模板修订表只有表头、没有数据行）。
+
+    正常情况走 ``_clone_revision_row``：模板数据行的排版由模板自己决定，
+    这里的宽度/对齐只是最后兜底，不足以还原真实模板（无边框、dxa 宽度）。
+    """
+    cell = etree.Element(qn("tc"))
+    tc_pr = etree.SubElement(cell, qn("tcPr"))
+    tc_w = etree.SubElement(tc_pr, qn("tcW"))
+    widths = [1600, 5500, 1800, 1350]
+    if cell_index < len(widths):
+        tc_w.set(qn("w"), str(widths[cell_index]))
+    tc_w.set(qn("type"), "dxa")
+    etree.SubElement(tc_pr, qn("vAlign")).set(qn("val"), "center")
+    paragraph = etree.SubElement(cell, qn("p"))
+    ppr = etree.SubElement(paragraph, qn("pPr"))
+    # w:jc 是 w:pPr 的子元素，不是属性；写成属性 Word 直接忽略（原实现如此，
+    # 所以兜底行连居中都没生效）。
+    etree.SubElement(ppr, qn("jc")).set(qn("val"), "center")
+    run = etree.SubElement(paragraph, qn("r"))
+    t_node = etree.SubElement(run, qn("t"))
+    t_node.text = text
+    t_node.set(XML_NS + "space", "preserve")
+    return cell
+
+
+def _set_revision_cell_text(cell, text) -> None:
+    """把单元格正文整体换成 ``text``，保留段落属性与首个 run 的字符格式。
+
+    只留第一个 ``w:p``、只保留它的 ``w:pPr``，再按原首个 run 的 ``w:rPr``
+    重建文本；``\\n``（Markdown 里的 ``<br>``）转成 ``w:br`` 而不是塞进
+    ``w:t``——``w:t`` 里的换行 Word 不认，会挤成一行。
+    """
+    paragraphs = cell.findall(qn("p"))
+    if paragraphs:
+        paragraph = paragraphs[0]
+        for extra in paragraphs[1:]:
+            cell.remove(extra)
+    else:
+        paragraph = etree.SubElement(cell, qn("p"))
+    run_properties = None
+    first_run = paragraph.find(qn("r"))
+    if first_run is not None:
+        existing = first_run.find(qn("rPr"))
+        if existing is not None:
+            run_properties = copy.deepcopy(existing)
+    for node in list(paragraph):
+        if node.tag != qn("pPr"):
+            paragraph.remove(node)
+    run = etree.SubElement(paragraph, qn("r"))
+    if run_properties is not None:
+        run.append(run_properties)
+    for index, line in enumerate(str(text).split("\n")):
+        if index:
+            etree.SubElement(run, qn("br"))
+        t_node = etree.SubElement(run, qn("t"))
+        t_node.text = line
+        t_node.set(XML_NS + "space", "preserve")
+
+
+def _clone_revision_row(prototype, values):
+    """按模板数据行原型克隆一行并只替换文本；原型不可用时退回自建单元格。
+
+    模板数据行携带 ``w:trPr``（``gridBefore`` 让数据行整体右移一个网格列、
+    ``trHeight``、``cantSplit``）、``pct`` 宽度和逐单元格 ``tcBorders``。自建
+    单元格拿不到这些，产出的行会没有边框、宽度单位变 dxa、比表头少一个网格
+    列——正是修订表排版错位的成因，因此有原型时一律克隆。
+    """
+    if prototype is not None:
+        row = copy.deepcopy(prototype)
+        cells = row.findall(qn("tc"))
+        if len(cells) == len(values):
+            # w14:paraId/textId 是段落唯一标识，克隆后必须去掉，避免整表重复 ID。
+            for node in row.iter():
+                for name in list(node.attrib):
+                    if name.rpartition("}")[2] in ("paraId", "textId"):
+                        del node.attrib[name]
+            for cell, text in zip(cells, values):
+                _set_revision_cell_text(cell, text)
+            return row
+    row = etree.Element(qn("tr"))
+    for index, text in enumerate(values):
+        row.append(_make_revision_cell(index, text))
+    return row
+
+
+def update_revision_record(document_root, config):
+    """用 ``_revision_record.md`` 的数据行替换模板修订记录表，返回写入行数。
+
+    必须直接改调用方传入的 ``document_root``（与 ``update_cover`` 一致）：
+    ``build()`` 末尾会把它统一序列化进 ``items["word/document.xml"]``，
+    若这里自行解析 ``items`` 再写回，改动会被那次序列化整份覆盖——修订记录
+    一直没能进正式产物就是这个原因。
+
+    重建行的排版取自模板数据行原型（详见 ``_clone_revision_row``）：第 i 条
+    Markdown 数据行用模板第 i 条数据行的排版，超出部分沿用最后一条，这样
+    模板原有行保持原样、新增行与最后一行同款。
+    """
+    rev_path = config.get("paths", {}).get("revision_record")
+    if not rev_path or not os.path.isfile(rev_path):
+        return 0
+    data_rows = _parse_revision_markdown(rev_path)
+    if not data_rows:
+        return 0
+    body = document_root.find(qn("body"))
+    if body is None:
+        return 0
+    tbl = _find_revision_record_table(body)
+    if tbl is None:
+        return 0
+    rows = tbl.findall(qn("tr"))
+    if len(rows) < 2:
+        return 0
+    header_rows = rows[:2]
+    # 先留下排版原型，再删旧数据行——顺序反了就没原型可克隆了。
+    prototypes = [copy.deepcopy(row) for row in rows[2:]]
+    for row in rows[2:]:
+        tbl.remove(row)
+    insert_after = header_rows[1]
+    for index, row_data in enumerate(data_rows):
+        values = (list(row_data) + ["", "", "", ""])[:4]
+        prototype = None
+        if prototypes:
+            prototype = prototypes[min(index, len(prototypes) - 1)]
+        row = _clone_revision_row(prototype, values)
+        insert_after.addnext(row)
+        insert_after = row
+    return len(data_rows)
+
+
 def set_update_fields(items: Dict[str, bytes], document_root) -> None:
     for node in list(document_root):
         if node.tag == qn("updateFields"):
@@ -1087,6 +1320,8 @@ def process_markdown(
                     config["headingStyles"],
                     heading_text,
                     len(heading.group(1)),
+                    num_id=_heading_num_id(numbering),
+                    list_level=len(heading.group(1)) - 1,
                     expressions=expressions,
                     bookmark_key=os.path.abspath(path) + "#" + heading_text,
                 ),
@@ -1208,6 +1443,7 @@ def build(
     # 假设存在“文件编号/版本号/页数”表格，原封面随模板保留。
     if doc_type in ("requirement", "design"):
         update_cover(document_root, config)
+        update_headers(items, config)
 
     relationship_root = _parse_xml_safe(items["word/_rels/document.xml.rels"], "word/_rels/document.xml.rels")
     image_manager = ImageManager(items, relationship_root)
@@ -1249,6 +1485,8 @@ def build(
                 config["headingStyles"],
                 entry.title,
                 entry.depth,
+                num_id=_heading_num_id(numbering),
+                list_level=entry.depth - 1,
                 expressions=expressions,
                 bookmark_key=os.path.abspath(markdown_path) if markdown_path else os.path.abspath(entry.path),
             ),
@@ -1271,6 +1509,17 @@ def build(
             images += image_count
             tables += table_count
 
+    # 模板修订/导航表与复杂表格资源中可能内嵌 HYPERLINK 域，
+    # 指向模板书签；重建文档不生成这些书签，统一解除为静态文本。
+    hyperlink_fields = neutralize_hyperlink_fields(document_root)
+    if hyperlink_fields:
+        print("[{0}] 解除 HYPERLINK 域 {1} 个（目标书签不存在，转为静态文本）".format(
+            doc_type, hyperlink_fields
+        ))
+
+    revision_rows = update_revision_record(document_root, config)
+    if revision_rows:
+        print("[{0}] 修订记录: 写入 {1} 行".format(doc_type, revision_rows))
     set_update_fields(items, document_root)
     numbering.save()
     expressions.save_footnotes()

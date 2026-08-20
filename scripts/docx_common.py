@@ -153,9 +153,15 @@ def load_config(doc_type: str, base: str = BASE) -> Dict:
     config["_config_path"] = config_path
     config["_base"] = base
     config["paths"] = paths
-    config["headingStyles"] = {
-        int(level): str(style_id) for level, style_id in (config.get("headingStyles") or {}).items()
-    }
+    try:
+        config["headingStyles"] = {
+            int(level): str(style_id)
+            for level, style_id in (config.get("headingStyles") or {}).items()
+        }
+    except (TypeError, ValueError) as exc:
+        # 非法级别键（如 "H1"）直接 int() 会裸 ValueError traceback；
+        # 转成结构化配置错误提示。
+        raise AutomationError("headingStyles 级别必须是整数: {0}".format(exc))
     if not config["headingStyles"]:
         raise AutomationError("headingStyles 不能为空")
     return config
@@ -262,6 +268,17 @@ def split_markdown_table_row(line: str) -> List[str]:
     if cells and not cells[-1].strip():
         cells.pop()
     return [re.sub(r"<br\s*/?>", "\n", cell.strip(), flags=re.IGNORECASE) for cell in cells]
+
+
+def encode_markdown_cell(value: str) -> str:
+    r"""把任意文本编码成可安全放进 Markdown 表格单元格的一段文字。
+
+    ``split_markdown_table_row`` 的逆运算：先转义 ``\`` 再转义 ``|``（顺序反了
+    会把新加的反斜杠再转义一次），换行编码成 ``<br>``——表格单元格不能跨行，
+    但换行是修订摘要这类内容的有效信息，直接丢掉就会挤成一行。
+    """
+    text = str(value).replace("\\", "\\\\").replace("|", "\\|")
+    return re.sub(r"\r\n|\r|\n", "<br>", text)
 
 
 def parse_markdown_table(lines: Iterable[str]) -> List[List[str]]:
@@ -396,6 +413,82 @@ def iter_chapter_entries(config: Dict) -> Iterable[Tuple[ChapterEntry, Optional[
                 yield entry, entry.path
 
     yield from walk(root, 1)
+
+
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _wqn(tag: str) -> str:
+    return W_NS + tag
+
+
+def neutralize_hyperlink_fields(document_root) -> int:
+    """把文档中的 ``HYPERLINK`` 域转为纯文本（unlink），返回解除数量。
+
+    模板修订/导航表与复杂表格资源（``assets/*/tables/*.xml``）可能内嵌
+    ``{ HYPERLINK \\l "_xxx" }`` 域，指向 ``_xxx`` 书签；重建文档的书签命名是
+    ``doc_...`` 体系，模板锚点对应书签不会存在，Word 刷新渲染域后会留下悬空锚点
+    导致刷新后校验报「超链接书签目标不存在」。构建侧在输出前解除为静态文本（保留
+    可见文字），校验侧对复杂表格预期 XML 施加同一变换以保持一致。
+
+    Word 序列化域时，若域结果结束于段落边界，``end`` 运行会落在下一段落开头
+    （修订表里跨段落的超链接域即如此），因此必须跨段落配对 begin/separate/end，
+    不能按单段落处理。做法：把 ``w:r`` 拍平成文档顺序列表，用栈配对嵌套域
+    （TOC 域内的 PAGEREF 等不影响外层配对），仅解除 HYPERLINK 域。
+    """
+    qn = _wqn
+    removed = 0
+
+    def is_hyperlink_instruction(instruction: str) -> bool:
+        return bool(instruction) and "HYPERLINK" in instruction.upper()
+
+    # fldSimple：整域即指令属性。
+    for field in list(document_root.iter(qn("fldSimple"))):
+        if is_hyperlink_instruction(field.get(qn("instr")) or ""):
+            parent = field.getparent()
+            index = parent.index(field)
+            for child in list(field):
+                parent.insert(index, child)
+                index += 1
+            parent.remove(field)
+            removed += 1
+
+    # 直接按文档顺序迭代全部 `w:r`（含被 `w:hyperlink` / `w:ins` /
+    # `w:sdt` 等内容控件包裹的运行）：按段落 `findall` 只找段落的直接子
+    # 运行，漏掉包裹内的 begin/end，会导致域配对失败、悬空书签残留。owner 记
+    # 录运行的实际父元素，删除时直接从中移除（begin 与 end 可能不在同一段落）。
+    flat = [(run, run.getparent()) for run in document_root.iter(qn("r"))]
+    fields = []
+    stack = []
+    for index, (run, _owner) in enumerate(flat):
+        field_char = run.find(qn("fldChar"))
+        field_type = field_char.get(qn("fldCharType")) if field_char is not None else None
+        if field_type == "begin":
+            stack.append({"begin": index, "separate": None, "parts": []})
+        elif field_type == "separate":
+            if stack and stack[-1]["separate"] is None:
+                stack[-1]["separate"] = index
+        elif field_type == "end":
+            if stack:
+                field = stack.pop()
+                fields.append(
+                    (field["begin"], field["separate"], index, "".join(field["parts"]))
+                )
+        elif stack and stack[-1]["separate"] is None:
+            # 指令文本归属栈顶域；域 separate 之后（缓存结果）与嵌套域内的
+            # 文本不收集，避免把缓存内容误并入指令。
+            stack[-1]["parts"].extend(node.text or "" for node in run.iter(qn("instrText")))
+    for begin, separate, end, instruction in fields:
+        if separate is None or not is_hyperlink_instruction(instruction):
+            continue
+        # 移除 begin..separate 与 end 运行，保留 separate 与 end 之间的缓存结果
+        # 运行（域的可见文字）。end 运行可能位于下一段落，按所属段落逐个移除。
+        targets = list(range(begin, separate + 1)) + [end]
+        for target in targets:
+            run, owner = flat[target]
+            owner.remove(run)
+        removed += 1
+    return removed
 
 
 def normalize_business_text(text: str) -> str:
