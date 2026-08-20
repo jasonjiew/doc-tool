@@ -261,6 +261,27 @@ class PortablePackageTests(unittest.TestCase):
         self.assertIn("Compress-Archive", script)
         self.assertIn("DocTool-$AppVersion-portable.zip", script)
 
+    def test_ci_publishes_portable_package(self):
+        """tag 流水线除安装器外还产出便携包，并挂进 Release 资产。"""
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
+        self.assertIn("DocTool-$env:APP_VERSION-portable.zip", package_block)
+        self.assertIn("Compress-Archive", package_block)
+        # 便携包也要有校验值，且发布说明与资产链接都要带上。
+        self.assertIn('"$portable.sha256"', package_block)
+        release_block = ci[ci.index("release-upload:"):]
+        self.assertIn("DocTool-$APP_VERSION-portable.zip", release_block)
+        self.assertIn("portable.zip.sha256", release_block)
+        self.assertIn("启动DocTool.cmd", release_block)
+
+    def test_ci_zips_portable_after_app_signing(self):
+        """便携包必须在应用签名之后打，否则包里是未签名 exe（照样被拦）。"""
+        ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
+        package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
+        sign_pos = package_block.index("$signtool.Source sign")
+        zip_pos = package_block.index("Compress-Archive")
+        self.assertLess(sign_pos, zip_pos)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
