@@ -14,9 +14,10 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：1.3.0 为 mermaid 官方网页渲染后端（预览加速）与最近项目新窗口打开发布；
+# 应用语义版本：1.4.0 为修订记录以 _revision_record.md 为唯一维护点，并修复修订表
+# 回填、排版与换行；1.3.0 的 mermaid 官方网页渲染后端已撤销（ad5c1fd），未发布；
 # 1.2.0 为多窗口、版本控制变更、mermaid-cli 渲染与机器可读 CLI 发布。
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
 PROJECT_SCHEMA_VERSION = 1
