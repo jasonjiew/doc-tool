@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from doc_tool.application.content.search import compile_pattern
+from doc_tool.application.content.writer import WriteResult
 from doc_tool.domain.content_index import ContentIndex
 
 
@@ -187,7 +188,22 @@ class ReplaceService:
             if cancel_token is not None:
                 cancel_token.check_cancel()
             file_matches = by_file[rel_path]
-            new_text = self._rewrite_file(rel_path, file_matches, replacement, writer)
+            try:
+                new_text = self._rewrite_file(rel_path, file_matches, replacement, writer)
+            except (OSError, UnicodeError, IndexError, KeyError, ValueError) as exc:
+                # 预览后文件被外部改动/删除（行数变化 → 陈旧行号越界、
+                # 文件消失 → 读取失败）：该文件本次不写回并计入失败，
+                # 不再把异常抛到 Qt 槽中造成「部分写回 + 无提示」，也避免
+                # 用户用陈旧偏移重试导致替换错位。
+                results.append(
+                    WriteResult(
+                        rel_path=rel_path,
+                        backup_path=None,
+                        written=False,
+                        error="文件已变化或不可读：{0}".format(exc),
+                    )
+                )
+                continue
             results.append(writer.write_text(rel_path, new_text))
         return results
 
@@ -206,7 +222,16 @@ class ReplaceService:
         for match in file_matches:
             by_line[match.line_no].append(match)
         for line_no, line_matches in by_line.items():
-            line = lines[line_no - 1]
+            index = line_no - 1
+            if not (0 <= index < len(lines)):
+                # 预览时的行号在写回前已失效（文件被外部编辑/删除）：
+                # 抛出以拒绝本次写回，绝不按陈旧偏移切片写入损坏内容。
+                raise ValueError(
+                    "命中行号 {0} 超出当前文件行数（{1}），文件已变化".format(
+                        line_no, len(lines)
+                    )
+                )
+            line = lines[index]
             for match in sorted(line_matches, key=lambda m: m.start, reverse=True):
                 line = (
                     line[: match.start]

@@ -163,7 +163,14 @@ class SnippetStore:
         return True
 
     def update(self, trigger: str, snippet: Snippet) -> bool:
-        """按触发词更新片段；不存在返回 False。"""
+        """按触发词更新片段；不存在返回 False。
+
+        新触发词与其它条目重复时拒绝（返回 False），避免产生两个同触发词
+        条目——否则删除任一相同触发词条目时 ``remove`` 的 ``!=`` 过滤会把
+        两条一起删掉，静默丢失另一条片段。
+        """
+        if snippet.trigger != trigger and self.find(snippet.trigger) is not None:
+            return False
         for index, existing in enumerate(self._snippets):
             if existing.trigger == trigger:
                 self._snippets[index] = Snippet(

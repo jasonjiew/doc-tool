@@ -73,7 +73,11 @@ class ReplacePanel(QWidget):
         self._preview: Optional[ReplacePreview] = None
         # 「回滚本次替换」的起点：本次会话开始前的清单条目数，避免把同会话
         # 更早的编辑/保存一并回滚。
-        self._rollback_marker: Optional[int] = None
+        # 「回滚本次替换」：armed 表示已执行过查找；_replaced_files 记录
+        # 本次替换会话实际写过的文件（回滚只恢复这些文件到写前内容，
+        # 不受改动清单去重移动条目位置的影响）。
+        self._rollback_armed = False
+        self._replaced_files: set = set()
 
         # 唯一外层布局：输入卡片 + diff 卡片 + 命中表 + 操作行。原先各
         # _build_* 各自创建 QVBoxLayout(self)，只有第一个会被安装，diff
@@ -207,8 +211,20 @@ class ReplacePanel(QWidget):
             return
         self._preview = preview
         self._matches = list(preview.matches)
-        # 捕获回滚起点：本次替换会话开始前已存在的改动清单条目数。
-        self._rollback_marker = self._writer.manifest.entry_count()
+        # 重扫用本次成功的查询参数：用户随后修改查找框（含改成非法正则）
+        # 不应破坏逐项替换后的剩余命中重扫。
+        self._last_query = (
+            self._find_entry.text().strip(),
+            self._regex_cb.isChecked(),
+            self._case_cb.isChecked(),
+            self._word_cb.isChecked(),
+        )
+        # 武装「回滚本次替换」：回滚目标是本会话实际写过的文件（其清单
+        # 条目经 record 去重后备份仍指向写前内容，与操作前是否已保存无关），
+        # 而不是按操作前条目数/键集合做位置切片——后者在文件本会话已保存过
+        # 时会漏掉这些文件的替换写回。
+        self._rollback_armed = True
+        self._replaced_files = set()
         self._render_matches()
         if preview.total == 0:
             self._set_status("无匹配")
@@ -223,9 +239,18 @@ class ReplacePanel(QWidget):
         match = self._selected_match()
         if match is None:
             return
-        results = self._service.apply_matches(
-            [match], self._replace_entry.text(), self._writer
-        )
+        try:
+            results = self._service.apply_matches(
+                [match], self._replace_entry.text(), self._writer
+            )
+        except (OSError, ValueError, KeyError, IndexError, UnicodeError) as exc:
+            # 写回中途异常（如文件在预览后被外部改动）：清空命中要求重新
+            # 查找，避免在陈旧偏移上重试造成替换错位。
+            self._matches = []
+            self._preview = None
+            self._render_matches()
+            self._set_status("替换失败：文件已变化，请重新查找。{0}".format(exc))
+            return
         if not all(getattr(r, "written", False) for r in results):
             error = next(
                 (r.error for r in results if not getattr(r, "written", False)),
@@ -236,6 +261,7 @@ class ReplacePanel(QWidget):
             self._update_action_state()
             return
         self._matches.remove(match)
+        self._replaced_files.add(match.rel_path)
         # 先触发上层写后联动（索引同步刷新），再重扫受影响文件：逐项替换后
         # 同一文件其余命中仍基于旧内容的列偏移，直接复用会把后续替换写错位。
         self._after_applied(results)
@@ -270,7 +296,21 @@ class ReplacePanel(QWidget):
         )
         if confirmed != QMessageBox.StandardButton.Yes:
             return
-        results = self._service.apply_matches(self._matches, replacement, self._writer)
+        try:
+            results = self._service.apply_matches(
+                self._matches, replacement, self._writer
+            )
+        except (OSError, ValueError, KeyError, IndexError, UnicodeError) as exc:
+            # 批量写回中途异常：失败文件保持未写状态，清空命中要求重新查找，
+            # 避免用户基于陈旧列表重试把已写文件再次按旧偏移切片。
+            self._matches = []
+            self._preview = None
+            self._render_matches()
+            self._set_status("批量替换失败：文件已变化，请重新查找。{0}".format(exc))
+            return
+        self._replaced_files.update(
+            r.rel_path for r in results if getattr(r, "written", False)
+        )
         failed = [r for r in results if not getattr(r, "written", False)]
         if failed:
             errors = "；".join(
@@ -300,16 +340,28 @@ class ReplacePanel(QWidget):
         self._after_applied(results)
 
     def rollback(self) -> None:
-        if self._rollback_marker is None:
-            # 双保险：按钮禁用之外，直接调用也拒绝——since=None 会回滚整个
-            # 会话改动（含本次替换前更早的独立编辑/保存），非「本次替换」。
+        if not self._rollback_armed:
+            # 双保险：按钮禁用之外，直接调用也拒绝——回滚全部会话改动
+            # 会把本次替换前更早的独立编辑/保存一并回滚，非「本次替换」。
             self._set_status("请先执行查找，再回滚本次替换")
             return
-        failures = self._writer.rollback(since=self._rollback_marker)
+        from doc_tool.application.content.writer import OP_EDIT
+
+        current = self._writer.manifest.keys()
+        target = {(OP_EDIT, rel) for rel in self._replaced_files} & current
+        if not target:
+            self._set_status("本次替换没有产生需要回滚的改动")
+            return
+        failures = self._writer.rollback_keys(target)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:
             self._set_status("已回滚本次替换")
+            # 成功回滚后解除武装：防止用户继续保存后再次点击，把与本次
+            # 替换无关的新保存一并回滚。
+            self._rollback_armed = False
+            self._replaced_files = set()
+            self._update_action_state()
             if self._on_applied is not None:
                 self._on_applied()
 
@@ -367,7 +419,7 @@ class ReplacePanel(QWidget):
         self._replace_all_btn.setEnabled(can_write and has_matches)
         # 未执行过查找（无回滚起点）时禁用「回滚本次替换」：旧逻辑在可写时
         # 恒启用，用户未查找直接点回滚会以 since=None 回滚整个会话改动。
-        self._rollback_btn.setEnabled(can_write and self._rollback_marker is not None)
+        self._rollback_btn.setEnabled(can_write and self._rollback_armed)
         self._clear_btn.setEnabled(has_matches)
 
     def _selected_types(self) -> Optional[List[str]]:
@@ -384,14 +436,28 @@ class ReplacePanel(QWidget):
         逐项替换每次只应用一个缓存 match，写回后其余命中仍基于搜索时的
         列偏移；直接复用会把后续替换写到错位位置（同一行多处命中尤其明显）。
         此处经上层写后联动同步刷新索引后，用最新行重建该文件的命中。
+        重扫使用 find_all 时的查询参数：查找框被用户随后改掉（甚至改成
+        非法正则）不应破坏本次替换会话的剩余命中。
         """
-        fresh = self._service.find_in_file(
-            rel_path,
+        query = self._last_query or (
             self._find_entry.text().strip(),
-            regex=self._regex_cb.isChecked(),
-            case_sensitive=self._case_cb.isChecked(),
-            whole_word=self._word_cb.isChecked(),
+            self._regex_cb.isChecked(),
+            self._case_cb.isChecked(),
+            self._word_cb.isChecked(),
         )
+        try:
+            fresh = self._service.find_in_file(
+                rel_path,
+                query[0],
+                regex=query[1],
+                case_sensitive=query[2],
+                whole_word=query[3],
+            )
+        except ValueError:
+            # 查询参数已失效：保留该文件其余命中并提示重新查找，
+            # 不再抛出中断替换流程。
+            self._set_status("查询参数已变化，请重新执行查找后继续替换")
+            return
         self._matches = [m for m in self._matches if m.rel_path != rel_path] + fresh
 
     def _set_status(self, text: str) -> None:

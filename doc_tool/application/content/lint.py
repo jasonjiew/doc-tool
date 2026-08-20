@@ -349,8 +349,14 @@ class TermStore:
         except (json.JSONDecodeError, OSError):
             return []
 
-    def save(self, terms: List[str]) -> None:
-        """写入术语清单（去重、去空）。"""
+    def save(self, terms: List[str]) -> Optional[str]:
+        """写入术语清单（去重、去空）。
+
+        Returns:
+            None 成功；写盘失败（目录不可写/磁盘满/杀软拦截 tmp 写入）返回
+            错误文本而不是抛异常——面板据此提示「术语未持久化」，避免术语
+            「看似已添加」实际重启后消失、且检查结果表因槽异常中断。
+        """
         cleaned: List[str] = []
         seen = set()
         for term in terms:
@@ -358,17 +364,27 @@ class TermStore:
             if value and value not in seen:
                 seen.add(value)
                 cleaned.append(value)
-        self._file.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._file.with_suffix(".json.tmp")
-        tmp.write_text(
-            json.dumps(cleaned, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
         import os
 
+        tmp = None
         try:
-            os.replace(str(tmp), str(self._file))
-        except OSError:
-            import shutil
+            self._file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._file.with_suffix(".json.tmp")
+            tmp.write_text(
+                json.dumps(cleaned, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            try:
+                os.replace(str(tmp), str(self._file))
+            except OSError:
+                import shutil
 
-            shutil.move(str(tmp), str(self._file))
+                shutil.move(str(tmp), str(self._file))
+        except OSError as exc:
+            if tmp is not None:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+            return "无法写入术语清单（{0}）".format(exc)
+        return None

@@ -292,5 +292,32 @@ class NumberingSignatureTests(unittest.TestCase):
         self.assertNotIn("lowerRoman", fmt_values)
 
 
+
+class TocLabelKeyTests(unittest.TestCase):
+    """validate_docx._toc_label_key：TOC 条目归一化比对（尾部页码只剥离缓存侧）。"""
+
+    def _key(self, text, **kwargs):
+        sys.path.insert(0, SCRIPTS)
+        from validate_docx import _toc_label_key
+
+        return _toc_label_key(text, **kwargs)
+
+    def test_cached_strips_page_number(self):
+        # Word TOC 缓存条目 = 标题 + 制表符 + 页码（paragraph_text 把 w:tab 转 \t）。
+        self.assertEqual(self._key("1.4项目背景与目标\t16"), "项目背景与目标")
+        self.assertEqual(self._key("第 1 章引言\t16"), "引言")
+        self.assertEqual(self._key("2.1 接口说明V1\t16"), "接口说明V1")
+
+    def test_expected_keeps_trailing_title_digits(self):
+        # 标题以数字结尾时，预期侧不得剥离尾部数字（缓存侧剥离页码后仍能对齐）。
+        self.assertEqual(self._key("2.1 接口说明V1", strip_page=False), "接口说明V1")
+        self.assertEqual(self._key("第1章 引言", strip_page=False), "引言")
+
+    def test_cached_and_expected_align_for_digit_ending_title(self):
+        # 旧实现两侧都剥离尾部数字：缓存「接口说明V1\t16」→「接口说明V1」，
+        # 预期「接口说明V1」→「接口说明V」，导致误报 TOC 不一致。
+        cached = self._key("2.1接口说明V1\t16", strip_page=True)
+        expected = self._key("2.1 接口说明V1", strip_page=False)
+        self.assertEqual(cached, expected)
 if __name__ == "__main__":
     unittest.main(verbosity=2)

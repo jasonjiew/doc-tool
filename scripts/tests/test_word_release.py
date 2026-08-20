@@ -268,20 +268,48 @@ class OutputStateTests(unittest.TestCase):
         self.assertEqual(state_path.parent, Path(self.output_path).parent)
 
 
+def _setup_project_pinned(root: str, version: str) -> str:
+    """建临时项目，并把修订记录末行版本号钉在 ``version`` 上。
+
+    管线开始处会按 ``_revision_record.md`` 末行版本号同步 ``documentVersion``
+    （输出文件名与封面版本号随之变化）。本用例族要预建「上一版正式输出」再断言
+    它不被覆盖，必须先让修订记录与清单版本号一致；否则真实模板里的 29 行修订
+    记录会把版本号顶成 V3.8，预建文件和失败状态就落在两个名字上。
+    """
+    from test_project_build import _setup_project
+
+    _setup_project(root)
+    record = Path(root) / "content" / "requirement" / "_revision_record.md"
+    record.write_text(
+        "# 修订记录 - requirement\n\n"
+        "| 版本 | 修改摘要 | 修改时间 | 修改人 |\n"
+        "|------|----------|----------|--------|\n"
+        "| {0} | 首次创建 | 2026-01-01 | 测试 |\n".format(version),
+        encoding="utf-8",
+    )
+    return root
+
+
 class PipelineWordReleaseTests(unittest.TestCase):
     """任务 7.5：Word 缺失/超时/保存失败/后校验失败保留旧输出。"""
 
     def setUp(self):
         self._tmp = tempfile.mkdtemp(prefix="doc-word-rel-")
-        self.project_root = self._tmp
-        from test_project_build import _setup_project, _make_manifest
-        _setup_project(self.project_root)
+        self.project_root = _setup_project_pinned(self._tmp, "1.0")
+        from test_project_build import _make_manifest
+
         self._make_manifest = _make_manifest
 
     def tearDown(self):
         shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _formal_output_path(self, manifest, paths):
+        """本用例族预建「旧正式输出」时用的文件名（版本号由清单决定）。
+
+        管线会按 ``content/<类型>/_revision_record.md`` 末行版本号同步
+        ``documentVersion``，因此 ``setUp`` 已把该文件末行钉在清单同版本上；
+        否则输出名会跟着修订记录跑，预建的旧输出与失败状态就对不上号。
+        """
         output_name = "{0} {1}({2}).docx".format(
             manifest.documentNo, manifest.documentName, manifest.documentVersion
         )
@@ -336,7 +364,7 @@ class PipelineWordReleaseTests(unittest.TestCase):
         # 同时 mock 前校验为 True，确保管线到达 Word 刷新阶段
         fake_report = word_check.WordAvailability(available=True)
         with patch.object(word_check, "check_word_available", return_value=fake_report):
-            with patch.object(kernel, "refresh_with_project", return_value=False):
+            with patch.object(kernel, "refresh_with_project", return_value=(False, "refresh_failed")):
                 with patch.object(kernel, "validate_with_project", return_value=True):
                     result = run_pipeline(manifest, paths, skip_word_refresh=False)
 
@@ -356,6 +384,55 @@ class PipelineWordReleaseTests(unittest.TestCase):
         attempt = read_last_attempt_state(str(formal))
         self.assertIsNotNone(attempt)
         self.assertEqual(attempt.failureCode, "E3001")
+
+    def test_word_refresh_timeout_reason_maps_to_E3002(self):
+        """refresh 返回 (False, "timeout") 时必须映射 E3002（刷新超时），
+        而不是旧实现的 E3001（误报 Word 不可用）。"""
+        from doc_tool.application import word_check
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.adapters import kernel
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        fake_report = word_check.WordAvailability(available=True)
+        with patch.object(word_check, "check_word_available", return_value=fake_report):
+            with patch.object(kernel, "refresh_with_project", return_value=(False, "timeout")):
+                with patch.object(kernel, "validate_with_project", return_value=True):
+                    result = run_pipeline(manifest, paths, skip_word_refresh=False)
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E3002")
+
+    def test_word_refresh_save_failed_reason_maps_to_E3003(self):
+        """refresh 返回 (False, "save_failed") 时必须映射 E3003（保存失败）。"""
+        from doc_tool.application import word_check
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.adapters import kernel
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        fake_report = word_check.WordAvailability(available=True)
+        with patch.object(word_check, "check_word_available", return_value=fake_report):
+            with patch.object(kernel, "refresh_with_project", return_value=(False, "save_failed")):
+                with patch.object(kernel, "validate_with_project", return_value=True):
+                    result = run_pipeline(manifest, paths, skip_word_refresh=False)
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E3003")
+
+    def test_word_refresh_generic_reason_maps_to_E3001(self):
+        """refresh 返回 (False, "refresh_failed") 时仍映射 E3001（一般刷新失败）。"""
+        from doc_tool.application import word_check
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.adapters import kernel
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        fake_report = word_check.WordAvailability(available=True)
+        with patch.object(word_check, "check_word_available", return_value=fake_report):
+            with patch.object(kernel, "refresh_with_project", return_value=(False, "refresh_failed")):
+                with patch.object(kernel, "validate_with_project", return_value=True):
+                    result = run_pipeline(manifest, paths, skip_word_refresh=False)
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E3001")
 
     def test_word_save_exception_preserves_previous_output(self):
         """Word 保存异常时映射到错误码，保留旧正式输出。"""
@@ -448,7 +525,7 @@ class PipelineWordReleaseTests(unittest.TestCase):
             return not require_refreshed  # 前校验 True，后校验 False
 
         with patch.object(word_check, "check_word_available", return_value=fake_report):
-            with patch.object(kernel, "refresh_with_project", return_value=True):
+            with patch.object(kernel, "refresh_with_project", return_value=(True, "ok")):
                 with patch.object(kernel, "validate_with_project", side_effect=selective_validate):
                     result = run_pipeline(manifest, paths, skip_word_refresh=False)
 
@@ -532,7 +609,7 @@ class PipelineWordReleaseTests(unittest.TestCase):
         fake_report = word_check.WordAvailability(available=True)
 
         with patch.object(word_check, "check_word_available", return_value=fake_report):
-            with patch.object(kernel, "refresh_with_project", return_value=True):
+            with patch.object(kernel, "refresh_with_project", return_value=(True, "ok")):
                 # 使用真实 validate，但 require_refreshed=True 时也返回 True
                 # （测试夹具的模板可能让后校验失败，所以强制 mock）
                 with patch.object(kernel, "validate_with_project", return_value=True):
@@ -567,13 +644,47 @@ class PipelineWordReleaseTests(unittest.TestCase):
 
         fake_report = word_check.WordAvailability(available=True)
         with patch.object(word_check, "check_word_available", return_value=fake_report):
-            with patch.object(kernel, "refresh_with_project", return_value=False):
+            with patch.object(kernel, "refresh_with_project", return_value=(False, "refresh_failed")):
                 result = run_pipeline(manifest, paths, skip_word_refresh=False)
 
         self.assertFalse(result.success)
         # 输出目录中无 .tmp 文件残留
         temp_files = list(paths.output_dir.glob(".*.tmp"))
         self.assertEqual(len(temp_files), 0)
+
+
+class RefreshReasonTests(unittest.TestCase):
+    """refresh_fields 失败原因分类与 [REASON] 标记扫描。"""
+
+    def test_classify_failure_keys(self):
+        from refresh_fields import (
+            REASON_REFRESH_FAILED,
+            REASON_SAVE_FAILED,
+            REASON_WORD_UNAVAILABLE,
+            _classify_failure,
+        )
+
+        self.assertEqual(_classify_failure(RuntimeError("Word 保存失败：磁盘不足")), REASON_SAVE_FAILED)
+        self.assertEqual(_classify_failure(RuntimeError("Save failed: disk full")), REASON_SAVE_FAILED)
+        self.assertEqual(_classify_failure(RuntimeError("没有注册类 (Word.Application)")), REASON_WORD_UNAVAILABLE)
+        self.assertEqual(_classify_failure(RuntimeError("未安装 pywin32")), REASON_WORD_UNAVAILABLE)
+        self.assertEqual(_classify_failure(RuntimeError("文档已损坏")), REASON_REFRESH_FAILED)
+
+    def test_scan_reason_marker_and_default(self):
+        from refresh_fields import (
+            REASON_SAVE_FAILED,
+            REASON_TIMEOUT,
+            _scan_reason,
+        )
+
+        self.assertEqual(
+            _scan_reason(("[doc] [FAIL] Word 刷新失败\n[REASON] save_failed\n").encode("utf-8")),
+            REASON_SAVE_FAILED,
+        )
+        self.assertEqual(_scan_reason(b"[REASON] timeout"), REASON_TIMEOUT)
+        # 无标记或未知键 → 一般刷新失败
+        self.assertEqual(_scan_reason(b"some stderr"), "refresh_failed")
+        self.assertEqual(_scan_reason(b"[REASON] unknown_key"), "refresh_failed")
 
 
 class PipelineAtomicPublishTests(unittest.TestCase):
@@ -681,6 +792,54 @@ class PipelineAtomicPublishTests(unittest.TestCase):
         self.assertFalse(second.success)
         self.assertEqual(_sha256(str(formal)), old_doc_hash)
         self.assertEqual(state_path.read_bytes(), old_state)
+
+    def test_state_restore_failure_keeps_previous_backups(self):
+        """发布回滚时状态文件恢复失败：上一版快照必须保留（不得被 finally 清理），
+        否则旧 DOCX + 新/无状态的永久不一致失去唯一恢复线索。"""
+        import os as _os
+
+        from doc_tool.adapters import kernel
+        from doc_tool.application import pipeline as pipeline_mod
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.domain.output_state import state_file_for
+
+        manifest = self._make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            first = run_pipeline(manifest, paths, skip_word_refresh=True)
+        self.assertTrue(first.success)
+        formal = Path(first.output_path)
+        state_path = state_file_for(formal)
+        previous_state = paths.output_dir / ("." + state_path.name + ".previous.bak")
+        old_state = state_path.read_bytes()
+        md_file = next(paths.content_dir(manifest.documentType).rglob("*.md"))
+        md_file.write_text(
+            md_file.read_text(encoding="utf-8") + "\n恢复失败测试新增。\n",
+            encoding="utf-8",
+        )
+
+        real_replace = _os.replace
+
+        def flaky_replace(src, dst):
+            # 仅让「恢复上一版状态文件」这一处失败；发布与 DOCX 恢复照常。
+            if str(dst) == str(state_path) and str(src).endswith(".previous.bak"):
+                raise OSError("模拟状态文件恢复失败")
+            return real_replace(src, dst)
+
+        with patch.object(kernel, "validate_with_project", return_value=True):
+            # 先让状态写入失败触发回滚（与 test_state_write_failure_rolls_back_docx_and_state
+            # 同一触发方式），再让回滚中的状态文件恢复失败。
+            with patch(
+                "doc_tool.domain.output_state.write_state",
+                side_effect=OSError("state disk failure"),
+            ):
+                with patch.object(pipeline_mod.os, "replace", side_effect=flaky_replace):
+                    second = run_pipeline(manifest, paths, skip_word_refresh=True)
+
+        self.assertFalse(second.success)
+        # 状态恢复失败 → 上一版状态快照必须保留（finally 不得清理）
+        self.assertTrue(previous_state.exists(), "状态恢复失败后快照必须保留")
+        self.assertEqual(previous_state.read_bytes(), old_state)
 
     def test_successful_pipeline_persists_last_build_version(self):
         from doc_tool.adapters import kernel

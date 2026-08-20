@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     Doc Tool 安装包构建脚本
@@ -34,6 +34,30 @@ $ErrorActionPreference = "Stop"
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
 $Version = "1.3.0"
+
+# --- vendored 运行时（优先使用，规避安全软件对 pip 的拦截与本机残缺安装）---
+$VendoredQt = "$RepoRoot\build\pyside-runtime"
+$VendoredPyInstaller = "$RepoRoot\build\pyinstaller-tool"
+$PyPathParts = @()
+if (Test-Path "$VendoredPyInstaller\PyInstaller") { $PyPathParts += $VendoredPyInstaller }
+if (Test-Path "$VendoredQt\PySide6") { $PyPathParts += $VendoredQt }
+if ($env:PYTHONPATH) { $PyPathParts += $env:PYTHONPATH }
+if ($PyPathParts.Count -gt 0) { $env:PYTHONPATH = ($PyPathParts | Select-Object -Unique) -join ';' }
+
+# PyInstaller 版本门禁：requirements-build.txt 锁定 6.22.1
+# （6.14.0 在 Python 3.13/Windows 上会打出冻结应用扩展模块加载失败的坏包）
+$PyInstallerMin = $null
+$PinLine = Select-String -Path "$RepoRoot\requirements-build.txt" -Pattern '^\s*pyinstaller==([0-9][0-9.]*)\s*$' -ErrorAction SilentlyContinue
+if ($PinLine) { $PyInstallerMin = [version]$PinLine.Matches[0].Groups[1].Value }
+$PyInstallerVerRaw = (& python -m PyInstaller --version 2>&1 | Select-Object -First 1).ToString().Trim()
+$PyInstallerVer = $null
+if ($PyInstallerVerRaw -match '^\d+\.\d+') { $PyInstallerVer = [version]($PyInstallerVerRaw -split '\s')[0] }
+if (-not $PyInstallerVer) {
+    throw "PyInstaller 不可用。请先执行 python -m pip install -r requirements-build.txt；pip 被安全软件拦截时，build\pyinstaller-tool 下已有 vendored 6.22.1 可自动使用。"
+}
+if ($PyInstallerMin -and $PyInstallerVer -lt $PyInstallerMin) {
+    throw "PyInstaller 版本过低: $PyInstallerVer，要求 >= $PyInstallerMin（旧版在 Python 3.13 上会打出 'DLL load failed while importing _socket' 的坏包）。"
+}
 
 $AppVersion = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
 $InstallerMatch = Select-String -Path "$PSScriptRoot\installer.iss" -Pattern '#define\s+MyAppVersion\s+"([^"]+)"'
@@ -88,6 +112,19 @@ if (-not $SkipPyInstaller) {
     Write-Host "  PyInstaller 构建完成。" -ForegroundColor Green
 } else {
     Write-Host "[2/5] 跳过 PyInstaller 构建。" -ForegroundColor DarkGray
+}
+
+# 产物内容校验：确认 Qt/python313 已打包（site-packages 的 PySide6 可能残缺，
+# 未挂载 vendored 运行时会打出缺 Qt 的坏包，这里确定性拦截）
+if (-not $SkipPyInstaller) {
+    Write-Host "  产物内容校验..." -ForegroundColor Yellow
+    $InternalDir = "$RepoRoot\dist\DocTool\_internal"
+    foreach ($Need in @('python313.dll', 'Qt6Core.dll', 'shiboken6.abi3.dll')) {
+        if (-not (Test-Path "$InternalDir\$Need")) {
+            throw "构建产物缺少 $InternalDir\$Need——请确认 PYTHONPATH 挂载了 build\pyside-runtime（直接运行 python -m PyInstaller 会用到残缺的 site-packages PySide6）。"
+        }
+    }
+    Write-Host "  产物内容校验通过。" -ForegroundColor Green
 }
 
 # 构建后必须扫描本次产物；只在构建前扫描旧 dist 无法阻断本次意外打包。
@@ -203,7 +240,7 @@ Python 3.13         PSF-2.0 License
 
 构建依赖（不打包）
 ------------------
-PyInstaller 6.14.0  GPL-2.0-or-later / BSD License
+PyInstaller $PyInstallerVer  GPL-2.0-or-later / BSD License
 Inno Setup 6        Inno Setup License
 
 应用文件清单

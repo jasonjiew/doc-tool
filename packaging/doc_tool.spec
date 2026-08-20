@@ -146,6 +146,10 @@ a = Analysis(
         "PySide6.QtPdfWidgets",
         "PySide6.QtSvgWidgets",
         "shiboken6_tool",
+        # multiprocessing 在公司受限环境下会经 socket/_socket 触发安全软件
+        # 拦截冻结 exe 加载扩展模块。常规 GUI 与文档构建不依赖多进程 spawn；
+        # Word 可用性预检在缺 multiprocessing 时降级为静态判定，不阻断流程。
+        "multiprocessing",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

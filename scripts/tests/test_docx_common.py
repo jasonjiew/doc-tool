@@ -24,6 +24,7 @@ from build_docx import (  # noqa: E402
 from docx_common import (  # noqa: E402
     AutomationError,
     iter_chapter_entries,
+    neutralize_hyperlink_fields,
     parse_image_reference,
     parse_markdown_table,
     validate_content_tree,
@@ -263,6 +264,136 @@ class TreeContractTests(unittest.TestCase):
             with self.assertRaisesRegex(AutomationError, "图片不存在"):
                 validate_content_tree(config)
 
+
+
+class NeutralizeHyperlinkFieldsTests(unittest.TestCase):
+    """docx_common.neutralize_hyperlink_fields：解除 HYPERLINK 域为静态文本。"""
+
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+    def _document(self, body_xml: str):
+        xml = (
+            '<w:document xmlns:w="{0}"><w:body>{1}</w:body></w:document>'
+        ).format(self.W, body_xml)
+        return etree.fromstring(xml.encode("utf-8"))
+
+    def _text(self, document) -> str:
+        return "".join(document.itertext())
+
+    def _fldchar_count(self, document) -> int:
+        return len(document.findall(".//" + qn("fldChar")))
+
+    def test_simple_hyperlink_field_unlinked(self):
+        body = (
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> HYPERLINK \l "_Toc123" </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>可见链接文字</w:t></w:r>'
+            '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "可见链接文字")
+        self.assertEqual(self._fldchar_count(document), 0)
+
+    def test_end_run_in_next_paragraph(self):
+        body = (
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> HYPERLINK \l "_Toc1" </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>跨段链接</w:t></w:r>'
+            '</w:p>'
+            '<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "跨段链接")
+
+    def test_nested_pageref_inside_toc_not_touched(self):
+        body = (
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> TOC \o "1-3" \h \z \u </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>目录缓存</w:t></w:r>'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> PAGEREF _Toc1 \h </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>1</w:t></w:r>'
+            '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 0)
+        # TOC 域 3 个 fldChar + 嵌套 PAGEREF 域 3 个 = 6，全部保留。
+        self.assertEqual(self._fldchar_count(document), 6)
+
+    def test_fldsimple_hyperlink_unlinked(self):
+        body = (
+            '<w:p>'
+            r'<w:fldSimple w:instr=" HYPERLINK \l &quot;_Toc9&quot; ">'
+            '<w:r><w:t>简单链接</w:t></w:r>'
+            '</w:fldSimple>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "简单链接")
+        self.assertEqual(len(document.findall(".//" + qn("fldSimple"))), 0)
+
+    def test_field_runs_wrapped_in_hyperlink_element(self):
+        # 域运行被 w:hyperlink 元素包裹（Word 修订表常见）：必须仍能配对解除。
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="_Toc7">'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> HYPERLINK \l "_Toc7" </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>包裹链接</w:t></w:r>'
+            '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "包裹链接")
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 1)
+        self.assertEqual(self._fldchar_count(document), 0)
+
+    def test_native_hyperlink_without_field_untouched(self):
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="_Toc3"><w:r><w:t>原生链接</w:t></w:r></w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 0)
+        self.assertEqual(self._text(document), "原生链接")
+
+    def test_non_hyperlink_field_untouched(self):
+        body = (
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            r'<w:r><w:instrText> NUMPAGES \* MERGEFORMAT </w:instrText></w:r>'
+            '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>12</w:t></w:r>'
+            '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_hyperlink_fields(document)
+        self.assertEqual(removed, 0)
+        self.assertEqual(self._text(document).strip(), "NUMPAGES \\* MERGEFORMAT 12")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

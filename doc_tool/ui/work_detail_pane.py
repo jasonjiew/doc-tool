@@ -154,6 +154,13 @@ class LogStream(QWidget):
             self._summary_label.setText(
                 "日志已展开" + self._pending_suffix()
             )
+            # 折叠期间到达的行只累积进 _lines、未写入视图：展开时全量回放，
+            # 避免可见日志与待读计数永久错位（append_line/set_lines 同路径）。
+            if self._view.toPlainText() != "\n".join(self._lines):
+                self._view.setPlainText("\n".join(self._lines))
+                self._view.verticalScrollBar().setValue(
+                    self._view.verticalScrollBar().maximum()
+                )
             self._pending_unread = 0
         else:
             self._view.hide()

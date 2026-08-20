@@ -731,3 +731,10 @@ class ContentWriter:
             if entry.trash_path and Path(entry.trash_path).exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 _rename_with_fallback(Path(entry.trash_path), target)
+            else:
+                # 回收站副本缺失（外部删除/清理）而目标也不存在：无法恢复，
+                # 报告失败并保留清单条目，与 OP_EDIT 备份缺失语义一致——
+                # 静默成功会让调用方 drop 条目，丢失最后的恢复线索。
+                raise OSError(
+                    "删除回滚失败：回收站副本缺失：{0}".format(entry.rel_path)
+                )

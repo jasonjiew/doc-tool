@@ -456,6 +456,44 @@ class WriteSafetyTests(unittest.TestCase):
         self.assertTrue(bak.exists())
         self.assertEqual(bak.read_text(encoding="utf-8"), "# 1.1 目的\n原始正文\n")
 
+    def test_delete_rollback_missing_trash_reports_failure(self):
+        """回收站副本缺失时删除回滚必须报失败并保留清单条目，而非静默成功。"""
+        writer = self._writer()
+        rel = "requirement/第1章 引言/1.1 目的.md"
+        result = writer.delete_file(rel)
+        self.assertTrue(result.written)
+        # 模拟回收站副本被外部清理
+        Path(result.path).unlink()
+        failures = writer.rollback()
+        self.assertEqual(len(failures), 1)
+        self.assertIn(rel, failures[0])
+        # 清单条目保留（恢复线索不丢失）
+        writer.manifest.load()
+        self.assertEqual(len(writer.manifest.entries), 1)
+
+    def test_rollback_keys_restores_pre_replace_content_of_reesaved_file(self):
+        """同一文件本会话已保存过再被替换写回：回滚该 edit 条目恢复的是
+        「替换写前」内容（record 去重后条目备份被替换写覆盖为写前状态），
+        不受清单条目位置移动影响（回归：按操作前条目数切片会漏掉该文件）。
+        """
+        from doc_tool.application.content.writer import OP_EDIT
+
+        writer = self._writer()
+        rel_a = "requirement/第1章 引言/1.1 目的.md"
+        rel_b = "requirement/第1章 引言/1.2 范围.md"
+        (self.content_root / rel_b).write_text("# 1.2 范围\n原始\n", encoding="utf-8")
+        # 会话早期：保存 fileA（清单已有其 edit 条目）
+        writer.write_text(rel_a, "早期内容A")
+        # 替换会话：再次写 fileA（record 去重，条目数不变、位置移动）并新写 fileB
+        writer.write_text(rel_a, "替换后内容A")
+        writer.write_text(rel_b, "替换后内容B")
+        # 回滚本次替换写过的文件（面板追踪的 _replaced_files 对应的键）
+        failures = writer.rollback_keys({(OP_EDIT, rel_a), (OP_EDIT, rel_b)})
+        self.assertEqual(failures, [])
+        # fileA 恢复为「替换写前」的早期内容（而非更早的原始内容）
+        self.assertEqual(self._read(rel_a), "早期内容A")
+        self.assertEqual(self._read(rel_b), "# 1.2 范围\n原始\n")
+
     def test_write_text_records_manifest_entry(self):
         """写入后清单记录 edit 条目。"""
         writer = self._writer()
@@ -825,6 +863,20 @@ class ChapterTreeModelTests(unittest.TestCase):
         result = next_chapter_rel_path("requirement/第3章/GXOA", files, "权限管理")
         self.assertEqual(result, "requirement/第3章/GXOA/权限管理.md")
 
+    def test_next_avoids_existing_target(self):
+        # 编号重复的脏数据下，生成路径已存在时递增而非覆盖。
+        from doc_tool.application.content.tree import next_chapter_rel_path
+
+        files = [
+            "requirement/第3章/3.7 GXOA/3.7.1 租户管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.2 产品管理.md",
+            "requirement/第3章/3.7 GXOA/3.7.3 权限管理.md",  # 目标 3.7.3 已被占用
+        ]
+        result = next_chapter_rel_path("requirement/第3章/3.7 GXOA", files, "权限管理")
+        self.assertEqual(
+            result, "requirement/第3章/3.7 GXOA/3.7.4 权限管理.md"
+        )
+
     def test_next_ignores_subdirectory_files_as_siblings(self):
         from doc_tool.application.content.tree import next_chapter_rel_path
 
@@ -1064,6 +1116,16 @@ class PreviewRendererTests(unittest.TestCase):
         self.assertIn("table", kinds)
         self.assertIn("paragraph", kinds)
 
+    def test_inline_code_not_processed_by_bold_or_emphasis(self):
+        """行内代码跨度内的 ** 与 * 不得被粗体/斜体正则二次处理。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        html_out = render_markdown_html("使用 `**保持原样**` 与 `*斜*` 测试\n")
+        self.assertIn("<code>**保持原样**</code>", html_out)
+        self.assertIn("<code>*斜*</code>", html_out)
+        self.assertNotIn("<b>保持原样</b>", html_out)
+        self.assertNotIn("<i>斜</i>", html_out)
+
     def test_preview_summary_counts(self):
         """结构摘要统计标题/段落/表格/图片数量。"""
         from doc_tool.application.content.preview import preview_summary
@@ -1138,6 +1200,22 @@ class ReplaceServiceTests(unittest.TestCase):
 
     def _read(self, rel):
         return (self.content_root / rel).read_text(encoding="utf-8")
+
+    def test_apply_matches_stale_line_numbers_reported_as_failure(self):
+        """预览后文件被外部改短：陈旧行号不得越界写坏内容，须按文件报失败。"""
+        matches = self.service.find_matches("档案管理")
+        self.assertGreater(len(matches), 0)
+        # 模拟预览后文件被外部改短（行数减少，缓存行号失效）
+        target = self.content_root / "requirement/第1章 引言/1.1 目的.md"
+        target.write_text("# 1.1 目的\n", encoding="utf-8")
+        results = self.service.apply_matches(matches, "档案", self.writer)
+        # 不抛异常；该文件的写入结果为失败且带说明
+        self.assertTrue(all(not r.written for r in results if r.rel_path.endswith("1.1 目的.md")))
+        self.assertTrue(
+            all("已变化" in (r.error or "") for r in results if not r.written)
+        )
+        # 失败文件未被错误写回
+        self.assertEqual(self._read("requirement/第1章 引言/1.1 目的.md"), "# 1.1 目的\n")
 
     def test_find_matches_with_positions(self):
         """命中带列位置。"""
@@ -1466,6 +1544,22 @@ class LintTests(unittest.TestCase):
         # 只有 gxpc（小写）被标记，GXPC 规范出现不标记
         self.assertEqual(len(term_issues), 1)
         self.assertIn("gxpc", term_issues[0].message)
+
+    def test_term_store_save_unwritable_returns_error_not_raise(self):
+        """术语清单写盘失败时 save 返回错误文本而非抛异常（面板据此提示）。"""
+        from doc_tool.application.content.lint import TermStore
+
+        # 用文件占位 .state 目录使其不可写：mkdir 在已有普通文件上抛 OSError
+        state = self.project_root / ".state-blocked"
+        state.write_text("occupied", encoding="utf-8")
+        store = TermStore(state)
+        error = store.save(["GXPC", "GXPC", "  "])  # 去重、去空
+        self.assertIsNotNone(error)
+        self.assertIn("无法写入", error)
+        # 正常目录写盘成功返回 None
+        ok = TermStore(self.project_root / ".state-ok")
+        self.assertIsNone(ok.save(["GXPC"]))
+        self.assertEqual(ok.load(), ["GXPC"])
 
     def test_check_all_sorted(self):
         """check_all 汇总并排序。"""
@@ -2394,7 +2488,7 @@ class TreeInteractionPureTests(unittest.TestCase):
         """4.7.1..4.7.24 后新增 4.7.28/29/30 → 顺延为 4.7.25/26/27。"""
         from doc_tool.application.content.tree import renumber_plan
 
-        prefix = "design/第4章 WEB端功能设计/4.7 KSOA"
+        prefix = "design/第4章 WEB端功能设计/4.7 产品管理"
         files = [
             "{0}/4.7.{1} 子模块.md".format(prefix, index) for index in range(1, 25)
         ] + [
@@ -2449,8 +2543,8 @@ class TreeInteractionPureTests(unittest.TestCase):
         from doc_tool.application.content.tree import renumber_plan
 
         files = [
-            "design/第4章 WEB端功能设计/4.1 KSHC/4.1.1 甲.md",
-            "design/第4章 WEB端功能设计/4.7 KSOA/4.7.5 乙.md",
+            "design/第4章 WEB端功能设计/4.1 系统管理/4.1.1 甲.md",
+            "design/第4章 WEB端功能设计/4.7 产品管理/4.7.5 乙.md",
         ]
         self.assertEqual(renumber_plan("design/第4章 WEB端功能设计", files), [])
 

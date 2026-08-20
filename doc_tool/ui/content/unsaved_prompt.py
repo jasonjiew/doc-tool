@@ -13,10 +13,7 @@ from typing import List
 
 from PySide6.QtWidgets import QMessageBox
 
-from doc_tool.application.content.unsaved import (
-    UnsavedChoice,
-    UnsavedResolver,
-)
+from doc_tool.application.content.unsaved import UnsavedChoice
 
 # 场景 → 对话框上下文文案。
 _CONTEXT_TEXT = {
@@ -41,7 +38,7 @@ def confirm_unsaved_dialog(rel_paths: List[str], context: str) -> UnsavedChoice:
 
     if context == "delete":
         discard = box.addButton("放弃", QMessageBox.ButtonRole.DestructiveRole)
-        cancel = box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
         box.exec()
         if box.clickedButton() is discard:
             return UnsavedChoice.DISCARD
@@ -50,7 +47,7 @@ def confirm_unsaved_dialog(rel_paths: List[str], context: str) -> UnsavedChoice:
     if context == "rename":
         save = box.addButton("先保存", QMessageBox.ButtonRole.AcceptRole)
         discard = box.addButton("放弃", QMessageBox.ButtonRole.DestructiveRole)
-        cancel = box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
         box.exec()
         clicked = box.clickedButton()
         if clicked is save:
@@ -61,7 +58,7 @@ def confirm_unsaved_dialog(rel_paths: List[str], context: str) -> UnsavedChoice:
 
     save = box.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
     discard = box.addButton("不保存", QMessageBox.ButtonRole.DestructiveRole)
-    cancel = box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+    box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
     box.exec()
     clicked = box.clickedButton()
     if clicked is save:

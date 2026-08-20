@@ -141,7 +141,7 @@ class LintPanel(QWidget):
 
     def run_check(self) -> None:
         terms = self._current_terms()
-        self._terms.save(terms)
+        persist_error = self._terms.save(terms)
         issues = self._linter.check_all(terms)
         if self._on_issues is not None:
             self._on_issues(issues)
@@ -166,6 +166,11 @@ class LintPanel(QWidget):
             self._status_label.setText("检查通过，未发现问题")
         else:
             self._status_label.setText("共 {0} 项".format(len(issues)))
+        if persist_error:
+            # 术语未持久化必须提示：否则用户以为已保存、重启后消失。
+            self._status_label.setText(
+                self._status_label.text() + "；术语保存失败：{0}".format(persist_error)
+            )
 
     def add_term(self) -> None:
         value = self._term_entry.text().strip()
@@ -175,9 +180,8 @@ class LintPanel(QWidget):
         if value not in terms:
             terms.append(value)
         self._term_entry.clear()
-        self._terms.save(terms)
         self._render_terms(terms)
-        self.run_check()
+        self.run_check()  # run_check 内部保存术语并透出持久化失败
 
     def remove_term(self) -> None:
         row = self._term_list.currentRow()
@@ -186,9 +190,8 @@ class LintPanel(QWidget):
         terms = self._current_terms()
         if 0 <= row < len(terms):
             terms.pop(row)
-            self._terms.save(terms)
             self._render_terms(terms)
-            self.run_check()
+            self.run_check()  # run_check 内部保存术语并透出持久化失败
 
     # --- 内部 ---
 

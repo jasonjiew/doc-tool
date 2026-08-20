@@ -33,6 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
     build_p = sub.add_parser("build", help="构建并校验文档（项目上下文）")
     build_p.add_argument("--skip-word-refresh", action="store_true")
     build_p.add_argument("--project", required=True, help="项目目录")
+    # 修订记录没有命令行参数：内容与版本号都由 content/<类型>/_revision_record.md
+    # 一处维护，构建按该文件为准（末行版本号 → documentVersion，数据行整表覆盖
+    # Word 修订记录表）。CI/脚本要写修订记录就直接改那个文件。
     sub.add_parser("info", help="显示环境诊断信息")
 
     preflight = sub.add_parser("preflight", help="导入预检")
@@ -109,7 +112,11 @@ def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
     from doc_tool.application.pipeline import run_pipeline
     from doc_tool.domain.manifest import ProjectManifest
     manifest = ProjectManifest.load(args.project)
-    result = run_pipeline(manifest, manifest.resolve_paths(args.project), skip_word_refresh=args.skip_word_refresh)
+    result = run_pipeline(
+        manifest,
+        manifest.resolve_paths(args.project),
+        skip_word_refresh=args.skip_word_refresh,
+    )
     for event in result.events:
         line = "[{0}] {1}".format(event.status.upper(), event.stage)
         if event.detail:

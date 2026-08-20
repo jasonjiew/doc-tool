@@ -126,7 +126,11 @@ class SnippetDialog(QDialog):
         snippet = self._edit_snippet(existing)
         if snippet is None:
             return
-        self._store.update(existing.trigger, snippet)
+        if not self._store.update(existing.trigger, snippet):
+            QMessageBox.warning(
+                self, "保存失败", "触发词已存在：{0}".format(snippet.trigger)
+            )
+            return
         self._reload()
 
     def _on_delete(self) -> None:

@@ -22,7 +22,6 @@
 from __future__ import annotations
 
 import os
-import multiprocessing
 import queue
 import sys
 import time
@@ -171,7 +170,14 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
         return False, ""
 
     timeout_seconds = max(0.1, float(timeout_seconds))
-    context = multiprocessing.get_context("spawn")
+    try:
+        import multiprocessing
+
+        context = multiprocessing.get_context("spawn")
+    except ImportError:
+        # multiprocessing 不可用（如冻结环境下 _socket 被安全软件拦截）：
+        # 跳过物理 Word DispatchEx 探测，由上层转为静态不可用。
+        return False, ""
     result_queue = context.Queue()
     process = context.Process(
         target=_dispatch_check_worker,

@@ -16,14 +16,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -36,7 +35,6 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
-    QWidget,
     QWizard,
     QWizardPage,
 )
@@ -402,7 +400,14 @@ class _ExecutingPage(QWizardPage):
 
     def initializePage(self) -> None:
         wizard = self.wizard()
+        if wizard._import_started:
+            # 重复进入执行页（结果页「上一步」已禁用，正常不可达）：
+            # 绝不再次发起导入——同一目标目录的第二次导入必以 E1005 失败，
+            # 且会覆盖已成功的导入结果页。
+            self._status_label.setText("导入任务正在运行…")
+            return
         self._status_label.setText("正在导入…")
+        wizard._step4_done = False
         wizard._do_import(on_done=self._on_done)
         self._started = True
 
@@ -527,6 +532,7 @@ class ImportWizard(QWizard):
         self._import_result = None
         self._target_root = ""
         self._step4_done = False
+        self._import_started = False
 
         self._runner = TaskRunner()
         self._poll_timer = QTimer(self)
@@ -571,12 +577,17 @@ class ImportWizard(QWizard):
     # --- 页面切换 ---
 
     def _on_page_changed(self, _page_id: int) -> None:
+        page = self.currentPage()
+        if page is None:
+            # 向导关闭/析构过程中 currentIdChanged(-1) 会触发本回调，
+            # 此时 currentPage() 已为 None，直接返回避免 AttributeError。
+            return
         self.button(QWizard.WizardButton.NextButton).setEnabled(
-            self.currentPage().isComplete()
+            page.isComplete()
         )
         self.button(QWizard.WizardButton.BackButton).setEnabled(
-            self.currentPage().isComplete()
-            and self.currentId() not in (0, 4)
+            page.isComplete()
+            and self.currentId() not in (0, 4, 5)
         )
 
     # --- 预检 ---
@@ -649,6 +660,7 @@ class ImportWizard(QWizard):
             require_exact_roundtrip=bool(self._require_exact_roundtrip),
             heading_style_map=heading_map,
         )
+        self._import_started = True
         started = self._runner.start(
             TaskSpec(
                 name="import",
@@ -661,6 +673,19 @@ class ImportWizard(QWizard):
         )
         if started:
             self._poll_timer.start()
+        else:
+            # 运行器被占用（理论上向导内不会发生）：必须回调，否则执行页
+            # 停在「正在导入…」且 Next 禁用，向导永久卡死。
+            from doc_tool.application.import_project import ImportResult
+
+            on_done(
+                ImportResult(
+                    success=False,
+                    error_code="E9000",
+                    events=[],
+                ),
+                target_root,
+            )
 
     def _on_task_event(self, event) -> None:
         if event.kind == "failed":

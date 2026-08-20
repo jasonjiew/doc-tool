@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 _QT_APP_REF = None
 
@@ -35,9 +35,30 @@ _NODE_RE = re.compile(
     r"|\{(?P<diamond>.*?)\})?"
 )
 _EDGE_RE = re.compile(
-    r"^(?P<left>.+?)\s*(?:--(?:\|(?P<label>.*?)\|)?>|---|-.->|==>)"
+    r"^(?P<left>.+?)\s*"
+    r"(?:"
+    r"--(?:\|(?P<label>.*?)\|)?>"          # --> 或 --|label|>（标签在箭头前）
+    r"|--(?P<txt>[^-|>][^|>]*?)-->"          # -- text -->（无管道文本边）
+    r"|---|-.->|==>)"
     r"(?:\|(?P<label2>.*?)\|)?\s*(?P<right>.+?)\s*$"
 )
+# 链式边拆解分隔符（A --> B --> C 按箭头切成节点序列）。
+_EDGE_SEP_RE = re.compile(r"(?:-->|---|-.->|==>)")
+
+
+def _split_chain_edges(line: str):
+    """把链式边行拆成 [(左节点, 右节点, 标签)] 边列表；非链式/含非法段返回 None。
+
+    只处理连续箭头的链式边（``A --> B --> C``）；含文本的边（``A -- text --> B``）
+    由 ``_EDGE_RE`` 的单边形态处理，此处返回 None 落入原有逻辑。
+    """
+    parts = _EDGE_SEP_RE.split(line)
+    if len(parts) < 2:
+        return None
+    segs = [part.strip() for part in parts if part.strip()]
+    if len(segs) < 2 or any(_NODE_RE.fullmatch(seg) is None for seg in segs):
+        return None
+    return [(segs[i], segs[i + 1], "") for i in range(len(segs) - 1)]
 _SEQ_MESSAGE_RE = re.compile(
     r"^\s*([A-Za-z_][\w-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
     r"([A-Za-z_][\w-]*)\s*:\s*(.+?)\s*$"
@@ -199,6 +220,10 @@ def validate(source: str, kind: Optional[str] = None) -> List[MermaidError]:
                 if _NODE_RE.fullmatch(edge.group("left").strip()) is None or _NODE_RE.fullmatch(edge.group("right").strip()) is None:
                     errors.append(MermaidError(number, "边定义的节点语法无效"))
                 continue
+            if _split_chain_edges(line) is not None:
+                # 链式边（A --> B --> C）是合法 Mermaid 语法：按箭头拆成
+                # 多条边校验，不再误报「无法识别的节点或边定义」。
+                continue
             if _NODE_RE.fullmatch(line) is None:
                 errors.append(MermaidError(number, "无法识别的 flowchart 节点或边定义"))
         else:
@@ -295,8 +320,11 @@ def _node_size(label: str, shape: str) -> Tuple[float, float]:
 def _shape_svg(shape: str, x: float, y: float, w: float, h: float) -> str:
     """绘制节点外框（矩形/圆角/菱形/圆柱/圆形），返回 SVG 片段。"""
     if shape == "diamond":
+        # 顶点顺序：上(中心x, 顶y) 右(右x, 中心y) 下(中心x, 底y) 左(左x, 中心y)。
+        # 注意 {4} 是中心 x、{5} 是底 y、{6} 是左 x：误用会把下/左顶点画到
+        # (中心x, 中心x) 与 (底y, 中心y) 的错位坐标上。
         points = "{0},{1} {2},{3} {0},{4} {5},{3}".format(
-            x + w / 2, y, x + w, y + h / 2, x + w / 2, y + h, x, y + h / 2
+            x + w / 2, y, x + w, y + h / 2, y + h, x
         )
         return '<polygon points="{0}" fill="#eef6ff" stroke="#3b82b8" stroke-width="2"/>'.format(points)
     if shape == "cyl":
@@ -325,6 +353,25 @@ def _shape_svg(shape: str, x: float, y: float, w: float, h: float) -> str:
     )
 
 
+def _merge_node(nodes: Dict, parsed) -> None:
+    """把解析出的节点并入节点表；已存在时不覆盖（保留首次定义的形状/标签）。
+
+    后续边可能用裸 id 引用节点（``B --> C``），裸 id 解析为 shape=box 且
+    标签=id，直接覆盖会把先前 ``B{校验通过?}`` 的菱形定义退化成方框、标签
+    被改写成 ``B``。仅当既存节点是裸 id（box/标签=id）而新定义带形状时升级。
+    """
+    if parsed is None:
+        return
+    nid, label, shape = parsed
+    existing = nodes.get(nid)
+    if existing is None:
+        nodes[nid] = parsed
+    elif existing[2] == "box" and existing[1] == nid and (shape != "box" or label != nid):
+        # 裸 id 先出现、带形状/真实标签后出现（``A --> B`` 在前、
+        # ``B{...} --> C`` 或 ``B[真实标签]`` 在后）：升级为后出现的定义。
+        nodes[nid] = parsed
+
+
 def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
     lines = source.splitlines()
     direction = _FLOW_HEADER_RE.match(lines[0].strip()).group(1).upper()
@@ -339,13 +386,28 @@ def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
             left = _parse_node(edge.group("left"))
             right = _parse_node(edge.group("right"))
             if left and right:
-                nodes[left[0]] = left
-                nodes[right[0]] = right
-                edges.append((left[0], right[0], edge.group("label") or edge.group("label2") or ""))
-        else:
-            node = _parse_node(line)
-            if node:
-                nodes[node[0]] = node
+                _merge_node(nodes, left)
+                _merge_node(nodes, right)
+                label = (
+                    edge.group("label")
+                    or edge.group("label2")
+                    or edge.group("txt")
+                    or ""
+                ).strip()
+                edges.append((left[0], right[0], label))
+            continue
+        chain = _split_chain_edges(line)
+        if chain is not None:
+            # 链式边（A --> B --> C）：拆成多条边渲染，不再静默丢弃。
+            for left_text, right_text, _label in chain:
+                left = _parse_node(left_text)
+                right = _parse_node(right_text)
+                if left and right:
+                    _merge_node(nodes, left)
+                    _merge_node(nodes, right)
+                    edges.append((left[0], right[0], ""))
+            continue
+        _merge_node(nodes, _parse_node(line))
     if not nodes:
         raise ValueError("flowchart 中没有可渲染节点")
 
@@ -552,8 +614,14 @@ def svg_to_png(svg: bytes, width: int, height: int) -> bytes:
 
     # 桌面应用中已有 QApplication；纯服务/测试进程可能没有，QtSvg 在此状态
     # 下创建绘制设备会原生崩溃，因此建立并持有最小 QGuiApplication。
+    # QGuiApplication 只能在主线程创建：后台线程（如 TaskRunner）首次调用且
+    # 无实例时给出明确错误而非原生崩溃；主线程已建 app 时后台线程仍可栅格化。
     global _QT_APP_REF
     if QGuiApplication.instance() is None:
+        import threading
+
+        if threading.current_thread() is not threading.main_thread():
+            raise RuntimeError("QtSvg PNG 栅格化首次调用必须在主线程执行")
         _QT_APP_REF = QGuiApplication([])
 
     renderer = QSvgRenderer(QByteArray(svg))

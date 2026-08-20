@@ -30,7 +30,9 @@ class SettingsDialog(QDialog):
         self.document_name = QLineEdit(manifest.documentName)
         self.document_version = QLineEdit(manifest.documentVersion)
         self.refresh_timeout = QSpinBox()
-        self.refresh_timeout.setRange(1, 86400)
+        # 与 ProjectManifest 的校验下限一致（刷新超时不能小于 60 秒），
+        # 避免对话框允许填写 1~59 秒、保存时又被清单校验拒绝。
+        self.refresh_timeout.setRange(60, 86400)
         self.refresh_timeout.setValue(manifest.refreshTimeoutSeconds)
         self.template_path = QLineEdit(manifest.relative_template_docx())
         self.publish_notes = QPlainTextEdit(manifest.publishNotes)

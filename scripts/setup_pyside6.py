@@ -49,13 +49,33 @@ def download() -> None:
 
 
 def extract() -> None:
-    """把已下载的 wheel 解压到 site-packages（zipfile，无原子重命名）。"""
+    """把已下载的 wheel 解压到 site-packages（zipfile，无原子重命名）。
+
+    只解压与 ``PIN`` 版本匹配的 wheel，并先清掉 site-packages 中旧的
+    PySide6/shiboken6 目录：旧版本 wheel 残留 + 新版本混装会让
+    shiboken6 与 PySide6 版本不一致，import 直接失败。
+    """
     SITE.mkdir(parents=True, exist_ok=True)
-    wheels = sorted(WHEELS.glob("*.whl"))
+    wheels = sorted(
+        whl
+        for whl in WHEELS.glob("*.whl")
+        if "-{0}-".format(PIN) in whl.name
+    )
     if not wheels:
         raise SystemExit(
-            "未找到 wheel，请先运行：python scripts/setup_pyside6.py"
+            "未找到 {0} 版本的 wheel，请先运行：python scripts/setup_pyside6.py".format(PIN)
         )
+    # 清掉旧版残留目录（zipfile 无法删除旧版本独有的文件）。
+    for stale in SITE.glob("PySide6*"):
+        if stale.is_dir():
+            import shutil
+
+            shutil.rmtree(str(stale), ignore_errors=True)
+    for stale in SITE.glob("shiboken6*"):
+        if stale.is_dir():
+            import shutil
+
+            shutil.rmtree(str(stale), ignore_errors=True)
     for whl in wheels:
         print("解压：", whl.name)
         with zipfile.ZipFile(whl) as z:

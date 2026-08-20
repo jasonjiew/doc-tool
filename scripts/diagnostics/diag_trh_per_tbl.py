@@ -41,7 +41,7 @@ for ti, tbl in enumerate(tbls):
 print("表格数: %d" % len(tbls))
 print("表格内行高完全一致(或全无): %d, 其中全为485: %d" % (n_uniform, n_uniform485))
 print("表格内行高<=2种: %d" % sum(1 for s in stats if s[2] <= 2))
-print("众数占比>=80%的表格: %d" % sum(1 for s in stats if s[5] >= 0.8))
+print("众数占比>=80%%的表格: %d" % sum(1 for s in stats if s[5] >= 0.8))
 # 样本
 print("前 20 个表格 (idx, 行数, 种类数, 众数, 众数行数, 占比):")
 for s in stats[:20]:

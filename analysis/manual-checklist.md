@@ -52,7 +52,9 @@
 
 ### 3.1 正式合并端到端
 
-- [ ] 「操作 → 正式合并」启动，事件日志依次出现 build / validate_pre / word_refresh / validate_post / publish
+- [ ] 「操作 → 正式合并」启动，事件日志依次出现 revision / build / validate_pre / word_refresh / validate_post / publish
+- [ ] 合并前不再弹「确认修订记录」窗；修订记录只在 `content/<类型>/_revision_record.md` 里手工维护
+- [ ] 在该文件表格末尾手工加一行后合并：revision 阶段显示「已按 _revision_record.md 末行同步文档版本号：旧 → 新」，Word 修订记录表按该文件整表覆盖
 - [ ] 「关于/环境诊断」显示 Word 可用（版本 16.0 或更高）
 - [ ] 构建阶段显示「构建到临时文件」，不直接写正式输出
 - [ ] 前校验通过
@@ -69,8 +71,8 @@
 - [ ] 章节编号连续无跳号
 - [ ] 图片完整显示，无红叉
 - [ ] 复杂表格样式保留（含嵌套表格）
-- [ ] 封面文档编号、版本号正确
-- [ ] 修订记录页存在且格式正确
+- [ ] 封面文档编号、版本号正确（版本号 = `_revision_record.md` 末行版本号）
+- [ ] 修订记录页存在且格式正确，内容与 `_revision_record.md` 数据行逐行一致
 
 ### 3.3 Word 缺失场景
 

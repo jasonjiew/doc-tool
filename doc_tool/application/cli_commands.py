@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Iterable, List, Tuple
 
 from doc_tool.application.issues import IssueRecord, issues_from_validation_report
 from doc_tool.domain.errors import DocToolError
@@ -42,6 +42,8 @@ class CommandResult:
 
     @property
     def exit_code(self) -> int:
+        if not self.results:
+            return 2  # 无项目可执行：视为用法/输入错误，不得静默成功
         succeeded = sum(1 for item in self.results if item.success)
         failed = len(self.results) - succeeded
         if failed == 0:
@@ -119,7 +121,24 @@ def preflight_command(docx: str) -> CommandResult:
 def import_command(args) -> CommandResult:
     from doc_tool.application.import_project import ImportRequest, import_first_time
 
-    target = Path(args.target_dir).resolve() / args.name
+    # 项目名必须是单层目录名：含 / \ .. 或盘符会逃逸 target_dir 之外。
+    name = (args.name or "").strip()
+    if (
+        not name
+        or name in (".", "..")
+        or "/" in name
+        or "\\" in name
+        or ":" in name
+    ):
+        return CommandResult("import", [
+            ProjectCommandResult(
+                str(Path(args.target_dir).resolve()),
+                False, "E5001",
+                "项目名必须是单层目录名（不能含路径分隔符、盘符或 ..）。",
+                data={"message": "非法项目名：{0!r}".format(args.name)},
+            )
+        ])
+    target = Path(args.target_dir).resolve() / name
     request = ImportRequest(
         source_docx=Path(args.docx),
         target_project_root=target,
@@ -308,6 +327,17 @@ def renumber_command(args) -> CommandResult:
                 )
         preview = [{"old": old, "new": new} for old, new in renamed]
         if not renamed:
+            if target:
+                # 用户显式指定 --dir 却无任何命中：静默成功会让脚本误以为已重排。
+                return ProjectCommandResult(
+                    str(root), False, "E2003",
+                    "指定目录下未找到需要重编号的章节。",
+                    data={
+                        "message": "指定目录下未找到需要重编号的章节",
+                        "renamed": 0, "preview": [], "applied": False,
+                        "directories": [],
+                    },
+                )
             return ProjectCommandResult(
                 str(root), True,
                 data={
@@ -340,7 +370,16 @@ def renumber_command(args) -> CommandResult:
                 },
             )
         writer = ContentWriter(content_root, paths.state_dir)
-        results = service.apply_rename_plan(batch, writer)
+        try:
+            results = service.apply_rename_plan(batch, writer)
+        except (OSError, ValueError) as exc:
+            # apply_rename_plan 内部已事务回滚；把失败映射为 E2003 而非通用
+            # E9000，便于调用方按重编号语义处理。
+            return ProjectCommandResult(
+                str(root), False, "E2003",
+                "重编号写回失败，本次改动已回滚。",
+                data={"message": str(exc), "preview": preview},
+            )
         if not all(r.written for r in results):
             failures = [r.error or r.rel_path for r in results if not r.written]
             return ProjectCommandResult(

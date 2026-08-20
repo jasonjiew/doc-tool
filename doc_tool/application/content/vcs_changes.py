@@ -11,6 +11,9 @@
 - SVN 基线 = 工作副本的 BASE 修订。
 - 检测来源（source）：git / svn / local。local 表示版本控制不可用或
   不在版本控制内，由调用方继续使用原有本地快照机制（不回退删除）。
+- 项目目录虽在仓库内、但被 ``.gitignore`` 忽略或从未 add 时，git 对它
+  永远报「无变化」；此时同样回退 local，否则真实的新增/修改会被静默
+  吞掉（见 ``GitChangeDetector.tracks_path``）。
 
 隔离原则（需求第四条/第五条）：
 - Repository Context 可共享：Git/SVN 仓库可能同时包含多个文档子项目。
@@ -120,6 +123,17 @@ RepoEntry = Tuple
 # 项目内部目录（相对 project_root）：不是文档变更，且回滚时绝不能
 # 删除应用自身状态（.state）或构建产物（output/logs）。
 _PROJECT_INTERNAL_DIRS = (".state", "output", "logs")
+
+# 项目在版本控制视野之外（被忽略/未纳入索引）时的兜底说明。
+UNTRACKED_PROJECT_NOTICE = (
+    "项目未纳入 Git（被 .gitignore 忽略或从未 add），已回退本地快照检测"
+)
+
+
+def _project_path_spec(repo_root: Path, project_root: Path) -> str:
+    """项目根相对仓库根的 pathspec；项目根即仓库根时返回 ``.``。"""
+    rel = Path(project_root).relative_to(Path(repo_root)).as_posix()
+    return "." if rel in ("", ".") else rel
 
 
 def _filter_repo_entries(
@@ -349,6 +363,32 @@ class GitChangeDetector:
             return True  # 测试注入
         return shutil.which(self._git) is not None
 
+    def tracks_path(self, repo_root: Path, path_spec: str) -> bool:
+        """``path_spec`` 目录下是否存在被 git 跟踪的文件。
+
+        用于区分「项目干净」与「项目在 git 视野之外」：项目目录被
+        ``.gitignore`` 忽略（或从未 add 过）时，``git status`` 对它永远
+        沉默，于是新增/修改会被静默吞掉、界面显示「无改动」。这种情况下
+        必须回退本地快照，而不是相信 git 的沉默。
+
+        命令失败或 git 不可用时返回 True（保守：维持 git 模式，绝不把
+        干净且已跟踪的项目误判成「未纳入 git」）。
+        """
+        if not self.is_available():
+            return True
+        try:
+            proc = _run(
+                [self._git, "ls-files", "-z", "--", path_spec or "."],
+                cwd=Path(repo_root),
+                timeout=self._timeout,
+                runner=self._runner,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return True
+        if proc.returncode != 0:
+            return True
+        return bool((proc.stdout or b"").strip(b"\0"))
+
     def repo_changes(self, repo_root: Path) -> Tuple[List[RepoEntry], Optional[str]]:
         """读取仓库级原始变更（未按项目过滤，可安全缓存共享）。
 
@@ -450,6 +490,16 @@ class GitChangeDetector:
         files = _filter_repo_entries(
             entries, repo_root, project_root, "git"
         )
+        if not files and not self.tracks_path(
+            repo_root, _project_path_spec(repo_root, project_root)
+        ):
+            # 项目在 git 视野之外：git 的「无变化」不可信，回退本地快照。
+            return ChangeReport(
+                source="local",
+                repository_root=str(repo_root),
+                project_root=str(project_root),
+                error=UNTRACKED_PROJECT_NOTICE,
+            )
         return ChangeReport(
             source="git",
             repository_root=str(repo_root),
@@ -619,6 +669,10 @@ class ChangeDetectionService:
         self._cache_ttl = cache_ttl
         self._git = GitChangeDetector(timeout=timeout, runner=git_runner)
         self._svn = SvnChangeDetector(timeout=timeout, runner=svn_runner)
+        # 「项目是否被 git 跟踪」的窗口级缓存：(monotonic, tracked)。
+        # 只在项目零变更时才需要，且跟踪状态几乎不变，用较长 TTL 避免
+        # 每次刷新都多起一个 git 进程。
+        self._tracked_cache: Optional[Tuple[float, bool]] = None
 
     @property
     def project_root(self) -> Path:
@@ -661,6 +715,15 @@ class ChangeDetectionService:
                 files = _filter_repo_entries(
                     entries, repo_root, self._project_root, "git"
                 )
+                if not files and not self._git_tracks_project(repo_root):
+                    # 项目被 .gitignore 忽略/从未 add：git 永远报「无变化」，
+                    # 会吞掉真实的新增与修改 → 回退本地快照。
+                    return ChangeReport(
+                        source="local",
+                        repository_root=str(repo_root),
+                        project_root=str(self._project_root),
+                        error=UNTRACKED_PROJECT_NOTICE,
+                    )
                 return ChangeReport(
                     source="git",
                     repository_root=str(repo_root),
@@ -680,6 +743,17 @@ class ChangeDetectionService:
             )
         # --- SVN ---
         return self._detect_svn()
+
+    def _git_tracks_project(self, repo_root: Path) -> bool:
+        """项目目录下是否有被 git 跟踪的文件（带窗口级缓存，TTL 60s）。"""
+        cached = self._tracked_cache
+        if cached is not None and time.monotonic() - cached[0] <= 60.0:
+            return cached[1]
+        tracked = self._git.tracks_path(
+            repo_root, _project_path_spec(repo_root, self._project_root)
+        )
+        self._tracked_cache = (time.monotonic(), tracked)
+        return tracked
 
     def _detect_svn(self) -> ChangeReport:
         wc_root = find_svn_wc_root(self._project_root)
@@ -730,11 +804,18 @@ class ChangeDetectionService:
         返回值兼容原有 ``ContentSnapshot.diff`` 语义：
         ``{rel_path: added | modified | deleted}``，rename 收敛为 modified。
         project.yml 以 ``project.yml`` 键出现（供改动面板展示）。
-        资源（assets）变化在提供 ``all_files``（内容索引路径）时反查引用
-        它的章节并标记为变更；未提供时资源变化不进入内容状态。
+        资源（图片/表格，无论在 content_root 内还是项目级 assets/）变化在提供
+        ``all_files``（内容索引路径）时反查引用它的章节；未提供时项目级资源
+        变化不进入内容状态。
+
+        反查出的章节一律标 ``modified``：章节文件本身没有变化，只是它渲染出
+        的内容变了。绝不能继承资源的 added/deleted——那会让一个真实存在、
+        未被改动的章节在改动面板里显示成「新增」，而「撤销新增」会把它删掉。
+        章节自身的真实状态永远优先于反查结果。
         """
         status: Dict[str, str] = {}
         project_root = Path(self._project_root)
+        asset_rels: List[str] = []  # 待反查引用章节的资源路径
         for item in report.files:
             if not item.abs_path:
                 continue
@@ -752,14 +833,19 @@ class ChangeDetectionService:
                     continue
                 if proj_rel == "project.yml":
                     status["project.yml"] = "modified"
-                elif all_files is not None:
-                    # 项目级资源变化：反查引用它的章节并标记变更。
-                    for referencing in _find_referencing_files(
-                        self._content_root, proj_rel, all_files
-                    ):
-                        status[referencing] = change_type
+                else:
+                    asset_rels.append(proj_rel)
                 continue
             status[rel] = change_type
+            if not rel.endswith((".md", ".markdown")):
+                # content_root 内的资源（如 general/images/x.png）同样反查章节。
+                asset_rels.append(rel)
+        if all_files is not None:
+            for asset_rel in asset_rels:
+                for referencing in _find_referencing_files(
+                    self._content_root, asset_rel, all_files
+                ):
+                    status.setdefault(referencing, "modified")
         return status
 
     def chapters(
@@ -770,10 +856,14 @@ class ChangeDetectionService:
         """把仓库级变更映射为章节级变更（含资源反查引用章节）。
 
         ``all_files``：当前索引的 rel_path 列表（相对 content_root），
-        用于把资源变更反查到引用它的 Markdown 章节。
+        用于把资源变更反查到引用它的 Markdown 章节。反查出的章节
+        ``change_type`` 恒为 modified 且 ``is_asset=True``（章节本身未变）；
+        章节自身已有变更条目时不再追加反查条目，避免同一章节重复出现。
         """
         chapters: List[ChangedChapter] = []
         project_root = Path(self._project_root)
+        own_paths: set = set()  # 章节自身有变更的路径
+        pending_assets: List[Tuple[str, ChangedFile]] = []
         for item in report.files:
             if not item.abs_path:
                 continue
@@ -796,22 +886,26 @@ class ChangeDetectionService:
                         )
                     )
                     continue
-                # 项目级资源（assets/…）：反查引用它的章节。
-                for referencing in _find_referencing_files(
-                    self._content_root, proj_rel, all_files
-                ):
-                    chapters.append(
-                        self._chapter_from_path(referencing, item, is_asset=True)
-                    )
+                # 项目级资源（assets/…）：稍后反查引用它的章节。
+                pending_assets.append((proj_rel, item))
                 continue
             if rel.endswith((".md", ".markdown")):
                 chapters.append(self._chapter_from_path(rel, item))
+                own_paths.add(rel)
             else:
-                # 资源变更：反查引用它的章节。
-                for referencing in _find_referencing_files(
-                    self._content_root, rel, all_files
-                ):
-                    chapters.append(self._chapter_from_path(referencing, item, is_asset=True))
+                # content_root 内的资源：稍后反查引用它的章节。
+                pending_assets.append((rel, item))
+        seen_assets: set = set()
+        for asset_rel, item in pending_assets:
+            for referencing in _find_referencing_files(
+                self._content_root, asset_rel, all_files
+            ):
+                if referencing in own_paths or referencing in seen_assets:
+                    continue
+                seen_assets.add(referencing)
+                chapters.append(
+                    self._chapter_from_path(referencing, item, is_asset=True)
+                )
         return chapters
 
     def _chapter_from_path(
@@ -821,14 +915,15 @@ class ChangeDetectionService:
         match = re.match(r"^(\d+(?:\.\d+)*)", stem)
         chapter_id = match.group(1) if match else ""
         title = strip_number_prefix(stem) if match else stem
-        change_type = item.change_type
+        # 资源反查出的章节：章节文件本身没变，只能是 modified，且没有旧路径。
+        change_type = "modified" if is_asset else item.change_type
         return ChangedChapter(
             chapter_id=chapter_id,
             title=title,
             path=rel,
             change_type=change_type,
             source=item.source,
-            old_path=item.old_path,
+            old_path=None if is_asset else item.old_path,
             is_asset=is_asset,
         )
 
@@ -852,7 +947,12 @@ def _find_referencing_files(
             text = (content_root / rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if name in text and re.search(r"!?\[[^\]]*\]\([^)\n]*" + re.escape(name), text):
+        # 只按链接目标文件名的精确 basename 匹配：子串匹配会把含该名字的
+        # 其它文件（如 a.png 命中 ba.png 的引用）误报为引用章节。
+        if any(
+            Path(target.split("#", 1)[0].strip()).name == name
+            for target in re.findall(r"!?\[[^\]]*\]\(([^)\s]+)", text)
+        ):
             hits.append(rel)
     return hits
 
@@ -910,28 +1010,58 @@ def _git_rollback_all(
     runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
     delete_untracked: bool = True,
 ) -> List[str]:
-    """git：恢复被跟踪文件（含 rename 旧路径）到 HEAD；可选删除未跟踪新增文件。"""
+    """git：恢复被跟踪文件到 HEAD；可选删除未跟踪新增文件。
+
+    staged 新增/重命名的新路径在 HEAD 中不存在：``git restore --staged``
+    对它们报 ``does not exist in 'HEAD'`` 并使整条命令失败，其余文件也
+    无法恢复。这些路径改用 ``git rm --cached`` 仅撤出暂存区（工作树文件
+    转为未跟踪），重命名的旧路径仍走 ``git restore`` 恢复。
+    """
     failures: List[str] = []
     repo_root = Path(report.repository_root or "")
-    tracked: List[str] = []
+    added_or_renamed_new: List[str] = []
+    restore_paths: List[str] = []
     untracked: List[str] = []
     for item in report.files:
         if item.untracked:
             untracked.append(item.abs_path)
             continue
-        if item.path not in tracked:
-            tracked.append(item.path)
-        if item.old_path and item.old_path not in tracked:
-            tracked.append(item.old_path)
-    error = _restore_tracked_paths(
-        [shutil.which("git") or "git", "restore", "--staged", "--worktree"],
-        repo_root,
-        tracked,
-        timeout,
-        runner=runner,
-    )
-    if error:
-        failures.append("git restore 失败：{0}".format(error))
+        if item.change_type in ("added", "renamed"):
+            if item.path not in added_or_renamed_new:
+                added_or_renamed_new.append(item.path)
+            if item.change_type == "renamed":
+                if item.old_path and item.old_path not in restore_paths:
+                    restore_paths.append(item.old_path)
+            continue
+        if item.path not in restore_paths:
+            restore_paths.append(item.path)
+        if item.old_path and item.old_path not in restore_paths:
+            restore_paths.append(item.old_path)
+    if added_or_renamed_new:
+        error = _restore_tracked_paths(
+            [shutil.which("git") or "git", "rm", "--cached"],
+            repo_root,
+            added_or_renamed_new,
+            timeout,
+            runner=runner,
+        )
+        if error:
+            failures.append("git rm --cached 失败：{0}".format(error))
+        elif delete_untracked:
+            # 撤出暂存后这些文件转为未跟踪：随未跟踪文件一并删除。
+            for item in report.files:
+                if item.change_type in ("added", "renamed") and item.abs_path:
+                    untracked.append(item.abs_path)
+    if restore_paths:
+        error = _restore_tracked_paths(
+            [shutil.which("git") or "git", "restore", "--staged", "--worktree"],
+            repo_root,
+            restore_paths,
+            timeout,
+            runner=runner,
+        )
+        if error:
+            failures.append("git restore 失败：{0}".format(error))
     if delete_untracked:
         failures.extend(_delete_untracked_files(untracked))
     return failures
@@ -944,7 +1074,12 @@ def _svn_rollback_all(
     runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
     delete_untracked: bool = True,
 ) -> List[str]:
-    """svn：revert 被跟踪文件；可选删除未版本化新增文件。"""
+    """svn：revert 被跟踪文件；可选删除未版本化新增文件。
+
+    ``svn revert`` 对 added（svn add 过）条目只撤出版本控制，文件以未版本化
+    状态留在工作副本——它在 BASE 中本不存在，delete_untracked 时应一并删除，
+    否则「回滚全部」后 added 文件静默残留（与 git 侧 staged 新增同源缺陷）。
+    """
     failures: List[str] = []
     wc_root = Path(report.repository_root or "")
     tracked = [item.path for item in report.files if not item.untracked]
@@ -958,6 +1093,11 @@ def _svn_rollback_all(
     )
     if error:
         failures.append("svn revert 失败：{0}".format(error))
+    elif delete_untracked:
+        # revert 成功后 added 条目转为未版本化：追加到删除列表。
+        for item in report.files:
+            if item.change_type == "added" and not item.untracked and item.abs_path:
+                untracked.append(item.abs_path)
     if delete_untracked:
         failures.extend(_delete_untracked_files(untracked))
     return failures

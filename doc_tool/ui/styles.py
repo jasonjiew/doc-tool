@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from doc_tool.resources import resource_path
 
@@ -238,7 +237,6 @@ QLabel#statusWarning {{ {font_small} color: {warning}; }}
         success=sem["success"],
         failure=sem["failure"],
         warning=sem["warning"],
-        neutral=sem["neutral"],
     )
 
 

@@ -226,6 +226,13 @@ class TabsHost(QWidget):
                 # 关闭脏标签 = 显式放弃未保存编辑：清除其草稿，避免下次打开
                 # 在崩溃恢复提示中复活已丢弃的内容。
                 self._autosave.clear(rel_path)
+        else:
+            # 边界兜底：编辑器尚未加载路径（正常流程不可达）时按 widget
+            # 身份清理，避免失效条目残留在 _editors 造成标签重建/泄漏。
+            for key, editor in list(self._editors.items()):
+                if editor is widget:
+                    self._editors.pop(key, None)
+                    break
         self._tabs.removeTab(index)
         widget.stop_autosave()
         widget.deleteLater()

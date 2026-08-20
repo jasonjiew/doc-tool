@@ -595,7 +595,11 @@ class ChapterTree(QWidget):
         index = self._tree.indexAt(pos)
         if not index.isValid():
             return
-        self._context_menu(index).exec(QCursor.pos())
+        menu = self._context_menu(index)
+        # 菜单关闭即删除：每次右键新建的 QMenu 以面板为父，若不删除会随
+        # 打开次数累积控件树（资源泄漏）。
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        menu.exec(QCursor.pos())
 
     def _markdown_link(self, rel_path: str) -> str:
         """生成章节引用链接：[标题](相对路径)。"""

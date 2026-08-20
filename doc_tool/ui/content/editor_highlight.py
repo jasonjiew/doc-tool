@@ -157,7 +157,7 @@ class _LineNumberedEdit(QPlainTextEdit):
 
         self._spell_checker = None
         self._snippet_active = False
-        self._snippet_placeholders: List[Tuple[int, int]] = []
+        self._snippet_placeholders: List[Tuple[int, int, str]] = []
         self._snippet_index: Optional[int] = None
         self._image_import_callback = None
 
@@ -229,11 +229,16 @@ class _LineNumberedEdit(QPlainTextEdit):
 
     # --- 代码片段占位符跳转 ---
 
-    def begin_snippet(self, positions: List[Tuple[int, int]]) -> None:
-        """片段插入后记录占位符文档区间；第一个占位符由调用方选中。"""
-        self._snippet_placeholders = list(positions)
-        self._snippet_index = 0 if positions else None
-        self._snippet_active = bool(positions)
+    def begin_snippet(self, specs: List[Tuple[int, int, str]]) -> None:
+        """片段插入后记录占位符 ``(起, 止, 默认文本)``；第一个占位符由调用方选中。
+
+        跳转时按默认文本在当前文档中重新定位，而不是沿用插入时的固定区间：
+        用户在占位符内输入与默认值不同长度的文本后，旧区间已失效，按文本
+        搜索可正确定位后续占位符。
+        """
+        self._snippet_placeholders = list(specs)
+        self._snippet_index = 0 if specs else None
+        self._snippet_active = bool(specs)
 
     def end_snippet(self) -> None:
         self._snippet_active = False
@@ -248,19 +253,34 @@ class _LineNumberedEdit(QPlainTextEdit):
         if self._snippet_index is None or not self._snippet_placeholders:
             self._snippet_active = False
             return
-        self._snippet_index += 1
-        if self._snippet_index >= len(self._snippet_placeholders):
-            # 全部占位符已填完：恢复正常 Tab（插入一个制表符）。
-            self.end_snippet()
-            self.textCursor().insertText("\t")
-            return
-        start, end = self._snippet_placeholders[self._snippet_index]
-        doc_length = self.document().characterCount()
-        if 0 <= start <= end <= doc_length:
-            cursor = self.textCursor()
-            cursor.setPosition(start)
-            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
-            self.setTextCursor(cursor)
+        doc = self.document()
+        doc_length = doc.characterCount()
+        while True:
+            self._snippet_index += 1
+            if self._snippet_index >= len(self._snippet_placeholders):
+                # 全部占位符已填完：恢复正常 Tab（插入一个制表符）。
+                self.end_snippet()
+                self.textCursor().insertText("\t")
+                return
+            _start, _end, default = self._snippet_placeholders[self._snippet_index]
+            if default:
+                # 占位符 Tab 顺序按序号、不按文档位置（``${2:x}`` 可出现在
+                # ``${1:y}`` 之前），因此从该占位符插入时的原始起点向后搜索：
+                # 文档被编辑后发生偏移仍能命中；找不到（默认文本被改掉）则
+                # 跳过该占位符。
+                found = doc.find(default, max(0, _start))
+                if found is not None and not found.isNull():
+                    self.setTextCursor(found)
+                    return
+                continue
+            # 无默认值的占位符（纯光标停靠点）无法文本定位：退化为原区间，
+            # 越界则跳过（文档被外部改动）。
+            if 0 <= _start <= _end <= doc_length:
+                sel = self.textCursor()
+                sel.setPosition(_start)
+                sel.setPosition(_end, QTextCursor.MoveMode.KeepAnchor)
+                self.setTextCursor(sel)
+                return
 
     def keyPressEvent(self, event) -> None:
         if self._snippet_active and event.key() == Qt.Key.Key_Tab:
@@ -291,8 +311,6 @@ class _LineNumberedEdit(QPlainTextEdit):
                 if local.lower().endswith(
                     (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
                 ):
-                    import os
-
                     self._image_import_callback(local)
                     event.acceptProposedAction()
                     return

@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import posixpath
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -53,6 +54,12 @@ _CONTEXT_WINDOW = 20
 
 _EXTERNAL_SCHEMES = ("http://", "https://", "mailto:", "ftp://", "data:")
 
+# 代码围栏起始/结束行（``` 或 ~~~）：围栏内代码示例中的链接/章节号是
+# 示例文本而非真实引用，不得误报 confirmed 悬空。
+_FENCE_LINE_RE = re.compile(r"^(?:`{3,}|~{3,})")
+# 图片链接的尺寸后缀 ` =WxH`（空格 + 等号）。
+_IMAGE_SIZE_SUFFIX_RE = re.compile(r"\s+=\d+x\d+\s*$")
+
 
 def leading_number(text: str) -> Optional[str]:
     """取文本开头的编号（如 3.1、3.1.4）；无编号返回 None。"""
@@ -67,7 +74,13 @@ def section_no_of_file(rel_path: str) -> Optional[str]:
 
 def _is_external(target: str) -> bool:
     stripped = target.lstrip()
-    return stripped.startswith(_EXTERNAL_SCHEMES)
+    if stripped.startswith(_EXTERNAL_SCHEMES):
+        return True
+    # 裸域名（[x](www.example.com)）也是外部链接：不判 confirmed 悬空。
+    first = stripped.split("/", 1)[0]
+    return bool(
+        re.fullmatch(r"(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?", first)
+    )
 
 
 class ReferenceScanner:
@@ -115,11 +128,21 @@ class ReferenceScanner:
             self.scan_file(rel_path)
 
     def scan_file(self, rel_path: str) -> List[FileReference]:
-        """扫描单个文件，返回其引用列表并写入索引。"""
+        """扫描单个文件，返回其引用列表并写入索引。
+
+        跳过 ``` / ~~~ 围栏代码块（其中粘贴的 Markdown 示例不是真实引用），
+        与拼写检查的围栏约定一致。
+        """
         refs: List[FileReference] = []
+        in_code = False
         for line_no, text in enumerate(
             self._index.lines.get(rel_path, []), start=1
         ):
+            if _FENCE_LINE_RE.match(text.strip()):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
             refs.extend(self._scan_line(rel_path, line_no, text))
         self._index.references[rel_path] = refs
         return refs
@@ -175,7 +198,8 @@ class ReferenceScanner:
         self, rel_path: str, line_no: int, text: str, target: str
     ) -> Optional[FileReference]:
         """图片链接：资产路径解析与悬空检测（提供 assets_root 时）。"""
-        image_path = target.split()[0]  # 去掉 `=642x269` 尺寸后缀
+        # 去掉 ` =642x269` 尺寸后缀；不用 split()[0]——含空格文件名会被截断。
+        image_path = _IMAGE_SIZE_SUFFIX_RE.sub("", target).strip()
         if self._assets_root is None:
             return FileReference(
                 kind=REF_IMAGE,
@@ -209,7 +233,7 @@ class ReferenceScanner:
         anchor: Optional[str],
     ) -> FileReference:
         """普通链接：解析到 content 文件，可选带锚点。"""
-        target_rel = self._resolve_content_file(link)
+        target_rel = self._resolve_content_file(rel_path, link)
         ref = FileReference(
             kind=REF_LINK,
             source=rel_path,
@@ -296,19 +320,37 @@ class ReferenceScanner:
 
     # --- 辅助 ---
 
-    def _resolve_content_file(self, link: str) -> Optional[str]:
-        """把链接目标解析为 content 文件的 rel_path；解析不到返回 None。"""
+    def _resolve_content_file(self, rel_path: str, link: str) -> Optional[str]:
+        """把链接目标解析为 content 文件的 rel_path；解析不到返回 None。
+
+        优先按相对路径解析（含 ``../`` 与目录前缀，基于来源文件目录）；
+        其次按文件名反查，跨目录同名歧义时优先取与来源同目录的文件。
+        """
         normalized = link.replace("\\", "/")
         if normalized.startswith("./"):
             normalized = normalized[2:]
         if normalized in self._index.files:
             return normalized
-        # 按文件名反查（处理带路径前缀的链接）
+        # 相对路径（含 ../）按来源文件目录解析；越出 contentRoot 即不匹配，
+        # 不再按 basename 反查到错误文件。
+        if normalized.startswith("../") or "/" in Path(normalized).parent.as_posix():
+            source_dir = Path(rel_path).parent.as_posix()
+            candidate = posixpath.normpath(posixpath.join(source_dir, normalized))
+            if candidate in self._index.files:
+                return candidate
+        # 按文件名反查（处理仍无法按路径解析的链接）
         name = Path(normalized).name
         if not name:
             return None
         matches = self._index.find_by_name(name)
-        return matches[0] if matches else None
+        if len(matches) <= 1:
+            return matches[0] if matches else None
+        # 歧义：跨目录同名文件——优先取与来源同目录者，其次取索引序第一个。
+        source_dir = Path(rel_path).parent.as_posix()
+        for match in matches:
+            if Path(match).parent.as_posix() == source_dir:
+                return match
+        return matches[0]
 
     def _anchor_exists(self, rel_path: str, anchor: str) -> bool:
         """锚点目标是否存在于某文件的标题清单。"""

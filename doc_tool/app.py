@@ -16,9 +16,14 @@ import sys
 
 def main() -> int:
     # PyInstaller 冻结应用使用 spawn 子进程对 Word COM 探测施加真实超时。
-    import multiprocessing
+    try:
+        import multiprocessing
 
-    multiprocessing.freeze_support()
+        multiprocessing.freeze_support()
+    except ImportError:
+        # 缺 multiprocessing（如冻结环境下 _socket 被安全软件拦截）时跳过，
+        # GUI 与常规文档构建不受影响；Word 预检降级为静态判定，见 word_check。
+        pass
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:  # pragma: no cover
@@ -50,7 +55,6 @@ def main() -> int:
     except Exception:  # pragma: no cover - 迁移失败不阻断启动
         pass
 
-    from doc_tool.domain.version import APP_VERSION
     from doc_tool.ui.main_window import MainWindow
     from doc_tool.ui.styles import apply_theme, set_window_icon
     from doc_tool.ui.window_registry import WindowRegistry

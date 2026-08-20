@@ -21,7 +21,7 @@ DEFAULT_TESTS = [
     "test_roundtrip.py", "test_style_mapping.py", "test_authoring_services.py",
     "test_issues.py", "test_cli_machine.py", "test_quality_gates.py", "test_quality_traceability.py",
     "test_gui_services.py", "test_content_operations.py", "test_safety_recovery.py",
-    "test_vcs_changes.py", "test_multi_window.py",
+    "test_vcs_changes.py", "test_revision_record.py", "test_multi_window.py",
     "test_lock_log_cancel.py", "test_word_release.py", "test_packaging.py",
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
     "test_migration.py", "test_public_export.py",

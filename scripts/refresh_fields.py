@@ -12,7 +12,7 @@ import argparse
 import os
 import subprocess
 import sys
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
 from docx_common import AutomationError, discover_document_types, load_config
 
@@ -35,6 +35,52 @@ def _kill_process_tree(pid: Optional[int]) -> None:
         stderr=subprocess.DEVNULL,
         check=False,
     )
+
+
+# 刷新失败原因键：worker 经 stderr 输出 [REASON] 标记，supervise 透传给管线
+# 映射稳定错误码（E3002 超时 / E3003 保存失败 / E3001 其余）。
+REASON_OK = "ok"
+REASON_TIMEOUT = "timeout"
+REASON_WORD_UNAVAILABLE = "word_unavailable"
+REASON_SAVE_FAILED = "save_failed"
+REASON_REFRESH_FAILED = "refresh_failed"
+
+_REASON_MARKER = "[REASON] "
+_REASON_KEYS = (
+    REASON_OK,
+    REASON_TIMEOUT,
+    REASON_WORD_UNAVAILABLE,
+    REASON_SAVE_FAILED,
+    REASON_REFRESH_FAILED,
+)
+
+
+def _classify_failure(exc: BaseException) -> str:
+    """把 worker 失败原因分类为稳定键。"""
+    text = str(exc)
+    lower = text.lower()
+    if "保存" in text or "save" in lower:
+        return REASON_SAVE_FAILED
+    if (
+        "pywin32" in lower
+        or "win32com" in lower
+        or "word.application" in lower
+        or "没有注册类" in text
+        or "拒绝访问" in text
+    ):
+        return REASON_WORD_UNAVAILABLE
+    return REASON_REFRESH_FAILED
+
+
+def _scan_reason(err_bytes: bytes) -> str:
+    """从 worker stderr 提取 [REASON] 标记；缺失时按一般刷新失败处理。"""
+    for line in err_bytes.splitlines():
+        stripped = line.decode("utf-8", errors="replace").strip()
+        if stripped.startswith(_REASON_MARKER):
+            key = stripped[len(_REASON_MARKER):].strip()
+            if key in _REASON_KEYS:
+                return key
+    return REASON_REFRESH_FAILED
 
 
 def _open_document(word, path: str, read_only: bool):
@@ -75,6 +121,7 @@ def refresh_worker(
         import win32com.client
     except ImportError as exc:
         print("[FAIL] 未安装 pywin32，无法刷新 Word 域: {0}".format(exc), file=sys.stderr, flush=True)
+        print("{0}{1}".format(_REASON_MARKER, REASON_WORD_UNAVAILABLE), file=sys.stderr, flush=True)
         return 1
 
     if output_path is None:
@@ -86,6 +133,7 @@ def refresh_worker(
     output = os.path.abspath(output_path)
     if not os.path.isfile(output):
         print("[FAIL] 待刷新文档不存在: {0}".format(output), file=sys.stderr, flush=True)
+        print("{0}{1}".format(_REASON_MARKER, REASON_REFRESH_FAILED), file=sys.stderr, flush=True)
         return 1
     # 显示标签：项目上下文无 doc_type 时用文件名替代，避免消息出现 None。
     if document is None:
@@ -130,6 +178,7 @@ def refresh_worker(
         return 0
     except Exception as exc:
         print("[{0}] [FAIL] Word 刷新失败: {1!r}".format(document, exc), file=sys.stderr, flush=True)
+        print("{0}{1}".format(_REASON_MARKER, _classify_failure(exc)), file=sys.stderr, flush=True)
         return 1
     finally:
         if opened is not None:
@@ -148,11 +197,16 @@ def supervise(
     document: Optional[str] = None,
     output_path: Optional[str] = None,
     timeout: Optional[int] = None,
-) -> bool:
+) -> Tuple[bool, str]:
     """Supervise the Word refresh worker with a timeout.
 
     Project context callers pass ``output_path`` and ``timeout`` directly;
     legacy callers pass ``document`` and the config is loaded from disk.
+
+    Returns:
+        ``(是否成功, 原因键)``：``ok / timeout / word_unavailable /
+        save_failed / refresh_failed``，供管线映射稳定错误码——旧实现只返回
+        bool，超时/保存失败被上层一律当作「Word 不可用」（E3001）误报。
     """
     if output_path is None or timeout is None:
         if document is None:
@@ -170,9 +224,13 @@ def supervise(
         "--output",
         os.path.abspath(output_path),
     ]
-    process = subprocess.Popen(command)
+    # 捕获 worker stderr：失败细节与 [REASON] 标记经父进程 stderr 透出，
+    # 保持原命令行可见性的同时让管线拿到稳定原因键。
+    process = subprocess.Popen(
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+    )
     try:
-        return process.wait(timeout=timeout) == 0
+        _stdout, err = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         print(
             "[{0}] [FAIL] Word 刷新超过 {1} 秒，已终止本次专用进程".format(label, timeout),
@@ -181,10 +239,16 @@ def supervise(
         )
         _kill_process_tree(process.pid)
         try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-        return False
+            process.communicate()
+        except Exception:
+            pass
+        return (False, REASON_TIMEOUT)
+    if process.returncode == 0:
+        return (True, REASON_OK)
+    if err:
+        sys.stderr.write(err.decode("utf-8", errors="replace"))
+        sys.stderr.flush()
+    return (False, _scan_reason(err or b""))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -213,7 +277,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     targets = tuple(available) if args.document == "all" else (args.document,)
     ok = True
     for target in targets:
-        if not supervise(target):
+        ok_refresh, _reason = supervise(target)
+        if not ok_refresh:
             ok = False
     return 0 if ok else 1
 

@@ -865,9 +865,6 @@ class MainWindow(QMainWindow):
         from doc_tool.application.pipeline import run_pipeline
         from doc_tool.application.word_check import check_word_available
 
-        if not self._confirm_pre_publish_checks():
-            return
-
         report = check_word_available(dispatch_check=False)
         self._word_available = bool(report.available)
         self._refresh_interaction_state()
@@ -880,12 +877,15 @@ class MainWindow(QMainWindow):
                 "原因：\n{0}".format(reasons),
             )
             return
+        revision_version = self._revision_record_version()
+        if not self._confirm_pre_publish_checks(revision_version):
+            return
         try:
             ensure_kernel_importable()
         except Exception as exc:  # noqa: BLE001
             self._show_error("内核不可用", str(exc)[:200])
             return
-        # 合并已确认、Word 与内核均可用：此时才把「跳过检查」标注写入发布说明，
+        # 前置检查已过、Word 与内核均可用：此时才把「跳过检查」标注写入发布说明，
         # 保证不会因后续中止留下未发布却标注跳过的陈旧审计记录。
         if getattr(self, "_pending_publish_skip_note", None):
             note = self._pending_publish_skip_note
@@ -899,12 +899,39 @@ class MainWindow(QMainWindow):
             name="merge",
             target=run_pipeline,
             args=(summary.manifest, summary.paths),
-            kwargs={"skip_word_refresh": False, "progress": self._progress_callback()},
+            kwargs={
+                "skip_word_refresh": False,
+                "progress": self._progress_callback(),
+            },
             timeout_seconds=TASK_UI["merge"]["timeout"],
         )
         self._start_task(spec)
 
-    def _confirm_pre_publish_checks(self) -> bool:
+    def _revision_record_version(self) -> Optional[str]:
+        """``_revision_record.md`` 末行版本号（发布前检查用），取不到返回 None。
+
+        修订记录由作者手工维护，末行即本次要发布的版本；管线会在锁内把它同步
+        到 ``documentVersion``。这里只是让发布前检查按「即将发布的版本号」比对
+        冻结基线，避免清单里的旧版本号让检查结论对不上。只读且不写盘：文件
+        缺失/表里还没有数据行时返回 None，检查退回清单现有版本号。
+        """
+        summary = self._project_summary
+        if summary is None:
+            return None
+        try:
+            from doc_tool.application.content.revision_record import (
+                document_version_from_record,
+            )
+
+            md_path = (
+                summary.paths.resolve(summary.manifest.relative_content_root())
+                / "_revision_record.md"
+            )
+            return document_version_from_record(md_path)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _confirm_pre_publish_checks(self, proposed_version: Optional[str] = None) -> bool:
         """Show the required pre-publish checklist and return whether to continue.
 
         全量 lint 扫描在后台线程执行（大项目可能数秒）：旧实现在 UI 线程同步
@@ -962,7 +989,7 @@ class MainWindow(QMainWindow):
                 holder["checks"] = pre_publish_checks(
                     quality_errors=quality_errors,
                     unresolved_reviews=review_store.unresolved_count,
-                    current_version=manifest.documentVersion,
+                    current_version=proposed_version or manifest.documentVersion,
                     baseline_version=baseline_version,
                     pending_changes=pending_changes,
                 )

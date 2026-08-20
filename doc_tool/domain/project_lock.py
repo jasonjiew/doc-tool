@@ -21,13 +21,12 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from doc_tool.domain.errors import ProjectLockBusyError
 from doc_tool.domain.paths import ProjectPaths
@@ -68,7 +67,12 @@ class ProjectLock:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ProjectLock":
+    def from_dict(cls, data) -> "ProjectLock":
+        # 锁文件被外部写成非对象 JSON（[]/"str"/42）时拒绝而非 AttributeError：
+        # _read_lock 只捕获 TypeError/ValueError，裸 AttributeError 会让
+        # acquire/release/inspect/force_clean 全部崩溃。
+        if not isinstance(data, dict):
+            raise ValueError("锁文件内容不是对象")
         return cls(
             host=str(data.get("host", "")),
             pid=int(data.get("pid", 0)),
@@ -80,13 +84,24 @@ class ProjectLock:
     def is_alive(self) -> bool:
         """判断持有锁的进程是否仍在本机存活。
 
-        不同主机视为陈旧（无法跨主机验证 PID）。
+        不同主机视为陈旧（无法跨主机验证 PID）。能取得进程创建时间时再与
+        锁记录时间比对：持有进程退出后 PID 被系统回收给无关进程（PID 复用）
+        时，进程仍"存活"但创建时间晚于锁获取时间 → 视为陈旧，避免项目
+        永久 busy 只能手工清理。
         """
         if self.host != _current_host():
             return False
         if self.pid <= 0:
             return False
-        return _pid_alive(self.pid)
+        if not _pid_alive(self.pid):
+            return False
+        created = _pid_start_time(self.pid)
+        if created is None:
+            return True  # 无法取得创建时间时保守视为存活
+        locked_at = _parse_iso_time(self.start_time)
+        if locked_at is None:
+            return True
+        return created <= locked_at
 
 
 _CACHED_HOST: Optional[str] = None
@@ -101,10 +116,14 @@ def _current_host() -> str:
     global _CACHED_HOST
     if _CACHED_HOST is not None:
         return _CACHED_HOST
-    try:
-        _CACHED_HOST = socket.gethostname()
-    except OSError:
-        _CACHED_HOST = ""
+    _CACHED_HOST = os.environ.get("COMPUTERNAME", "")
+    if not _CACHED_HOST:
+        try:
+            import socket  # 延迟导入：仅 COMPUTERNAME 不可用时才加载可能被拦的 _socket
+
+            _CACHED_HOST = socket.gethostname()
+        except OSError:
+            _CACHED_HOST = ""
     return _CACHED_HOST
 
 
@@ -166,6 +185,74 @@ def _pid_alive_windows(pid: int) -> bool:
     except (OSError, AttributeError):
         # ctypes 不可用或调用失败 → 回退到保守策略：视为存活
         return True
+
+
+def _pid_start_time(pid: int) -> Optional[float]:
+    """返回进程创建时间（epoch 秒）；Windows 无法查询时返回 None。
+
+    供 ``is_alive`` 做 PID 复用防护：锁记录 startTime 之后创建的进程不是
+    当初持锁的进程。非 Windows 平台无可靠跨进程创建时间来源，返回 None。
+    """
+    if os.name != "nt" or pid <= 0:
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        )
+        kernel32.GetProcessTimes.restype = wintypes.BOOL
+        kernel32.GetProcessTimes.argtypes = (
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.FILETIME),
+            ctypes.POINTER(wintypes.FILETIME),
+            ctypes.POINTER(wintypes.FILETIME),
+            ctypes.POINTER(wintypes.FILETIME),
+        )
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+        )
+        if not handle:
+            return None
+        try:
+            creation = wintypes.FILETIME()
+            exit_t = wintypes.FILETIME()
+            kernel = wintypes.FILETIME()
+            user = wintypes.FILETIME()
+            ok = kernel32.GetProcessTimes(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(exit_t),
+                ctypes.byref(kernel),
+                ctypes.byref(user),
+            )
+            if not ok:
+                return None
+            # FILETIME（100ns 自 1601-01-01）→ epoch 秒。
+            ft = (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+            return ft / 10_000_000.0 - 11644473600.0
+        finally:
+            kernel32.CloseHandle(handle)
+    except (OSError, AttributeError):
+        return None
+
+
+def _parse_iso_time(value: str) -> Optional[float]:
+    """把锁记录的时间戳（ISO 8601）解析为 epoch 秒；无法解析返回 None。"""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).timestamp()
+    except (TypeError, ValueError):
+        return None
 
 
 def acquire_lock(
@@ -233,20 +320,27 @@ def release_lock(paths: ProjectPaths) -> bool:
 
     仅当锁文件的 PID 与当前进程一致时才删除，防止误删他人持有的锁。
     返回是否成功释放。
+
+    删除必须与 acquire/force_clean 一样在 ``_acquire_guard`` 内完成：
+    否则并发 acquire 写入锁文件时，release 可能读到半截内容（existing
+    None → 误删正在写入的锁，互斥失效，两个任务并发操作同一项目），
+    或读后删掉他人刚接管的新锁。
     """
     lock_file = paths.lock_file
-    if not lock_file.exists():
+    with _acquire_guard(lock_file):
+        if not lock_file.exists():
+            return False
+        existing = _read_lock(lock_file)
+        if existing is None:
+            # guard 已串行化写锁进程，此处读到损坏内容即文件确实损坏：
+            # 清理后由后续 acquire 重建。
+            _remove_lock(lock_file)
+            return True
+        if existing.pid == os.getpid() and existing.host == _current_host():
+            _remove_lock(lock_file)
+            return True
+        # 锁不属于当前进程，不删除
         return False
-    existing = _read_lock(lock_file)
-    if existing is None:
-        # 锁文件损坏，安全删除
-        _remove_lock(lock_file)
-        return True
-    if existing.pid == os.getpid() and existing.host == _current_host():
-        _remove_lock(lock_file)
-        return True
-    # 锁不属于当前进程，不删除
-    return False
 
 
 def inspect_lock(paths: ProjectPaths) -> Optional[ProjectLock]:

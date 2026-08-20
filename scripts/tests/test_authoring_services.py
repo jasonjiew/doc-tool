@@ -99,6 +99,25 @@ class SpellCheckTests(unittest.TestCase):
         hits = [hit.word for hit in checker.check(text)]
         self.assertEqual(hits, ["worl"])  # 只有围栏外的
 
+    def test_unclosed_fence_tail_still_checked(self):
+        # 围栏未闭合时不得静默跳过后续全部行：围栏后的内容补检。
+        checker = self._checker()
+        hits = [hit.word for hit in checker.check("hello\n```\nworl zzz\n")]
+        self.assertEqual(hits, ["worl", "zzz"])
+
+    def test_unclosed_tilde_fence_tail_checked_with_offsets(self):
+        checker = self._checker()
+        text = "hello\n~~~\nhelloo\n"
+        hits = checker.check(text)
+        self.assertEqual([h.word for h in hits], ["helloo"])
+        # 围栏起始行偏移 6（"hello\n"），"helloo" 相对围栏行偏移 4。
+        self.assertEqual(hits[0].start, 10)
+
+    def test_suggest_includes_user_words(self):
+        checker = self._checker()
+        checker.add_user_word("termstor")
+        self.assertIn("termstor", checker.suggest("termsto"))
+
     def test_mermaid_fence_skipped(self):
         checker = self._checker()
         text = "```mermaid\nflowchart TD\n  A[zzz] --> B[worl]\n```\nhello"
@@ -176,6 +195,13 @@ class UserDictionaryTests(unittest.TestCase):
         store = self._store()
         self.assertTrue(store.add("word"))
         self.assertFalse(store.add("WORD"))  # 归一化后重复
+
+    def test_save_atomic_no_tmp_left(self):
+        store = self._store()
+        store.add("alpha")
+        self.assertFalse(Path(self.path + ".tmp").exists())
+        reloaded = self._store()
+        self.assertTrue(reloaded.contains("alpha"))
 
     def test_invalid_word_rejected(self):
         store = self._store()
@@ -661,6 +687,74 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertIn("![图](images/mermaid_0001.png", converted.text)
         self.assertIn("flowchart TD\n  ???", converted.text)
 
+    def test_diamond_shape_polygon_is_symmetric(self):
+        """菱形节点四个顶点必须是 上/右/下/左 的对称坐标。
+
+        回归：旧实现把下顶点写成 (中心x, 中心x)、左顶点写成 (底y, 中心y)，
+        导致菱形右偏/下移（左顶点 x 被画成 y+h）。这里用固定几何直接断言。
+        """
+        from doc_tool.application.content.mermaid import _shape_svg
+
+        svg = _shape_svg("diamond", 30.0, 20.0, 160.0, 76.0)
+        self.assertIn(
+            '<polygon points="110.0,20.0 190.0,58.0 110.0,96.0 30.0,58.0"',
+            svg,
+        )
+        # 左顶点 x 必须回到节点左缘（30），不得被画成底 y（96）。
+        self.assertNotIn("110.0,20.0 190.0,58.0 110.0,110.0 96.0,58.0", svg)
+
+    def test_diamond_render_vertices_centered(self):
+        """整图渲染的菱形：上下顶点同 x、左右顶点同 y 且左 x 小于中心 x。"""
+        import re as _re
+        from doc_tool.application.content.mermaid import render
+
+        result = render(
+            "flowchart TD\n    A{是否继续?} --> B[结束]",
+            use_cli=False,
+        )
+        self.assertTrue(result.ok, result.error)
+        svg = result.svg.decode("utf-8")
+        match = _re.search(r'<polygon points="([^"]+)"', svg)
+        self.assertIsNotNone(match, "缺少菱形 polygon")
+        points = [tuple(float(v) for v in pair.split(",")) for pair in match.group(1).split(" ")]
+        self.assertEqual(len(points), 4)
+        top, right, bottom, left = points
+        self.assertAlmostEqual(top[0], bottom[0], places=3)  # 上下同 x
+        self.assertAlmostEqual(right[1], left[1], places=3)  # 左右同 y
+        self.assertLess(left[0], top[0])                     # 左顶点在中心左侧
+        self.assertGreater(bottom[1], right[1])              # 下顶点在右顶点之下
+    def test_reused_node_keeps_shape_and_label(self):
+        """后续边用裸 id 引用节点时，不得把先定义的菱形退化成方框。
+
+        回归：``B{校验通过?} --> C`` 之后的 ``B -->|是| C`` 会把 B 重新解析为
+        裸 id（shape=box、标签=id）并覆盖原定义，导致菱形变方框、标签丢失。
+        """
+        import re as _re
+        from doc_tool.application.content.mermaid import render
+
+        result = render(
+            "flowchart TD\n"
+            "    A{启动} --> B{校验通过?}\n"
+            "    B -->|是| C[继续]\n"
+            "    B -->|否| D[报错]\n"
+            "    D --> A",
+            use_cli=False,
+        )
+        self.assertTrue(result.ok, result.error)
+        svg = result.svg.decode("utf-8")
+        polygons = _re.findall(r'<polygon points="([^"]+)"', svg)
+        # A、B 两个菱形都必须保留为 polygon（此前全被退化成 rect）。
+        self.assertEqual(len(polygons), 2, svg)
+        for points in polygons:
+            pts = [tuple(float(v) for v in pair.split(",")) for pair in points.split(" ")]
+            self.assertEqual(len(pts), 4)
+            top, right, bottom, left = pts
+            self.assertAlmostEqual(top[0], bottom[0], places=3)
+            self.assertAlmostEqual(right[1], left[1], places=3)
+            self.assertLess(left[0], top[0])
+        # 标签不得被裸 id 覆盖。
+        self.assertIn("校验通过?", svg)
+        self.assertIn("启动", svg)
 
 if __name__ == "__main__":
     unittest.main()

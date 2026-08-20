@@ -18,7 +18,7 @@ from doc_tool.domain.content_index import REF_LINK, REF_SECTION, ContentIndex
 
 _ID_RE = re.compile(r"\b(?:RQ|REQ|DES|DS|IF|TC|AC)-\d+\b", re.I)
 _NUMBER_REF_RE = re.compile(
-    r"(?:\u89c1|\u53c2\u89c1|\u5bf9\u5e94|\u6765\u81ea)\s*"
+    r"(?:\u89c1|\u53c2\u89c1|\u8be6\u89c1|\u53c2\u8003|\u5bf9\u5e94|\u6765\u81ea)\s*"
     r"(?:\u9700\u6c42|\u8bbe\u8ba1|\u63a5\u53e3|\u9a8c\u6536|\u7ae0\u8282)?\s*"
     r"(\d+(?:\.\d+)+)"
 )
@@ -56,13 +56,25 @@ class TraceMatrix:
 
 def _classify(text: str, document_type: str) -> str:
     lowered = text.lower()
+    # 文档类型优先：requirement 文档内的标题一律算需求；design 文档内再按
+    # 关键词细分接口/验收子项。原实现关键词优先，design 文档标题只要带
+    # 「需求」字样（如「需求分析」）就会被误归 requirement，矩阵错位。
+    if document_type == "requirement":
+        return "requirement"
+    if document_type == "design":
+        if "\u9a8c\u6536" in text or lowered.startswith(("tc-", "ac-")):
+            return "acceptance"
+        if "\u63a5\u53e3" in text or lowered.startswith("if-"):
+            return "interface"
+        return "design"
+    # 未知/通用文档类型：退回标题关键词启发式。
     if "\u9a8c\u6536" in text or lowered.startswith(("tc-", "ac-")):
         return "acceptance"
     if "\u63a5\u53e3" in text or lowered.startswith("if-"):
         return "interface"
-    if "\u9700\u6c42" in text or lowered.startswith(("rq-", "req-")) or document_type == "requirement":
+    if "\u9700\u6c42" in text or lowered.startswith(("rq-", "req-")):
         return "requirement"
-    if "\u8bbe\u8ba1" in text or lowered.startswith(("des-", "ds-")) or document_type == "design":
+    if "\u8bbe\u8ba1" in text or lowered.startswith(("des-", "ds-")):
         return "design"
     return "unclassified"
 
@@ -79,9 +91,19 @@ class TraceabilityService:
         for rel_path in self.index.all_files():
             entry = self.index.files[rel_path]
             lines = self.index.lines.get(rel_path, [])
-            for heading in self.index.headings.get(rel_path, []):
+            headings_in_file = self.index.headings.get(rel_path, [])
+            for heading in headings_in_file:
                 start = max(0, heading.line_no - 1)
-                context = "\n".join(lines[start: heading.line_no + 4])
+                # 引用窗口（标题行起 4 行内）不得跨越到下一个标题：下一标题的
+                # 编号/引用属于其自身条目，混入会让上游条目 references 误增。
+                window_end = heading.line_no + 4
+                next_line = min(
+                    (h.line_no for h in headings_in_file if h.line_no > heading.line_no),
+                    default=None,
+                )
+                if next_line is not None:
+                    window_end = min(window_end, next_line - 1)
+                context = "\n".join(lines[start: window_end])
                 # 条目编号优先取标题自身的前置编号（如 1.1）；标题无编号时才
                 # 看标题文本内的 RQ-102 形式。正文里的 RQ/编号引用只进 references，
                 # 不能抢占条目自己的编号，否则「1.1 需求概述」会被误注册为正文

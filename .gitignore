@@ -37,6 +37,9 @@ env/
 *.pfx
 *.key
 secrets.yaml
+# 代码签名证书产物（自签名测试证书/私钥备份，禁止入库）
+scripts/cert-out/
+*.cer
 
 # --- 历史二进制 BAT（含 NUL 字节，仅作留存，禁止作为入口） ---
 migration/legacy/binary-bat/*.bat

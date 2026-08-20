@@ -32,7 +32,6 @@ import yaml
 from lxml import etree
 
 from doc_tool.domain.ooxml import (
-    OOXMLSecurityError,
     parse_xml_safe,
     read_docx_package,
 )

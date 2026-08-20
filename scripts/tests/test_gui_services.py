@@ -984,6 +984,81 @@ class MainWindowInteractionTests(unittest.TestCase):
         window._handle_pipeline_result.assert_not_called()
         window.close()
 
+    def _merge_patches(self, MainWindow):
+        """把 _on_merge 的外部依赖（Word/内核/前置检查）全部替换掉。"""
+        from unittest.mock import patch
+
+        return [
+            patch(
+                "doc_tool.application.word_check.check_word_available",
+                return_value=SimpleNamespace(available=True, reasons=[]),
+            ),
+            patch("doc_tool.adapters.kernel.ensure_kernel_importable"),
+            patch.object(MainWindow, "_refresh_interaction_state"),
+            patch.object(MainWindow, "_confirm_pre_publish_checks", return_value=True),
+            patch.object(MainWindow, "_start_task"),
+        ]
+
+    def _run_merge(self, last_version="V3.8"):
+        """构造窗口跑一次 _on_merge，返回（_start_task mock, 前置检查 mock）。
+
+        合并不再弹修订记录窗：项目替身指向临时目录里真实的
+        ``_revision_record.md``，版本号由该文件末行决定（``last_version`` 为
+        空则不创建该文件，模拟旧项目/无修订表）。
+        """
+        import contextlib
+
+        from doc_tool.domain.paths import ProjectPaths
+        from doc_tool.ui.main_window import MainWindow
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-merge-"))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        type_root = root / "content" / "requirement"
+        type_root.mkdir(parents=True)
+        if last_version:
+            (type_root / "_revision_record.md").write_text(
+                "| 版本 | 修改摘要 | 修改时间 | 修改人 |\n"
+                "|------|----------|----------|--------|\n"
+                "| {0} | 上次合并 | 2026-07-01 | 王杰 |\n".format(last_version),
+                encoding="utf-8",
+            )
+        window = MainWindow()
+        window._project_summary = SimpleNamespace(
+            manifest=SimpleNamespace(
+                documentVersion="V3.7",
+                publishNotes="",
+                relative_content_root=lambda: "content/requirement",
+            ),
+            paths=ProjectPaths(root),
+            is_writable=True,
+        )
+        with contextlib.ExitStack() as stack:
+            mocks = [
+                stack.enter_context(patcher)
+                for patcher in self._merge_patches(MainWindow)
+            ]
+            window._on_merge()
+        window.close()
+        return mocks[-1], mocks[-2]
+
+    def test_merge_passes_no_revision_arguments_to_pipeline(self):
+        """修订记录由 _revision_record.md 一处维护：管线不再收摘要/版本号参数。"""
+        start, checks = self._run_merge()
+        spec = start.call_args.args[0]
+        self.assertEqual(spec.name, "merge")
+        self.assertFalse(spec.kwargs["skip_word_refresh"])
+        self.assertEqual(
+            sorted(spec.kwargs), ["progress", "skip_word_refresh"]
+        )
+        # 前置检查按修订记录末行版本号提示，而非清单里的旧版本号。
+        checks.assert_called_once_with("V3.8")
+
+    def test_merge_without_revision_record_falls_back_to_manifest_version(self):
+        """没有修订记录文件时前置检查退回清单版本号（传 None），合并照常启动。"""
+        start, checks = self._run_merge(last_version="")
+        start.assert_called_once()
+        checks.assert_called_once_with(None)
+
     def test_project_switch_resets_persistent_result(self):
         from unittest.mock import Mock, patch
 
@@ -1778,6 +1853,29 @@ class ChangesPanelTests(unittest.TestCase):
         self.assertEqual(restored, [True])
         panel.close()
 
+    def test_binary_item_shows_placeholder_without_decoding(self):
+        """选中非文本改动（content 内图片）只提示，不按 UTF-8 读文件。
+
+        Git 模式会把 ``content/**`` 下的图片一起列进改动，此前面板会直接
+        ``read_text`` 触发 UnicodeDecodeError。
+        """
+        from doc_tool.application.content.changes import ChangeItem
+
+        asset_rel = "requirement/images/图1.png"
+        asset_path = self.content_root / asset_rel
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        asset_path.write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe\x00binary")
+
+        panel = self._panel()
+        panel.set_items([ChangeItem(asset_rel, "added", asset_rel)])
+        panel._list.setCurrentRow(0)
+        text = panel._diff_view.toPlainText()
+        self.assertIn("非文本文件", text)
+        self.assertIn("新增", text)
+        # 未读取文件内容：二进制字节不会出现在 diff 视图里。
+        self.assertNotIn("PNG", text)
+        panel.close()
+
 
 class TabsHostDirtyTests(unittest.TestCase):
     """脏标签 ● 提示 + 关闭脏 tab 确认（离屏渲染）。"""
@@ -2089,6 +2187,26 @@ class EditorAuthoringWorkbenchTests(unittest.TestCase):
         self.assertEqual(panel._editor.textCursor().selectedText(), "foo")
         panel.close()
 
+    def test_snippet_tab_locates_next_placeholder_after_edit_shift(self):
+        """在占位符内输入与默认值不同长度的文本后按 Tab：必须仍定位到下一个
+        占位符（旧实现沿用插入时区间，编辑后跳转到错误位置甚至空白）。"""
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from doc_tool.application.content.snippets import Snippet
+
+        panel = self._panel()
+        panel._editor.moveCursor(panel._editor.textCursor().MoveOperation.End)
+        panel.insert_snippet(Snippet("demo", "", "A ${2:乙} B ${1:甲} C"))
+        self.assertEqual(panel._editor.textCursor().selectedText(), "甲")
+        # 在第一个占位符处输入比默认值更长的文本（区间偏移）
+        panel._editor.textCursor().insertText("甲乙丙")
+        QTest.keyClick(panel._editor, Qt.Key.Key_Tab)
+        self.assertEqual(
+            panel._editor.textCursor().selectedText(), "乙",
+            "编辑使区间失效后 Tab 仍须按默认文本定位到下一个占位符",
+        )
+        panel.close()
+
     def test_snippet_tab_follows_placeholder_number_order(self):
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
@@ -2193,6 +2311,103 @@ class EditorAuthoringWorkbenchTests(unittest.TestCase):
         self.assertTrue(dialog.render_result.ok)
         self.assertFalse(dialog.preview.pixmap().isNull())
         dialog.close()
+
+    def test_save_refuses_overwrite_when_file_modified_externally(self):
+        """磁盘文件被外部修改后保存必须经确认：拒绝时不写入，避免 lost update。"""
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        panel = self._panel()
+        target = self.content / self.rel
+        # 模拟外部修改：写盘并让 mtime 前进（编辑器 _mtime 为加载时基准）
+        target.write_text("# 标题\n外部修改内容\n", encoding="utf-8")
+        import os as _os
+
+        st = target.stat()
+        _os.utime(target, (st.st_atime + 10, st.st_mtime + 10))
+        # 编辑器变为脏
+        panel._editor.setPlainText("# 标题\n编辑器修改\n")
+        self.assertTrue(panel.is_dirty())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No):
+            saved = panel.save()
+        self.assertFalse(saved, "拒绝覆盖外部修改时必须返回未保存")
+        self.assertIn("外部修改内容", target.read_text(encoding="utf-8"))
+        panel.close()
+
+    def test_external_change_prompt_not_repeated_for_same_mtime(self):
+        """用户拒绝重载后，同一外部变更（同 mtime）不再重复弹确认框；
+        保存保护仍独立生效（save 的 mtime 校验不受影响）。"""
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        panel = self._panel()
+        target = self.content / self.rel
+        target.write_text("# 标题\n外部修改内容\n", encoding="utf-8")
+        import os as _os
+
+        st = target.stat()
+        _os.utime(target, (st.st_atime + 10, st.st_mtime + 10))
+        panel._editor.setPlainText("# 标题\n编辑器修改\n")
+        with patch.object(
+            QMessageBox, "question", return_value=QMessageBox.StandardButton.No
+        ) as question:
+            self.assertFalse(panel.check_external_change())
+            self.assertFalse(panel.check_external_change())  # 再次切换标签
+        # 只提示一次（第一次弹框，第二次命中 dismissed 标记直接返回）
+        self.assertEqual(question.call_count, 1)
+        # 保存保护仍生效：save() 的 mtime 校验独立于 dismissed 标记
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No):
+            self.assertFalse(panel.save())
+        self.assertIn("外部修改内容", target.read_text(encoding="utf-8"))
+        panel.close()
+
+    def test_save_proceeds_after_confirmed_overwrite(self):
+        """用户确认后保存覆盖外部修改（正常写盘路径）。"""
+        from unittest.mock import patch
+
+        from PySide6.QtWidgets import QMessageBox
+
+        panel = self._panel()
+        target = self.content / self.rel
+        target.write_text("# 标题\n外部修改内容\n", encoding="utf-8")
+        import os as _os
+
+        st = target.stat()
+        _os.utime(target, (st.st_atime + 10, st.st_mtime + 10))
+        panel._editor.setPlainText("# 标题\n编辑器修改\n")
+        with patch.object(
+            QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
+        ):
+            saved = panel.save()
+        self.assertTrue(saved)
+        self.assertIn("编辑器修改", target.read_text(encoding="utf-8"))
+        panel.close()
+
+
+class LogStreamReplayTests(unittest.TestCase):
+    """任务详情日志折叠/展开回放。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def test_lines_appended_while_collapsed_replayed_on_expand(self):
+        """折叠期间到达的日志行在展开后必须回放到视图，不得丢失。"""
+        from doc_tool.ui.work_detail_pane import LogStream
+
+        stream = LogStream()
+        stream.append_line("第一行")
+        stream.set_expanded(False)  # 折叠
+        stream.append_line("第二行")  # 折叠期间到达：只进 _lines
+        self.assertEqual(stream.pending_unread, 1)
+        stream.set_expanded(True)  # 展开：必须回放
+        text = stream._view.toPlainText()
+        self.assertIn("第一行", text)
+        self.assertIn("第二行", text)
+        self.assertEqual(stream.pending_unread, 0)
+        stream.close()
 
 
 if __name__ == "__main__":

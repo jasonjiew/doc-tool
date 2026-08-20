@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -144,6 +145,85 @@ class MachineCliTests(unittest.TestCase):
                 code = main(["renumber", "--project", str(root), "--output", "json"])
             self.assertEqual(code, 0)
             self.assertEqual(json.loads(out.getvalue())["results"][0]["data"]["renamed"], 0)
+
+    def test_renumber_dir_no_match_fails(self):
+        from doc_tool.domain.manifest import ProjectManifest
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            content = root / "content" / "requirement"
+            content.mkdir(parents=True)
+            (content / "1.1 a.md").write_text("# 1.1 a\n", encoding="utf-8")
+            manifest = ProjectManifest(
+                documentType="requirement", documentNo="REQ-1", documentName="测试",
+                documentVersion="1.0", sourceSha256="x",
+                paths={"contentRoot": "content/requirement"},
+            )
+            manifest.save(root, backup=False)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = main(
+                    ["renumber", "--project", str(root), "--dir", "不存在的目录", "--output", "json"]
+                )
+            self.assertEqual(code, 1)
+            data = json.loads(out.getvalue())
+            self.assertFalse(data["results"][0]["success"])
+            self.assertEqual(data["results"][0]["errorCode"], "E2003")
+
+    def test_import_name_with_separator_rejected(self):
+        # 项目名含路径分隔符/.. 时在进入导入流程前拒绝，防止逃逸 target_dir。
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = main(["import", "--docx", "x.docx", "--name", "a/b", "--output", "json"])
+        self.assertEqual(code, 1)
+        data = json.loads(out.getvalue())
+        self.assertEqual(data["results"][0]["errorCode"], "E5001")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = main(["import", "--docx", "x.docx", "--name", "..", "--output", "json"])
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out.getvalue())["results"][0]["errorCode"], "E5001")
+
+    def _run_build(self, extra_args):
+        """跑一次 `build --project`，返回传给 run_pipeline 的关键字参数。"""
+        from unittest.mock import Mock, patch
+
+        import doc_tool.cli as cli
+
+        pipeline_result = types.SimpleNamespace(events=[], success=True)
+        run_pipeline = Mock(return_value=pipeline_result)
+        manifest = Mock()
+        manifest.resolve_paths.return_value = object()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("doc_tool.adapters.kernel.ensure_kernel_importable"), \
+                 patch("doc_tool.application.pipeline.run_pipeline", run_pipeline), \
+                 patch("doc_tool.domain.manifest.ProjectManifest.load", return_value=manifest):
+                code = cli.main(["build", "--project", tmp] + list(extra_args))
+        self.assertEqual(code, 0)
+        run_pipeline.assert_called_once()
+        return run_pipeline.call_args.kwargs
+
+    def test_build_passes_no_revision_arguments(self):
+        """修订记录只由 _revision_record.md 维护：build 不再有 --revision-* 参数。"""
+        kwargs = self._run_build([])
+        self.assertEqual(sorted(kwargs), ["skip_word_refresh"])
+        self.assertFalse(kwargs["skip_word_refresh"])
+
+    def test_build_rejects_removed_revision_flags(self):
+        """旧脚本传 --revision-summary 时以用法错误退出，不静默忽略。"""
+        from doc_tool.cli import build_parser
+
+        parser = build_parser()
+        for flag in (
+            "--revision-version",
+            "--revision-summary",
+            "--revision-summary-file",
+            "--revision-author",
+        ):
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    parser.parse_args(["build", "--project", ".", flag, "x"])
+            self.assertEqual(raised.exception.code, 2)
 
     def test_import_parser_rejects_legacy_document_type(self):
         """任务 4.4/4.7：公共 CLI import 只接受 general，旧类型参数被拒绝。"""

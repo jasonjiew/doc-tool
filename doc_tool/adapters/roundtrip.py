@@ -5,7 +5,8 @@
 产物与源 Word 做业务元素对比，复用 ``validate_docx.body_events``（正文业务事件
 提取）与 ``compare_baseline_events``（顺序/文本基线比较），并按损失类型分级：
 
-- BLOCK：业务元素数量不一致、正文段落丢失/变化、标题层级或文本变化、图片缺失。
+- BLOCK：业务元素数量不一致、正文段落丢失/变化、标题层级或文本变化、图片缺失、
+  元素类型变化及未识别的差异格式（fail-closed）。
 - WARN：仅表示性差异（如表格文本矩阵差异），默认放行。
 
 本模块不直接构建文档；试构建由 ``import_project`` 在往返阶段前完成。
@@ -130,7 +131,9 @@ def _classify_error(
         return RoundtripIssue(SEVERITY_BLOCK, error, "#count")
     match = re.match(r"^#(\d+)\s+基线内容/位置不一致:\s*(.+)$", error)
     if not match:
-        return RoundtripIssue(SEVERITY_WARN, error, "#?")
+        # 未识别的差异格式一律按内容丢失 BLOCK（fail-closed）：避免未来
+        # compare_baseline_events 新增差异格式时被默认 WARN 静默放行。
+        return RoundtripIssue(SEVERITY_BLOCK, error, "#?")
     index = int(match.group(1))
     detail = match.group(2)
     left_kind = source_events[index].kind
@@ -155,7 +158,11 @@ def _classify_error(
                     position,
                 )
         return RoundtripIssue(SEVERITY_BLOCK, "正文段落丢失或文本变化：{0}".format(detail), position)
-    return RoundtripIssue(SEVERITY_WARN, "表格或元素表示差异：{0}".format(detail), position)
+    if left_kind == right_kind:
+        # 同 kind（T/C 表格）仅是文本矩阵表示差异，降 WARN 放行；
+        # 元素类型不一致（如 T 变 P）按内容丢失 BLOCK。
+        return RoundtripIssue(SEVERITY_WARN, "表格或元素表示差异：{0}".format(detail), position)
+    return RoundtripIssue(SEVERITY_BLOCK, "元素类型变化：{0}".format(detail), position)
 
 
 def _event_text(event) -> str:
@@ -164,7 +171,7 @@ def _event_text(event) -> str:
     return str(value[0]) if event.kind == "L" and isinstance(value, tuple) and value else str(value)
 
 
-_MANUAL_NUM_RE = re.compile(r"^\d{1,3}[.、．]\s*")
+_MANUAL_NUM_RE = re.compile(r"^\d+[.、．]\s*")
 
 
 def _without_manual_number(text: str) -> str:

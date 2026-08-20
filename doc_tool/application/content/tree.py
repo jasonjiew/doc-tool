@@ -63,10 +63,14 @@ def build_tree(
     items: List[TreeItem] = []
     seen_dir_ids: set = set()
 
-    # 按文档类型分组，保持稳定顺序。
+    # 按文档类型分组，保持稳定顺序。布局 B（contentRoot 直挂文件、无类型
+    # 目录）时首段是文件名而非类型：全部归入单一虚拟组，避免每个根级文件
+    # 自成一组 → 生成与文件节点 node_id 重复的"类型"节点，损坏树结构。
+    known_types = {"requirement", "design", "general"}
     by_type: Dict[str, List[str]] = {}
     for rel in files:
-        document_type = rel.split("/", 1)[0]
+        first = rel.split("/", 1)[0]
+        document_type = first if first in known_types else "__root__"
         by_type.setdefault(document_type, []).append(rel)
 
     # 单一类型项目隐藏类型维度：不创建类型根节点，章节目录直接作为顶层。
@@ -410,7 +414,8 @@ def renumber_plan_after_delete(
             + " "
             + strip_number_prefix(Path(rest).stem)
         )
-        renames.append((rel, prefix + new_stem + ".md"))
+        # 保留原扩展名：.markdown 等合法后缀不得被静默改成 .md。
+        renames.append((rel, prefix + new_stem + Path(rel).suffix))
     renames.sort(key=lambda pair: _numeric_prefix(Path(pair[1]).stem))
     return renames
 
@@ -443,6 +448,17 @@ def renumber_plan(dir_rel_path: str, files: Sequence[str]) -> List[Tuple[str, st
         node
         for node in children
         if _numeric_prefix(Path(node).name) is not None
+    ]
+    if not numbered:
+        return []
+    # 编号归属校验：只重排「编号以父编号为前缀」的直接子节点（与
+    # renumber_plan_after_delete 一致）。否则目录下嵌套过深（如 4.7.1.1）
+    # 或错位的编号（如 5.3 stray）会被静默改写为父分支编号，截断/破坏
+    # 编号层级；它们保持原位，不占用序号。
+    numbered = [
+        node
+        for node in numbered
+        if _numeric_prefix(Path(node).name)[: len(parent_number)] == parent_number
     ]
     if not numbered:
         return []
@@ -519,4 +535,19 @@ def next_chapter_rel_path(dir_rel_path: str, files: List[str], title: str) -> st
             else ""
         )
     head = number + " " if number else ""
-    return prefix + head + title + ".md"
+    candidate = prefix + head + title + ".md"
+    # 目标已存在（编号重复/标题冲突的脏数据）时递增数字段，避免覆盖现有文件。
+    step = 0
+    while candidate in files and step < 1000:
+        step += 1
+        if max_num is not None:
+            bumped = list(max_num)
+            bumped[-1] += step
+            number = ".".join(str(part) for part in bumped)
+        elif dir_num is not None:
+            number = ".".join(str(part) for part in dir_num) + "." + str(step + 1)
+        else:
+            number = str(step)
+        head = number + " " if number else ""
+        candidate = prefix + head + title + ".md"
+    return candidate

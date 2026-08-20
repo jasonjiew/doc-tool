@@ -258,9 +258,25 @@ class ReimportService:
         if getattr(self, "_source_replaced", False):
             try:
                 backup = self.paths.state_dir / "reimport_last_source.docx"
+                source = self.paths.resolve(self.manifest.relative_source_docx())
                 if backup.is_file():
-                    shutil.copy2(backup, self.paths.resolve(self.manifest.relative_source_docx()))
-                self.manifest.sourceSha256 = getattr(self, "_rollback_sha", self.manifest.sourceSha256)
+                    shutil.copy2(backup, source)
+                    self.manifest.sourceSha256 = getattr(
+                        self, "_rollback_sha", self.manifest.sourceSha256
+                    )
+                elif not getattr(self, "_source_existed", True):
+                    # 源原本不存在且无备份（从未复制成功）：删除新源，
+                    # 恢复「无源文档」原状，避免磁盘新 DOCX + 清单旧指纹
+                    # 的永久不一致（source_changed 恒为真）。
+                    source.unlink(missing_ok=True)
+                    self.manifest.sourceSha256 = getattr(
+                        self, "_rollback_sha", self.manifest.sourceSha256
+                    )
+                else:
+                    # 源原本存在但备份缺失（复制失败）：无法恢复旧内容，
+                    # 至少把指纹更新为新文件真实哈希；保存失败时保持现状。
+                    if source.is_file():
+                        self.manifest.sourceSha256 = file_sha256(source)
                 self.manifest.save(self.paths.root, backup=True)
             except Exception:
                 pass
@@ -287,6 +303,8 @@ class ReimportService:
         self._rollback_sha = old_sha
         self._source_replaced = False
         source_path = self.paths.resolve(self.manifest.relative_source_docx())
+        source_existed = source_path.is_file()
+        self._source_existed = source_existed
         source_backup = self.paths.state_dir / "reimport_last_source.docx"
         try:
             if extractor is None:
@@ -344,6 +362,7 @@ class ReimportService:
                 "touched": [list(item) for item in touched],
                 "oldSourceSha256": old_sha,
                 "sourceBackup": str(source_backup),
+                "sourceExisted": source_existed,
             }, ensure_ascii=False, indent=2))
             if source_path.is_file():
                 shutil.copy2(source_path, source_backup)
@@ -365,6 +384,12 @@ class ReimportService:
             return ReimportResult(False, error_code="E_REIMPORT", message=str(exc))
         finally:
             shutil.rmtree(staging, ignore_errors=True)
+            # 源替换临时文件在 os.replace/shutil.move 双失败时残留：
+            # 一律清理，避免 .docx.tmp 遗留在项目 original/ 目录。
+            try:
+                source_path.with_suffix(".docx.tmp").unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def rollback_last(self) -> List[str]:
         payload = json.loads(self.transaction_file.read_text(encoding="utf-8"))
@@ -372,8 +397,12 @@ class ReimportService:
         touched = [tuple(item) for item in payload.get("touched", [])]
         failures = writer.rollback_keys(touched)
         backup = Path(str(payload.get("sourceBackup", "")))
+        source = self.paths.resolve(self.manifest.relative_source_docx())
         if backup.is_file():
-            shutil.copy2(backup, self.paths.resolve(self.manifest.relative_source_docx()))
+            shutil.copy2(backup, source)
+        elif not payload.get("sourceExisted", True):
+            # 源原本不存在且无备份：删除新源，恢复「无源文档」原状。
+            source.unlink(missing_ok=True)
         self.manifest.sourceSha256 = str(payload.get("oldSourceSha256", ""))
         self.manifest.save(self.paths.root, backup=True)
         # 回滚后重写基线与索引/追踪，保证下次重导入对比口径与回滚后的内容一致。

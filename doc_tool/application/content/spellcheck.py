@@ -52,7 +52,8 @@ class SpellChecker:
     ) -> None:
         self._builtin: Set[str] = set(builtin_words or ())
         self._user: Set[str] = set(user_words or ())
-        self._prefix_index: Dict[str, List[str]] = self._build_index(self._builtin)
+        self._prefix_index: Dict[str, List[str]] = self._build_index(self._builtin | self._user)
+        self._index_dirty = False
 
     # --- 词典 ---
 
@@ -65,7 +66,9 @@ class SpellChecker:
         normalized = _normalize(word.strip())
         if not normalized or not _VALID_DICT_WORD_RE.match(normalized):
             return
-        self._user.add(normalized)
+        if normalized not in self._user:
+            self._user.add(normalized)
+            self._index_dirty = True
 
     def contains(self, word: str) -> bool:
         return _normalize(word) in self._builtin or _normalize(word) in self._user
@@ -77,16 +80,22 @@ class SpellChecker:
 
         跳过 ```/~~~ 围栏代码块。供全文档检查与单测使用；编辑器按可见行增量
         检查使用 ``check_range``。
+
+        围栏未闭合（文档尾部仍在代码块内）时不静默跳过：围栏起始行之后的
+        内容按普通文本补检，宁可多报也不漏掉真实拼写错误。
         """
         misspellings: List[Misspelling] = []
         in_code = False
         offset = 0
+        fence_start_offset = 0
         # 用 keepends=True 按真实行长（含 \n 或 \r\n 分隔符）累计偏移：
         # ``splitlines()`` 会剥掉 \r，CRLF 文件从第二行起 start/end 整体偏小，
         # 编辑器高亮/定位会错位。
         for raw_line in text.splitlines(keepends=True):
             line = raw_line.rstrip("\r\n")
             if _FENCE_RE.match(line.strip()):
+                if not in_code:
+                    fence_start_offset = offset
                 in_code = not in_code
                 offset += len(raw_line)
                 continue
@@ -102,6 +111,19 @@ class SpellChecker:
                             )
                         )
             offset += len(raw_line)
+        if in_code:
+            # 围栏未闭合：围栏起始行之后的内容补检（围栏行本身无 token）。
+            tail = text[fence_start_offset:]
+            for match in _TOKEN_RE.finditer(tail):
+                token = match.group(0)
+                if not self.contains(token):
+                    misspellings.append(
+                        Misspelling(
+                            word=token,
+                            start=fence_start_offset + match.start(),
+                            end=fence_start_offset + match.end(),
+                        )
+                    )
         return misspellings
 
     def check_line(self, line: str, base_offset: int = 0) -> List[Misspelling]:
@@ -125,6 +147,10 @@ class SpellChecker:
         normalized = _normalize(word)
         if not normalized:
             return []
+        if self._index_dirty:
+            # 用户词典新增词后重建前缀索引，使建议候选包含用户词。
+            self._prefix_index = self._build_index(self._builtin | self._user)
+            self._index_dirty = False
         first = normalized[0]
         if first not in self._prefix_index:
             return []
@@ -252,18 +278,25 @@ class UserDictionary:
             pass
 
     def save(self) -> None:
-        """写回磁盘（排序稳定；写入失败静默，不影响编辑）。"""
+        """写回磁盘（排序稳定；先写临时文件再原子替换，避免半写文件；
+        写入失败静默，不影响编辑）。"""
         import os
 
         directory = os.path.dirname(self._path)
         if directory:
             os.makedirs(directory, exist_ok=True)
+        temporary = self._path + ".tmp"
         try:
-            with open(self._path, "w", encoding="utf-8") as handle:
+            with open(temporary, "w", encoding="utf-8") as handle:
                 for word in sorted(self._words):
                     handle.write(word + "\n")
+            os.replace(temporary, self._path)
         except OSError:
-            pass
+            try:
+                if os.path.exists(temporary):
+                    os.remove(temporary)
+            except OSError:
+                pass
 
     def contains(self, word: str) -> bool:
         return _normalize(word) in self._words

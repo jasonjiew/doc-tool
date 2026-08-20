@@ -22,7 +22,7 @@ class IssueNormalizationTests(unittest.TestCase):
             SimpleNamespace(stage="validate_pre", status="failed", detail="未知", error_code="E7777", metrics={}),
         ]
         records = issues_from_pipeline(events, "requirement")
-        self.assertEqual([r.severity for r in records], ["error", "info"])
+        self.assertEqual([r.severity for r in records], ["error", "warning"])
         self.assertEqual(records[0].suggested_action, "请查看日志中的阶段和错误详情。")
         self.assertEqual(records[1].error_code, "E7777")
 
@@ -55,6 +55,35 @@ class IssueNormalizationTests(unittest.TestCase):
             records[0].rel_path, "content/requirement/第1章 概述/_index.md"
         )
         self.assertEqual(records[0].line_no, 3)
+
+    def test_validation_report_check_name_not_merged_into_path(self):
+        # validate_docx 生产报告形如 ``[FAIL] {check.name}: {detail}``；
+        # 检查名不得并入 rel_path（旧正则把 ``章节编号错误:`` 一起吞进路径）。
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "requirement-validation.md"
+            report.write_text(
+                "- [FAIL] 章节编号错误: chapters/3.7.md:12 编号不连续\n"
+                "- [FAIL] 内部标题层级跳跃: content/requirement/第1章 概述/_index.md:3\n",
+                encoding="utf-8",
+            )
+            records = issues_from_validation_report(report, "requirement")
+        self.assertEqual(len(records), 2)
+        self.assertEqual((records[0].rel_path, records[0].line_no), ("chapters/3.7.md", 12))
+        self.assertEqual(
+            records[1].rel_path, "content/requirement/第1章 概述/_index.md"
+        )
+        self.assertEqual(records[1].line_no, 3)
+
+    def test_pipeline_line_zero_is_kept(self):
+        # 行号显式 0 时不得被 ``or`` 吞成 None。
+        events = [
+            SimpleNamespace(stage="build", status="failed", detail="x", error_code="E2001",
+                            metrics={"line": 0, "lineNo": 7}),
+            SimpleNamespace(stage="build", status="failed", detail="y", error_code="E2001",
+                            metrics={"lineNo": 0}),
+        ]
+        records = issues_from_pipeline(events, "requirement")
+        self.assertEqual([r.line_no for r in records], [0, 0])
 
     def test_lint_mapping_filter_and_summary(self):
         raw = [

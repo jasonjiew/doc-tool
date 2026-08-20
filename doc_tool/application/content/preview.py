@@ -179,9 +179,23 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
 
         escaped = _IMAGE_INLINE_RE.sub(image, escaped)
         escaped = _LINK_INLINE_RE.sub(link, escaped)
-        escaped = _CODE_INLINE_RE.sub(r"<code>\1</code>", escaped)
+        # 代码跨度先占位再还原：粗体/斜体正则会处理 <code> 内的 ``**x**``
+        # 文本，把代码内容渲染成 `<code><b>x</b></code>`，与源码不符。
+        code_spans: List[str] = []
+
+        def capture_code(match: re.Match) -> str:
+            code_spans.append(match.group(1))
+            return "\x00DOC_TOOL_CODE_{0}\x00".format(len(code_spans) - 1)
+
+        escaped = _CODE_INLINE_RE.sub(capture_code, escaped)
         escaped = _BOLD_INLINE_RE.sub(r"<b>\1</b>", escaped)
-        return _EMPHASIS_INLINE_RE.sub(r"<i>\1</i>", escaped)
+        escaped = _EMPHASIS_INLINE_RE.sub(r"<i>\1</i>", escaped)
+        for index, span in enumerate(code_spans):
+            escaped = escaped.replace(
+                "\x00DOC_TOOL_CODE_{0}\x00".format(index),
+                "<code>{0}</code>".format(span),
+            )
+        return escaped
 
     def flush_table() -> None:
         nonlocal table_rows

@@ -42,7 +42,6 @@ from doc_tool.application.content.vcs_changes import (
 from doc_tool.application.content.unsaved import (
     UnsavedChoice,
     UnsavedResolver,
-    collect_unsaved,
 )
 from doc_tool.application.content.workspace_state import (
     SessionState,
@@ -121,6 +120,7 @@ class ContentWorkspace(QWidget):
             self._project_root, self._content_root
         )
         self._change_source = "local"
+        self._change_source_note = ""
         self._assets_root = Path(assets_root) if assets_root else None
         self._writable = writable
         self._on_status = on_status
@@ -313,6 +313,7 @@ class ContentWorkspace(QWidget):
             self._writer,
             on_applied=self._after_write,
             on_renamed=self._on_file_renamed,
+            on_confirm_dirty=self._confirm_rename_dirty,
             writable=self._writable,
         )
         refactor.set_files(self._index.all_files())
@@ -498,12 +499,15 @@ class ContentWorkspace(QWidget):
                 report, self._index.all_files()
             )
             self._change_source = report.source
+            self._change_source_note = ""
             self._vcs_managed = True
         else:
             status = self._snapshot.diff(
                 self._content_root, self._index.all_files()
             )
             self._change_source = "local"
+            # 为什么没用版本控制判断（未纳入 git / git 不可用…）：面板要说明。
+            self._change_source_note = report.error or ""
             self._vcs_managed = False
         self._writer.set_backup_enabled(not self._vcs_managed)
         status = overlay_rename_status(status, self._writer.manifest.entries)
@@ -616,7 +620,7 @@ class ContentWorkspace(QWidget):
             return
         if status is None:
             status = self._status_map()
-        panel.set_source(self._change_source)
+        panel.set_source(self._change_source, self._change_source_note)
         panel.set_items(self._change_items(status))
 
     def _after_restore(self) -> None:
@@ -746,8 +750,6 @@ class ContentWorkspace(QWidget):
         避免旧路径标签后续保存时重建已改名的文件；重命名失败逐个汇总提示，
         不再静默忽略。
         """
-        from pathlib import Path
-
         from PySide6.QtWidgets import QMessageBox
 
         from doc_tool.application.content.refactor import RefactorService
@@ -783,30 +785,39 @@ class ContentWorkspace(QWidget):
                         )
                         return False
         service = RefactorService(self._index)
-        failures: List[str] = []
-        applied_renames = {}
-        for old, new in renames:
-            plan = service.compute_rename_plan(old, Path(new).name)
-            if plan is None:
-                failures.append("{0} → {1}".format(old, new))
-                continue
+        # 批量计划 + staging 应用：让位链（同名标题 + 连续编号）下逐条
+        # apply 会因索引尚未刷新而误判目标占用、抛 ValueError 且前面的
+        # 重命名已实际应用；批量计划一次完成冲突校验，冲突时整体中止，
+        # 不产生半迁移状态（与 _on_renumber_dir 一致）。
+        plan = service.compute_batch_rename_plan(renames)
+        if plan is None:
+            QMessageBox.warning(
+                self, "重编号失败", "目标文件不在内容索引中，请刷新后重试"
+            )
+            return True
+        if plan.conflicts:
+            QMessageBox.warning(
+                self, "重编号冲突", "；".join(plan.conflicts)
+            )
+            return True
+        try:
             results = service.apply_rename_plan(plan, self._writer)
-            if not all(r.written for r in results):
-                failures.append("{0} → {1}".format(old, new))
-                continue
-            applied_renames[old] = new
-            # 旧路径已改名：关闭其标签并清除草稿，避免旧路径标签保存时
-            # 重建已改名的文件、或崩溃恢复复活旧路径的废弃内容。
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(
+                self, "重编号失败", "已中止并尝试回滚：{0}".format(exc)
+            )
+            return True
+        if not all(r.written for r in results):
+            QMessageBox.warning(
+                self, "重编号失败", "部分写回失败，请查看备份与改动清单"
+            )
+            return True
+        # 旧路径已改名：关闭其标签并清除草稿，避免旧路径标签保存时
+        # 重建已改名的文件、或崩溃恢复复活旧路径的废弃内容。
+        for old, _new in renames:
             self.tabs_host.close_file(old)
             self._autosave.clear(old)
-        if applied_renames:
-            self._mark_review_association(applied_renames)
-        if failures:
-            QMessageBox.warning(
-                self,
-                "部分重编号失败",
-                "以下章节重编号失败，请检查文件状态：\n" + "\n".join(failures),
-            )
+        self._mark_review_association(dict(renames))
         return True
 
     def _on_renumber_dir(self, dir_rel_path: str) -> None:
@@ -1122,6 +1133,17 @@ class ContentWorkspace(QWidget):
             panel = getattr(self, "_image_assets_panel", None)
             if panel is not None:
                 panel.set_index(self._index)
+        # 批量写回直接落盘、绕过编辑器缓冲区：同步已打开标签的磁盘状态，
+        # 避免用户基于过期内容保存、静默回退本次批量改动（双向数据丢失）。
+        # 干净标签静默重载，脏标签弹确认（与 check_external_change 一致）。
+        for rel_path in list(self.tabs_host.open_rel_paths()):
+            editor = self.tabs_host.editor_for(rel_path)
+            if editor is None:
+                continue
+            try:
+                editor.check_external_change()
+            except Exception:  # noqa: BLE001  # 刷新失败不阻断写后联动
+                continue
         if self._on_request_validate is not None:
             self._on_request_validate()
 
@@ -1139,6 +1161,25 @@ class ContentWorkspace(QWidget):
             ReviewStore(self._state_dir).mark_association_changes(existing, renamed)
         except Exception:
             pass
+
+    def _confirm_rename_dirty(self, rel_paths) -> bool:
+        """重命名/重编号（底部面板入口）执行前确认受影响旧路径的未保存编辑。
+
+        与章节树入口（``_maybe_renumber_after_delete`` / ``_on_rename_file``）
+        同一决策：先保存/放弃/取消；取消中止整个联动。返回 True 表示可继续。
+        """
+        dirty = [rel for rel in rel_paths if self._editor_is_dirty(rel)]
+        if not dirty:
+            return True
+        choice = self._unsaved_resolver(dirty, "rename")
+        if choice == UnsavedChoice.CANCEL:
+            return False
+        if choice == UnsavedChoice.SAVE:
+            for rel in dirty:
+                editor = self.tabs_host.editor_for(rel)
+                if editor is not None and not editor.save():
+                    return False
+        return True  # DISCARD → 继续（编辑被放弃，旧标签关闭）
 
     def _on_file_renamed(self, old_rel_path: str) -> None:
         """重命名成功后关闭旧路径标签并清除其草稿（重命名面板联动）。

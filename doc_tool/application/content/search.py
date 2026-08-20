@@ -112,7 +112,11 @@ class SearchService:
         for rel_path in self._index.all_files():
             if cancel_token is not None:
                 cancel_token.check_cancel()
-            entry = self._index.files[rel_path]
+            entry = self._index.files.get(rel_path)
+            if entry is None:
+                # 搜索在后台线程遍历索引快照，UI 线程可能同时删除文件并
+                # 从索引移除条目：跳过缺失项而非抛 KeyError 误报「搜索失败」。
+                continue
             if allowed and entry.document_type not in allowed:
                 continue
             lines = self._index.lines.get(rel_path, [])

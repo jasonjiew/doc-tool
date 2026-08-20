@@ -145,6 +145,11 @@ a = Analysis(
         "PySide6.QtPdfWidgets",
         "PySide6.QtSvgWidgets",
         "shiboken6_tool",
+        # 与 packaging/doc_tool.spec 一致：multiprocessing 在公司受限环境下
+        # 会经 socket/_socket 触发安全软件拦截冻结 exe 加载扩展模块。
+        # 常规 GUI 与文档构建不依赖多进程 spawn；排除后可避免启动阶段
+        # "DLL load failed while importing _socket" 报错。
+        "multiprocessing",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

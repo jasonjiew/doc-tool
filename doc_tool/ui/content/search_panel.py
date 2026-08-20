@@ -70,6 +70,9 @@ class SearchPanel(QWidget):
         self._last_result: Optional[SearchResult] = None
         # 旧搜索运行中输入的新查询：待旧任务终态后自动启动，不静默丢弃。
         self._pending_options: Optional[SearchOptions] = None
+        # 在途搜索结果已被更新的查询（或清空查询）取代：终态回调丢弃旧结果，
+        # 避免「清空输入框后旧搜索完成又把过期命中渲染回来」。
+        self._invalidate_inflight = False
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -157,6 +160,8 @@ class SearchPanel(QWidget):
         options = self._current_options()
         if not options.query.strip():
             self._pending_options = None
+            # 清空查询使在途搜索的结果作废：其终态回调不得渲染过期命中。
+            self._invalidate_inflight = True
             self._render(SearchResult(query="", total=0))
             return
         from doc_tool.application.content.search import compile_pattern
@@ -185,6 +190,8 @@ class SearchPanel(QWidget):
         from doc_tool.application.content.search import run_search
         from doc_tool.ui.task_bridge import TaskSpec
 
+        # 新搜索启动即取代此前在途结果。
+        self._invalidate_inflight = False
         self._runner.start(
             TaskSpec(
                 name="search",
@@ -206,6 +213,10 @@ class SearchPanel(QWidget):
         if pending is not None:
             # 有排队的新查询：丢弃过期旧结果，直接启动新搜索。
             self._start_search(pending)
+            return
+        if self._invalidate_inflight:
+            # 在途结果已被清空查询/更新查询取代：丢弃，不渲染过期命中。
+            self._invalidate_inflight = False
             return
         if result is None:
             if self._runner.is_cancelled:

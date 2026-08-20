@@ -29,6 +29,7 @@ from docx_common import (
     discover_document_types,
     iter_chapter_entries,
     load_config,
+    neutralize_hyperlink_fields,
     normalize_business_text,
     parse_image_reference,
     parse_markdown_table,
@@ -158,14 +159,16 @@ class DocxPackage:
         self.styles = self.xml_roots["word/styles.xml"]
         self.settings = self.xml_roots["word/settings.xml"]
         self.relationships = self.xml_roots["word/_rels/document.xml.rels"]
+        # 标题识别映射 = 输出文档 styles.xml 名称启发式 ∪ 清单映射。
+        # Word 保存时会重编号 styleId（本模板 140→1、4→20、5→30 …），只按清单
+        # 的旧 styleId 识别会导致刷新后所有标题等级解析为 None，body_events 在首个
+        # H1 前即停止（started 永假）而返回空事件集，刷新后校验全盘误报。名称启发式
+        # 在重编号后依然命中（Word 保留样式名），清单映射兜底名称无法识别的自定义
+        # 样式；两路并集按段落实际 pStyle 反查，互不干扰。
+        self.heading_styles = self._heading_style_map()
         if heading_styles:
-            # 项目清单的 headingStyles（级别 -> styleId）优先；样式映射导入的
-            # 自定义样式名无法被名称启发式识别，必须按清单映射识别标题。
-            self.heading_styles = {
-                str(style_id): int(level) for level, style_id in heading_styles.items()
-            }
-        else:
-            self.heading_styles = self._heading_style_map()
+            for level, style_id in heading_styles.items():
+                self.heading_styles.setdefault(str(style_id), int(level))
         self.relationship_map = {relationship.get("Id"): relationship for relationship in self.relationships}
 
     def _heading_style_map(self) -> Dict[str, int]:
@@ -220,9 +223,6 @@ class DocxPackage:
                 if not started:
                     continue
                 image_hashes = self.image_hashes(element)
-                bookmarks = tuple(
-                    node.get(qn("name")) or "" for node in element.iter(qn("bookmarkStart"))
-                )
                 hyperlinks = tuple(
                     node.get(qn("anchor")) or node.get(R_NS + "id") or ""
                     for node in element.iter(qn("hyperlink"))
@@ -376,6 +376,9 @@ def _expected_table_xml(path: str):
         raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(path, exc))
     if root.tag != qn("tbl"):
         raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(path))
+    # 构建侧会在装配后把复杂表格内嵌的 HYPERLINK 域解除为静态文本；预期侧施加
+    # 同一变换，保证「复杂表格 OOXML 一致」在刷新前严格比对中不误报。
+    neutralize_hyperlink_fields(root)
     return root
 
 
@@ -530,7 +533,41 @@ def normalized_part(package: DocxPackage, name: str, remove_update_fields: bool 
     return canonical_xml(node)
 
 
-def template_preservation_errors(template: DocxPackage, output: DocxPackage) -> Dict[str, List[str]]:
+# 与 scripts/build_docx.py 的 update_headers 保持同一替换语义：构建会按清单把
+# 页眉中的文档编号/版本号文本更新为当前值，校验时对模板与输出两侧同时应用
+# 该规范化，避免把「预期内的页眉版本更新」误报为模板部件变化。
+_HEADER_DOC_NO_RE = re.compile(r"^[a-zA-Z0-9_-]+-\d+-\d+-\d+$")
+_HEADER_VERSION_RE = re.compile(r"^\d+\.\d+$")
+
+
+def _normalize_header_fields(root, config: Dict) -> None:
+    """把页眉文本节点中的文档编号/版本号替换为清单配置值（与构建侧一致）。"""
+    doc_no = str(config.get("documentNo", ""))
+    doc_ver = str(config.get("documentVersion", ""))
+    for t_node in root.iter(qn("t")):
+        if t_node.text is None:
+            continue
+        text = t_node.text.strip()
+        if not text:
+            continue
+        if _HEADER_DOC_NO_RE.match(text) and doc_no:
+            t_node.text = doc_no
+        elif _HEADER_VERSION_RE.match(text) and doc_ver:
+            t_node.text = doc_ver
+
+
+def _normalized_header_part(package: DocxPackage, name: str, config: Dict) -> Optional[bytes]:
+    root = package.xml_roots.get(name)
+    if root is None:
+        return None
+    node = copy.deepcopy(root)
+    _normalize_header_fields(node, config)
+    return canonical_xml(node)
+
+
+def template_preservation_errors(
+    template: DocxPackage, output: DocxPackage, config: Optional[Dict] = None
+) -> Dict[str, List[str]]:
     errors = {"styles": [], "numbering": [], "headers": [], "footers": [], "sections": [], "settings": []}
     for name, category in (
         ("word/styles.xml", "styles"),
@@ -541,14 +578,23 @@ def template_preservation_errors(template: DocxPackage, output: DocxPackage) -> 
             errors[category].append("模板部件变化: {0}".format(name))
     template_numbering = _numbering_signature(template)
     output_numbering = _numbering_signature(output)
-    if template_numbering - output_numbering:
+    # Word 保存会合并重复 abstractNum 定义（多份相同定义归并为一份），按多集
+    # 相减会误报「缺失」；按唯一签名集合比较，仅当模板存在输出完全没有的
+    # 定义时才判定为丢失/变化。
+    if set(template_numbering) - set(output_numbering):
         errors["numbering"].append("模板原有编号定义缺失或变化")
     for prefix, category in (("word/header", "headers"), ("word/footer", "footers")):
         names = sorted(
             name for name in set(template.items) | set(output.items) if name.startswith(prefix) and name.endswith(".xml")
         )
         for name in names:
-            if normalized_part(template, name) != normalized_part(output, name):
+            if config is not None and name.startswith("word/header"):
+                template_part = _normalized_header_part(template, name, config)
+                output_part = _normalized_header_part(output, name, config)
+            else:
+                template_part = normalized_part(template, name)
+                output_part = normalized_part(output, name)
+            if template_part != output_part:
                 errors[category].append("模板部件变化: {0}".format(name))
     if template.section_signatures() != output.section_signatures():
         errors["sections"].append("Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化")
@@ -578,29 +624,36 @@ def _paragraph_style_names(package: DocxPackage) -> set:
 
 
 def _numbering_signature(package: DocxPackage) -> Counter:
-    """返回被 ``w:num`` 实际引用的 ``abstractNum`` 定义签名（多集）。
+    """返回被正文段落实际引用的 ``abstractNum`` 定义签名（唯一集合）。
 
-    仅统计「使用中」的定义：Word 保存时会裁剪模板中无任何 num 引用的孤立
-    abstractNum 定义（真实 Word 模板常携带），把它们计入签名会在刷新后校验里
-    误报「模板原有编号定义缺失」。被引用的定义必须语义不变，因此裁剪侧差值
-    （template - output）非空仍能捕获真实的丢失/变化。
+    Word 保存时会重编号 abstractNumId、合并重复定义并裁剪无引用定义；仅统计
+    「正文段落实际使用」的定义并取唯一集合，可容忍 Word 的合法去重/裁剪，
+    同时保留对真实语义丢失/变化的捕获（模板有而输出无的独立定义仍会命中）。
     """
     style_names = _style_id_names(package)
     root = package.xml_roots.get("word/numbering.xml")
     if root is None:
         return Counter()
-    used_ids = set()
+    # numId -> abstractNumId：两种合法序列化都识别（子元素 ``<w:abstractNumId
+    # w:val="0"/>`` 与属性 ``w:num w:abstractNumId="0"``）。
+    num_to_abstract = {}
     for num in root.findall(qn("num")):
-        # ``abstractNumId`` 两种合法序列化都识别：子元素（``<w:abstractNumId
-        # w:val="0"/>``，构建侧生成）与属性（``w:num w:abstractNumId="0"``，
-        # 真实 Word 常如此写）。
+        num_id = num.get(qn("numId"))
         child = num.find(qn("abstractNumId"))
-        if child is not None:
-            used_ids.add(child.get(qn("val")))
-        attribute = num.get(qn("abstractNumId"))
-        if attribute:
-            used_ids.add(attribute)
-    signatures = []
+        abstract = child.get(qn("val")) if child is not None else num.get(qn("abstractNumId"))
+        if num_id is not None and abstract:
+            num_to_abstract[num_id] = abstract
+    used_ids = {num_to_abstract[num_id] for num_id in num_to_abstract}
+    document = getattr(package, "document", None)
+    if document is not None:
+        # 仅统计正文段落实际引用的 numId（Word 会裁剪无段落引用的 num 与定义）。
+        used_num_ids = set()
+        for node in document.iter(qn("numId")):
+            value = node.get(qn("val"))
+            if value:
+                used_num_ids.add(value)
+        used_ids = {num_to_abstract[nid] for nid in used_num_ids if nid in num_to_abstract}
+    signatures = Counter()
     for abstract in root.findall(qn("abstractNum")):
         if abstract.get(qn("abstractNumId")) not in used_ids:
             continue
@@ -622,8 +675,8 @@ def _numbering_signature(package: DocxPackage) -> Counter:
                     style_names.get(style_id, style_id),
                 )
             )
-        signatures.append(tuple(levels))
-    return Counter(signatures)
+        signatures[tuple(levels)] += 1
+    return signatures
 
 
 def _section_geometry(package: DocxPackage) -> List[Tuple]:
@@ -764,7 +817,7 @@ def word_semantic_preservation_errors(
         errors["styles"].append("Word 刷新后主题字体/颜色定义变化")
     # Word prunes unused duplicate abstract numbering definitions when saving.
     # Every retained definition must still be present with identical semantics.
-    if _numbering_signature(template) - _numbering_signature(output):
+    if set(_numbering_signature(template)) - set(_numbering_signature(output)):
         errors["numbering"].append("Word 刷新后模板原有编号级别、格式或标题关联缺失")
     if _section_geometry(template) != _section_geometry(output):
         errors["sections"].append("Word 刷新后 Section 数量、纸张、方向或页边距变化")
@@ -819,6 +872,25 @@ def expected_toc_labels(config: Dict, max_level: int = 3) -> List[str]:
             prefix = ".".join(str(value) for value in entry.number)
         result.append(normalize_business_text(prefix + " " + entry.title))
     return result
+
+
+def _toc_label_key(text: str, *, strip_page: bool = True) -> str:
+    """把 TOC 条目文本归一为「仅标题」用于按序比对。
+
+    Word 刷新后的 TOC 缓存条目由 toc 样式自动编号 + 标题 + 页码组成
+    （如「第 1 章引言16」「1.4项目背景与目标16」）；预期标签是章节语义编号 +
+    标题（如「第1章 引言」「2.1 项目背景与目标」）。自动编号按 TOC 顺序而非
+    章节语义编号，且「第 N 章」含空格，两侧去掉开头自动编号后仅比较标题序列。
+
+    ``strip_page``：是否剥离尾部页码。只对缓存侧开（缓存含页码）；预期侧
+    无页码，若同样剥离会把以数字结尾的标题误删（如「接口说明V1」→「接口
+    说明V」），导致与缓存侧比对失败。
+    """
+    value = text
+    if strip_page:
+        value = re.sub(r"\s*\d+\s*$", "", value)
+    value = re.sub(r"^(?:第\s*\d+\s*章|\d+(?:\.\d+)*)\s*", "", value)
+    return normalize_business_text(value).strip()
 
 
 @dataclass
@@ -905,7 +977,7 @@ def validate(
     preservation = (
         word_semantic_preservation_errors(template, output, config)
         if require_refreshed
-        else template_preservation_errors(template, output)
+        else template_preservation_errors(template, output, config)
     )
     company_profile = doc_type in ("requirement", "design")
     cover_text, cover_fields = cover_values(output)
@@ -972,11 +1044,9 @@ def validate(
     if require_refreshed and company_profile:
         toc_cached = output.toc_cached_paragraphs()
         toc_expected = expected_toc_labels(config, 3)
-        cached_labels = [
-            re.sub(r"\s+\d+\s*$", "", normalize_business_text(text)).strip()
-            for text in toc_cached
-        ]
-        toc_ok = cached_labels == toc_expected
+        # 尾部页码只剥离缓存侧（预期侧无页码，剥离会误删以数字结尾的标题）。
+        cached_labels = [_toc_label_key(text, strip_page=True) for text in toc_cached]
+        toc_ok = cached_labels == [_toc_label_key(text, strip_page=False) for text in toc_expected]
         page_cached = cover_text.get("页数", "")
         page_ok = page_cached.isdigit() and int(page_cached) > 0
         report.row_check(

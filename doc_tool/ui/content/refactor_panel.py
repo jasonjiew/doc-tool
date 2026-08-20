@@ -43,6 +43,7 @@ class RefactorPanel(QWidget):
         *,
         on_applied: Optional[Callable[[], None]] = None,
         on_renamed: Optional[Callable[[str], None]] = None,
+        on_confirm_dirty: Optional[Callable[[List[str]], bool]] = None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -53,12 +54,17 @@ class RefactorPanel(QWidget):
         # 重命名成功后回调旧路径：上层据此关闭旧路径标签并清除其草稿，
         # 避免旧路径标签后续保存时重建已改名的文件。
         self._on_renamed = on_renamed
+        # 执行前确认受影响旧路径的未保存编辑（先保存/放弃/取消）；
+        # 返回 False 中止整个联动。由工作区注入（与章节树入口同一决策）。
+        self._on_confirm_dirty = on_confirm_dirty
         self._writable = writable
         self._plan = None
         self._all_files: List[str] = []
-        # 「回滚本次联动」的起点：本次操作开始前的清单条目数，避免把同会话
-        # 更早的编辑/保存一并回滚。
-        self._rollback_marker: Optional[int] = None
+        # 「回滚本次联动」：armed 表示已预览过；_applied_keys 记录本次
+        # 联动实际写入的清单键（edit/rename），回滚按键匹配恢复，不受
+        # 改动清单去重移动条目位置的影响。
+        self._rollback_armed = False
+        self._applied_keys: set = set()
 
         # 唯一外层布局：输入卡片 + 影响清单 + 操作行。原先各 _build_*
         # 各自创建 QVBoxLayout(self)，只有第一个会被安装，影响清单因此不可见。
@@ -164,8 +170,11 @@ class RefactorPanel(QWidget):
             self._set_status("目标文件不在内容索引中")
             return
         self._plan = plan
-        # 捕获回滚起点：本次联动开始前已存在的改动清单条目数。
-        self._rollback_marker = self._writer.manifest.entry_count()
+        # 武装「回滚本次联动」：回滚目标是本次联动实际写入的清单键
+        # （引用编辑 edit + 重命名 rename），按键匹配恢复，与操作前
+        # 文件是否已保存过无关（条目经 record 去重后备份仍指向写前内容）。
+        self._rollback_armed = True
+        self._applied_keys = set()
         self._tree.clear()
         for i, edit in enumerate(plan.edits):
             item = QTreeWidgetItem(
@@ -210,11 +219,33 @@ class RefactorPanel(QWidget):
         )
         if confirmed != QMessageBox.StandardButton.Yes:
             return
-        results = self._service.apply_rename_plan(plan, self._writer)
+        # 未保存保护：受影响旧路径在编辑器中有未保存编辑时先确认，
+        # 避免重命名成功后关闭旧标签静默丢弃这些编辑（与章节树入口一致）。
+        if self._on_confirm_dirty is not None and not self._on_confirm_dirty(
+            [old for old, _new in plan.renames]
+        ):
+            return
+        try:
+            results = self._service.apply_rename_plan(plan, self._writer)
+        except (OSError, ValueError, KeyError) as exc:
+            # 服务内部已尽力回滚；面板必须提示并刷新索引，避免磁盘状态
+            # 与树/索引不一致且用户无感知。
+            self._set_status("执行失败：{0}".format(exc))
+            if self._on_applied is not None:
+                self._on_applied()
+            return
         if not all(r.written for r in results):
             failed = [r.rel_path for r in results if not r.written]
             self._set_status("部分写回失败：{0}".format(", ".join(failed)))
             return
+        from doc_tool.application.content.writer import OP_EDIT, OP_RENAME
+
+        self._applied_keys.update(
+            (OP_RENAME, new_rel) for _old_rel, new_rel in plan.renames
+        )
+        self._applied_keys.update(
+            (OP_EDIT, edit.rel_path) for edit in plan.edits
+        )
         if self._on_renamed is not None and plan.rel_path:
             self._on_renamed(plan.rel_path)
         no_backup = [
@@ -235,16 +266,26 @@ class RefactorPanel(QWidget):
         self._update_action_state()
 
     def rollback(self) -> None:
-        if self._rollback_marker is None:
-            # 双保险：按钮禁用之外，直接调用也拒绝——since=None 会回滚整个
-            # 会话改动（含更早的独立编辑/保存），非「本次联动」。
+        if not self._rollback_armed:
+            # 双保险：按钮禁用之外，直接调用也拒绝——回滚全部会话改动
+            # 会把本次联动前更早的独立编辑/保存一并回滚，非「本次联动」。
             self._set_status("请先预览联动，再回滚本次联动")
             return
-        failures = self._writer.rollback(since=self._rollback_marker)
+        current = self._writer.manifest.keys()
+        target = self._applied_keys & current
+        if not target:
+            self._set_status("本次联动没有产生需要回滚的改动")
+            return
+        failures = self._writer.rollback_keys(target)
         if failures:
             self._set_status("回滚失败：{0}".format(", ".join(failures)))
         else:
             self._set_status("已回滚本次联动")
+            # 成功回滚后解除武装：防止用户继续保存后再次点击，把与本次
+            # 联动无关的新保存一并回滚。
+            self._rollback_armed = False
+            self._applied_keys = set()
+            self._update_action_state()
             if self._on_applied is not None:
                 self._on_applied()
 
@@ -262,7 +303,7 @@ class RefactorPanel(QWidget):
         self._apply_btn.setEnabled(applyable)
         # 未预览过联动（无回滚起点）时禁用「回滚本次联动」：旧逻辑在可写时
         # 恒启用，未预览直接回滚会以 since=None 回滚整个会话改动。
-        self._rollback_btn.setEnabled(self._writable and self._rollback_marker is not None)
+        self._rollback_btn.setEnabled(self._writable and self._rollback_armed)
 
     def _set_status(self, text: str) -> None:
         self._status_label.setText(text)

@@ -31,8 +31,13 @@ _LINT_SEVERITIES = {
 # 目录）；先试行首锚定的空格友好模式（detail 通常以路径开头），再退回原
 # 无空格模式定位行中间的路径，避免把前置说明文字并入路径。
 _LOCATION_PATTERNS = (
-    re.compile(r"^(?P<path>.+?\.(?:md|markdown))[:：](?P<line>\d+)", re.I),
-    re.compile(r"(?P<path>[^\s，,:：]+\.(?:md|markdown))[:：](?P<line>\d+)", re.I),
+    # 行首锚定、路径允许空格与中文（``content/requirement/第1章 概述/_index.md:3``），
+    # 但路径内不允许冒号——避免把行首的「检查名:」前缀并入 rel_path。
+    re.compile(r"^(?P<path>[^:：]+?\.(?:md|markdown))[:：](?P<line>\d+)", re.I),
+    # 非锚定：detail 形如「检查名: 路径:行」时（validate_docx 报告为
+    # ``[FAIL] {check.name}: {detail}``），从冒号后定位路径；路径允许空格中文。
+    re.compile(r"(?:^|[:：]\s*)(?P<path>[^:：]+?\.(?:md|markdown))[:：](?P<line>\d+)", re.I),
+    # 中文「第 N 行」说明格式。
     re.compile(r"(?P<path>[^\s，,]+\.(?:md|markdown)).{0,8}?第\s*(?P<line>\d+)\s*行", re.I),
 )
 
@@ -85,8 +90,9 @@ def _error_catalog() -> dict:
 
 
 def severity_for_error_code(error_code: Optional[str]) -> str:
-    """已登记错误均为阻断错误；未知/空错误码稳定降级为 info。"""
-    return SEVERITY_ERROR if error_code in _error_catalog() else SEVERITY_INFO
+    """已登记错误均为阻断错误；未知/空错误码降级为 warning（保留可见性，
+    避免生产未知错误在 UI 按 info 过滤后丢失）。"""
+    return SEVERITY_ERROR if error_code in _error_catalog() else SEVERITY_WARNING
 
 
 def error_metadata(error_code: Optional[str]) -> tuple[str, str]:
@@ -118,7 +124,9 @@ def issues_from_pipeline(
         default_message, advice = error_metadata(code)
         detail = str(getattr(event, "detail", "") or default_message or "任务失败")
         metrics = getattr(event, "metrics", {}) or {}
-        line_value = metrics.get("line") or metrics.get("lineNo")
+        line_value = metrics.get("line")
+        if line_value is None:
+            line_value = metrics.get("lineNo")
         try:
             line_no = int(line_value) if line_value is not None else None
         except (TypeError, ValueError):

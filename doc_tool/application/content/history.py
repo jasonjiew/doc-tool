@@ -92,6 +92,13 @@ class BuildHistoryStore:
         self.root.mkdir(parents=True, exist_ok=True)
         metadata = self.root / (history_id + ".json")
         atomic_write(metadata, json.dumps(payload, ensure_ascii=False, indent=2))
+        # 归档完整性校验：回读元数据并与本次内存快照比对，写入截断/损坏即刻暴露。
+        try:
+            reread = json.loads(metadata.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise OSError("历史归档写入校验失败：{0}".format(history_id)) from exc
+        if reread.get("contentFiles") != files:
+            raise OSError("历史归档校验失败：快照记录不一致：{0}".format(history_id))
         return metadata
 
     def list_entries(self) -> List[HistoryEntry]:
@@ -177,21 +184,34 @@ class BuildHistoryStore:
                     "历史快照内容与记录不一致，已拒绝恢复：{0}".format(rel_path)
                 )
         changed: List[str] = []
-        for rel_path in sorted(expected):
-            source = snapshot / rel_path
-            result = writer.write_text(rel_path, source.read_text(encoding="utf-8"))
-            if not result.written:
-                raise OSError(result.error or "历史恢复失败")
-            changed.append(rel_path)
-        current = {
-            path.relative_to(writer.content_root).as_posix()
-            for path in writer.content_root.rglob("*.md") if path.is_file()
-        }
-        for rel_path in sorted(current - set(expected)):
-            result = writer.delete_file(rel_path)
-            if not result.written:
-                raise OSError(result.error or "历史恢复删除失败")
-            changed.append(rel_path)
+        # 事务化：先捕获清单条目数作为回滚起点；任一步写入失败即回滚本次
+        # 恢复已落盘的改动，避免出现「部分文件已恢复、部分还是旧版」的半状态。
+        checkpoint = writer.manifest.entry_count()
+        try:
+            for rel_path in sorted(expected):
+                source = snapshot / rel_path
+                result = writer.write_text(rel_path, source.read_text(encoding="utf-8"))
+                if not result.written:
+                    raise OSError(result.error or "历史恢复失败")
+                changed.append(rel_path)
+            current = {
+                path.relative_to(writer.content_root).as_posix()
+                for path in writer.content_root.rglob("*.md") if path.is_file()
+            }
+            for rel_path in sorted(current - set(expected)):
+                result = writer.delete_file(rel_path)
+                if not result.written:
+                    raise OSError(result.error or "历史恢复删除失败")
+                changed.append(rel_path)
+        except OSError as exc:
+            rollback_failures = writer.rollback(since=checkpoint)
+            if rollback_failures:
+                raise OSError(
+                    "{0}；恢复已回滚但部分文件回滚失败：{1}".format(
+                        exc, "、".join(rollback_failures)
+                    )
+                ) from exc
+            raise
         if rebuild is not None:
             rebuild()
         return changed
@@ -209,4 +229,8 @@ def extract_docx_text(path: Path) -> str:
 
 
 def diff_docx_text(older: Path, newer: Path) -> str:
-    return render_unified_diff(extract_docx_text(older), extract_docx_text(newer))
+    try:
+        return render_unified_diff(extract_docx_text(older), extract_docx_text(newer))
+    except (KeyError, ET.ParseError, zipfile.BadZipFile, OSError) as exc:
+        # 产物缺失/损坏时给出可读提示而非抛栈（历史面板对比入口容错）。
+        return "无法提取 Word 文本进行对比：{0}".format(exc)

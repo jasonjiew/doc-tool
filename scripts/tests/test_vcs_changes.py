@@ -274,7 +274,7 @@ class GitDetectionTests(RepoFixtureMixin, unittest.TestCase):
         )
 
     def test_chinese_and_space_paths(self):
-        pa = make_project(self.repo, "需求 说明书 KF-2090-1-001", {
+        pa = make_project(self.repo, "需求 说明书 FIXTURE-001", {
             "content/第3章 功能/3.7.28 客户管理.md": "# 3.7.28 客户管理\nok",
         })
         commit_all(self.repo, "init")
@@ -378,6 +378,97 @@ class GitDetectionTests(RepoFixtureMixin, unittest.TestCase):
             [(c.chapter_id, c.path) for c in asset_hits],
             [("3.7.28", "3.7.28 客户管理.md")],
         )
+
+    def test_asset_change_marks_chapter_modified_not_added(self):
+        """新增/删除被引用的资源：章节标 modified，绝不继承 added/deleted。
+
+        继承会让一个真实存在、未被改动的章节在改动面板显示为「新增」，
+        而「撤销新增」会把它删掉（数据丢失）。
+        """
+        pa = make_project(self.repo, "proj_a", {
+            "content/3.7.28 客户管理.md": (
+                "# 3.7.28 客户管理\nok\n\n"
+                "![新图](../assets/images/new.png)\n"
+                "![旧图](../assets/images/old.png)\n"
+            ),
+        })
+        (pa / "assets/images").mkdir(parents=True, exist_ok=True)
+        (pa / "assets/images/old.png").write_bytes(b"\x89PNGold")
+        commit_all(self.repo, "init")
+        # 章节自身未改：只新增一张它引用的图片 + 删除另一张
+        (pa / "assets/images/new.png").write_bytes(b"\x89PNGnew")
+        (pa / "assets/images/old.png").unlink()
+
+        service = self.service(pa)
+        report = service.detect()
+        all_files = ["3.7.28 客户管理.md"]
+        status = service.status_map(report, all_files)
+        self.assertEqual(status["3.7.28 客户管理.md"], "modified")
+        chapters = service.chapters(report, all_files)
+        self.assertEqual(len(chapters), 1)
+        self.assertTrue(chapters[0].is_asset)
+        self.assertEqual(chapters[0].change_type, "modified")
+        self.assertIsNone(chapters[0].old_path)
+
+    def test_chapter_own_status_wins_over_asset_reverse_lookup(self):
+        """章节自身的真实状态优先于资源反查（不被反查结果覆盖或抹平）。"""
+        pa = make_project(self.repo, "proj_a", {"content/keep.md": "keep"})
+        commit_all(self.repo, "init")
+        # 章节本身是新增的，并且引用了一张同样新增的图片
+        (pa / "content/3.7.31 新增.md").write_text(
+            "# 3.7.31 新增\n![图](../assets/images/new.png)\n", encoding="utf-8"
+        )
+        (pa / "assets/images").mkdir(parents=True, exist_ok=True)
+        (pa / "assets/images/new.png").write_bytes(b"\x89PNGnew")
+
+        service = self.service(pa)
+        report = service.detect()
+        all_files = ["keep.md", "3.7.31 新增.md"]
+        status = service.status_map(report, all_files)
+        self.assertEqual(status["3.7.31 新增.md"], "added")
+        # 章节只出现一次（自身条目），不再追加资源反查的重复条目
+        paths = [c.path for c in service.chapters(report, all_files)]
+        self.assertEqual(paths.count("3.7.31 新增.md"), 1)
+
+    def test_content_root_asset_also_maps_to_chapter(self):
+        """content_root 内的资源（如 general/images/x.png）同样反查引用章节。"""
+        pa = make_project(self.repo, "proj_a", {
+            "content/general/1.1 概述.md": (
+                "# 1.1 概述\n![图](images/shot.png)\n"
+            ),
+        })
+        commit_all(self.repo, "init")
+        (pa / "content/general/images").mkdir(parents=True, exist_ok=True)
+        (pa / "content/general/images/shot.png").write_bytes(b"\x89PNG")
+
+        service = self.service(pa)
+        report = service.detect()
+        status = service.status_map(report, ["general/1.1 概述.md"])
+        # 资源自身仍以 added 出现（可在面板撤销新增），章节标 modified
+        self.assertEqual(status["general/images/shot.png"], "added")
+        self.assertEqual(status["general/1.1 概述.md"], "modified")
+
+    def test_gitignored_project_falls_back_to_local(self):
+        """项目被 .gitignore 忽略：git 永远沉默 → 必须回退本地快照。"""
+        (self.repo / ".gitignore").write_text("proj_ig/\n", encoding="utf-8")
+        pig = make_project(self.repo, "proj_ig", {"content/a.md": "a"})
+        commit_all(self.repo, "init")
+        (pig / "content/a.md").write_text("changed", encoding="utf-8")
+        (pig / "content/new.md").write_text("new", encoding="utf-8")
+
+        report = self.service(pig).detect()
+        self.assertEqual(report.source, "local")
+        self.assertIn("Git", report.error or "")
+        # 低层检测器（不带缓存）行为一致
+        self.assertEqual(GitChangeDetector().detect(pig).source, "local")
+
+    def test_clean_tracked_project_stays_git(self):
+        """已跟踪但无改动的项目仍是 git 模式（不能被未跟踪兜底误判）。"""
+        pa = make_project(self.repo, "proj_a", {"content/a.md": "a"})
+        commit_all(self.repo, "init")
+        report = self.service(pa).detect()
+        self.assertEqual(report.source, "git")
+        self.assertEqual(report.files, ())
 
     def test_cache_invalidation_after_write(self):
         pa = make_project(self.repo, "proj_a", {"content/a.md": "a"})
@@ -763,6 +854,38 @@ class VcsRollbackTests(RepoFixtureMixin, unittest.TestCase):
         ).stdout.strip()
         self.assertEqual(status, "", "回滚后工作树应干净")
 
+    def test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked(self):
+        """delete_untracked=False（改动面板 VCS 模式）时，staged 新增文件
+        不得被 git restore 直接删除：撤出暂存后作为未跟踪文件保留，交由
+        上层按改动清单判定是否删除（只删本会话工具创建的）。
+
+        旧实现把 staged 新增路径也交给 git restore，git 会把工作树文件一并
+        删除，即使上层明确要求不删除未跟踪文件——用户手动 git add 的文件
+        会在「回滚全部」时被静默删除。
+        """
+        pa = make_project(self.repo, "proj_a", {"content/a.md": "v1"})
+        commit_all(self.repo, "init")
+        # 被跟踪：modified
+        (pa / "content/a.md").write_text("v2", encoding="utf-8")
+        _run_git(self.repo, "add", "proj_a/content/a.md")
+        # staged 新增（用户手动 git add 的新章节）
+        (pa / "content/new.md").write_text("n", encoding="utf-8")
+        _run_git(self.repo, "add", "proj_a/content/new.md")
+
+        report = self.service(pa).detect()
+        failures = rollback_all(report, delete_untracked=False)
+        self.assertEqual(failures, [])
+        # 修改被恢复；staged 新增文件保留为未跟踪（不被静默删除）。
+        self.assertEqual(
+            (pa / "content/a.md").read_text(encoding="utf-8"), "v1"
+        )
+        self.assertTrue((pa / "content/new.md").exists())
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=str(self.repo),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        self.assertIn("proj_a/content/new.md", status)
+
     def test_git_rollback_all_does_not_touch_other_projects(self):
         """回滚只影响当前项目：同一仓库另一项目的未提交改动保持不变。"""
         pa = make_project(self.repo, "proj_a", {"content/a.md": "a1"})
@@ -818,6 +941,67 @@ class VcsRollbackTests(RepoFixtureMixin, unittest.TestCase):
         self.assertNotIn("proj_a/content/new.md", revert_call[0][0])
         self.assertFalse((pa / "content/new.md").exists())
         self.assertTrue((pa / "content/modified.md").exists())
+
+    def test_svn_rollback_all_deletes_versioned_added_when_untracked_removal_on(self):
+        """svn add 过的文件在 delete_untracked=True 时回滚必须删除：revert 只
+        撤出版本控制、文件仍以未版本化留在工作副本（与 git staged 新增同源）。"""
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+        pa = wc / "proj_a"
+        (pa / "content").mkdir(parents=True)
+        (pa / "project.yml").write_text(PROJECT_YML.format(name="A"), encoding="utf-8")
+        (pa / "content/modified.md").write_text("m", encoding="utf-8")
+        (pa / "content/added.md").write_text("n", encoding="utf-8")
+
+        def runner(args, cwd):
+            if args[:2] == ["svn", "status"]:
+                return subprocess.CompletedProcess(
+                    args, 0,
+                    stdout=(
+                        '<?xml version="1.0"?><status><target path=".">'
+                        '<entry path="proj_a/content/modified.md"><wc-status item="modified" props="none"/></entry>'
+                        '<entry path="proj_a/content/added.md"><wc-status item="added" props="none"/></entry>'
+                        "</target></status>"
+                    ).encode("utf-8"),
+                    stderr=b"",
+                )
+            return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+        service = ChangeDetectionService(pa, pa / "content", svn_runner=runner)
+        report = service.detect()
+        failures = rollback_all(report, runner=runner, delete_untracked=True)
+        self.assertEqual(failures, [])
+        self.assertFalse((pa / "content/added.md").exists(), "added 文件回滚后应被删除")
+        self.assertTrue((pa / "content/modified.md").exists())
+
+    def test_svn_rollback_all_keeps_versioned_added_when_not_deleting_untracked(self):
+        """delete_untracked=False（改动面板 VCS 模式）时 added 文件保留为未版本化，
+        交由上层按改动清单判定（只删本会话创建的），不静默删除。"""
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+        pa = wc / "proj_a"
+        (pa / "content").mkdir(parents=True)
+        (pa / "project.yml").write_text(PROJECT_YML.format(name="A"), encoding="utf-8")
+        (pa / "content/added.md").write_text("n", encoding="utf-8")
+
+        def runner(args, cwd):
+            if args[:2] == ["svn", "status"]:
+                return subprocess.CompletedProcess(
+                    args, 0,
+                    stdout=(
+                        '<?xml version="1.0"?><status><target path=".">'
+                        '<entry path="proj_a/content/added.md"><wc-status item="added" props="none"/></entry>'
+                        "</target></status>"
+                    ).encode("utf-8"),
+                    stderr=b"",
+                )
+            return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+        service = ChangeDetectionService(pa, pa / "content", svn_runner=runner)
+        report = service.detect()
+        failures = rollback_all(report, runner=runner, delete_untracked=False)
+        self.assertEqual(failures, [])
+        self.assertTrue((pa / "content/added.md").exists(), "不删未跟踪时 added 文件应保留")
 
     def test_rollback_all_local_returns_message(self):
         from doc_tool.application.content.vcs_changes import ChangeReport

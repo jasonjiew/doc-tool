@@ -124,6 +124,10 @@ class EditorPanel(QWidget):
         self._flash_timer = QTimer(self)
         self._flash_timer.setSingleShot(True)
         self._flash_timer.timeout.connect(self._clear_flash)
+        # 已提示过「外部修改」的 (rel_path, mtime) 集合：用户拒绝重载后，
+        # 同一外部变更不再重复弹框；save() 仍独立做 mtime 校验，不削弱
+        # 覆盖保护。load()/save() 后清除（基准已刷新）。
+        self._dismissed_external: set = set()
 
         self._build_toolbar()
         self._build_panes()
@@ -323,6 +327,7 @@ class EditorPanel(QWidget):
         """加载文件内容到编辑器并刷新预览（干净状态，不写草稿）。"""
         self._rel_path = rel_path
         self._mtime = self._file_mtime(rel_path)
+        self._dismissed_external.clear()
         self._draft_timer.stop()
         self._editor.setPlainText(text)
         self._dirty = False
@@ -358,12 +363,35 @@ class EditorPanel(QWidget):
             # 无未保存更改时不重写：避免覆盖上次备份（.bak）并给改动清单
             # 追加无意义的 edit 条目，破坏「回滚上次保存」的备份点。
             return True
+        # 外部修改保护：磁盘 mtime 与编辑器加载基准不一致（全局替换/重命名
+        # 写盘、外部编辑器修改等）时，先确认再写，避免静默覆盖外部改动
+        # （lost update）。与 check_external_change 的提示语义一致。
+        current_mtime = self._file_mtime(self._rel_path)
+        if (
+            current_mtime is not None
+            and self._mtime is not None
+            and current_mtime != self._mtime
+        ):
+            from PySide6.QtWidgets import QMessageBox
+
+            answer = QMessageBox.question(
+                self,
+                "文件已在外部被修改",
+                "文件已在外部被修改：\n{0}\n\n"
+                "保存将覆盖外部修改，是否继续保存？".format(self._rel_path),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self._status_label.setText("已取消保存，保留外部修改")
+                return False
         text = self._editor.toPlainText()
         result = self._writer.write_text(self._rel_path, text)
         if not result.written:
             self._status_label.setText("保存失败：{0}".format(result.error))
             return False
         self._mtime = self._file_mtime(self._rel_path)
+        self._dismissed_external.clear()
         self._dirty = False
         self._draft_loaded = False
         self._draft_failed = False
@@ -399,7 +427,12 @@ class EditorPanel(QWidget):
             return False
         import shutil
 
-        shutil.copy2(str(backup), str(target))
+        try:
+            shutil.copy2(str(backup), str(target))
+        except OSError as exc:
+            # 复制被拦截（如安全软件）/IO 失败时明确提示，避免静默的半完成回滚。
+            self._status_label.setText("回滚失败：{0}".format(exc))
+            return False
         # 已恢复到保存前状态：丢弃备份，并从改动清单移除该文件 edit 条目，
         # 避免 .bak 残留在 contentRoot 阻断构建、徽标仍显示"已修改"。
         try:
@@ -461,6 +494,10 @@ class EditorPanel(QWidget):
             return False
         current = self._file_mtime(self._rel_path)
         if current is not None and self._mtime is not None and current != self._mtime:
+            key = (self._rel_path, current)
+            if key in self._dismissed_external:
+                # 同一外部变更已提示过且用户选择保留未保存编辑：不再重复弹框。
+                return False
             if self._dirty:
                 from PySide6.QtWidgets import QMessageBox
 
@@ -472,6 +509,9 @@ class EditorPanel(QWidget):
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if answer != QMessageBox.StandardButton.Yes:
+                    # 记录本次外部变更已提示：切换标签不再重复弹框（save()
+                    # 仍独立做 mtime 校验，覆盖保护不受影响）。
+                    self._dismissed_external.add(key)
                     self._status_label.setText("保留未保存更改，未重载外部版本")
                     return False
                 # 用户确认丢弃未保存编辑：清除其草稿，避免下次打开恢复已废弃内容。
@@ -707,12 +747,12 @@ class EditorPanel(QWidget):
         cursor.beginEditBlock()
         cursor.insertText(text)
         cursor.endEditBlock()
-        positions = [(start + p.start, start + p.end) for p in placeholders]
-        editor.begin_snippet(positions)
-        if positions:
+        specs = [(start + p.start, start + p.end, p.default) for p in placeholders]
+        editor.begin_snippet(specs)
+        if specs:
             sel = editor.textCursor()
-            sel.setPosition(positions[0][0])
-            sel.setPosition(positions[0][1], QTextCursor.MoveMode.KeepAnchor)
+            sel.setPosition(specs[0][0])
+            sel.setPosition(specs[0][1], QTextCursor.MoveMode.KeepAnchor)
             editor.setTextCursor(sel)
         self._status_label.setText("已插入片段：{0}".format(snippet.trigger))
         return True

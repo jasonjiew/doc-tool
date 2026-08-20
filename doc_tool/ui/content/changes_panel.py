@@ -76,6 +76,7 @@ class ChangesPanel(QWidget):
         self._rollback_all = rollback_all
         self._items: List[ChangeItem] = []
         self._source = "local"
+        self._source_note = ""
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
@@ -121,19 +122,31 @@ class ChangesPanel(QWidget):
         self._status_label.setObjectName("statusMuted")
         self._status_label.setWordWrap(True)
         actions.addWidget(self._status_label, 1)
+        self._revision_btn = QPushButton("生成修订记录", self)
+        self._revision_btn.setProperty("btnRole", "secondary")
+        self._revision_btn.clicked.connect(self._on_generate_revision_record)
+        actions.addWidget(self._revision_btn)
         outer.addLayout(actions)
         self._update_action_state()
 
     # --- 数据 ---
 
-    def set_source(self, source: str) -> None:
-        """标注变更检测来源（git/svn/local），显示在计数行。"""
+    def set_source(self, source: str, note: str = "") -> None:
+        """标注变更检测来源（git/svn/local），显示在计数行。
+
+        ``note``：可选说明（如「项目未纳入 Git，已回退本地快照」），让用户
+        知道为什么不是用版本控制在判断新增/修改。
+        """
         self._source = source or "local"
+        self._source_note = note or ""
         self._render_source_label()
 
     def _render_source_label(self) -> None:
         label = _SOURCE_LABELS.get(self._source, self._source)
-        self._source_label.setText("检测来源：{0}".format(label))
+        text = "检测来源：{0}".format(label)
+        if getattr(self, "_source_note", ""):
+            text = "{0}（{1}）".format(text, self._source_note)
+        self._source_label.setText(text)
 
     def set_items(self, items: List[ChangeItem]) -> None:
         """推送改动项并渲染列表与计数（保留当前选中不动）。"""
@@ -185,16 +198,22 @@ class ChangesPanel(QWidget):
         self._update_action_state()
 
     def _read_current(self, rel_path: str) -> str:
-        if rel_path.startswith("assets/"):
+        """读当前文件文本；非文本（图片/表格 XML 等）不参与 diff。"""
+        if not rel_path.endswith((".md", ".markdown")):
             return ""
         try:
             return (self._content_root / rel_path).read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             return ""
 
     def _diff_text(self, item: ChangeItem) -> str:
         from doc_tool.application.content.changes import render_unified_diff
 
+        if not item.rel_path.endswith((".md", ".markdown")):
+            # 资源文件（图片/表格）没有可读的文本差异，只说明状态。
+            return "（{0}：非文本文件，不显示差异）".format(
+                _ITEM_LABELS.get(item.status, item.status)
+            )
         if item.status == "added":
             old = ""
         else:
@@ -214,6 +233,7 @@ class ChangesPanel(QWidget):
         )
         self._restore_btn.setEnabled(restorable)
         self._rollback_all_btn.setEnabled(self._writable and bool(self._items))
+        self._revision_btn.setEnabled(self._has_revision_candidates())
         if item is None:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("")
@@ -289,3 +309,18 @@ class ChangesPanel(QWidget):
         if self._on_restored is not None:
             self._on_restored()
         self._update_action_state()
+
+    def _has_revision_candidates(self) -> bool:
+        """是否存在可生成修订记录的 Markdown 改动条目（资源/project.yml 不计）。"""
+        return any(
+            item.rel_path.endswith((".md", ".markdown")) for item in self._items
+        )
+
+    def _on_generate_revision_record(self) -> None:
+        """生成修订记录定位清单（章节->小节），弹窗展示可编辑并复制。"""
+        if not self._items:
+            return
+        from doc_tool.application.content.revision_record import build_revision_record
+        from doc_tool.ui.content.revision_record_dialog import RevisionRecordDialog
+
+        RevisionRecordDialog(build_revision_record(self._items), parent=self).exec()

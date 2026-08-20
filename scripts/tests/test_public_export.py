@@ -176,8 +176,6 @@ class PublicExportTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("doc_tool_export", module_path)
         export = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(export)
-        sl = _load_scan_leaks()
-        vocab = sl.load_vocabulary()
 
         with tempfile.TemporaryDirectory(prefix="doc-pub-export-") as tmp:
             output = Path(tmp) / "export"

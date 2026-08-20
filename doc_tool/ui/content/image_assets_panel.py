@@ -142,10 +142,14 @@ class ImageAssetsPanel(QWidget):
             result = self._writer.delete_asset(rel_path)
             if not result.written:
                 failures.append("{0}: {1}".format(rel_path, result.error or "删除失败"))
-        self._status.setText(
-            "清理完成" if not failures else "部分失败：" + "; ".join(failures)
-        )
         self._notify_changed()
+        if failures:
+            # _notify_changed → on_changed → workspace._after_write → set_index
+            # → refresh() 会把状态覆盖为「未使用 N 项…」：失败明细必须在其后
+            # 重新写入，否则用户看不到哪些图片删除失败。
+            self._status.setText("部分失败：" + "; ".join(failures))
+        else:
+            self._status.setText("清理完成")
 
     def repoint_selected(self) -> None:
         ref = self._selected_missing()
