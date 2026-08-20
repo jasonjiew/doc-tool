@@ -138,6 +138,14 @@ python scripts\setup_pyside6.py
 Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
 ```
 
+### 免安装（便携包）
+
+Release 同时提供 `DocTool-X.Y.Z-portable.zip`：解压到任意目录，双击其中的 `启动DocTool.cmd` 即可，不需要管理员权限，也不写注册表。
+
+**不要单独取出 `DocTool.exe`** —— 它依赖同目录的 `_internal\`。启动脚本每次会把整个程序目录复制到 `%TEMP%` 下一个全新的随机目录再启动，用于绕开部分终端安全软件对未签名 exe 的两类拦截：从 `%TEMP%` 之外加载 DLL 被拒（报 `DLL load failed while importing _socket`），以及同一路径反复运行后被判定为低信誉。
+
+如果安全软件仍然拦截，请联系 IT 把安装目录加入信任区/执行控制白名单，或为 exe 配置代码签名证书（见 `docs/code-signing-certificate.md`）。
+
 ## 使用方法
 
 ### 1. 创建项目
@@ -289,13 +297,32 @@ python scripts\tests\run_tests.py test_cli_machine.py test_project_build.py
 python scripts\tests\run_tests.py --coverage --coverage-min 80
 ```
 
-构建 Windows 安装包：
+### 打包
+
+三条打包链路，同一份 PyInstaller 规格（`packaging/doc_tool.spec`，onedir），按用途选：
+
+| 入口 | 产物 | 包含步骤 | 需要 Inno Setup |
+| --- | --- | --- | --- |
+| `build_exe.ps1` | `dist\DocTool\`、便携 zip | PyInstaller、产物内容校验、冻结冒烟 | 否 |
+| `packaging\build.ps1` | 安装器 `DocTool-Setup-X.Y.Z.exe` | 泄漏扫描、PyInstaller、严格泄漏扫描、冻结冒烟、Inno Setup、SHA-256 与依赖清单 | 是 |
+| `.gitlab-ci.yml`（推 `vX.Y.Z` 标签触发） | Release 全套资产 | 版本一致性、测试与覆盖率门禁、依赖审计、SBOM、净化源码导出扫描、PyInstaller、严格泄漏扫描、公共发布门禁、可选代码签名、Inno Setup、安装级冒烟、SHA-256、便携 zip | 是（在 Runner 上） |
+
+日常与团队分发用轻量脚本即可（也可双击 `打包成exe.cmd`，参数原样透传）：
 
 ```powershell
-.\packaging\build.ps1
+.\build_exe.ps1 -Portable      # onedir + dist\DocTool-X.Y.Z-portable.zip（免安装分发）
+.\build_exe.ps1 -OneFile       # 单文件 exe，使用 packaging\doc_tool_onefile.spec
+.\build_exe.ps1 -SkipTests     # 跳过产物校验与冻结冒烟
 ```
 
-发布流水线包括测试、依赖审计、敏感文档泄漏扫描、PyInstaller 构建、冻结应用和安装级冒烟测试，并生成 SHA-256、CycloneDX 与 SPDX 清单。
+要点：
+
+- `build_exe.ps1` **不跑**泄漏扫描与发布门禁，只适合本地迭代和内部分发；正式对外产物必须走 tag 流水线。
+- `packaging\build.ps1` 的 `release_gate.py` 只报告状态，硬阻断只在 CI 的 `--public` 模式。
+- 两个本地脚本优先使用仓库自带的 vendored 运行时（`build\pyinstaller-tool`、`build\pyside-runtime`），规避 pip 被终端安全软件拦截；PyInstaller 低于 `requirements-build.txt` 锁定版本会直接报错（旧版在 Python 3.13 上会打出扩展模块加载失败的坏包）。
+- 便携包的启动脚本在 `packaging\portable\启动DocTool.cmd`，必须保持纯 ASCII（cmd.exe 按系统 ANSI 代码页解析批处理文件）。
+
+发布版本时需同步 5 处版本标识：`doc_tool/domain/version.py`、`.gitlab-ci.yml`、README 徽章、`packaging/build.ps1`、`packaging/installer.iss`；CI 的 `validate-version` 会校验标签与后三者一致，并要求工作树干净（含未跟踪文件）。
 
 ### 代码结构
 
