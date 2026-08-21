@@ -256,17 +256,32 @@ class PortablePackageTests(unittest.TestCase):
     def test_build_script_exposes_portable_switch(self):
         script = (Path(REPO_ROOT) / "build_exe.ps1").read_text(encoding="utf-8")
         self.assertIn("[switch]$Portable", script)
-        # 便携包必须由 onedir 产出，且 zip 里同时包含目录与启动脚本。
-        self.assertIn("packaging\\portable\\启动DocTool.cmd", script)
-        self.assertIn("Compress-Archive", script)
-        self.assertIn("DocTool-$AppVersion-portable.zip", script)
+        # 装配逻辑统一委托给 packaging/make_portable.ps1（与 CI 同源）。
+        self.assertIn("make_portable.ps1", script)
+        make_portable = (
+            Path(REPO_ROOT) / "packaging" / "make_portable.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Compress-Archive", make_portable)
+        self.assertIn("DocTool-$Version-portable.zip", make_portable)
+        # zip 里同时包含应用目录、启动脚本与诊断脚本。
+        self.assertIn("启动DocTool.cmd", make_portable)
+        self.assertIn("diagnose.cmd", make_portable)
+
+    def test_dist_staging_script_shared(self):
+        """stage_dist.ps1 除低了启动/诊断脚本的复处漂移与基线过期。"""
+        stage = (Path(REPO_ROOT) / "packaging" / "stage_dist.ps1").read_text(encoding="utf-8")
+        self.assertIn("EXP_BL_SIZE", stage)
+        self.assertIn("Get-FileHash", stage)
+        self.assertIn("diagnose.cmd", stage)
+        build_installer = (Path(REPO_ROOT) / "packaging" / "build.ps1").read_text(encoding="utf-8")
+        self.assertIn("stage_dist.ps1", build_installer)
 
     def test_ci_publishes_portable_package(self):
         """tag 流水线除安装器外还产出便携包，并挂进 Release 资产。"""
         ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
         package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
         self.assertIn("DocTool-$env:APP_VERSION-portable.zip", package_block)
-        self.assertIn("Compress-Archive", package_block)
+        self.assertIn("make_portable.ps1", package_block)
         # 便携包也要有校验值，且发布说明与资产链接都要带上。
         self.assertIn('"$portable.sha256"', package_block)
         release_block = ci[ci.index("release-upload:"):]
@@ -279,9 +294,29 @@ class PortablePackageTests(unittest.TestCase):
         ci = (Path(REPO_ROOT) / ".gitlab-ci.yml").read_text(encoding="utf-8")
         package_block = ci[ci.index("package-installer:"):ci.index("release-upload:")]
         sign_pos = package_block.index("$signtool.Source sign")
-        zip_pos = package_block.index("Compress-Archive")
+        zip_pos = package_block.index("make_portable.ps1")
         self.assertLess(sign_pos, zip_pos)
 
+
+    def test_installer_ships_diagnose_cmd(self):
+        """安装器随带诊断脚本，成员双击运行后回传 DocTool-diagnose.txt。"""
+        iss = (Path(REPO_ROOT) / "packaging" / "installer.iss").read_text(encoding="utf-8")
+        self.assertIn("diagnose.cmd", iss)
+        self.assertTrue(
+            (Path(REPO_ROOT) / "packaging" / "portable" / "diagnose.cmd").is_file(),
+            "诊断脚本必须入库",
+        )
+
+    def test_gui_entry_has_self_heal_fallback(self):
+        """GUI 入口冻结态下 PySide6 导入失败走 self_heal 自愈，其余启动异常可见化。"""
+        app_src = (Path(REPO_ROOT) / "doc_tool" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("self_heal.handle_blocked_import", app_src)
+        self.assertIn("self_heal.report_startup_failure", app_src)
+        heal = (
+            Path(REPO_ROOT) / "doc_tool" / "application" / "self_heal.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("DOCTOOL_RELOCATED", heal)
+        self.assertIn("MessageBoxW", heal)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

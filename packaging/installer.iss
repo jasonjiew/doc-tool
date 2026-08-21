@@ -30,7 +30,7 @@
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "1.4.1"
+#define MyAppVersion "1.4.2"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"
@@ -91,6 +91,8 @@ Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescriptio
 Source: "..\dist\{#MyAppNameEn}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 安装版启动器：复制到 %TEMP% 全新目录再启动（绕开安全软件对未签名 exe 的拦截）
 Source: "installed\启动DocTool.cmd"; DestDir: "{app}"; Flags: ignoreversion
+; 诊断工具：成员双击运行后回传 DocTool-diagnose.txt（基线由打包流水线刷新）
+Source: "..\dist\diagnose.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; 开始菜单快捷方式：经启动器运行（%TEMP% 复制启动，规避安全软件拦截）

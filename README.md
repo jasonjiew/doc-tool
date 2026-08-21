@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.4.1-blue)
+![Version](https://img.shields.io/badge/version-1.4.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md) · [GitHub](https://github.com/wangjie0721666-web/doc-tool)
@@ -144,7 +144,7 @@ Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
 
 Release 同时提供 `DocTool-X.Y.Z-portable.zip`：解压到任意目录，双击其中的 `启动DocTool.cmd` 即可，不需要管理员权限，也不写注册表。
 
-**不要单独取出 `DocTool.exe`** —— 它依赖同目录的 `_internal\`。启动脚本每次会把整个程序目录复制到 `%TEMP%` 下一个全新的随机目录再启动，用于绕开部分终端安全软件对未签名 exe 的两类拦截：从 `%TEMP%` 之外加载 DLL 被拒（报 `DLL load failed while importing _socket`），以及同一路径反复运行后被判定为低信誉。
+`DocTool.exe` 依赖同目录的 `_internal\`，两者不要拆散。自 1.4.2 起，即使直接双击 `DocTool.exe`，程序在检测到扩展模块被安全软件拦截时也会自动把整个目录迁移到 `%TEMP%` 下的稳定目录并自行重启（失败会弹窗并写 `DocTool-startup.log`）；`启动DocTool.cmd` 仍作为预置迁移路径保留，双击它同样可用。zip 根部的 `diagnose.cmd` 是诊断工具：遇到问题时双击运行，把生成的 `DocTool-diagnose.txt` 发给维护人员。
 
 如果安全软件仍然拦截，请联系 IT 把安装目录加入信任区/执行控制白名单，或为 exe 配置代码签名证书（见 `docs/code-signing-certificate.md`）。
 

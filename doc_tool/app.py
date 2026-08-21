@@ -14,6 +14,11 @@ from __future__ import annotations
 import sys
 
 
+def _is_frozen() -> bool:
+    """是否运行于 PyInstaller 冻结产物中。"""
+    return bool(getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None))
+
+
 def main() -> int:
     # PyInstaller 冻结应用使用 spawn 子进程对 Word COM 探测施加真实超时。
     try:
@@ -27,6 +32,13 @@ def main() -> int:
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:  # pragma: no cover
+        if _is_frozen():
+            # 冻结态下扩展模块导入失败，最常见的根因是终端安全软件拦截未签名
+            # exe 从当前目录加载 DLL。交给自愈模块：迁移到 %TEMP% 稳定目录重启；
+            # 彻底失败时弹消息框并写日志（不再静默退出）。
+            from doc_tool.application import self_heal
+
+            return self_heal.handle_blocked_import(exc)
         print(
             "当前环境缺少 PySide6，无法启动图形界面。"
             "请先安装：python -m pip install PySide6。",
@@ -34,6 +46,21 @@ def main() -> int:
         )
         print("原始错误：{0}".format(exc), file=sys.stderr)
         return 1
+
+    if _is_frozen():
+        # 冻结 GUI 没有控制台，未捕获异常会被静默吞掉、成员机器上表现为
+        # 「双击没反应」。冻结态兜底：显示消息框并落盘日志。
+        try:
+            return _run_gui(QApplication)
+        except Exception as exc:  # noqa: BLE001 - 启动期兜底，必须兜住一切
+            from doc_tool.application import self_heal
+
+            return self_heal.report_startup_failure(exc)
+    return _run_gui(QApplication)
+
+
+def _run_gui(QApplication) -> int:
+    """GUI 主体（原 main() 的后半段，独立出来便于启动期兜底）。"""
 
     app = QApplication(sys.argv)
     from doc_tool.domain.branding import (

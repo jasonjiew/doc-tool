@@ -24,7 +24,7 @@ DEFAULT_TESTS = [
     "test_vcs_changes.py", "test_revision_record.py", "test_multi_window.py",
     "test_lock_log_cancel.py", "test_word_release.py", "test_packaging.py",
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
-    "test_migration.py", "test_public_export.py",
+    "test_migration.py", "test_self_heal.py", "test_public_export.py",
 ]
 
 

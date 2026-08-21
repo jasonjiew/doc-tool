@@ -17,7 +17,7 @@ stages:
   - release
 
 variables:
-  APP_VERSION: "1.4.1"
+  APP_VERSION: "1.4.2"
   PYTHON_VERSION: "3.13"
   COVERAGE_MIN: "60"
 
@@ -177,6 +177,11 @@ package-installer:
         Write-Warning "未配置代码签名证书，产出仅限受控试点"
       }
 
+      # installer.iss 引用 ..\dist\diagnose.cmd：先把启动/诊断脚本暂存进 dist\
+      # （dist/DocTool/ 来自 build-onedir 产物；dist 根的脚本需要这一步生成）。
+      powershell -NoProfile -ExecutionPolicy Bypass -File packaging\stage_dist.ps1
+      if ($LASTEXITCODE -ne 0) { throw "dist 暂存失败" }
+
       $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
       if (!(Test-Path $iscc)) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
       if (!(Test-Path $iscc)) { throw "Inno Setup 未安装" }
@@ -188,16 +193,14 @@ package-installer:
         Pop-Location
       }
 
-      # 团队分发便携包：onedir 目录 + 启动脚本（脚本每次复制到 %TEMP% 下全新随机
-      # 目录再启动，绕开安全软件对「未签名 exe 从 %TEMP% 之外加载 DLL」的拦截与
-      # 路径信誉拖黑）。必须放在应用签名之后，否则包里装的是未签名 exe。
+      # 团队分发便携包：onedir 目录 + 启动脚本 + 诊断脚本（基线自动刷新）。
+      # 必须放在应用签名之后，否则包里装的是未签名 exe。
+      # 装配逻辑统一在 packaging/make_portable.ps1，与本地 build_exe.ps1 -Portable 同源。
+      powershell -NoProfile -ExecutionPolicy Bypass -File packaging\make_portable.ps1 -Version $env:APP_VERSION
+      if ($LASTEXITCODE -ne 0) { throw "便携包生成失败" }
       $portable = "packaging\Output\DocTool-$env:APP_VERSION-portable.zip"
-      New-Item -ItemType Directory -Force "packaging\Output" | Out-Null
-      if (Test-Path $portable) { Remove-Item $portable -Force }
-      Copy-Item "packaging\portable\启动DocTool.cmd" "dist\" -Force
-      Compress-Archive -Path "dist\DocTool", "dist\启动DocTool.cmd" -DestinationPath $portable -CompressionLevel Optimal
       $portableHash = (Get-FileHash $portable -Algorithm SHA256).Hash
-      "$portableHash  DocTool-$env:APP_VERSION-portable.zip" | Out-File "$portable.sha256" -Encoding ascii -NoNewline
+      if (!(Test-Path "$portable.sha256")) { throw "便携包校验值文件缺失: $portable.sha256" }
 
       $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test_installer_smoke.ps1 -InstallerPath $exe

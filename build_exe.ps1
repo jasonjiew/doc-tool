@@ -23,9 +23,10 @@
 
 .PARAMETER Portable
     在 onedir 构建之后额外打出团队分发便携包
-    dist\DocTool-<版本>-portable.zip（DocTool\ + 启动DocTool.cmd）。
-    启动脚本每次把整个目录复制到 %TEMP% 下全新随机目录再启动，绕开安全软件
-    对「未签名 exe 从 %TEMP% 之外加载 DLL」的拦截与路径信誉拖黑。
+    packaging\Output\DocTool-<版本>-portable.zip（DocTool\ + 启动DocTool.cmd
+    + diagnose.cmd）。启动脚本每次把整个目录复制到 %TEMP% 下全新随机目录再启动，
+    绕开安全软件对「未签名 exe 从 %TEMP% 之外加载 DLL」的拦截与路径信誉拖黑；
+    1.4.2 起 DocTool.exe 内置同等自愈逻辑，成员直接双击 exe 也能自动迁移启动。
 
 .PARAMETER SkipTests
     跳过冻结冒烟测试与产物内容校验。
@@ -249,28 +250,11 @@ if ($OneFile) {
 # 到任意位置，双击脚本即可（脚本每次复制到 %TEMP% 下全新随机目录再启动）。
 if ($Portable) {
     if ($OneFile) {
-        throw "-Portable 需要 onedir 布局（便携包依赖 DocTool\ 目录），请去掉 -OneFile。"
+        throw "-Portable 需要 onedir 目录（便携包依赖 DocTool\ 目录），请去掉 -OneFile。"
     }
     Write-Host ""
     Write-Host "=== 生成便携包 ===" -ForegroundColor Cyan
-    $Launcher = Join-Path $RepoRoot "packaging\portable\启动DocTool.cmd"
-    if (-not (Test-Path $Launcher)) { throw "缺少启动脚本: $Launcher" }
-    Push-Location $RepoRoot
-    try {
-        $AppVersion = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
-    } finally {
-        Pop-Location
-    }
-    if (-not $AppVersion) { throw "无法读取 APP_VERSION" }
-    Copy-Item $Launcher (Join-Path $RepoRoot "dist") -Force
-    $Zip = Join-Path $RepoRoot "dist\DocTool-$AppVersion-portable.zip"
-    if (Test-Path $Zip) { Remove-Item $Zip -Force }
-    Compress-Archive -Path @(
-        (Join-Path $RepoRoot "dist\DocTool"),
-        (Join-Path $RepoRoot "dist\启动DocTool.cmd")
-    ) -DestinationPath $Zip -CompressionLevel Optimal
-    $SizeMb = [math]::Round((Get-Item $Zip).Length / 1MB, 1)
-    Write-Host "便携包: $Zip（$SizeMb MB）" -ForegroundColor White
-    Write-Host "分发说明：整包发给同事，解压后双击「启动DocTool.cmd」，不要单独取出 DocTool.exe。" -ForegroundColor White
+    & (Join-Path $RepoRoot "packaging\make_portable.ps1") -RepoRoot $RepoRoot
+    if ($LASTEXITCODE -gt 0) { throw "便携包生成失败" }
 }
 

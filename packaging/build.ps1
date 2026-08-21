@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     Doc Tool 安装包构建脚本
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 # fallback corrupting captured output in PowerShell-driven release builds.
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "1.4.1"
+$Version = "1.4.2"
 
 # --- vendored 运行时（优先使用，规避安全软件对 pip 的拦截与本机残缺安装）---
 $VendoredQt = "$RepoRoot\build\pyside-runtime"
@@ -157,6 +157,11 @@ if (-not $SkipTests) {
 
 # --- 阶段 4：Inno Setup 编译 ---
 Write-Host "[4/5] Inno Setup 编译安装器..." -ForegroundColor Yellow
+
+# 安装器随带诊断脚本（installer.iss 从 dist\ 引用 diagnose.cmd）：
+# 把启动脚本与基线已刷新的诊断脚本暂存进 dist\。
+& "$PSScriptRoot\stage_dist.ps1" -RepoRoot $RepoRoot
+if ($LASTEXITCODE -gt 0) { throw "dist 暂存失败" }
 
 # 查找 ISCC.exe
 $IsccPaths = @(

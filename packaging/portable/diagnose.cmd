@@ -1,17 +1,27 @@
 @echo off
 setlocal enableextensions
-rem Doc Tool portable diagnostic. Put this file in the folder that contains
-rem the 'DocTool' subfolder (the same folder as the launcher .cmd), run it,
-rem then send back the generated DocTool-diagnose.txt.
+rem Doc Tool diagnostic. Ships INSIDE both distribution formats:
+rem   * portable zip: sits next to the 'DocTool' folder (zip root)
+rem   * installed app: sits in the install folder next to DocTool.exe
+rem Run it (double-click), then send back the generated DocTool-diagnose.txt.
+rem The EXP_* baselines below are refreshed automatically from the actual
+rem build outputs by packaging/make_portable.ps1 / stage_dist.ps1 - do not
+rem hand-edit them.
 rem NOTE: keep this file ASCII-only - cmd.exe parses batch files with the
 rem system ANSI codepage, so non-ASCII bytes can corrupt parsing.
 
 set "HERE=%~dp0"
 set "APP=%HERE%DocTool"
+set "INS="
+if not exist "%APP%\DocTool.exe" (
+    set "APP=%HERE%"
+    set "INS=1"
+)
 set "LOG=%HERE%DocTool-diagnose.txt"
 set "TMPH=%TEMP%\dt_diag_hash.txt"
 
-rem --- expected baselines for DocTool 1.4.1 portable ---
+rem --- expected baseline values below are auto-rewritten per build ---
+rem --- (see packaging/stage_dist.ps1); the numbers ship with the package ---
 set "EXP_BL_SIZE=1402481"
 set "EXP_BL_HASH=6e71e842c225ef92fb0ae201f5a8f3962d2f0d1291841db14339335d6cf766f8"
 set "EXP_PY_SIZE=6129496"
@@ -45,6 +55,9 @@ if not exist "%APP%\DocTool.exe" (
 )
 
 >>"%LOG%" echo --- 2. file counts ---
+if defined INS (
+    >>"%LOG%" echo   note: installed layout - installer files may add a few extra files.
+)
 call :count "%APP%" %EXP_APP_FILES% "DocTool"
 call :count "%APP%\_internal" %EXP_INT_FILES% "_internal"
 >>"%LOG%" echo.
@@ -114,7 +127,7 @@ rem %1 = folder, %2 = expected count, %3 = label
 set "N=0"
 for /f %%N in ('dir /s /b /a-d "%~1" 2^>nul ^| find /c /v ""') do set "N=%%N"
 >>"%LOG%" echo   %~3 : %N% files   expected: %~2
-if not "%N%"=="%~2" >>"%LOG%" echo     ^<== COUNT MISMATCH: extraction incomplete or files removed
+if %N% LSS %~2 >>"%LOG%" echo     ^<== COUNT TOO LOW: extraction incomplete or files removed by security software
 goto :eof
 
 :chk

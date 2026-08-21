@@ -1,0 +1,57 @@
+﻿# -*- coding: utf-8 -*-
+<#
+.SYNOPSIS
+    生成团队分发便携包：dist\DocTool + 启动脚本 + 诊断脚本 →
+    packaging\Output\DocTool-<版本>-portable.zip（+ .sha256）。
+
+.DESCRIPTION
+    唯一的便携包装配入口，供以下两处共用，避免两处实现漂移：
+      * build_exe.ps1 -Portable（本地一键打包）
+      * .gitlab-ci.yml package-installer（tag 流水线）
+    装配前先调用 stage_dist.ps1 刷新启动/诊断脚本。
+#>
+
+[CmdletBinding()]
+param(
+    [string]$RepoRoot = "",
+    [string]$Version = ""
+)
+
+$ErrorActionPreference = "Stop"
+if (-not $RepoRoot) { $RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path }
+
+& (Join-Path $PSScriptRoot "stage_dist.ps1") -RepoRoot $RepoRoot
+
+if (-not $Version) {
+    Push-Location $RepoRoot
+    try {
+        $Version = (& python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)").Trim()
+    } finally {
+        Pop-Location
+    }
+    if (-not $Version) { throw "无法读取 APP_VERSION" }
+}
+
+$OutDir = Join-Path $RepoRoot "packaging\Output"
+New-Item -ItemType Directory -Force $OutDir | Out-Null
+$Zip = Join-Path $OutDir "DocTool-$Version-portable.zip"
+if (Test-Path $Zip) { Remove-Item $Zip -Force }
+
+Push-Location $RepoRoot
+try {
+    Compress-Archive -Path @(
+        (Join-Path $RepoRoot "dist\DocTool"),
+        (Join-Path $RepoRoot "dist\启动DocTool.cmd"),
+        (Join-Path $RepoRoot "dist\diagnose.cmd")
+    ) -DestinationPath $Zip -CompressionLevel Optimal
+} finally {
+    Pop-Location
+}
+
+$Hash = (Get-FileHash $Zip -Algorithm SHA256).Hash
+"$Hash  DocTool-$Version-portable.zip" | Out-File "$Zip.sha256" -Encoding ascii -NoNewline
+$SizeMb = [math]::Round((Get-Item $Zip).Length / 1MB, 1)
+Write-Host "便携包: $Zip（$SizeMb MB）" -ForegroundColor White
+Write-Host "SHA-256: $Hash" -ForegroundColor White
+Write-Host "分发说明：整包发给同事，解压后双击「启动DocTool.cmd」；" -ForegroundColor DarkGray
+Write-Host "          即使直接双击 DocTool.exe，1.4.2+ 也会自动迁移到 %TEMP% 后启动。" -ForegroundColor DarkGray
