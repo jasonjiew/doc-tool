@@ -1,4 +1,4 @@
-; -*- coding: utf-8 -*-
+﻿; -*- coding: utf-8 -*-
 ; Inno Setup 脚本：Doc Tool Windows 安装器
 ;
 ; 任务 8.5：稳定 AppId、按用户安装、开始菜单和可选桌面快捷方式。
