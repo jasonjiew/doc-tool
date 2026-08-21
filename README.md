@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.4.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md) · [GitHub](https://github.com/wangjie0721666-web/doc-tool)
@@ -133,6 +133,8 @@ python scripts\setup_pyside6.py
 ### 安装版
 
 项目支持通过 PyInstaller 和 Inno Setup 生成独立安装包，最终用户无需安装 Python。公开 Release 建立后，可在这里提供下载入口和 SHA-256 校验说明。
+
+安装器与便携包同策略：开始菜单/桌面快捷方式通过启动器把程序复制到 `%TEMP%` 下全新随机目录再启动，规避安全软件对未签名 exe 的拦截；安装时若默认目录含中文等非 ASCII 字符（如中文 Windows 用户名导致 `C:\Users\张三\...`），会自动改用 `C:\ProgramData\DocTool` 并提示——PyInstaller 引导程序在非 ASCII 路径下初始化内嵌 Python 会失败，报 `Failed to start embedded python interpreter!`。
 
 ```powershell
 Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
@@ -324,6 +326,7 @@ python scripts\tests\run_tests.py --coverage --coverage-min 80
 - `packaging\build.ps1` 的 `release_gate.py` 只报告状态，硬阻断只在 CI 的 `--public` 模式。
 - 两个本地脚本优先使用仓库自带的 vendored 运行时（`build\pyinstaller-tool`、`build\pyside-runtime`），规避 pip 被终端安全软件拦截；PyInstaller 低于 `requirements-build.txt` 锁定版本会直接报错（旧版在 Python 3.13 上会打出扩展模块加载失败的坏包）。
 - 便携包的启动脚本在 `packaging\portable\启动DocTool.cmd`，必须保持纯 ASCII（cmd.exe 按系统 ANSI 代码页解析批处理文件）。
+- 安装器与便携包共用「复制到 `%TEMP%` 全新随机目录再启动」策略规避安全软件拦截（启动器在 `packaging\installed\启动DocTool.cmd`）；安装器另做非 ASCII 安装目录检测——中文 Windows 用户名下默认目录含中文，PyInstaller 引导程序会报 `Failed to start embedded python interpreter!`，检测到时会自动改用 `{commonappdata}\DocTool` 并提示（见 `packaging/installer.iss` 的 `[Code]`）。
 
 发布版本时需同步 5 处版本标识：`doc_tool/domain/version.py`、`.gitlab-ci.yml`、README 徽章、`packaging/build.ps1`、`packaging/installer.iss`；CI 的 `validate-version` 会校验标签与后三者一致，并要求工作树干净（含未跟踪文件）。
 

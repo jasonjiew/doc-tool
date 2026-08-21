@@ -18,10 +18,19 @@
 ; 发布决策（见 docs/release/02-release-decisions.md）：
 ;   Publisher 采用中性「Doc Tool Project」，URL 本期为空（公共域名未定）；
 ;   决策已登记为 DECIDED，正式公开前如需更名按决策登记表一次性调整。
+;
+; 加固（2026-08，针对成员报 "Failed to start embedded python interpreter!"）：
+;   1) 中文 Windows 用户名会把默认安装目录变成 C:\Users\张三\AppData\Local\...，
+;      PyInstaller 引导程序在非 ASCII 路径下初始化内嵌 Python 失败，报上述错误。
+;      安装器检测到非 ASCII 安装目录时自动改用 {commonappdata}\DocTool 并提示；
+;      用户若仍选择非 ASCII 目录，Next 会被阻止并给出说明。
+;   2) 开始菜单/桌面快捷方式经 installed\启动DocTool.cmd 把程序复制到 %TEMP% 下
+;      全新随机目录再启动，绕开安全软件对未签名 exe 从安装目录加载 DLL 的拦截
+;      （与便携包同策略）。
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.4.1"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"
@@ -80,17 +89,19 @@ Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescriptio
 [Files]
 ; PyInstaller onedir 产出（dist/DocTool/* -> 安装目录/*）
 Source: "..\dist\{#MyAppNameEn}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 安装版启动器：复制到 %TEMP% 全新目录再启动（绕开安全软件对未签名 exe 的拦截）
+Source: "installed\启动DocTool.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-; 开始菜单快捷方式
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
+; 开始菜单快捷方式：经启动器运行（%TEMP% 复制启动，规避安全软件拦截）
+Name: "{group}\{#MyAppName}"; Filename: "{app}\启动DocTool.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 ; 桌面快捷方式（可选）
-Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\启动DocTool.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; 安装完成后可选启动应用
-Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; 安装完成后可选启动应用（经启动器）
+Filename: "{app}\启动DocTool.cmd"; Description: "立即启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; 卸载前确保应用已关闭
@@ -100,6 +111,80 @@ Filename: "{cmd}"; Parameters: "/C taskkill /IM {#MyAppExeName} /F /T 2>nul"; Fl
 ; 的文件；安装目录中非安装器拥有的文件会被保留，符合非破坏性卸载要求。
 
 [Code]
+var
+  NonAsciiDirHintShown: Boolean;
+
+// 判断安装是否处于静默模式（/SILENT 或 /VERYSILENT）。Inno Setup 6.7.3
+// 没有内置 IsSilent 函数，用 ParamStr 检测命令行参数。
+function IsSilent: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if (CompareText(ParamStr(I), '/SILENT') = 0) or
+       (CompareText(ParamStr(I), '/VERYSILENT') = 0) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+// 判断目录路径是否只含 ASCII 字符。PyInstaller 引导程序在非 ASCII 路径
+// （如中文 Windows 用户名导致的 C:\Users\张三\...）下初始化内嵌 Python 会
+// 失败并报 "Failed to start embedded python interpreter!"。
+function IsAsciiPath(const S: String): Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  for I := 1 to Length(S) do
+  begin
+    if Ord(S[I]) > 127 then
+    begin
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
+
+// 进入目录选择页时：默认目录含非 ASCII 字符则自动改用 {commonappdata}（纯 ASCII）。
+// 仅交互式安装生效；静默安装（/SILENT /VERYSILENT）由调用方显式传入目录，
+// 且经启动器复制到 %TEMP% 纯 ASCII 目录运行，不在此处拦截。
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpSelectDir) and (not IsSilent()) then
+  begin
+    if (not NonAsciiDirHintShown) and (not IsAsciiPath(WizardDirValue())) then
+    begin
+      WizardForm.DirEdit.Text := ExpandConstant('{commonappdata}\{#MyAppNameEn}');
+      MsgBox('默认安装目录包含中文等非 ASCII 字符，会导致程序无法启动。' + #13#10 +
+             '已自动改用纯英文目录：' + ExpandConstant('{commonappdata}\{#MyAppNameEn}') + #13#10 +
+             '如不希望安装到该目录，请手动选择一个纯英文路径（例如 D:\DocTool）。',
+             mbInformation, MB_OK);
+      NonAsciiDirHintShown := True;
+    end;
+  end;
+end;
+
+// 目录选择页点「下一步」时：目录仍含非 ASCII 字符则阻止继续，并给出说明。
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpSelectDir) and (not IsSilent()) then
+  begin
+    if not IsAsciiPath(WizardDirValue()) then
+    begin
+      MsgBox('安装目录不能包含中文等非 ASCII 字符，否则程序将无法启动。' + #13#10 +
+             '请选择纯英文目录，例如 D:\DocTool 或 C:\ProgramData\DocTool。',
+             mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
 function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
@@ -112,9 +197,12 @@ end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  // 升级时跳过目录选择页（使用之前的目录）
+  // 升级时跳过目录选择页（使用之前的目录）。注意不能用 {app} 常量——
+  // ShouldSkipPage 在 {app} 初始化之前就可能被调用，会触发
+  // "attempt was made to expand the 'app' constant before it was initialized"；
+  // WizardDirValue() 直接读目录输入框的当前值，任何阶段都安全。
   if PageID = wpSelectDir then
-    Result := FileExists(ExpandConstant('{app}\{#MyAppExeName}'))
+    Result := FileExists(WizardDirValue() + '\{#MyAppExeName}')
   else
     Result := False;
 end;

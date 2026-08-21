@@ -32,6 +32,7 @@ _internal/lxml/**
 _internal/PIL/**
 _internal/yaml/**
 _internal/win32/**
+_internal/win32com/**
 _internal/pythonwin/**
 _internal/pywin32_system32/**
 _internal/setuptools/**
