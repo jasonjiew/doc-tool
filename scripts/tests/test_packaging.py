@@ -256,6 +256,36 @@ class PortablePackageTests(unittest.TestCase):
         self.assertNotIn("Copy-Item", text)
         self.assertNotIn("%TGT%", text)
 
+    def test_launcher_reports_start_failure(self):
+        """1.4.5：preflight 启动并监视应用，快速失败时启动器给出可见报错。"""
+        text = self.LAUNCHER.read_text(encoding="ascii")
+        self.assertIn("STARTFAIL", text)
+        self.assertIn("NOTSTARTED", text)
+        self.assertIn("dt_startfail_reason.txt", text)
+        # 兜底直启（preflight 未运行/未能启动时）仍在。
+        self.assertIn('start "" "%SRC%\\DocTool.exe"', text)
+        preflight = (
+            Path(REPO_ROOT) / "packaging" / "portable" / "preflight.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Start-Process", preflight)
+        self.assertIn("WaitForExit", preflight)
+        self.assertIn("STARTFAIL", preflight)
+        installed = (
+            Path(REPO_ROOT) / "packaging" / "installed" / "启动DocTool.cmd"
+        ).read_text(encoding="ascii")
+        self.assertIn("STARTFAIL", installed)
+        self.assertIn("NOTSTARTED", installed)
+
+    def test_preflight_script_is_ascii_only(self):
+        """preflight.ps1 与启动器一样必须 ASCII-only（PS 5.1 无 BOM 按 ANSI 解析）。"""
+        raw = (
+            Path(REPO_ROOT) / "packaging" / "portable" / "preflight.ps1"
+        ).read_bytes()
+        offenders = [
+            (index, byte) for index, byte in enumerate(raw) if byte > 0x7F
+        ]
+        self.assertEqual(offenders, [], "preflight.ps1 出现非 ASCII 字节")
+
     def test_build_script_exposes_portable_switch(self):
         script = (Path(REPO_ROOT) / "build_exe.ps1").read_text(encoding="utf-8")
         self.assertIn("[switch]$Portable", script)

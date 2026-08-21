@@ -4,11 +4,21 @@
 # file grows by 4 KB and loses its header, breaking the embedded Python
 # interpreter with 'Failed to start embedded python interpreter!').
 #
-# Output (one line, captured by the launcher's for /f):
-#   - empty          : all good
-#   - "REPAIRED"     : base_library.zip was corrupt and has been restored from
-#                      base_library.zip.bak
+# Since 1.4.5 this script ALSO launches the app and watches the first seconds
+# of startup: after the checks pass, DocTool.exe is started from here and the
+# process is watched for up to 8 seconds. A quick nonzero exit means startup
+# failed (endpoint security blocking the .pyd loads, or components corrupted
+# after the header check) - the reason is captured from DocTool-startup.log so
+# the launcher can show it instead of a silent black-window flash.
+#
+# Output (one line, captured by the launcher):
+#   - empty          : all good, app is running
+#   - "REPAIRED"     : base_library.zip was corrupt and restored from .bak
 #   - "BROKEN: ..."  : a critical file is unreadable / not the expected format
+#   - "STARTFAIL: exit=N" : app exited fast with code N; reason written to
+#                      %TEMP%\dt_startfail_reason.txt
+#   - "NOTSTARTED"   : the app could not be launched from here; the launcher
+#                      falls back to starting it directly
 #
 # ASCII-only: Windows PowerShell 5.1 parses .ps1 without a BOM as the system
 # ANSI codepage, so keep this file free of non-ASCII bytes.
@@ -41,6 +51,34 @@ function Test-Zip([string]$p) {
     } catch {
         return $false
     }
+}
+
+function Get-StartupFailureReason {
+    $log = Join-Path $env:TEMP 'DocTool-startup.log'
+    if (-not (Test-Path -LiteralPath $log)) {
+        $log = Join-Path $b 'DocTool-startup.log'
+    }
+    if (-not (Test-Path -LiteralPath $log)) { return '(no DocTool-startup.log found)' }
+    try {
+        $content = [System.IO.File]::ReadAllText($log, [System.Text.Encoding]::UTF8)
+    } catch {
+        return '(cannot read DocTool-startup.log)'
+    }
+    $lines = @($content -split "`r?`n")
+    $last = -1
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+        if ($lines[$i] -like '====*') { $last = $i; break }
+    }
+    if ($last -lt 0) { $last = 0 }
+    $block = @($lines[$last..($lines.Count - 1)] | Where-Object {
+        $_ -match 'import error|error|Exception'
+    } | Select-Object -First 3)
+    if ($block.Count -eq 0) { return '(startup log has no error lines)' }
+    $text = ($block -join ' | ')
+    if ($text.Length -gt 400) { $text = $text.Substring(0, 400) }
+    # keep only printable ASCII so the launcher's 'type' output is safe
+    $text = $text -replace '[^\x20-\x7E]', '?'
+    return $text
 }
 
 $bad = @()
@@ -83,10 +121,38 @@ if (Test-Zip $bl) {
 
 if ($bad.Count -gt 0) {
     $result = 'BROKEN: ' + (($bad | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')
-} elseif ($repaired) {
-    $result = 'REPAIRED'
 } else {
+    # --- launch the app and watch the first seconds of startup ---
     $result = ''
+    $exe = Join-Path $b 'DocTool.exe'
+    if (-not (Test-Path -LiteralPath $exe)) {
+        $result = 'NOTSTARTED'
+    } else {
+        try {
+            $proc = Start-Process -FilePath $exe -PassThru
+            if ($null -eq $proc) {
+                $result = 'NOTSTARTED'
+            } elseif (-not $proc.WaitForExit(8000)) {
+                # still running after 8s -> treat as healthy
+            } elseif ($proc.ExitCode -eq 0) {
+                # exited on its own with 0 -> nothing to report
+            } else {
+                $result = 'STARTFAIL: exit=' + $proc.ExitCode
+                $reason = Get-StartupFailureReason
+                try {
+                    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                    [System.IO.File]::WriteAllText(
+                        (Join-Path $env:TEMP 'dt_startfail_reason.txt'),
+                        $reason,
+                        $utf8NoBom
+                    )
+                } catch { }
+            }
+        } catch {
+            $result = 'NOTSTARTED'
+        }
+        if (($result -eq '') -and $repaired) { $result = 'REPAIRED' }
+    }
 }
 
 # Write the result to a temp file instead of stdout: PowerShell 5.1 can print
