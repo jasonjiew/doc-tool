@@ -23,8 +23,10 @@
 合并流程（``_revision_record.md`` 单向流向 Word）：
 1. 作者在 ``_revision_record.md`` 表格末尾手工加一行（版本/摘要/日期/修改人）；
 2. ``pipeline._prepare_revision_sync`` 只读地取末行版本号；
-3. 管线在项目锁内把它同步到 ``ProjectManifest.documentVersion``（封面「版本号」
-   与输出文件名随之更新）；
+3. 管线在项目锁内把它同步到 ``ProjectManifest.documentVersion``（封面「版本号」、
+   页眉「版次」与输出文件名随之更新），同步时按
+   ``paths.normalize_document_version`` 去掉 ``V`` 前缀——表格里历史行惯用
+   ``V3.8``，而这三处一律是纯数字 ``3.8``；表格内容本身不被改写；
 4. 构建内核 ``build_docx.update_revision_record`` 用该文件的数据行整表覆盖
    Word 模板里的修订记录表。
 """
@@ -37,6 +39,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from doc_tool.application.content.changes import ChangeItem
 from doc_tool.application.content.writer import atomic_write
+from doc_tool.domain.paths import normalize_document_version
 
 # 修订记录分组顺序与中文标签（与改动面板 _ITEM_LABELS 一致）。
 _STATUS_GROUPS = (
@@ -118,15 +121,20 @@ def build_revision_record(items: Sequence[ChangeItem]) -> str:
 def normalize_revision_version(value: str) -> str:
     """校验并规范化修订记录表里的版本号。
 
-    该版本号会成为 ``documentVersion``，进而进入封面「版本号」与输出文件名，
-    因此不能为空，也不能包含换行或 ``|``（那说明表格行被写坏了）。版本号的
-    具体格式仍由项目清单的既有校验规则约束；这里只做最小安全校验。
+    该版本号会成为 ``documentVersion``，进而进入封面「版本号」、页眉「版次」
+    与输出文件名，因此不能为空，也不能包含换行或 ``|``（那说明表格行被写坏
+    了）。版本号的具体格式仍由项目清单的既有校验规则约束；这里只做最小安全
+    校验，并按 ``normalize_document_version`` 去掉 ``V`` 前缀——修订记录表里
+    历史行惯用 ``V3.8``，而封面/页眉/文件名一律是纯数字 ``3.8``。
     """
     version = str(value).strip()
     if not version:
         raise ValueError("版本号不能为空。")
     if "|" in version or "\n" in version or "\r" in version:
         raise ValueError("版本号不能包含竖线或换行。")
+    version = normalize_document_version(version)
+    if not version:
+        raise ValueError("版本号不能为空。")
     return version
 
 

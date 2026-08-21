@@ -45,6 +45,7 @@ try {
         (Join-Path $RepoRoot "dist\DocTool"),
         (Join-Path $RepoRoot "dist\启动DocTool.cmd"),
         (Join-Path $RepoRoot "dist\diagnose.cmd"),
+        (Join-Path $RepoRoot "dist\preflight.ps1"),
         (Join-Path $RepoRoot "packaging\portable\请先读我.txt"),
         (Join-Path $RepoRoot "packaging\portable\安装证书.cmd")
     )
@@ -65,5 +66,5 @@ $SizeMb = [math]::Round((Get-Item $Zip).Length / 1MB, 1)
 Write-Host "便携包: $Zip（$SizeMb MB）" -ForegroundColor White
 Write-Host "SHA-256: $Hash" -ForegroundColor White
 Write-Host "分发说明：整包发给同事，解压后先读「请先读我.txt」——首次双击「安装证书.cmd」" -ForegroundColor DarkGray
-Write-Host "          导入公司证书，之后双击「启动DocTool.cmd」启动；" -ForegroundColor DarkGray
-Write-Host "          即使直接双击 DocTool.exe，1.4.2+ 也会自动迁移到 %TEMP% 后启动。" -ForegroundColor DarkGray
+Write-Host "          导入公司证书，之后双击「启动DocTool.cmd」（或直接双击 DocTool.exe）启动；" -ForegroundColor DarkGray
+Write-Host "          1.4.4 起原地启动，不再复制到 %TEMP%（透明加密客户端会加密 .pyd，反而导致启动失败）。" -ForegroundColor DarkGray

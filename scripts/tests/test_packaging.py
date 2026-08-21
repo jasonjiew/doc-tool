@@ -225,10 +225,10 @@ class ReleasePipelineTests(unittest.TestCase):
 class PortablePackageTests(unittest.TestCase):
     """团队分发便携包：启动脚本入库且可复现打包。
 
-    安全软件（火绒企业版）会拦截未签名 exe 从 %TEMP% 之外加载 DLL，并把反复运行
-    的同一路径信誉拖黑。便携包的启动脚本每次把整个目录复制到 %TEMP% 下的全新随机
-    目录再启动，绕开这两点。脚本此前只存在于 gitignore 的 dist\\ 下、手工维护，
-    清一次 dist 就没了——必须入库并由构建脚本产出。
+    1.4.4 起产物全量代码签名，启动脚本原地启动已签名 exe，不再复制到 %TEMP%
+    （透明加密客户端如亿赛通 DocGuard 会加密复制出的 .pyd，导致启动失败）。
+    脚本此前只存在于 gitignore 的 dist\\ 下、手工维护，清一次 dist 就没了——
+    必须入库并由构建脚本产出。
     """
 
     LAUNCHER = Path(REPO_ROOT) / "packaging" / "portable" / "启动DocTool.cmd"
@@ -244,14 +244,17 @@ class PortablePackageTests(unittest.TestCase):
         ]
         self.assertEqual(offenders, [], "启动脚本出现非 ASCII 字节")
 
-    def test_launcher_copies_to_fresh_temp_dir(self):
+    def test_launcher_starts_in_place_without_temp_copy(self):
+        """1.4.4：原地启动已签名 exe，不再复制到 %TEMP%（透明加密客户端会加密 .pyd）。"""
         text = self.LAUNCHER.read_text(encoding="ascii")
         # 相对自身定位 DocTool\，解压到任意路径都能用。
         self.assertIn("%~dp0DocTool", text)
-        # 每次全新随机目录（名字不含 DocTool），复制后再启动。
-        self.assertIn("%TEMP%\\dt_run_", text)
-        self.assertIn("robocopy", text)
-        self.assertIn("start \"\" \"%TGT%\\DocTool.exe\"", text)
+        # 原地启动：不再复制、不再引用 dt_run_ / robocopy / Copy-Item / %TGT%。
+        self.assertIn('start "" "%SRC%\\DocTool.exe"', text)
+        self.assertNotIn("dt_run_", text)
+        self.assertNotIn("robocopy", text)
+        self.assertNotIn("Copy-Item", text)
+        self.assertNotIn("%TGT%", text)
 
     def test_build_script_exposes_portable_switch(self):
         script = (Path(REPO_ROOT) / "build_exe.ps1").read_text(encoding="utf-8")
@@ -315,7 +318,8 @@ class PortablePackageTests(unittest.TestCase):
         heal = (
             Path(REPO_ROOT) / "doc_tool" / "application" / "self_heal.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("DOCTOOL_RELOCATED", heal)
+        # 1.4.4: 不再复制到 %TEMP%（透明加密客户端会加密 .pyd），故不再有迁移标记
+        self.assertNotIn("DOCTOOL_RELOCATED", heal)
         self.assertIn("MessageBoxW", heal)
 
 if __name__ == "__main__":

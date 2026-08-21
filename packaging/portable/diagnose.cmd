@@ -79,36 +79,9 @@ popd
 >>"%LOG%" echo exit code: %RC%
 >>"%LOG%" echo.
 
->>"%LOG%" echo --- 5. same thing from a fresh %%TEMP%% copy (same path as the launcher: PowerShell Copy-Item) ---
-set "TGT=%TEMP%\dt_diag_%RANDOM%_%RANDOM%"
->>"%LOG%" echo target: %TGT%
-rem 1.4.3: robocopy/xcopy copies get mangled by the AV file filter (+4 KB,
-rem headers broken), which made this stage report false corruption that the
-rem real launcher never produced. Use Copy-Item here too - it is the exact
-rem copy path the launcher uses, so this stage now measures what users run.
-set "DT_DSRC=%APP%"
-set "DT_DTGT=%TGT%"
-powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Copy-Item -LiteralPath $env:DT_DSRC -Destination $env:DT_DTGT -Recurse -Force" >nul 2>&1
->>"%LOG%" echo Copy-Item exit: %ERRORLEVEL%   (0 = ok)
-if not exist "%TGT%\doc-tool-cli.exe" (
-    >>"%LOG%" echo copy FAILED - doc-tool-cli.exe did not arrive in TEMP
-    goto :cleanup5
-)
-call :count "%TGT%" %EXP_APP_FILES% "TEMP copy"
-call :chk "%TGT%\_internal\base_library.zip" %EXP_BL_SIZE% %EXP_BL_HASH%
->>"%LOG%" echo waiting 8s so real-time scanning can settle...
-ping 127.0.0.1 -n 9 >nul 2>&1
-pushd "%TGT%"
->>"%LOG%" 2>&1 "%TGT%\doc-tool-cli.exe" --version
-set "RC=%ERRORLEVEL%"
-popd
->>"%LOG%" echo exit code: %RC%
-
-:cleanup5
-rd /s /q "%TGT%" 2>nul
->>"%LOG%" echo.
-
->>"%LOG%" echo --- 6. security software processes ---
+rem 1.4.4: the launcher no longer copies the app to %TEMP% (signed build runs
+rem in place), so the old "run from a fresh %TEMP% copy" stage was removed.
+>>"%LOG%" echo --- 5. security software processes ---
 tasklist /fo table 2>&1 | findstr /i /c:"esafe" /c:"safenet" /c:"360" /c:"symantec" /c:"mcafee" /c:"kaspersky" /c:"trend" /c:"sophos" /c:"eset" /c:"huorong" /c:"qianxin" /c:"deep" /c:"edr" /c:"dlp" /c:"MsMpEng" >>"%LOG%" 2>&1
 >>"%LOG%" echo (empty means none of the known names matched - not proof of absence)
 >>"%LOG%" echo.

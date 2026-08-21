@@ -19,7 +19,7 @@ DEFAULT_TESTS = [
     "test_iteration_scenarios.py", "test_project_model.py", "test_import_preflight.py",
     "test_fidelity.py", "test_project_build.py", "test_import_project.py",
     "test_roundtrip.py", "test_style_mapping.py", "test_authoring_services.py",
-    "test_issues.py", "test_cli_machine.py", "test_quality_gates.py", "test_quality_traceability.py",
+    "test_issues.py", "test_markdown_structure.py", "test_cli_machine.py", "test_quality_gates.py", "test_quality_traceability.py",
     "test_gui_services.py", "test_content_operations.py", "test_safety_recovery.py",
     "test_vcs_changes.py", "test_revision_record.py", "test_multi_window.py",
     "test_lock_log_cancel.py", "test_word_release.py", "test_packaging.py",

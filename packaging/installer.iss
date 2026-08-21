@@ -1,4 +1,4 @@
-﻿; -*- coding: utf-8 -*-
+; -*- coding: utf-8 -*-
 ; Inno Setup 脚本：Doc Tool Windows 安装器
 ;
 ; 任务 8.5：稳定 AppId、按用户安装、开始菜单和可选桌面快捷方式。
@@ -24,13 +24,13 @@
 ;      PyInstaller 引导程序在非 ASCII 路径下初始化内嵌 Python 失败，报上述错误。
 ;      安装器检测到非 ASCII 安装目录时自动改用 {commonappdata}\DocTool 并提示；
 ;      用户若仍选择非 ASCII 目录，Next 会被阻止并给出说明。
-;   2) 开始菜单/桌面快捷方式经 installed\启动DocTool.cmd 把程序复制到 %TEMP% 下
-;      全新随机目录再启动，绕开安全软件对未签名 exe 从安装目录加载 DLL 的拦截
-;      （与便携包同策略）。
+;   2) 开始菜单/桌面快捷方式经 installed\启动DocTool.cmd 启动（1.4.4 起不再复制
+;      到 %TEMP%：透明加密客户端如亿赛通 DocGuard 会加密复制出的 .pyd 导致启动
+;      失败；改为已签名产物原地启动，与便携包同策略）。
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "1.4.3"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"
@@ -89,8 +89,10 @@ Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescriptio
 [Files]
 ; PyInstaller onedir 产出（dist/DocTool/* -> 安装目录/*）
 Source: "..\dist\{#MyAppNameEn}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; 安装版启动器：复制到 %TEMP% 全新目录再启动（绕开安全软件对未签名 exe 的拦截）
+; 安装版启动器：1.4.4 起原地启动已签名 exe（不再复制到 %TEMP%）
 Source: "installed\启动DocTool.cmd"; DestDir: "{app}"; Flags: ignoreversion
+; 预检脚本（1.4.4）：启动前校验关键文件并自修复 base_library.zip
+Source: "portable\preflight.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; 诊断工具：成员双击运行后回传 DocTool-diagnose.txt（基线由打包流水线刷新）
 Source: "..\dist\diagnose.cmd"; DestDir: "{app}"; Flags: ignoreversion
 ; 成员引导与公司自签名证书（1.4.3）：首次一键导入信任后已签名 exe 不再被拦截；
@@ -100,7 +102,7 @@ Source: "portable\安装证书.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\scripts\cert-out\codesign.cer"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
-; 开始菜单快捷方式：经启动器运行（%TEMP% 复制启动，规避安全软件拦截）
+; 开始菜单快捷方式：经启动器原地启动（不再复制到 %TEMP%）
 Name: "{group}\{#MyAppName}"; Filename: "{app}\启动DocTool.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 ; 桌面快捷方式（可选）
@@ -159,7 +161,7 @@ end;
 
 // 进入目录选择页时：默认目录含非 ASCII 字符则自动改用 {commonappdata}（纯 ASCII）。
 // 仅交互式安装生效；静默安装（/SILENT /VERYSILENT）由调用方显式传入目录，
-// 且经启动器复制到 %TEMP% 纯 ASCII 目录运行，不在此处拦截。
+// 且启动器原地启动已签名 exe（1.4.4 起不再复制到 %TEMP%），不在此处拦截。
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (CurPageID = wpSelectDir) and (not IsSilent()) then

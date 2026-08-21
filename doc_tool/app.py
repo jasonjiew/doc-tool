@@ -34,8 +34,8 @@ def main() -> int:
     except ImportError as exc:  # pragma: no cover
         if _is_frozen():
             # 冻结态下扩展模块导入失败，最常见的根因是终端安全软件拦截未签名
-            # exe 从当前目录加载 DLL。交给自愈模块：迁移到 %TEMP% 稳定目录重启；
-            # 彻底失败时弹消息框并写日志（不再静默退出）。
+            # exe 从当前目录加载 DLL。交给自愈模块：写日志并弹消息框给出处置指引
+            # （不再静默退出；1.4.4 起不再复制到 %TEMP%，见 self_heal 模块说明）。
             from doc_tool.application import self_heal
 
             return self_heal.handle_blocked_import(exc)

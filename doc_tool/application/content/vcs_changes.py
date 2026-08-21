@@ -1129,3 +1129,348 @@ def rollback_all(
             report, timeout=timeout, runner=runner, delete_untracked=delete_untracked
         )
     return ["当前项目不在版本控制内，无法执行版本控制回滚"]
+
+
+# ---------------------------------------------------------------------------
+# 版本控制提交与拉取（改动面板「提交改动」/「拉取更新」）
+# ---------------------------------------------------------------------------
+
+
+def _run_vcs_command(
+    command: Sequence[str],
+    cwd: Path,
+    timeout: float,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Optional[str]:
+    """执行单条版本控制命令；成功返回 None，失败返回错误文本。"""
+    try:
+        proc = _run(list(command), cwd=cwd, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)[:200]
+    if proc.returncode != 0:
+        return _decode(proc.stderr)[:300]
+    return None
+
+
+def _git_commit_all(
+    report: ChangeReport,
+    message: str,
+    *,
+    timeout: float = 60.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> List[str]:
+    """git：暂存并提交项目内全部未提交改动（新增/修改/删除/重命名）。
+
+    提交范围 = 报告内变更文件（``git add -A -- <paths>`` 后
+    ``git commit -m <msg> -- <paths>``），不会把同一仓库中其它文档项目的
+    改动、也不会把 .state 等应用内部目录一并提交——与检测/回滚的
+    Project Context 隔离一致。
+    """
+    failures: List[str] = []
+    root_text = (report.repository_root or "").strip()
+    if not root_text:
+        return ["Git 仓库根不可用"]
+    repo_root = Path(root_text)
+    if not repo_root.is_dir():
+        return ["Git 仓库根不可用"]
+    message = (message or "").strip()
+    if not message:
+        return ["提交信息不能为空"]
+    # 提交范围 = 报告内变更文件（已按 project_root 过滤并排除 .state 等
+    # 内部目录），含重命名旧路径；绝不用整项目目录做 pathspec，否则会把
+    # .state/ 等应用状态一并提交。
+    paths: List[str] = []
+    for item in report.files:
+        if item.path not in paths:
+            paths.append(item.path)
+        if item.old_path and item.old_path not in paths:
+            paths.append(item.old_path)
+    if not paths:
+        return ["当前项目没有可提交的改动"]
+    paths.sort()
+    git = shutil.which("git") or "git"
+    error = _run_vcs_command(
+        [git, "add", "-A", "--"] + paths, repo_root, timeout, runner=runner
+    )
+    if error:
+        failures.append("git add 失败：{0}".format(error))
+        return failures
+    error = _run_vcs_command(
+        [git, "commit", "-m", message, "--"] + paths,
+        repo_root,
+        timeout,
+        runner=runner,
+    )
+    if error:
+        failures.append("git commit 失败：{0}".format(error))
+    return failures
+
+
+def _svn_commit_all(
+    report: ChangeReport,
+    message: str,
+    *,
+    timeout: float = 60.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> List[str]:
+    """svn：登记新增/删除后提交项目内全部未提交改动。
+
+    SVN 不会自动登记未版本化新增与磁盘删除：新增文件先 ``svn add``、
+    已删除文件先 ``svn rm``，再 ``svn commit`` 限定项目路径提交。
+    """
+    failures: List[str] = []
+    root_text = (report.repository_root or "").strip()
+    if not root_text:
+        return ["SVN 工作副本根不可用"]
+    wc_root = Path(root_text)
+    if not wc_root.is_dir():
+        return ["SVN 工作副本根不可用"]
+    message = (message or "").strip()
+    if not message:
+        return ["提交信息不能为空"]
+    svn = shutil.which("svn") or "svn"
+    for item in report.files:
+        if item.untracked:
+            error = _run_vcs_command(
+                [svn, "add", "--parents", "--force", item.path],
+                wc_root,
+                timeout,
+                runner=runner,
+            )
+            if error:
+                failures.append("svn add 失败（{0}）：{1}".format(item.path, error))
+        elif item.change_type == "deleted":
+            error = _run_vcs_command(
+                [svn, "rm", "--force", item.path],
+                wc_root,
+                timeout,
+                runner=runner,
+            )
+            if error:
+                failures.append("svn rm 失败（{0}）：{1}".format(item.path, error))
+    if failures:
+        return failures
+    # 提交目标 = 报告内变更文件（已排除 .state 等内部目录），避免把
+    # 应用状态一并提交；无文件时报错返回。
+    paths = sorted(item.path for item in report.files)
+    if not paths:
+        return ["当前项目没有可提交的改动"]
+    error = _run_vcs_command(
+        [svn, "commit", "-m", message, "--"] + paths,
+        wc_root,
+        timeout,
+        runner=runner,
+    )
+    if error:
+        failures.append("svn commit 失败：{0}".format(error))
+    return failures
+
+
+def commit_all(
+    report: ChangeReport,
+    message: str,
+    *,
+    timeout: float = 60.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> List[str]:
+    """VCS 模式下提交当前项目的全部未提交改动（改动面板「提交改动」）。
+
+    - git：``git add -A``（限定项目路径）后 ``git commit``（限定项目路径）。
+    - svn：未版本化新增 ``svn add``、删除 ``svn rm``，再 ``svn commit``。
+    - local：无法提交，返回说明。
+
+    只处理报告内的文件（已按 project_root 过滤），不波及同一仓库中其它
+    文档项目。返回失败说明列表（空 = 全部成功）。
+    """
+    if report.source == "git":
+        return _git_commit_all(report, message, timeout=timeout, runner=runner)
+    if report.source == "svn":
+        return _svn_commit_all(report, message, timeout=timeout, runner=runner)
+    return ["当前项目不在版本控制内，无法提交"]
+
+
+@dataclass(frozen=True)
+class PullResult:
+    """一次拉取的结果（改动面板「拉取更新」的反馈）。
+
+    - ``ok``：命令是否成功。git 合并冲突时 pull 返回非零，视为失败；
+      svn update 冲突不改变退出码，ok 仍为 True 但 ``conflicts`` 非空。
+    - ``summary``：人类可读摘要（更新了 N 个文件 / 已是最新版本）。
+    - ``changed_files``：拉取带入的文件（相对仓库根）。
+    - ``conflicts``：合并/更新冲突文件（需用户手工解决）。
+    - ``error``：失败原因（含命令输出文本）。
+    """
+
+    ok: bool
+    summary: str
+    changed_files: Tuple[str, ...] = ()
+    conflicts: Tuple[str, ...] = ()
+    error: Optional[str] = None
+
+
+def _git_unmerged_paths(
+    repo_root: Path,
+    git: str,
+    timeout: float,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]],
+) -> Tuple[str, ...]:
+    """冲突后列出未合并路径（``git ls-files -u`` 各 stage 去重）。"""
+    try:
+        proc = _run(
+            [git, "ls-files", "-u"], cwd=repo_root, timeout=timeout, runner=runner
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    if proc.returncode != 0:
+        return ()
+    paths = sorted(
+        {
+            line.split("\t", 1)[1]
+            for line in _decode(proc.stdout).splitlines()
+            if "\t" in line
+        }
+    )
+    return tuple(paths)
+
+
+def _git_pull_changes(
+    report: ChangeReport,
+    *,
+    timeout: float,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]],
+) -> PullResult:
+    """git：执行 git pull，对比拉取前后 HEAD 统计带入文件；冲突时列未合并路径。"""
+    repo_root = Path((report.repository_root or "").strip())
+    git = shutil.which("git") or "git"
+
+    def run_capture(args: Sequence[str]):
+        try:
+            return _run([git] + list(args), cwd=repo_root, timeout=timeout, runner=runner)
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    pre: Optional[str] = None
+    proc = run_capture(["rev-parse", "HEAD"])
+    if proc is not None and proc.returncode == 0:
+        pre = _decode(proc.stdout).strip() or None
+
+    proc = run_capture(["pull"])
+    if proc is None:
+        return PullResult(ok=False, summary="", error="git pull 执行失败")
+    output = (_decode(proc.stdout) + _decode(proc.stderr)).strip()
+    if proc.returncode != 0:
+        conflicts = _git_unmerged_paths(repo_root, git, timeout, runner)
+        error = (
+            "git pull 失败：{0}".format(output)
+            if output
+            else "git pull 失败（退出码 {0}）".format(proc.returncode)
+        )
+        return PullResult(ok=False, summary="", conflicts=conflicts, error=error)
+
+    post: Optional[str] = None
+    proc2 = run_capture(["rev-parse", "HEAD"])
+    if proc2 is not None and proc2.returncode == 0:
+        post = _decode(proc2.stdout).strip() or None
+
+    changed: List[str] = []
+    if pre and post and pre != post:
+        proc3 = run_capture(["diff", "--name-only", pre, post])
+        if proc3 is not None and proc3.returncode == 0:
+            changed = [
+                line.strip()
+                for line in _decode(proc3.stdout).splitlines()
+                if line.strip()
+            ]
+    summary = "已是最新版本" if not changed else "更新了 {0} 个文件".format(len(changed))
+    return PullResult(ok=True, summary=summary, changed_files=tuple(changed))
+
+
+def _svn_pull_changes(
+    report: ChangeReport,
+    *,
+    timeout: float,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]],
+) -> PullResult:
+    """svn：执行 svn update 并解析输出（U/A/D/G/E 为变更，C 为冲突）。"""
+    wc_root = Path((report.repository_root or "").strip())
+    svn = shutil.which("svn") or "svn"
+    try:
+        proc = _run([svn, "update"], cwd=wc_root, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError):
+        return PullResult(ok=False, summary="", error="svn update 执行失败")
+    output = (_decode(proc.stdout) + _decode(proc.stderr)).strip()
+    if proc.returncode != 0:
+        error = (
+            "svn update 失败：{0}".format(output)
+            if output
+            else "svn update 失败（退出码 {0}）".format(proc.returncode)
+        )
+        return PullResult(ok=False, summary="", error=error)
+
+    changed: List[str] = []
+    conflicts: List[str] = []
+    in_summary = False
+    revision: Optional[str] = None
+    for raw in output.splitlines():
+        line = raw.strip()
+        if line.startswith("Summary of conflicts"):
+            in_summary = True
+            continue
+        if line.startswith("C "):
+            conflicts.append(line[2:].strip())
+        elif not in_summary and line.startswith(("U ", "A ", "D ", "G ", "E ")):
+            changed.append(line[2:].strip())
+        if line.startswith("Updated to revision") or line.startswith("At revision"):
+            revision = line.rsplit(" ", 1)[-1].strip(".")
+    if changed or conflicts:
+        parts = []
+        if changed:
+            parts.append("{0} 个文件更新".format(len(changed)))
+        if conflicts:
+            parts.append("{0} 个冲突".format(len(conflicts)))
+        summary = "，".join(parts)
+        if revision:
+            summary = "{0}（r{1}）".format(summary, revision)
+    else:
+        summary = "已是最新版本"
+        if revision:
+            summary = "{0}（r{1}）".format(summary, revision)
+    return PullResult(
+        ok=True,
+        summary=summary,
+        changed_files=tuple(changed),
+        conflicts=tuple(conflicts),
+    )
+
+
+def pull_changes(
+    report: ChangeReport,
+    *,
+    timeout: float = 120.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> PullResult:
+    """VCS 模式下拉取远端最新变更（改动面板「拉取更新」）。
+
+    - git：``git pull``（仓库级操作），对比拉取前后 HEAD 统计带入文件；
+      合并冲突时返回 ``ok=False`` 并附未合并路径清单。
+    - svn：``svn update``（工作副本级操作），解析输出统计 U/A/D/G/E 变更
+      与 C 冲突文件。
+    - local：无法拉取，返回 ``ok=False``。
+
+    返回 ``PullResult``，面板据此展示成功摘要、变更数量与冲突文件。
+    """
+    if report.source == "git":
+        verb = "git pull"
+    elif report.source == "svn":
+        verb = "svn update"
+    else:
+        return PullResult(ok=False, summary="", error="当前项目不在版本控制内，无法拉取")
+    root_text = (report.repository_root or "").strip()
+    if not root_text:
+        return PullResult(ok=False, summary="", error="{0}：仓库根不可用".format(verb))
+    root = Path(root_text)
+    if not root.is_dir():
+        return PullResult(ok=False, summary="", error="{0}：仓库根不可用".format(verb))
+    if report.source == "git":
+        return _git_pull_changes(report, timeout=timeout, runner=runner)
+    return _svn_pull_changes(report, timeout=timeout, runner=runner)

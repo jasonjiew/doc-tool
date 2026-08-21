@@ -112,6 +112,48 @@ def issue_type_for_stage(stage: str) -> str:
     return "build"
 
 
+def _location_records(
+    locations: Iterable[object],
+    *,
+    issue_type: str,
+    document_type: str,
+    severity: str,
+    code: Optional[str],
+    generated: str,
+) -> List[IssueRecord]:
+    """把一个失败事件的多处出错位置展开成多条可定位问题。
+
+    构建前检查一次会报出全部问题（而不是遇到第一个就停），每处各占
+    一行，用户在问题面板双击即可跳到具体行，不需要回去翻日志。
+    """
+    records: List[IssueRecord] = []
+    for item in locations:
+        if not isinstance(item, dict):
+            continue
+        line_value = item.get("line")
+        try:
+            line_no = int(line_value) if line_value is not None else None
+        except (TypeError, ValueError):
+            line_no = None
+        message = str(item.get("message") or "").strip()
+        if not message:
+            continue
+        records.append(IssueRecord(
+            source=SOURCE_PIPELINE,
+            issue_type=issue_type,
+            document_type=document_type,
+            severity=severity,
+            rel_path=str(item.get("relPath") or item.get("path") or ""),
+            line_no=line_no,
+            error_code=code,
+            message=message,
+            suggested_action=str(item.get("hint") or "").strip()
+            or "请修正该位置的内容后重试。",
+            generated_at=generated,
+        ))
+    return records
+
+
 def issues_from_pipeline(
     events: Iterable[object], document_type: str, generated_at: str = ""
 ) -> List[IssueRecord]:
@@ -124,6 +166,21 @@ def issues_from_pipeline(
         default_message, advice = error_metadata(code)
         detail = str(getattr(event, "detail", "") or default_message or "任务失败")
         metrics = getattr(event, "metrics", {}) or {}
+        issue_type = issue_type_for_stage(str(getattr(event, "stage", "")))
+        severity = severity_for_error_code(code)
+        # 内核给出结构化出错位置时逐条展开：一个「构建失败」事件往往对应
+        # 多处内容问题，归为一条就只能定位到第一处。
+        expanded = _location_records(
+            metrics.get("locations") or (),
+            issue_type=issue_type,
+            document_type=document_type,
+            severity=severity,
+            code=code,
+            generated=generated,
+        )
+        if expanded:
+            records.extend(expanded)
+            continue
         line_value = metrics.get("line")
         if line_value is None:
             line_value = metrics.get("lineNo")
@@ -133,9 +190,9 @@ def issues_from_pipeline(
             line_no = None
         records.append(IssueRecord(
             source=SOURCE_PIPELINE,
-            issue_type=issue_type_for_stage(str(getattr(event, "stage", ""))),
+            issue_type=issue_type,
             document_type=document_type,
-            severity=severity_for_error_code(code),
+            severity=severity,
             rel_path=str(metrics.get("rel_path") or metrics.get("file") or ""),
             line_no=line_no,
             error_code=code,

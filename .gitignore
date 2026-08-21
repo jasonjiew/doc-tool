@@ -65,6 +65,7 @@ probe-*/
 
 # --- 测试产物与本地会话数据 ---
 test-results.xml
+.coverage
 coverage.xml
 coverage.json
 tmp/

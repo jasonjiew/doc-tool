@@ -75,6 +75,9 @@ class ResultState:
     report_path: Optional[Path] = None
     log_path: Optional[Path] = None
     project_root: Optional[Path] = None
+    # 已格式化的出错位置行（``文件:行号 说明 建议``），内核给出结构化
+    # 位置时填充。失败卡片与技术详情直接展示，用户不必去日志里翻。
+    locations: Tuple[str, ...] = ()
 
     @property
     def is_terminal(self) -> bool:
@@ -310,7 +313,13 @@ def derive_step_list(
 
 
 def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:
-    """Return safe user reason and advice for a stable task error code."""
+    """Return user-facing reason and advice for a stable task error code.
+
+    ``detail`` 是阶段事件给出的具体原因（已包含文件与行号），存在时
+    优先展示它：旧行为不论真实原因是什么都只显示错误类的固定文案
+    （如「Word 文档构建失败」），用户必须去日志里翻才知道改哪里。建议
+    仍按错误类给出（它描述的是处理路径，不会因具体原因而变）。
+    """
     from doc_tool.domain import errors
 
     classes = (
@@ -326,13 +335,42 @@ def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:
         errors.ResourceNotFoundError,
         errors.CancelledError,
     )
+    safe_detail = " ".join((detail or "").split())[:300]
     for error_type in classes:
         if error_type.code == error_code:
-            return error_type.user_message, error_type.suggested_action
+            return (
+                safe_detail or error_type.user_message,
+                error_type.suggested_action,
+            )
     if error_code == "E9009":
         return "任务运行超时。", "请检查 Word 或系统状态后重试，并查看日志了解最后阶段。"
-    safe_detail = (detail or "").strip()
     reason = "任务未成功完成。"
     if safe_detail and error_code and error_code != "E9000":
-        reason = safe_detail[:200]
+        reason = safe_detail
     return reason, "请查看日志和技术详情；如问题持续，请联系维护人员。"
+
+
+def format_stage_locations(events, limit: int = 20) -> Tuple[str, ...]:
+    """从阶段事件的 ``metrics["locations"]`` 提取可读的出错位置行。
+
+    构建前检查一次报全部问题，这里把它们渲染成
+    ``文件:行号 说明 建议``，供失败卡片与技术详情直接列出。
+    """
+    lines: List[str] = []
+    for event in events or ():
+        if getattr(event, "status", "") not in ("failed", "cancelled"):
+            continue
+        metrics = getattr(event, "metrics", None) or {}
+        for item in metrics.get("locations") or ():
+            if not isinstance(item, dict):
+                continue
+            where = str(item.get("relPath") or item.get("path") or "")
+            if item.get("line") is not None:
+                where = "{0}:{1}".format(where, item["line"])
+            parts = [where, str(item.get("message") or ""), str(item.get("hint") or "")]
+            text = " ".join(part for part in parts if part).strip()
+            if text:
+                lines.append(text)
+            if len(lines) >= limit:
+                return tuple(lines)
+    return tuple(lines)

@@ -110,6 +110,23 @@ def _sha256(path: str) -> str:
     return digest.hexdigest()
 
 
+def _header_texts(docx_path: str) -> list:
+    """全部页眉部件里的非空文本节点（校验页眉「版次」写成了什么）。"""
+    with read_docx_package(docx_path) as package:
+        items = package.read_all()
+    texts: list = []
+    for name in sorted(items):
+        if not (name.startswith("word/header") and name.endswith(".xml")):
+            continue
+        root = parse_xml_safe(items[name], name)
+        texts.extend(
+            (node.text or "").strip()
+            for node in root.iter(qn("t"))
+            if (node.text or "").strip()
+        )
+    return texts
+
+
 def _revision_table_rows(docx_path: str) -> list:
     """修订记录表的全部 ``w:tr``（前 2 行是表头）。"""
     with read_docx_package(docx_path) as package:
@@ -578,23 +595,30 @@ class RevisionRecordBuildTests(unittest.TestCase):
             result.success,
             [(e.stage, e.status, e.detail) for e in result.events],
         )
-        self.assertEqual(manifest.documentVersion, "V1.1")
+        self.assertEqual(manifest.documentVersion, "1.1")
         self.assertTrue(
-            Path(result.output_path).name.endswith("(V1.1).docx"), result.output_path
+            Path(result.output_path).name.endswith("(1.1).docx"), result.output_path
         )
         details = [
             event.detail
             for event in result.events
             if event.stage == STAGE_REVISION and event.status == "succeeded"
         ]
-        self.assertTrue(any("1.0 → V1.1" in text for text in details), details)
+        self.assertTrue(any("1.0 → 1.1" in text for text in details), details)
         # 工具不再往修订记录里写任何东西
         self.assertEqual(self._revision_md_path().read_text(encoding="utf-8"), before)
-        # 产物修订表就是该文件的数据行
+        # 产物修订表就是该文件的数据行：表格里作者写的 V1.0/V1.1 原样保留，
+        # 只有封面/页眉/文件名这三处「本次文档版本号」去掉 V 前缀。
         self.assertEqual(
             [row[0] for row in extract_revision_rows(result.output_path)],
             ["V1.0", "V1.1"],
         )
+        from validate_docx import DocxPackage, cover_values
+
+        cover_text, _cover_fields = cover_values(DocxPackage(result.output_path))
+        self.assertEqual(cover_text.get("版本号"), "1.1")
+        self.assertIn("1.1", _header_texts(result.output_path))
+        self.assertNotIn("V1.1", _header_texts(result.output_path))
 
     def test_multiline_summary_becomes_line_breaks(self) -> None:
         """摘要里的 ``<br>`` 转成 ``w:br`` 换行，而不是塞进单个 ``w:t``。"""

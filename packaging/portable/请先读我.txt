@@ -15,8 +15,12 @@
 
 正常启动
 --------
-双击「启动DocTool.cmd」。会出现一个黑色窗口：正在把程序复制到临时目录，
-等几秒到一分钟主界面就会打开，这是正常现象，以后每次启动都会这样。
+双击「启动DocTool.cmd」（或直接双击 DocTool\DocTool.exe），
+程序会直接从当前位置启动，主界面几秒内打开。
+
+（1.4.4 起不再复制到临时目录启动——在装有透明加密软件（如亿赛通 DocGuard）
+的电脑上，复制进临时目录的程序组件可能被加密导致启动失败，因此改为
+原地直接启动。）
 
 常见问题
 --------
@@ -25,12 +29,15 @@
 
 2. 报错「Failed to start embedded python interpreter!」：
    说明程序文件在解压或拷贝过程中被安全软件破坏了。
+   用「启动DocTool.cmd」启动时如果先提示
+   [ERROR] Program files look encrypted or corrupted...，
+   会直接告诉你是哪个文件被加密/改写了（常见 +4KB、文件头被改）。
    a) 先完成上面的「安装证书.cmd」，再重新解压本压缩包
      （安装版：重新运行安装包）；
    b) 解压后不要只把 DocTool.exe 单独拷出来——它必须和旁边的
       _internal 文件夹放在一起；
-   c) 仍然报错就双击「启动DocTool.cmd」启动（它会换一条干净的
-      路径再启动一次）。
+   c) 仍然报错就请 IT 把 DocTool 加入安全管理平台/加密软件白名单
+     （常见于亿赛通 DocGuard、IP-guard 等透明加密客户端）。
 
 3. 以上都试过仍无法启动：
    双击「diagnose.cmd」，等它跑完，把生成的 DocTool-diagnose.txt

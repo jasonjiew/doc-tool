@@ -32,6 +32,8 @@ from docx_common import (
     ImageReference,
     OOXMLSecurityError,
     discover_document_types,
+    error_location,
+    format_location,
     iter_chapter_entries,
     load_config,
     neutralize_hyperlink_fields,
@@ -41,6 +43,11 @@ from docx_common import (
     read_docx_package,
     resolve_resource,
     validate_content_tree,
+)
+
+from doc_tool.domain.markdown_structure import (
+    META_SYNTAX_HINT,
+    parse_table_meta as _table_meta,
 )
 
 
@@ -1157,36 +1164,16 @@ def set_update_fields(items: Dict[str, bytes], document_root) -> None:
     )
 
 
-def _table_meta(line: str):
-    match = re.fullmatch(
-        r"<!--\s*TBL:style=([\w.]*)\s+type=(\w+)\s+tw=(\d+)(?:\s+trh=(\d+))?\s+"
-        r"cols=([\d,]*)((?:\s+(?:cm|ind|lay|bd|hdr|cs|tcm|va)=[\w:,\-\.]*)*)\s*-->",
-        line,
-    )
-    if match:
-        extras = {
-            item.group(1): item.group(2)
-            for item in re.finditer(r"(cm|ind|lay|bd|hdr|cs|tcm|va)=([\w:,\-\.]*)", match.group(6) or "")
-        }
-        return (
-            match.group(1) or None,
-            [int(value) for value in match.group(5).split(",") if value] or None,
-            match.group(2),
-            int(match.group(3)),
-            int(match.group(4)) if match.group(4) else None,
-            extras,
-        )
-    legacy = re.fullmatch(r"<!--\s*TBL:style=([\w.]*)\s+cols=([\d,]*)\s*-->", line)
-    if legacy:
-        return (
-            legacy.group(1) or None,
-            [int(value) for value in legacy.group(2).split(",") if value] or None,
-            "dxa",
-            None,
-            None,
-            {},
-        )
-    return None
+def _markdown_error(
+    path: str, line_no: int, message: str, hint: str = "", rule: str = ""
+) -> AutomationError:
+    """构造带结构化位置的正文插入阶段错误。
+
+    消息仍以 ``路径:行号`` 开头（旧日志与报告解析依赖该形状），同时
+    把位置以 ``locations`` 传给上层，避免只能从文本里反推。
+    """
+    entry = error_location(path, line_no, message, hint, rule)
+    return AutomationError(format_location(entry), locations=[entry])
 
 
 def _relationship_ids(element) -> List[str]:
@@ -1235,7 +1222,13 @@ def process_markdown(
         if complex_table:
             filename = complex_table.group(2)
             if not filename:
-                raise AutomationError("{0}:{1} 复杂表格缺少 XML 文件名".format(path, index + 1))
+                raise _markdown_error(
+                    path,
+                    index + 1,
+                    "复杂表格标记缺少 XML 文件名",
+                    "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
+                    "complex_table_syntax",
+                )
             table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
             try:
                 with open(table_path, "rb") as table_file:
@@ -1285,10 +1278,22 @@ def process_markdown(
 
         table_meta = _table_meta(stripped)
         if stripped.startswith("<!-- TBL:") and table_meta is None:
-            raise AutomationError("{0}:{1} 表格元数据语法无效".format(path, index + 1))
+            raise _markdown_error(
+                path,
+                index + 1,
+                "表格元数据语法无效",
+                META_SYNTAX_HINT,
+                "table_meta_syntax",
+            )
         if table_meta is not None:
             if index + 1 >= len(lines) or not lines[index + 1].strip().startswith("|"):
-                raise AutomationError("{0}:{1} 表格元数据后缺少 Markdown 表格".format(path, index + 1))
+                raise _markdown_error(
+                    path,
+                    index + 1,
+                    "表格元数据的下一行不是表格（必须紧跟以 | 开头的表头行）。",
+                    "如果中间有空行请删除；如果这里本来没有表格，请删除这条元数据注释。",
+                    "table_meta_orphan",
+                )
             block: List[str] = []
             cursor = index + 1
             while cursor < len(lines) and lines[cursor].strip().startswith("|"):

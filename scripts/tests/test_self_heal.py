@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """self_heal（冻结启动自愈）单元测试。
 
-覆盖：ASCII 判定、重拉脚本生成（纯 ASCII）、explorer 中继启动、
-防死循环可见报错、其它启动异常兜底。所有外部副作用（消息框、日志、
-子进程、文件写入）均以 mock/tempdir 隔离。
+覆盖：ASCII 判定、日志写入、导入失败可见报错（退出码 2）、其它启动异常兜底，
+以及「不再迁移到 %TEMP%」的回归断言。所有外部副作用（消息框、日志、文件
+写入）均以 mock/tempdir 隔离。
 """
 
 from __future__ import annotations
@@ -45,89 +45,44 @@ class CandidateBaseTests(unittest.TestCase):
         self.assertEqual(bases[0], r"C:\Users\Public")
 
 
-class RelaunchScriptTests(unittest.TestCase):
-    def test_cmd_bootstrap_is_ascii_and_delegates_to_ps1(self):
-        """cmd 按 ANSI 代码页解析：引导脚本必须纯 ASCII，只负责跳转到 .ps1。"""
-        raw = self_heal._RELAUNCH_CMD_BODY.encode("ascii")  # 不是 ASCII 会直接抛异常
-        self.assertIn(b"dt_relaunch.ps1", raw)
-        self.assertIn(b"powershell", raw)
-
-    def test_ps1_body_quotes_src_single_quoted(self):
-        """源路径内嵌进 .ps1 必须用单引号并转义，避免 PowerShell 展开 $ 与 `。"""
-        with tempfile.TemporaryDirectory() as tmp:
-            fake_dir = os.path.join(tmp, "含中文目录 DocTool$var")
-            with mock.patch.object(self_heal, "_candidate_bases", return_value=[tmp]), mock.patch.object(
-                self_heal, "_app_dir", return_value=fake_dir
-            ):
-                cmd_path = self_heal._write_relaunch_script([])
-            ps1 = os.path.join(tmp, self_heal._RELAUNCH_PS1)
-            self.assertTrue(os.path.isfile(cmd_path))
-            self.assertTrue(os.path.isfile(ps1))
-            with open(cmd_path, "rb") as fh:
-                fh.read().decode("ascii")
-            with open(ps1, "rb") as fh:
-                content = fh.read()
-            self.assertTrue(content.startswith(b"\xef\xbb\xbf"), "ps1 必须带 UTF-8 BOM")
-            text = content.decode("utf-8-sig")
-            self.assertIn("$src = '{0}'".format(fake_dir), text)
-            self.assertIn("DOCTOOL_RELOCATED", text)
-            self.assertIn("dt_run_", text)
-
-    def test_write_relaunch_script_all_bases_fail(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            bad = os.path.join(tmp, "no", "such", "base")
-            with mock.patch.object(self_heal, "_candidate_bases", return_value=[bad]):
-                with mock.patch.object(os, "makedirs", side_effect=OSError("denied")):
-                    self.assertIsNone(self_heal._write_relaunch_script([]))
-
-
-class SpawnExplorerTests(unittest.TestCase):
-    def test_spawn_uses_explorer(self):
-        env = {k: v for k, v in os.environ.items() if k != self_heal.RELOCATED_ENV}
-        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
-            self_heal.subprocess, "Popen"
-        ) as fake_popen:
-            ok = self_heal._spawn_via_explorer(r"C:\Temp\dt_relaunch.cmd", [])
-        self.assertTrue(ok)
-        args, _kwargs = fake_popen.call_args
-        self.assertEqual(args[0][0].lower(), "explorer.exe")
-        self.assertEqual(args[0][1], r"C:\Temp\dt_relaunch.cmd")
-
-
 class HandleBlockedImportTests(unittest.TestCase):
-    def test_relocated_marker_short_circuits(self):
-        with mock.patch.dict(os.environ, {self_heal.RELOCATED_ENV: "1"}), mock.patch.object(
+    def test_always_reports_and_returns_two(self):
+        """不再迁移：任何导入失败都直接写日志 + 弹框，退出码 2。"""
+        with mock.patch.object(
             self_heal, "_write_log", return_value=[r"C:\x\DocTool-startup.log"]
-        ) as fake_log, mock.patch.object(self_heal, "_message_box") as fake_box, mock.patch.object(
-            self_heal, "_write_relaunch_script"
-        ) as fake_gen:
+        ) as fake_log, mock.patch.object(self_heal, "_message_box") as fake_box:
             rc = self_heal.handle_blocked_import(ImportError("blocked"))
         self.assertEqual(rc, 2)
-        fake_gen.assert_not_called()
         self.assertTrue(fake_log.called)
         self.assertTrue(fake_box.called)
+        box_text = fake_box.call_args[0][1]
+        self.assertIn("blocked", box_text)
 
-    def test_success_path_spawns_explorer_and_returns_zero(self):
-        env = {k: v for k, v in os.environ.items() if k != self_heal.RELOCATED_ENV}
-        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
-            self_heal, "_write_relaunch_script", return_value=r"C:\Temp\dt_relaunch.cmd"
-        ), mock.patch.object(
-            self_heal, "_spawn_via_explorer", return_value=True
-        ) as fake_spawn, mock.patch.object(self_heal, "_write_log"):
-            rc = self_heal.handle_blocked_import(ImportError("blocked"))
-        self.assertEqual(rc, 0)
-        self.assertTrue(fake_spawn.called)
+    def test_log_lines_contain_error_and_frozen_state(self):
+        captured = {}
 
-    def test_relay_failure_reports(self):
-        env = {k: v for k, v in os.environ.items() if k != self_heal.RELOCATED_ENV}
-        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
-            self_heal, "_write_relaunch_script", return_value=None
-        ), mock.patch.object(
-            self_heal, "_write_log", return_value=[r"C:\x\DocTool-startup.log"]
-        ), mock.patch.object(self_heal, "_message_box") as fake_box:
-            rc = self_heal.handle_blocked_import(ImportError("blocked"))
+        def fake_write_log(log):
+            captured["lines"] = list(log)
+            return [r"C:\x\DocTool-startup.log"]
+
+        with mock.patch.object(self_heal, "_write_log", side_effect=fake_write_log), mock.patch.object(
+            self_heal, "_message_box"
+        ):
+            rc = self_heal.handle_blocked_import(ImportError("boom: _socket"))
         self.assertEqual(rc, 2)
-        self.assertTrue(fake_box.called)
+        lines = "\n".join(captured["lines"])
+        self.assertIn("import error: ImportError('boom: _socket')", lines)
+        self.assertIn("DocTool 启动诊断", lines)
+
+    def test_no_relocation_code_left(self):
+        """1.4.4 回归：自愈模块不再包含复制到 %TEMP% 的迁移逻辑。"""
+        with open(
+            os.path.join(REPO_ROOT, "doc_tool", "application", "self_heal.py"),
+            encoding="utf-8",
+        ) as fh:
+            src = fh.read()
+        for marker in ("dt_run_", "_write_relaunch_script", "_spawn_via_explorer", "DOCTOOL_RELOCATED"):
+            self.assertNotIn(marker, src, "self_heal 不应再引用迁移逻辑: {0}".format(marker))
 
 
 class ReportStartupFailureTests(unittest.TestCase):

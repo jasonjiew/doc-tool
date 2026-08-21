@@ -132,6 +132,94 @@ class PipelineResult:
         return self.events[-1] if self.events else None
 
 
+# 单次失败最多透出的出错位置条数：一份大文档可能一次性积累上百个问题，
+# 全量塞进事件 metrics 会让日志与界面失控；超出部分由日志中的完整消息兜底。
+_MAX_LOCATIONS = 50
+
+
+def _relative_to(path_value: str, root: Optional[Path]) -> str:
+    """把绝对路径转成相对 ``root`` 的 POSIX 路径；转不了返回文件名。
+
+    问题面板按「相对内容根」的 rel_path 打开文件定位，因此内核给出的绝对
+    路径必须在这里归一，否则双击定位会失败。
+    """
+    if not path_value:
+        return ""
+    candidate = Path(path_value)
+    if root is not None:
+        try:
+            return candidate.resolve().relative_to(Path(root).resolve()).as_posix()
+        except (ValueError, OSError):
+            pass
+    return candidate.name
+
+
+def exception_locations(
+    exc: Exception, content_root: Optional[Path] = None
+) -> List[Dict[str, object]]:
+    """把内核异常的结构化出错位置归一为稳定键的列表。
+
+    内核（``docx_common.AutomationError``）在构建前检查与正文插入阶段收集
+    ``locations``；这里补上相对内容根的 ``relPath``，供上层直接定位。没有
+    结构化位置的异常返回空列表，上层退回从消息文本解析。
+    """
+    raw = getattr(exc, "locations", None) or ()
+    entries: List[Dict[str, object]] = []
+    for item in list(raw)[:_MAX_LOCATIONS]:
+        if not isinstance(item, dict):
+            continue
+        path_value = str(item.get("path") or "")
+        line_value = item.get("line")
+        try:
+            line_no = int(line_value) if line_value is not None else None
+        except (TypeError, ValueError):
+            line_no = None
+        entries.append({
+            "path": path_value,
+            "relPath": _relative_to(path_value, content_root),
+            "line": line_no,
+            "message": str(item.get("message") or ""),
+            "hint": str(item.get("hint") or ""),
+            "rule": str(item.get("rule") or ""),
+        })
+    return entries
+
+
+def locations_summary(locations: List[Dict[str, object]], user_message: str) -> str:
+    """失败摘要：先说清共几处、首个问题在哪一行、怎么改。
+
+    没有结构化位置时退回内核原始消息——旧的做法是永远只显示「Word 文档构建
+    失败」，用户必须去日志里翻长文本才知道改哪一行。
+    """
+    if not locations:
+        return user_message
+    first = locations[0]
+    where = first.get("relPath") or first.get("path") or ""
+    if first.get("line") is not None:
+        where = "{0}:{1}".format(where, first["line"])
+    parts = [part for part in (where, first.get("message"), first.get("hint")) if part]
+    head = " ".join(str(part) for part in parts)
+    if len(locations) > 1:
+        return "共 {0} 处内容问题，首个：{1}".format(len(locations), head)
+    return head
+
+
+def _failure_metrics(
+    exc: Exception, content_root: Optional[Path] = None
+) -> Dict[str, object]:
+    """阶段失败事件的 metrics：出错位置清单 + 首个问题的文件与行号。"""
+    locations = exception_locations(exc, content_root)
+    if not locations:
+        return {}
+    first = locations[0]
+    metrics: Dict[str, object] = {"locations": locations}
+    if first.get("relPath"):
+        metrics["rel_path"] = first["relPath"]
+    if first.get("line") is not None:
+        metrics["line"] = first["line"]
+    return metrics
+
+
 def _map_exception(exc: Exception) -> DocToolError:
     """将内核异常映射到结构化错误类型。
 
@@ -435,9 +523,16 @@ def run_pipeline(
     except Exception as exc:
         err = _map_exception(exc)
         result.error_code = err.code
+        try:
+            root_for_locations = paths.resolve(manifest.relative_content_root())
+        except Exception:  # noqa: BLE001
+            root_for_locations = None
+        metrics = _failure_metrics(exc, root_for_locations)
         result.events.append(StageEvent(
             _current_stage(result), "failed",
-            detail=err.user_message, error_code=err.code,
+            detail=locations_summary(metrics.get("locations") or [], err.user_message),
+            metrics=metrics,
+            error_code=err.code,
         ))
         log.error(_current_stage(result), exception=exc)
         _rollback_revision_sync(revision_sync, manifest, log)
@@ -474,6 +569,11 @@ def _run_pipeline_inner(
     from doc_tool.domain.version import get_commit_id
 
     token = cancel_token or CancellationToken()
+    # 出错位置归一到「相对内容根」的 rel_path：问题面板据此打开文件并定位。
+    try:
+        content_root: Optional[Path] = paths.resolve(manifest.relative_content_root())
+    except Exception:  # noqa: BLE001 - 定位辅助信息不得影响管线主流程
+        content_root = None
 
     def write_state(*args, **kwargs):
         """成功状态写入失败需触发发布回滚；失败诊断写入失败只记日志。"""
@@ -583,10 +683,17 @@ def _run_pipeline_inner(
         raise
     except Exception as exc:
         err = _map_exception(exc)
+        metrics = _failure_metrics(exc, content_root)
+        locations = metrics.get("locations") or []
         result.events.append(StageEvent(
-            STAGE_BUILD, "failed", detail=err.user_message, error_code=err.code,
+            STAGE_BUILD, "failed",
+            detail=locations_summary(locations, err.user_message),
+            metrics=metrics,
+            error_code=err.code,
         ))
-        log.error(STAGE_BUILD, exception=exc)
+        log.error(STAGE_BUILD, exception=exc, metrics={
+            "issueCount": len(locations),
+        } if locations else None)
         result.error_code = err.code
         _record_stage(STAGE_BUILD, "failed")
         _cleanup_temp()
@@ -639,8 +746,12 @@ def _run_pipeline_inner(
         raise
     except Exception as exc:
         err = _map_exception(exc)
+        metrics = _failure_metrics(exc, content_root)
         result.events.append(StageEvent(
-            STAGE_VALIDATE_PRE, "failed", detail=err.user_message, error_code=err.code,
+            STAGE_VALIDATE_PRE, "failed",
+            detail=locations_summary(metrics.get("locations") or [], err.user_message),
+            metrics=metrics,
+            error_code=err.code,
         ))
         log.error(STAGE_VALIDATE_PRE, exception=exc)
         result.error_code = err.code

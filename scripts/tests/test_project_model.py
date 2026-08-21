@@ -27,7 +27,11 @@ from doc_tool.domain.errors import (  # noqa: E402
     ProjectManifestError,
 )
 from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
-from doc_tool.domain.paths import ProjectPaths, build_output_filename  # noqa: E402
+from doc_tool.domain.paths import (  # noqa: E402
+    ProjectPaths,
+    build_output_filename,
+    normalize_document_version,
+)
 from doc_tool.domain.version import (  # noqa: E402
     APP_VERSION,
     PROJECT_SCHEMA_VERSION,
@@ -222,6 +226,28 @@ class ProjectManifestTests(unittest.TestCase):
             manifest.documentType,
         )
         self.assertEqual(filename, "运维手册.docx")
+
+    def test_document_version_drops_v_prefix(self):
+        """封面「版本号」、页眉「版次」与文件名统一为纯数字：V3.8 → 3.8。"""
+        manifest = _make_manifest(documentVersion="V3.9")
+        self.assertEqual(manifest.documentVersion, "3.9")
+        filename = build_output_filename(
+            manifest.documentNo,
+            manifest.documentName,
+            manifest.documentVersion,
+            manifest.documentType,
+        )
+        self.assertTrue(filename.endswith("(3.9).docx"), filename)
+
+    def test_normalize_document_version_only_strips_leading_letter(self):
+        self.assertEqual(normalize_document_version(" v2.5 "), "2.5")
+        self.assertEqual(normalize_document_version("V10"), "10")
+        # 不是版本前缀的字母、纯字母值与空值原样保留。
+        self.assertEqual(normalize_document_version("Ver3.8"), "Ver3.8")
+        self.assertEqual(normalize_document_version("V"), "V")
+        self.assertEqual(normalize_document_version(""), "")
+        # 后缀写法不受影响，只去掉前缀字母。
+        self.assertEqual(normalize_document_version("V1.0-rc1"), "1.0-rc1")
 
     def test_general_document_type_is_writable(self):
         manifest = _make_manifest(documentType="general", documentNo="")

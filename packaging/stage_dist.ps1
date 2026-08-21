@@ -33,11 +33,18 @@ foreach ($Need in @(
     if (-not (Test-Path $Need)) { throw "dist 未就绪，缺少: $Need（请先完成 PyInstaller 构建）" }
 }
 
-# 1) 启动脚本
+# 1) 启动脚本 + 预检脚本（1.4.4：启动前校验关键文件并自修复 base_library.zip）
 Copy-Item (Join-Path $RepoRoot "packaging\portable\启动DocTool.cmd") $DistRoot -Force
+Copy-Item (Join-Path $RepoRoot "packaging\portable\preflight.ps1") $DistRoot -Force
 
 # 2) 诊断脚本：以真实构建产物刷新基线
 $bl = Join-Path $Internal "base_library.zip"
+# 预检自修复用的备份：启动脚本发现 base_library.zip 被安全软件改写（+4KB/头损坏）时自动恢复
+$bak = "$bl.bak"
+if (-not (Test-Path $bak) -or (Get-Item $bl).LastWriteTime -gt (Get-Item $bak).LastWriteTime) {
+    Copy-Item $bl $bak -Force
+    Write-Host "已生成备份: $bak" -ForegroundColor Green
+}
 $py = Join-Path $Internal "python313.dll"
 $gui = Join-Path $DistDir "DocTool.exe"
 $cli = Join-Path $DistDir "doc-tool-cli.exe"

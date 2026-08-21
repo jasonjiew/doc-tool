@@ -44,6 +44,23 @@ def _sanitize_filename_part(value: str) -> str:
     return sanitized.strip().rstrip(" .")
 
 
+def normalize_document_version(value: str) -> str:
+    """去掉文档版本号的 ``V``/``v`` 前缀（``V3.8`` → ``3.8``）。
+
+    版本号会进入封面「版本号」、页眉「版次」和输出文件名，这三处在模板与
+    历史产物里一律是 ``3.8``、``2.5`` 这样的纯数字写法。作者在修订记录或
+    设置里习惯写 ``V3.8``，因此在版本号进入清单和产物前统一剥离前缀，避免
+    同一份文档出现 ``(V3.8).docx`` 与封面 ``3.8`` 两种写法。
+
+    只剥离紧跟数字的单个前缀字母；``1.0-rc1`` 这类其余写法原样保留，版本号
+    格式本身仍由清单既有校验约束。
+    """
+    version = str(value).strip()
+    if len(version) > 1 and version[0] in ("V", "v") and version[1].isdigit():
+        return version[1:].strip()
+    return version
+
+
 def build_output_filename(
     document_no: str,
     document_name: str,
@@ -54,12 +71,13 @@ def build_output_filename(
 
     输出名来自可编辑的 ``project.yml``，因此不能直接拼接到路径中。按规范
     将 Windows 非法字符、路径分隔符和控制字符确定性替换为下划线，既保留
-    原始文档元数据，也避免把产物写到 ``output/`` 之外。
+    原始文档元数据，也避免把产物写到 ``output/`` 之外。版本号先去掉 ``V``
+    前缀（见 ``normalize_document_version``），与封面/页眉保持一致。
     """
     values = {
         "documentNo": str(document_no),
         "documentName": str(document_name),
-        "documentVersion": str(document_version),
+        "documentVersion": normalize_document_version(document_version),
     }
     required = {"documentName"}
     if document_type != "general":

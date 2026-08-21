@@ -644,6 +644,97 @@ class VcsBackupPolicyTests(BaseWindowCase):
         )
         ws.shutdown()
 
+    def _git_status(self, repo: Path) -> str:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(repo),
+            capture_output=True,
+            check=True,
+        )
+        text = proc.stdout.decode("utf-8", errors="replace")
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    def test_commit_all_changes_commits_project(self):
+        """改动面板「提交改动」在 git 项目：写入改动后提交，仓库干净。"""
+        repo = self._tmp / "repo"
+        repo.mkdir()
+        init_repo(repo)
+        pa = make_project(repo, "proj_a", {"content/a.md": "v1"})
+        # .state 属应用内部状态，按项目约定不进入版本控制
+        (repo / ".gitignore").write_text(".state/\n", encoding="utf-8")
+        commit_all(repo, "init")
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            pa / "content", project_root=pa, state_dir=pa / ".state"
+        )
+        self.assertTrue(wait_index(ws))
+        ws._writer.write_text("a.md", "v2")
+        clear_vcs_cache()
+
+        failures = ws._commit_all_changes("feat: workspace commit")
+        self.assertEqual(failures, [])
+        # 仓库干净、提交信息正确、会话改动清单已清空
+        self.assertEqual(self._git_status(repo), "")
+        log = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=str(repo),
+            capture_output=True,
+            check=True,
+        )
+        self.assertEqual(
+            log.stdout.decode("utf-8", errors="replace").strip(),
+            "feat: workspace commit",
+        )
+        ws._writer.manifest.load()
+        self.assertTrue(ws._writer.manifest.empty)
+        ws.shutdown()
+
+    def test_commit_all_changes_scoped_to_project(self):
+        """同一 git 仓库两个项目：提交 A 不影响 B 的改动。"""
+        repo = self._tmp / "repo"
+        repo.mkdir()
+        init_repo(repo)
+        pa = make_project(repo, "proj_a", {"content/a.md": "a1"})
+        make_project(repo, "proj_b", {"content/b.md": "b1"})
+        (repo / ".gitignore").write_text(".state/\n", encoding="utf-8")
+        commit_all(repo, "init")
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            pa / "content", project_root=pa, state_dir=pa / ".state"
+        )
+        self.assertTrue(wait_index(ws))
+        ws._writer.write_text("a.md", "a2")
+        (repo / "proj_b/content/b.md").write_text("b2", encoding="utf-8")
+        clear_vcs_cache()
+
+        failures = ws._commit_all_changes("feat: a only")
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            self._git_status(repo), " M proj_b/content/b.md"
+        )
+        ws.shutdown()
+
+    def test_commit_all_changes_local_project_rejected(self):
+        """本地（无 VCS）项目「提交改动」返回说明，不产生提交。"""
+        pb = make_project(self._tmp, "proj_b", {"content/b.md": "v1"})
+        from doc_tool.ui.content.workspace import ContentWorkspace
+
+        ws = ContentWorkspace(
+            pb / "content", project_root=pb, state_dir=pb / ".state"
+        )
+        self.assertTrue(wait_index(ws))
+        ws._writer.write_text("b.md", "v2")
+        clear_vcs_cache()
+        failures = ws._commit_all_changes("msg")
+        self.assertEqual(failures, ["当前项目不在版本控制内，无法提交"])
+        # 文件保持修改后状态（未提交、未回滚）
+        self.assertEqual(
+            (pb / "content/b.md").read_text(encoding="utf-8"), "v2"
+        )
+        ws.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

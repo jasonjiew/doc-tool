@@ -14,6 +14,9 @@ restore_file）与「回滚全部会话改动」。已删除文件从快照 diff
 非可恢复条目（如 Git/SVN 检测出的 ``project.yml`` 变更）仅展示，禁用恢复。
 ``rollback_all``：可选的「回滚全部」实现；VCS 模式下由上层用
 git restore / svn revert 恢复，而不是本地 .bak 清单。
+``on_commit`` / ``on_pull``：可选的「提交改动」/「拉取更新」实现；
+仅在 Git/SVN 项目启用（git > svn），由上层执行 git add/commit、git pull
+或 svn add/rm/commit、svn update。
 """
 
 from __future__ import annotations
@@ -23,7 +26,9 @@ from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -36,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from doc_tool.application.content.changes import ChangeItem
+from doc_tool.application.content.vcs_changes import PullResult
 
 _ITEM_LABELS = {"added": "新增", "modified": "已修改", "deleted": "已删除"}
 
@@ -64,6 +70,8 @@ class ChangesPanel(QWidget):
         on_restored: Optional[Callable[[], None]] = None,
         writable: bool = True,
         rollback_all: Optional[Callable[[], List[str]]] = None,
+        on_commit: Optional[Callable[[str], List[str]]] = None,
+        on_pull: Optional[Callable[[], PullResult]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -74,6 +82,9 @@ class ChangesPanel(QWidget):
         self._writable = writable
         # VCS 模式下由上层提供版本控制回滚实现（否则用本地 .bak 清单）。
         self._rollback_all = rollback_all
+        # 提交/拉取仅 Git/SVN 项目可用，由上层提供实现（git > svn）。
+        self._on_commit = on_commit
+        self._on_pull = on_pull
         self._items: List[ChangeItem] = []
         self._source = "local"
         self._source_note = ""
@@ -92,6 +103,14 @@ class ChangesPanel(QWidget):
         self._source_label.setObjectName("statusMuted")
         top.addWidget(self._source_label)
         top.addStretch(1)
+        self._commit_btn = QPushButton("提交改动", self)
+        self._commit_btn.setProperty("btnRole", "secondary")
+        self._commit_btn.clicked.connect(self._on_commit_clicked)
+        top.addWidget(self._commit_btn)
+        self._pull_btn = QPushButton("拉取更新", self)
+        self._pull_btn.setProperty("btnRole", "secondary")
+        self._pull_btn.clicked.connect(self._on_pull_clicked)
+        top.addWidget(self._pull_btn)
         self._rollback_all_btn = QPushButton("回滚全部会话改动", self)
         self._rollback_all_btn.setProperty("btnRole", "secondary")
         self._rollback_all_btn.clicked.connect(self._on_rollback_all)
@@ -140,6 +159,7 @@ class ChangesPanel(QWidget):
         self._source = source or "local"
         self._source_note = note or ""
         self._render_source_label()
+        self._update_vcs_buttons()
 
     def _render_source_label(self) -> None:
         label = _SOURCE_LABELS.get(self._source, self._source)
@@ -234,6 +254,7 @@ class ChangesPanel(QWidget):
         self._restore_btn.setEnabled(restorable)
         self._rollback_all_btn.setEnabled(self._writable and bool(self._items))
         self._revision_btn.setEnabled(self._has_revision_candidates())
+        self._update_vcs_buttons()
         if item is None:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("")
@@ -252,6 +273,27 @@ class ChangesPanel(QWidget):
                 }.get(item.status, "恢复到基线")
             )
             self._status_label.setText("")
+
+    def _update_vcs_buttons(self) -> None:
+        """提交/拉取仅 Git/SVN 项目可用；本地项目禁用并标注命令差异。"""
+        vcs_managed = self._source in ("git", "svn")
+        self._commit_btn.setEnabled(
+            self._writable and vcs_managed and bool(self._items)
+        )
+        self._pull_btn.setEnabled(self._writable and vcs_managed)
+        if self._source == "git":
+            self._commit_btn.setToolTip(
+                "git add -A + git commit -m（限定当前项目路径）"
+            )
+            self._pull_btn.setToolTip("git pull：拉取远端最新变更")
+        elif self._source == "svn":
+            self._commit_btn.setToolTip(
+                "svn add + svn rm + svn commit -m（限定当前项目路径）"
+            )
+            self._pull_btn.setToolTip("svn update：更新到远端最新版本")
+        else:
+            self._commit_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
+            self._pull_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
 
     def _on_restore_clicked(self) -> None:
         item = self._selected_item()
@@ -309,6 +351,82 @@ class ChangesPanel(QWidget):
         if self._on_restored is not None:
             self._on_restored()
         self._update_action_state()
+
+    def _on_commit_clicked(self) -> None:
+        """「提交改动」：弹窗收集提交信息后调用上层版本控制提交。"""
+        if not self._writable or not self._items or self._source not in ("git", "svn"):
+            return
+        if self._on_commit is None:
+            self._status_label.setText("提交功能不可用（未配置版本控制提交）")
+            return
+        message, ok = QInputDialog.getMultiLineText(
+            self, "提交改动", "提交信息（必填，将写入版本控制历史）：", ""
+        )
+        if not ok:
+            return
+        message = (message or "").strip()
+        if not message:
+            self._status_label.setText("提交信息不能为空")
+            return
+        failures = self._on_commit(message)
+        if failures:
+            self._status_label.setText("提交失败：{0}".format("；".join(failures)))
+            return
+        if self._on_restored is not None:
+            self._on_restored()
+        self._update_action_state()
+        self._status_label.setText("已提交改动到版本控制")
+
+    def _on_pull_clicked(self) -> None:
+        """「拉取更新」：确认后执行 git pull / svn update，并反馈结果。
+
+        成功后状态行展示摘要（更新了 N 个文件 / 已是最新版本）；存在冲突时
+        弹窗列出冲突文件并提示手工解决；失败时展示命令错误文本。
+        """
+        if not self._writable or self._source not in ("git", "svn"):
+            return
+        if self._on_pull is None:
+            self._status_label.setText("拉取功能不可用（未配置版本控制拉取）")
+            return
+        verb = "git pull" if self._source == "git" else "svn update"
+        answer = QMessageBox.question(
+            self,
+            "拉取更新",
+            "将执行 {0}，把远端最新变更合并到当前工作副本。\n\n"
+            "请先保存所有打开的编辑内容。确认？".format(verb),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = self._on_pull()
+        finally:
+            QApplication.restoreOverrideCursor()
+        message = ""
+        if result.conflicts:
+            QMessageBox.warning(
+                self,
+                "拉取存在冲突",
+                "以下 {0} 个文件有合并冲突，需要手工解决：\n\n{1}\n\n"
+                "请编辑冲突文件（或使用「回滚全部会话改动」放弃改动）后重新提交。".format(
+                    len(result.conflicts), "\n".join(result.conflicts)
+                ),
+            )
+            message = "拉取：{0}，{1} 个文件冲突，需手工解决".format(
+                result.summary or "完成", len(result.conflicts)
+            )
+        elif not result.ok:
+            self._status_label.setText(
+                "拉取失败：{0}".format(result.error or "未知原因")
+            )
+            return
+        else:
+            message = "拉取完成：{0}".format(result.summary or "已更新")
+        if self._on_restored is not None:
+            self._on_restored()
+        self._update_action_state()
+        if message:
+            self._status_label.setText(message)
 
     def _has_revision_candidates(self) -> bool:
         """是否存在可生成修订记录的 Markdown 改动条目（资源/project.yml 不计）。"""

@@ -1050,8 +1050,8 @@ class MainWindowInteractionTests(unittest.TestCase):
         self.assertEqual(
             sorted(spec.kwargs), ["progress", "skip_word_refresh"]
         )
-        # 前置检查按修订记录末行版本号提示，而非清单里的旧版本号。
-        checks.assert_called_once_with("V3.8")
+        # 前置检查按修订记录末行版本号（已去 V）提示，而非清单里的旧版本号。
+        checks.assert_called_once_with("3.8")
 
     def test_merge_without_revision_record_falls_back_to_manifest_version(self):
         """没有修订记录文件时前置检查退回清单版本号（传 None），合并照常启动。"""

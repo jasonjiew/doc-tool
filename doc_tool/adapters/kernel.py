@@ -23,7 +23,11 @@ from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple, Union
 
 from doc_tool.domain.manifest import ProjectManifest
-from doc_tool.domain.paths import ProjectPaths, build_output_filename
+from doc_tool.domain.paths import (
+    ProjectPaths,
+    build_output_filename,
+    normalize_document_version,
+)
 
 
 # doc_tool/adapters/kernel.py -> doc_tool/adapters/ -> doc_tool/ -> doc-automation/
@@ -129,10 +133,14 @@ def config_from_project(
     doc_type = manifest.documentType
     template_path = paths.resolve(manifest.relative_template_docx())
     heading_styles = _effective_heading_styles(manifest, template_path)
+    # 版本号在这里再规范一次：管线同步修订记录版本号时是直接赋值给 dataclass
+    # 字段的（绕过 ``__post_init__``），内核拿到的值必须已无 V 前缀，否则封面
+    # 「版本号」和页眉「版次」会被写成 V3.8，与模板/历史产物写法不一致。
+    document_version = normalize_document_version(manifest.documentVersion)
     output_name = build_output_filename(
         manifest.documentNo,
         manifest.documentName,
-        manifest.documentVersion,
+        document_version,
         manifest.documentType,
     )
     output_path = (
@@ -149,7 +157,7 @@ def config_from_project(
         "documentType": doc_type,
         "documentNo": manifest.documentNo,
         "documentName": manifest.documentName,
-        "documentVersion": str(manifest.documentVersion),
+        "documentVersion": document_version,
         "paths": {
             "template": str(template_path),
             "content_root": str(paths.resolve(manifest.relative_content_root())),

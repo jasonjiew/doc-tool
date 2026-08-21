@@ -124,6 +124,16 @@ def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
         if event.error_code:
             line += " ({0})".format(event.error_code)
         print(line)
+        # 内核给出结构化出错位置时逐条列出：命令行使用者（包括 CI）
+        # 不应该只拿到一个错误码，而要能直接看到哪个文件第几行要改。
+        for item in (event.metrics or {}).get("locations") or ():
+            if not isinstance(item, dict):
+                continue
+            where = str(item.get("relPath") or item.get("path") or "")
+            if item.get("line") is not None:
+                where = "{0}:{1}".format(where, item["line"])
+            parts = [where, str(item.get("message") or ""), str(item.get("hint") or "")]
+            print("  - {0}".format(" ".join(part for part in parts if part).strip()))
     return 0 if result.success else 1
 
 

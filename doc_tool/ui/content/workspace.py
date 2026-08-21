@@ -37,6 +37,9 @@ from doc_tool.application.content.snapshot import (
 from doc_tool.application.content.tree import build_tree
 from doc_tool.application.content.vcs_changes import (
     ChangeDetectionService,
+    PullResult,
+    commit_all,
+    pull_changes,
     rollback_all,
 )
 from doc_tool.application.content.unsaved import (
@@ -364,6 +367,8 @@ class ContentWorkspace(QWidget):
             on_restored=self._after_restore,
             writable=self._writable,
             rollback_all=self._rollback_all_changes,
+            on_commit=self._commit_all_changes,
+            on_pull=self._pull_changes,
         )
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
@@ -430,6 +435,10 @@ class ContentWorkspace(QWidget):
         panel = getattr(self, "_refactor_panel", None)
         if panel is not None and target:
             panel.set_target(target)
+
+    def show_issues(self) -> None:
+        """把「问题」面板推到前台（任务失败后由主窗口调用）。"""
+        self._select_panel("问题")
 
     def run_lint(self) -> None:
         self._select_panel("检查")
@@ -612,6 +621,41 @@ class ContentWorkspace(QWidget):
             except OSError:
                 pass
         return failures + notices
+
+    def _commit_all_changes(self, message: str) -> List[str]:
+        """改动面板「提交改动」：VCS 模式提交项目内全部未提交改动。
+
+        提交成功后清空会话改动清单（条目已入库，避免陈旧条目影响徽标/面板），
+        并失效仓库缓存，使刷新立即反映提交后的干净状态。git > svn。
+        """
+        report = self._vcs.detect()
+        if report.source not in ("git", "svn"):
+            return ["当前项目不在版本控制内，无法提交"]
+        failures = commit_all(report, message)
+        if not failures:
+            try:
+                self._writer.manifest.load()
+                self._writer.manifest.clear()
+            except OSError:
+                pass
+        self._vcs.invalidate_cache()
+        return failures
+
+    def _pull_changes(self) -> PullResult:
+        """改动面板「拉取更新」：git pull / svn update，返回带统计的结果。
+
+        结果含成功摘要（更新了 N 个文件 / 已是最新版本）、带入文件清单与
+        冲突文件；失败时含命令错误文本。缓存失效由本方法完成，界面刷新由
+        面板经 ``on_restored`` 触发。
+        """
+        report = self._vcs.detect()
+        if report.source not in ("git", "svn"):
+            return PullResult(
+                ok=False, summary="", error="当前项目不在版本控制内，无法拉取"
+            )
+        result = pull_changes(report)
+        self._vcs.invalidate_cache()
+        return result
 
     def _refresh_changes_panel(self, status: Optional[Dict[str, str]] = None) -> None:
         """刷新改动面板（status 缺省时重新推导）。"""

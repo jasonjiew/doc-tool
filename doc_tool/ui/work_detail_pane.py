@@ -240,6 +240,15 @@ class ResultCard(QFrame):
         self._advice.hide()
         self._layout.addWidget(self._advice)
 
+        self._locations = QLabel(self)
+        self._locations.setObjectName("resultLocations")
+        self._locations.setWordWrap(True)
+        self._locations.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._locations.hide()
+        self._layout.addWidget(self._locations)
+
         self._actions = QHBoxLayout()
         self._actions.setContentsMargins(0, 4, 0, 0)
         self._action_buttons: List[QPushButton] = []
@@ -275,6 +284,20 @@ class ResultCard(QFrame):
         else:
             self._advice.hide()
 
+        # 出错位置：失败时直接列出前几条「文件:行号 说明」，让用户不必先
+        # 展开技术详情或翻日志就知道改哪里。
+        if result.locations:
+            shown = list(result.locations[:5])
+            text = "\n".join("• {0}".format(line) for line in shown)
+            if len(result.locations) > len(shown):
+                text += "\n• …共 {0} 处，完整清单见「问题」面板。".format(
+                    len(result.locations)
+                )
+            self._locations.setText(text)
+            self._locations.show()
+        else:
+            self._locations.hide()
+
         # 重建操作按钮；路径不存在则跳过，避免打开无效路径。
         self._clear_actions()
         output = result.output_path
@@ -296,6 +319,7 @@ class ResultCard(QFrame):
             or result.stage
             or result.exception_summary
             or result.log_path
+            or result.locations
         ):
             self._add_action("技术详情…", lambda: self._show_tech())
             self._render_tech(result)
@@ -311,6 +335,8 @@ class ResultCard(QFrame):
             ("异常摘要", result.exception_summary or "无"),
             ("日志路径", str(result.log_path) if result.log_path else "未生成"),
         ]
+        for index, location in enumerate(result.locations[:10], start=1):
+            lines.append(("出错位置 {0}".format(index), location))
         for name, value in lines:
             row = QLabel(self._tech_frame)
             row.setObjectName("techDetail")

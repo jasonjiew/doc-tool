@@ -221,8 +221,9 @@ class RevisionTableReadTest(unittest.TestCase):
             "\n<!-- 表后说明 -->\n"
         )
         self.assertTrue(has_revision_table(self.md))
+        # last_revision_version 是原样读取；文档版本号统一去掉 V 前缀。
         self.assertEqual(last_revision_version(self.md), "V3.8")
-        self.assertEqual(document_version_from_record(self.md), "V3.8")
+        self.assertEqual(document_version_from_record(self.md), "3.8")
 
     def test_header_only_table_has_no_version(self):
         """只有表头：作者还没写过修订记录 → 沿用清单版本号。"""
@@ -291,7 +292,7 @@ class RevisionVersionSyncTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _manifest(self, version="V3.7"):
+    def _manifest(self, version="3.7"):
         """只带同步所需字段的清单替身（真实清单需要完整项目结构）。"""
         return types.SimpleNamespace(
             documentVersion=version,
@@ -317,11 +318,12 @@ class RevisionVersionSyncTest(unittest.TestCase):
             + "| V3.8 | 新增呼吸机接口 | 2026-07-01 | 王杰 |\n",
             encoding="utf-8",
         )
-        manifest = self._manifest("V3.7")
+        manifest = self._manifest("3.7")
         status, result, plan = self._sync(manifest)
         self.assertEqual(status, "succeeded")
-        self.assertEqual(manifest.documentVersion, "V3.8")
-        self.assertIn("V3.7 → V3.8", self._detail(result))
+        # 修订记录里写 V3.8，进清单/封面/文件名的一律是去掉 V 的 3.8。
+        self.assertEqual(manifest.documentVersion, "3.8")
+        self.assertIn("3.7 → 3.8", self._detail(result))
         self.assertEqual(
             [event.stage for event in result.events], [STAGE_REVISION] * 2
         )
@@ -329,40 +331,41 @@ class RevisionVersionSyncTest(unittest.TestCase):
         self.assertNotIn("V3.9", self.md.read_text(encoding="utf-8"))
         # 构建失败回滚：清单版本号退回原值（清单只在发布成功后落盘）。
         _rollback_revision_sync(plan, manifest, _FakeLog())
-        self.assertEqual(manifest.documentVersion, "V3.7")
+        self.assertEqual(manifest.documentVersion, "3.7")
 
     def test_same_version_is_noop(self):
+        """清单已是 3.8、修订记录末行写 V3.8：去 V 后相同，视为无操作。"""
         self.md.write_text(
             self._HEADER + "| V3.8 | 上次合并 | 2026-07-01 | 王杰 |\n",
             encoding="utf-8",
         )
-        manifest = self._manifest("V3.8")
+        manifest = self._manifest("3.8")
         status, result, plan = self._sync(manifest)
         self.assertEqual(status, "succeeded")
-        self.assertEqual(manifest.documentVersion, "V3.8")
+        self.assertEqual(manifest.documentVersion, "3.8")
         self.assertIn("已与 _revision_record.md 末行一致", self._detail(result))
         self.assertFalse(plan["applied"])
 
     def test_missing_record_keeps_manifest_version(self):
         """无修订记录表（旧项目模板也没有）：沿用清单版本号，合并照常。"""
-        manifest = self._manifest("V3.7")
+        manifest = self._manifest("3.7")
         status, result, _plan = self._sync(manifest)
         self.assertEqual(status, "skipped")
-        self.assertEqual(manifest.documentVersion, "V3.7")
+        self.assertEqual(manifest.documentVersion, "3.7")
         self.assertIn("没有修订记录表", self._detail(result))
 
     def test_header_only_table_keeps_manifest_version(self):
         self.md.write_text("# 修订记录\n\n" + self._HEADER, encoding="utf-8")
-        manifest = self._manifest("V3.7")
+        manifest = self._manifest("3.7")
         status, result, _plan = self._sync(manifest)
         self.assertEqual(status, "skipped")
-        self.assertEqual(manifest.documentVersion, "V3.7")
+        self.assertEqual(manifest.documentVersion, "3.7")
         self.assertIn("还没有数据行", self._detail(result))
 
     def test_broken_paths_do_not_block_build(self):
         """读取整体失败（清单/路径异常）也只跳过同步，不抛给管线。"""
         broken = types.SimpleNamespace(
-            documentVersion="V3.7",
+            documentVersion="3.7",
             documentType="requirement",
             relative_content_root=lambda: "",  # 触发 PathEscapeError
             relative_template_docx=lambda: "template/template.docx",
@@ -371,7 +374,7 @@ class RevisionVersionSyncTest(unittest.TestCase):
         result = PipelineResult(success=False)
         status = _sync_revision_version(None, broken, result, _FakeLog())
         self.assertEqual(status, "skipped")
-        self.assertEqual(broken.documentVersion, "V3.7")
+        self.assertEqual(broken.documentVersion, "3.7")
         self.assertIn("读取失败", self._detail(result))
 
     def test_prepare_bootstraps_record_from_template(self):
@@ -388,7 +391,7 @@ class RevisionVersionSyncTest(unittest.TestCase):
         previous = sys.modules.get("extract_revision_record")
         sys.modules["extract_revision_record"] = fake
         try:
-            manifest = self._manifest("V2.4")
+            manifest = self._manifest("2.4")
             status, _result, _plan = self._sync(manifest)
         finally:
             if previous is None:
@@ -396,7 +399,8 @@ class RevisionVersionSyncTest(unittest.TestCase):
             else:
                 sys.modules["extract_revision_record"] = previous
         self.assertEqual(status, "succeeded")
-        self.assertEqual(manifest.documentVersion, "V2.5")
+        # 模板提取出的历史行写作 V2.5；进清单的是去 V 后的 2.5。
+        self.assertEqual(manifest.documentVersion, "2.5")
         self.assertTrue(self.md.is_file())
 
     def test_ensure_revision_record_bootstraps_missing_file_without_overwrite(self):

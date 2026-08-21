@@ -36,14 +36,17 @@ if hasattr(sys.stdout, "reconfigure"):
 from doc_tool.application.content.vcs_changes import (  # noqa: E402
     ChangeDetectionService,
     ChangedFile,
+    ChangeReport,
     GitChangeDetector,
     SvnChangeDetector,
     clear_vcs_cache,
+    commit_all as vcs_commit_all,
     find_git_repo_root,
     find_svn_wc_root,
     parse_git_name_status_z,
     parse_git_status_z,
     parse_svn_status_xml,
+    pull_changes as vcs_pull_changes,
     rollback_all,
 )
 
@@ -1010,6 +1013,434 @@ class VcsRollbackTests(RepoFixtureMixin, unittest.TestCase):
         failures = rollback_all(report)
         self.assertEqual(len(failures), 1)
         self.assertIn("版本控制", failures[0])
+
+
+class VcsCommitPullTests(RepoFixtureMixin, unittest.TestCase):
+    """提交（commit_all）与拉取（pull_changes）：git > svn。"""
+
+    def _git_out(self, repo: Path, *args: str) -> str:
+        proc = subprocess.run(
+            ["git"] + list(args), cwd=str(repo), capture_output=True, check=True
+        )
+        # 逐行 strip：整体 strip 会吞掉首行前导空格（porcelain 第一列 XY）。
+        text = proc.stdout.decode("utf-8", errors="replace")
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    def _make_project(self, name: str, files: dict) -> Path:
+        project = make_project(self.repo, name, files)
+        commit_all(self.repo, "init {0}".format(name))
+        return project
+
+    # --- git 提交 ---
+
+    def test_git_commit_all_commits_project_changes(self):
+        pa = self._make_project(
+            "proj_a",
+            {
+                "content/a.md": "a",
+                "content/c.md": "c",
+            },
+        )
+        (pa / "content/a.md").write_text("a2", encoding="utf-8")
+        (pa / "content/new.md").write_text("new", encoding="utf-8")
+        (pa / "content/c.md").unlink()
+        service = self.service(pa)
+        report = service.detect()
+        self.assertEqual(report.source, "git")
+        self.assertEqual(len(report.files), 3)
+        failures = vcs_commit_all(report, "feat: update a, add new, drop c")
+        self.assertEqual(failures, [])
+        # 仓库干净 + 提交信息正确
+        self.assertEqual(self._git_out(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(
+            self._git_out(self.repo, "log", "-1", "--format=%s"),
+            "feat: update a, add new, drop c",
+        )
+        # 提交后再检测：无变化（清缓存避免命中旧仓库级缓存）
+        clear_vcs_cache()
+        self.assertEqual(service.detect().files, ())
+
+    def test_git_commit_all_scopes_to_project(self):
+        self._make_project("proj_a", {"content/a.md": "a"})
+        self._make_project("proj_b", {"content/b.md": "b"})
+        pa = self.repo / "proj_a"
+        pb = self.repo / "proj_b"
+        (pa / "content/a.md").write_text("a2", encoding="utf-8")
+        (pb / "content/b.md").write_text("b2", encoding="utf-8")
+        report = self.service(pa).detect()
+        failures = vcs_commit_all(report, "feat: a only")
+        self.assertEqual(failures, [])
+        # proj_b 的改动必须原样保留（未暂存、未提交）
+        self.assertEqual(
+            self._git_out(self.repo, "status", "--porcelain"),
+            " M proj_b/content/b.md",
+        )
+        self.assertEqual(
+            self._git_out(self.repo, "diff", "--cached", "--name-only"), ""
+        )
+        self.assertEqual(
+            self._git_out(self.repo, "log", "-1", "--format=%s"), "feat: a only"
+        )
+
+    def test_git_commit_all_empty_message(self):
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+        (pa / "content/a.md").write_text("a2", encoding="utf-8")
+        report = self.service(pa).detect()
+        failures = vcs_commit_all(report, "   ")
+        self.assertEqual(failures, ["提交信息不能为空"])
+        # 未发生提交
+        self.assertNotEqual(self._git_out(self.repo, "status", "--porcelain"), "")
+
+    def test_git_commit_all_command_failure_reports_error(self):
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+        (pa / "content/a.md").write_text("a2", encoding="utf-8")
+
+        def bad_runner(args, cwd):
+            return subprocess.CompletedProcess(
+                args, returncode=128, stdout=b"", stderr=b"fatal: not a git repository"
+            )
+
+        report = self.service(pa).detect()
+        failures = vcs_commit_all(report, "msg", runner=bad_runner)
+        self.assertTrue(failures)
+        self.assertIn("git add", failures[0])
+
+    def test_git_commit_all_no_repo_root(self):
+        report = ChangeReport(
+            source="git", repository_root="", project_root=str(self._tmp)
+        )
+        self.assertEqual(vcs_commit_all(report, "msg"), ["Git 仓库根不可用"])
+
+    # --- svn 提交（注入假 svn） ---
+
+    def _svn_project(self):
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+        project = wc / "proj_a"
+        (project / "content").mkdir(parents=True)
+        (project / "project.yml").write_text(
+            PROJECT_YML.format(name="A"), encoding="utf-8"
+        )
+        return wc, project
+
+    @staticmethod
+    def _svn_status_runner(wc: Path, entries: list):
+        def runner(args, cwd):
+            body = "".join(
+                "<entry path={0}{1}{0}><wc-status item={0}{2}{0} props={0}none{0}/></entry>".format(
+                    '"', path, item
+                )
+                for path, item in entries
+            )
+            xml = (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                "<status><target path="
+                + '"'
+                + "."
+                + '"'
+                + ">"
+                + body
+                + "</target></status>"
+            )
+            return subprocess.CompletedProcess(
+                args, returncode=0, stdout=xml.encode("utf-8"), stderr=b""
+            )
+
+        return runner
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.calls: list = []
+
+        def __call__(self, args, cwd):
+            self.calls.append((list(args), str(cwd)))
+            return subprocess.CompletedProcess(
+                args, returncode=0, stdout=b"", stderr=b""
+            )
+
+    def test_svn_commit_all_registers_and_commits(self):
+        wc, project = self._svn_project()
+        status_runner = self._svn_status_runner(
+            wc,
+            [
+                ("proj_a/content/a.md", "modified"),
+                ("proj_a/content/new.md", "unversioned"),
+                ("proj_a/content/old.md", "deleted"),
+            ],
+        )
+        service = ChangeDetectionService(
+            project, project / "content", svn_runner=status_runner
+        )
+        report = service.detect()
+        self.assertEqual(report.source, "svn")
+        recorder = self._Recorder()
+        failures = vcs_commit_all(report, "feat: svn", runner=recorder)
+        self.assertEqual(failures, [])
+        commands = [args for args, _ in recorder.calls]
+        self.assertIn(
+            ["svn", "add", "--parents", "--force", "proj_a/content/new.md"],
+            commands,
+        )
+        self.assertIn(
+            ["svn", "rm", "--force", "proj_a/content/old.md"], commands
+        )
+        self.assertIn(
+            [
+                "svn",
+                "commit",
+                "-m",
+                "feat: svn",
+                "--",
+                "proj_a/content/a.md",
+                "proj_a/content/new.md",
+                "proj_a/content/old.md",
+            ],
+            commands,
+        )
+
+    def test_svn_commit_all_aborts_when_add_fails(self):
+        wc, project = self._svn_project()
+        status_runner = self._svn_status_runner(
+            wc, [("proj_a/content/new.md", "unversioned")]
+        )
+        service = ChangeDetectionService(
+            project, project / "content", svn_runner=status_runner
+        )
+        report = service.detect()
+        calls: list = []
+
+        def failing_runner(args, cwd):
+            calls.append(list(args))
+            if args[1] == "add":
+                return subprocess.CompletedProcess(
+                    args, returncode=1, stdout=b"", stderr=b"E155010"
+                )
+            return subprocess.CompletedProcess(
+                args, returncode=0, stdout=b"", stderr=b""
+            )
+
+        failures = vcs_commit_all(report, "msg", runner=failing_runner)
+        self.assertTrue(failures)
+        self.assertIn("svn add", failures[0])
+        self.assertFalse(
+            any(args[1] == "commit" for args in calls),
+            "svn add 失败后不应继续 commit",
+        )
+
+    def test_svn_commit_all_empty_message(self):
+        wc, project = self._svn_project()
+        report = ChangeReport(
+            source="svn", repository_root=str(wc), project_root=str(project)
+        )
+        self.assertEqual(vcs_commit_all(report, " "), ["提交信息不能为空"])
+
+    # --- 拉取 ---
+
+    def test_pull_git_invokes_git_pull(self):
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+        recorder = self._Recorder()
+        report = ChangeReport(
+            source="git",
+            repository_root=str(self.repo),
+            project_root=str(pa),
+        )
+        result = vcs_pull_changes(report, runner=recorder)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.summary, "已是最新版本")
+        self.assertEqual(result.changed_files, ())
+        self.assertEqual(result.conflicts, ())
+        # 记录里必须包含 git pull（前面还有 rev-parse 探测）
+        self.assertTrue(any(args[1:] == ["pull"] for args, _ in recorder.calls))
+
+    def test_pull_git_updates_worktree(self):
+        """真实 git：origin 新增提交，工作仓库 pull 后文件出现。"""
+        origin = self._tmp / "origin"
+        origin.mkdir()
+        init_repo(origin)
+        (origin / "base.txt").write_text("base", encoding="utf-8")
+        commit_all(origin, "base")
+        work = self._tmp / "work"
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(work)],
+            check=True,
+            capture_output=True,
+        )
+        _run_git(work, "config", "user.email", "t@t.t")
+        _run_git(work, "config", "user.name", "t")
+        project = work / "proj_a"
+        (project / "content").mkdir(parents=True)
+        (project / "project.yml").write_text(
+            PROJECT_YML.format(name="A"), encoding="utf-8"
+        )
+        (project / "content/a.md").write_text("a", encoding="utf-8")
+        commit_all(work, "project")
+        # origin 新增远端提交
+        (origin / "remote.txt").write_text("remote", encoding="utf-8")
+        commit_all(origin, "remote")
+        report = ChangeReport(
+            source="git", repository_root=str(work), project_root=str(project)
+        )
+        result = vcs_pull_changes(report)
+        self.assertTrue(result.ok)
+        self.assertTrue((work / "remote.txt").exists())
+        self.assertIn("remote.txt", result.changed_files)
+        self.assertEqual(result.conflicts, ())
+        self.assertIn("1 个文件", result.summary)
+        # 本地项目提交保留（git pull 可能产生 merge 提交，检查历史而非 HEAD）
+        self.assertIn(
+            "project", self._git_out(work, "log", "--format=%s", "-5")
+        )
+
+    def test_pull_svn_invokes_svn_update(self):
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+        recorder = self._Recorder()
+        report = ChangeReport(
+            source="svn", repository_root=str(wc), project_root=str(wc)
+        )
+        result = vcs_pull_changes(report, runner=recorder)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.summary, "已是最新版本")
+        self.assertEqual(recorder.calls[0][0][1:], ["update"])
+
+    def test_pull_failure_reports_error(self):
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+
+        def bad_runner(args, cwd):
+            return subprocess.CompletedProcess(
+                args, returncode=1, stdout=b"", stderr=b"fatal: no upstream configured"
+            )
+
+        report = ChangeReport(
+            source="git", repository_root=str(self.repo), project_root=str(pa)
+        )
+        result = vcs_pull_changes(report, runner=bad_runner)
+        self.assertFalse(result.ok)
+        self.assertIn("git pull", result.error or "")
+        self.assertEqual(result.conflicts, ())
+
+    def test_pull_local_report_rejected(self):
+        report = ChangeReport(source="local", project_root=str(self._tmp))
+        self.assertEqual(
+            vcs_commit_all(report, "m"), ["当前项目不在版本控制内，无法提交"]
+        )
+        result = vcs_pull_changes(report)
+        self.assertFalse(result.ok)
+        self.assertIn("无法拉取", result.error or "")
+
+    def test_pull_git_reports_changed_files(self):
+        """git pull 快进更新：报告带入的文件清单与数量。"""
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+
+        class Fake:
+            def __init__(self):
+                self.calls = []
+                self._rev_count = 0
+
+            def __call__(self, args, cwd):
+                self.calls.append(list(args))
+                name = args[1] if len(args) > 1 else ""
+                if name == "rev-parse":
+                    self._rev_count += 1
+                    out = b"abc123\n" if self._rev_count == 1 else b"def456\n"
+                    return subprocess.CompletedProcess(args, 0, out, b"")
+                if name == "pull":
+                    return subprocess.CompletedProcess(
+                        args, 0, b"Updating abc123..def456\nFast-forward\n", b""
+                    )
+                if name == "diff":
+                    return subprocess.CompletedProcess(
+                        args, 0, b"content/a.md\ncontent/new.md\n", b""
+                    )
+                return subprocess.CompletedProcess(args, 0, b"", b"")
+
+        report = ChangeReport(
+            source="git", repository_root=str(self.repo), project_root=str(pa)
+        )
+        result = vcs_pull_changes(report, runner=Fake())
+        self.assertTrue(result.ok)
+        self.assertEqual(result.changed_files, ("content/a.md", "content/new.md"))
+        self.assertEqual(result.conflicts, ())
+        self.assertIn("2", result.summary)
+        self.assertIn("更新了", result.summary)
+
+    def test_pull_git_conflict_reports_unmerged_files(self):
+        """git pull 合并冲突：ok=False 且列出未合并文件。"""
+        pa = self._make_project("proj_a", {"content/a.md": "a"})
+
+        def fake(args, cwd):
+            name = args[1] if len(args) > 1 else ""
+            if name == "rev-parse":
+                return subprocess.CompletedProcess(args, 0, b"abc123\n", b"")
+            if name == "pull":
+                return subprocess.CompletedProcess(
+                    args,
+                    1,
+                    b"",
+                    b"CONFLICT (content): Merge conflict in content/a.md\n"
+                    b"Automatic merge failed; fix conflicts and then commit the result.",
+                )
+            if name == "ls-files":
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    b"100644 111 1\tcontent/a.md\n"
+                    b"100644 222 2\tcontent/a.md\n"
+                    b"100644 333 3\tcontent/a.md\n",
+                    b"",
+                )
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+
+        report = ChangeReport(
+            source="git", repository_root=str(self.repo), project_root=str(pa)
+        )
+        result = vcs_pull_changes(report, runner=fake)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.conflicts, ("content/a.md",))
+        self.assertIn("git pull", result.error or "")
+
+    def test_pull_svn_parses_changes_and_conflicts(self):
+        """svn update：解析 U/A 变更与 C 冲突并统计。"""
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+
+        def fake(args, cwd):
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                b"Updating '.':\n"
+                b"U    content/a.md\n"
+                b"A    content/b.md\n"
+                b"C    content/c.md\n"
+                b"Updated to revision 42.\n",
+                b"",
+            )
+
+        report = ChangeReport(
+            source="svn", repository_root=str(wc), project_root=str(wc)
+        )
+        result = vcs_pull_changes(report, runner=fake)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.changed_files, ("content/a.md", "content/b.md"))
+        self.assertEqual(result.conflicts, ("content/c.md",))
+        self.assertIn("2 个文件更新", result.summary)
+        self.assertIn("1 个冲突", result.summary)
+
+    def test_pull_svn_failure_reports_error(self):
+        wc = self._tmp / "wc"
+        (wc / ".svn").mkdir(parents=True)
+
+        def fake(args, cwd):
+            return subprocess.CompletedProcess(
+                args, 1, b"", b"svn: E170000: Unable to connect to a repository"
+            )
+
+        report = ChangeReport(
+            source="svn", repository_root=str(wc), project_root=str(wc)
+        )
+        result = vcs_pull_changes(report, runner=fake)
+        self.assertFalse(result.ok)
+        self.assertIn("svn update", result.error or "")
 
 
 if __name__ == "__main__":

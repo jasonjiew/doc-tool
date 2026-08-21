@@ -31,6 +31,11 @@ BASE = os.environ.get("DOC_TOOL_TEST_BASE") or REPO_BASE
 if REPO_BASE not in sys.path:
     sys.path.insert(0, REPO_BASE)
 
+from doc_tool.domain.markdown_structure import (  # noqa: E402
+    check_table_structure,
+    is_separator_row,
+    split_table_row,
+)
 from doc_tool.domain.ooxml import (  # noqa: E402
     OOXMLSecurityError,
     parse_xml_safe,
@@ -39,7 +44,57 @@ from doc_tool.domain.ooxml import (  # noqa: E402
 
 
 class AutomationError(RuntimeError):
-    """A user-actionable build/validation error."""
+    """A user-actionable build/validation error.
+
+    ``locations`` 携带机器可读的出错位置，让上层（管线、问题面板、CLI）
+    能直接展示「哪个文件第几行、为什么、怎么改」，而不是只给一个错误码
+    让用户自己去日志里翻。每项为稳定键的 dict：
+
+    - ``path``：出错文件路径。
+    - ``line``：1-based 行号；整文件级问题为 None。
+    - ``message``：问题说明。
+    - ``hint``：修法建议（可为空）。
+    - ``rule``：稳定规则名，供筛选与测试断言。
+
+    只有消息文本、没有结构化位置的旧调用点保持原样（``locations``
+    为空），上层会退回从消息里解析 ``路径:行号``。
+    """
+
+    def __init__(self, message: str, locations: Optional[Iterable[Dict]] = None) -> None:
+        super().__init__(message)
+        self.locations: List[Dict] = [dict(item) for item in (locations or ())]
+
+
+def error_location(
+    path: str,
+    line: Optional[int],
+    message: str,
+    hint: str = "",
+    rule: str = "",
+) -> Dict:
+    """构造一条结构化出错位置。"""
+    return {
+        "path": str(path),
+        "line": int(line) if line is not None else None,
+        "message": message,
+        "hint": hint,
+        "rule": rule,
+    }
+
+
+def format_location(entry: Dict) -> str:
+    """把一条位置渲染成 ``路径:行号 说明 建议`` 单行文本。
+
+    保持与旧报告一致的 ``路径:行号`` 前缀：校验报告解析与现有
+    测试都依赖这个形状定位文件。
+    """
+    head = entry["path"]
+    if entry.get("line") is not None:
+        head = "{0}:{1}".format(head, entry["line"])
+    parts = [head, entry.get("message", "")]
+    if entry.get("hint"):
+        parts.append(entry["hint"])
+    return " ".join(part for part in parts if part)
 
 
 @dataclass(frozen=True)
@@ -240,34 +295,16 @@ def resolve_resource(root: str, relative_path: str, label: str) -> str:
 def split_markdown_table_row(line: str) -> List[str]:
     r"""Split a pipe table row without treating ``\|`` as a delimiter.
 
-    Only the two escapes required by the project are decoded here:
-    ``\|`` becomes ``|`` and ``\\`` becomes ``\``.  Other backslashes are
-    preserved because they may be business data, Windows paths or regex text.
+    拆分规则已收敛到 ``doc_tool.domain.markdown_structure``（构建与内容
+    检查共用同一份契约）；这里只把异常类型转回 ``AutomationError``，
+    保持内核对外的失败语义不变。
     """
-    value = line.strip()
-    if not value.startswith("|"):
-        raise AutomationError("Markdown 表格行必须以 | 开头: {0}".format(line))
-    cells: List[str] = []
-    current: List[str] = []
-    index = 0
-    while index < len(value):
-        char = value[index]
-        if char == "\\" and index + 1 < len(value) and value[index + 1] in ("|", "\\"):
-            current.append(value[index + 1])
-            index += 2
-            continue
-        if char == "|":
-            cells.append("".join(current))
-            current = []
-        else:
-            current.append(char)
-        index += 1
-    cells.append("".join(current))
-    if cells and not cells[0].strip():
-        cells.pop(0)
-    if cells and not cells[-1].strip():
-        cells.pop()
-    return [re.sub(r"<br\s*/?>", "\n", cell.strip(), flags=re.IGNORECASE) for cell in cells]
+    from doc_tool.domain.markdown_structure import TableRowSyntaxError
+
+    try:
+        return split_table_row(line)
+    except TableRowSyntaxError as exc:
+        raise AutomationError(str(exc)) from exc
 
 
 def encode_markdown_cell(value: str) -> str:
@@ -285,7 +322,7 @@ def parse_markdown_table(lines: Iterable[str]) -> List[List[str]]:
     rows: List[List[str]] = []
     for line in lines:
         cells = split_markdown_table_row(line)
-        if cells and all(re.fullmatch(r":?-{1,}:?", cell or "") for cell in cells):
+        if is_separator_row(cells):
             continue
         rows.append(cells)
     if not rows:
@@ -294,30 +331,71 @@ def parse_markdown_table(lines: Iterable[str]) -> List[List[str]]:
     return [row + [""] * (width - len(row)) for row in rows]
 
 
-def _validate_markdown(path: str, depth: int, config: Dict, errors: List[str]) -> None:
+def _validate_markdown(
+    path: str,
+    depth: int,
+    config: Dict,
+    errors: List[str],
+    locations: Optional[List[Dict]] = None,
+) -> None:
+    """检查一份 Markdown 的构建前约束，一次收集全部问题。
+
+    ``errors`` 收单行文本（兼容旧报告），``locations`` 收同一批问题的
+    结构化位置，供上层直接跳转定位。
+    """
+    collected: List[Dict] = locations if locations is not None else []
+
+    def add(line_no: Optional[int], message: str, hint: str = "", rule: str = "") -> None:
+        entry = error_location(path, line_no, message, hint, rule)
+        collected.append(entry)
+        errors.append(format_location(entry))
+
     with open(path, encoding="utf-8") as handle:
         lines = handle.read().splitlines()
+
+    # 表格结构契约：元数据语法、元数据后是否紧跟表格。不阻断的结论
+    # （列数不符、行列不齐、缺分隔行）不在构建时报，由内容检查面板负责。
+    for finding in check_table_structure(lines):
+        if finding.blocking:
+            add(finding.line_no, finding.message, finding.hint, finding.rule)
+
     for line_number, line in enumerate(lines, start=1):
         stripped = line.strip()
         heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
         if heading and len(heading.group(1)) <= depth:
-            errors.append(
-                "{0}:{1} 内部标题层级必须深于文件章节层级 H{2}: {3}".format(
-                    path, line_number, depth, stripped
-                )
+            add(
+                line_number,
+                "内部标题层级必须深于文件章节层级 H{0}: {1}".format(depth, stripped),
+                "请把该标题至少多加一级 #（不浅于 H{0}）。".format(depth + 1),
+                "heading_level",
             )
 
         table_marker = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
         if stripped.startswith("<!-- TABLE:") and not table_marker:
-            errors.append("{0}:{1} 复杂表格标记语法无效: {2}".format(path, line_number, stripped))
+            add(
+                line_number,
+                "复杂表格标记语法无效: {0}".format(stripped),
+                "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
+                "complex_table_syntax",
+            )
         if table_marker:
             filename = table_marker.group(2)
             if not filename:
-                errors.append("{0}:{1} 复杂表格标记缺少 XML 文件名".format(path, line_number))
+                add(
+                    line_number,
+                    "复杂表格标记缺少 XML 文件名",
+                    "请补上表格 XML 文件名，形如 <!-- TABLE:1:table_0001.xml -->。",
+                    "complex_table_syntax",
+                )
             else:
                 table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
                 if not os.path.isfile(table_path):
-                    errors.append("{0}:{1} 复杂表格 XML 不存在: {2}".format(path, line_number, table_path))
+                    add(
+                        line_number,
+                        "复杂表格 XML 不存在: {0}".format(table_path),
+                        "请确认文件已放入表格目录，或修正标记中的文件名。",
+                        "complex_table_missing",
+                    )
                 else:
                     try:
                         with open(table_path, "rb") as table_file:
@@ -325,21 +403,41 @@ def _validate_markdown(path: str, depth: int, config: Dict, errors: List[str]) -
                             # 仓库内不保留第二条可被业务代码直接调用的解析路径。
                             parse_xml_safe(table_file.read(), os.path.basename(table_path))
                     except (OOXMLSecurityError, OSError) as exc:
-                        errors.append("{0}:{1} 复杂表格 XML 无法解析: {2}".format(path, line_number, exc))
+                        add(
+                            line_number,
+                            "复杂表格 XML 无法解析: {0}".format(exc),
+                            "请用文本编辑器检查该 XML 是否完整且根节点为 w:tbl。",
+                            "complex_table_parse",
+                        )
 
         image_ref = parse_image_reference(stripped)
         if stripped.startswith("![") and image_ref is None:
-            errors.append("{0}:{1} 图片 Markdown 语法无效: {2}".format(path, line_number, stripped))
+            add(
+                line_number,
+                "图片 Markdown 语法无效: {0}".format(stripped),
+                "正确写法形如 ![说明](images/a.png) 或 ![说明](images/a.png =800x600)。",
+                "image_syntax",
+            )
         if image_ref is not None:
             image_path = resolve_resource(config["paths"]["asset_root"], image_ref.relative_path, "图片")
             if not os.path.isfile(image_path):
-                errors.append("{0}:{1} 图片不存在: {2}".format(path, line_number, image_path))
+                add(
+                    line_number,
+                    "图片不存在: {0}".format(image_path),
+                    "请把图片放入资源目录，或修正链接中的相对路径。",
+                    "image_missing",
+                )
             else:
                 try:
                     with Image.open(image_path) as image:
                         image.verify()
                 except Exception as exc:
-                    errors.append("{0}:{1} 图片损坏或格式不支持: {2}".format(path, line_number, exc))
+                    add(
+                        line_number,
+                        "图片损坏或格式不支持: {0}".format(exc),
+                        "请用图片工具重新导出为 PNG/JPEG 后替换。",
+                        "image_broken",
+                    )
 
 
 def validate_content_tree(config: Dict) -> List[ChapterEntry]:
@@ -355,17 +453,35 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
             raise AutomationError("资源目录不存在: {0}".format(path))
 
     errors: List[str] = []
+    locations: List[Dict] = []
     flattened: List[ChapterEntry] = []
     max_heading = max(config["headingStyles"])
 
+    def add(
+        target: str,
+        line_no: Optional[int],
+        message: str,
+        hint: str = "",
+        rule: str = "",
+    ) -> None:
+        entry = error_location(target, line_no, message, hint, rule)
+        locations.append(entry)
+        errors.append(format_location(entry))
+
     def walk(directory: str, parent: Tuple[int, ...], depth: int) -> None:
         if depth > max_heading:
-            errors.append("章节层级 H{0} 超过 headingStyles 配置范围: {1}".format(depth, directory))
+            add(
+                directory,
+                None,
+                "章节层级 H{0} 超过 headingStyles 配置范围".format(depth),
+                "请减少目录嵌套层级，或在项目清单里扩展 headingStyles。",
+                "chapter_depth",
+            )
             return
         try:
             entries = scan_entries(directory, depth)
         except AutomationError as exc:
-            errors.append(str(exc))
+            add(directory, None, str(exc), "", "chapter_scan")
             return
         for position, entry in enumerate(entries, start=1):
             expected = parent + (position,)
@@ -373,29 +489,42 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
                 expected_number = display_number(expected)
                 actual_number = display_number(entry.number)
                 suffix = "" if entry.kind == "dir" else ".md"
-                errors.append(
-                    "{0}: 编号 {1} 与层级/顺序不一致；实际预期编号为 {2}，请改为“{2} {3}{4}”".format(
-                        entry.path, actual_number, expected_number, entry.title, suffix
-                    )
+                add(
+                    entry.path,
+                    None,
+                    "编号 {0} 与层级/顺序不一致；实际预期编号为 {1}".format(
+                        actual_number, expected_number
+                    ),
+                    "请改为“{0} {1}{2}”。".format(expected_number, entry.title, suffix),
+                    "chapter_numbering",
                 )
             flattened.append(entry)
             if entry.kind == "dir":
                 index_path = os.path.join(entry.path, "_index.md")
                 if os.path.isfile(index_path):
-                    _validate_markdown(index_path, depth, config, errors)
+                    _validate_markdown(index_path, depth, config, errors, locations)
                 walk(entry.path, entry.number, depth + 1)
                 try:
                     child_entries = scan_entries(entry.path, depth + 1)
                 except AutomationError:
                     child_entries = []
                 if not child_entries and not os.path.isfile(index_path):
-                    errors.append("空章节目录既没有 _index.md 也没有子章节: {0}".format(entry.path))
+                    add(
+                        entry.path,
+                        None,
+                        "空章节目录既没有 _index.md 也没有子章节",
+                        "请补上 _index.md 正文，或删除该空目录。",
+                        "empty_chapter",
+                    )
             else:
-                _validate_markdown(entry.path, depth, config, errors)
+                _validate_markdown(entry.path, depth, config, errors, locations)
 
     walk(root, tuple(), 1)
     if errors:
-        raise AutomationError("构建前检查失败:\n- " + "\n- ".join(errors))
+        raise AutomationError(
+            "构建前检查失败:\n- " + "\n- ".join(errors),
+            locations=locations,
+        )
     return flattened
 
 

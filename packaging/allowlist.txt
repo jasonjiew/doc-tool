@@ -16,6 +16,8 @@ _internal/python313.dll
 _internal/_*.pyd
 _internal/*.dll
 _internal/base_library.zip
+_internal/base_library.zip.bak
+# 1.4.4: base_library.zip 的备份（启动脚本检测到被安全软件改写时自动恢复）
 _internal/libcrypto-*.dll
 _internal/libssl-*.dll
 _internal/libffi-*.dll

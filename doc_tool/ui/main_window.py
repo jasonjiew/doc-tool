@@ -73,6 +73,7 @@ from doc_tool.ui.workbench_state import (
     derive_step_list,
     derive_workbench_state,
     error_presentation,
+    format_stage_locations,
 )
 
 
@@ -1304,6 +1305,13 @@ class MainWindow(QMainWindow):
                     report_path if report_path is not None and report_path.is_file() else None
                 ),
             )
+            # 失败且有可定位问题时直接把「问题」面板推到前台：双击即可
+            # 打开对应 .md 并定位到行，不需要用户自己去找面板。
+            if self._result_state.status == "failure" and self._result_state.locations:
+                try:
+                    workspace.show_issues()
+                except Exception:  # noqa: BLE001 - 面板聚焦失败不得影响结果展示
+                    pass
 
         steps = derive_step_list(
             self._stage_events, fallback_label=self._task_label(current_task)
@@ -1371,6 +1379,7 @@ class MainWindow(QMainWindow):
             if old_output_exists:
                 reason += " 本次任务未生成新的正式产物；项目中原有输出未被覆盖。"
             cancelled = code == "E5003" or self._task_terminal_kind == "cancelled"
+            locations = format_stage_locations(getattr(result, "events", None))
             self._result_state = ResultState(
                 status="cancelled" if cancelled else "failure",
                 task=self._current_task,
@@ -1382,7 +1391,15 @@ class MainWindow(QMainWindow):
                 exception_summary=(detail or "")[:200],
                 log_path=self._current_log_path(),
                 project_root=project_root,
+                locations=locations,
             )
+            # 出错位置同时写入日志流：用户看到的第一屏就含“哪个文件第几行”。
+            for location in locations[:20]:
+                self._append_log("  ✗ {0}".format(location))
+            if len(locations) > 20:
+                self._append_log(
+                    "  …共 {0} 处内容问题，完整清单见「问题」面板。".format(len(locations))
+                )
             self._status_label.setText(
                 "任务已取消" if cancelled else "任务失败（{0}）".format(code)
             )

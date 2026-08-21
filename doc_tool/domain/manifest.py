@@ -39,7 +39,12 @@ from typing import Any, Dict, Optional, Union
 import yaml
 
 from doc_tool.domain.errors import IncompatibleSchemaError, ProjectManifestError
-from doc_tool.domain.paths import MANIFEST_NAME, ProjectPaths, build_output_filename
+from doc_tool.domain.paths import (
+    MANIFEST_NAME,
+    ProjectPaths,
+    build_output_filename,
+    normalize_document_version,
+)
 from doc_tool.domain.version import (
     APP_VERSION,
     PROJECT_SCHEMA_VERSION,
@@ -128,7 +133,9 @@ class ProjectManifest:
             ) from exc
         self.documentNo = str(self.documentNo)
         self.documentName = str(self.documentName)
-        self.documentVersion = str(self.documentVersion)
+        # 版本号统一去掉 V 前缀：封面「版本号」、页眉「版次」与输出文件名都
+        # 按纯数字写法（模板与历史产物即如此），作者写 V3.8 也不会漏进产物。
+        self.documentVersion = normalize_document_version(self.documentVersion)
         if self.documentType not in DOCUMENT_TYPES and can_write_schema(self.schemaVersion):
             raise ProjectManifestError(
                 "未知的文档类型：{0}。".format(self.documentType),

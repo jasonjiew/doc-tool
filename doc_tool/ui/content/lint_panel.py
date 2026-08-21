@@ -35,6 +35,7 @@ _RULE_LABELS = {
     "numbering_uniqueness": "编号唯一性",
     "sensitive_info": "敏感信息",
     "interface_table_structure": "接口表结构",
+    "markdown_structure": "表格结构",
 }
 
 _SEVERITY_LABELS = {

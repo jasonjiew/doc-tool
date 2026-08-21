@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""术语/一致性检查：重复标题、术语大小写不一致、TODO/TBD 残留。
+"""术语/一致性检查：重复标题、术语大小写不一致、TODO/TBD 残留、表格结构。
 
 - 重复标题：索引中完全相同的标题文本（规范化后）出现在多处。
 - 术语大小写：术语清单中的规范拼写（如 ``WiFi``），正文出现非规范大小写时标记。
 - 待办残留：``TODO``/``TBD``/``FIXME``/``XXX``/``待补充`` 等标记。
+- 表格结构：与构建内核共用 ``doc_tool.domain.markdown_structure`` 契约，在合并前
+  就报出会让构建失败的元数据问题，以及不阻断但改变排版的列数/分隔行问题。
 
 术语清单存储于项目 ``.state/terms.json``（``TermStore``），可在结果面板
 增删，变更后立即生效并重跑相关检查。
@@ -80,6 +82,7 @@ class ContentLinter:
             "numbering_uniqueness": self.check_numbering_uniqueness,
             "sensitive_info": self.check_sensitive_info,
             "interface_table_structure": self.check_interface_table_structure,
+            "markdown_structure": self.check_markdown_structure,
         }
         for rule in self._rules().values():
             if rule.enabled and rule.rule_id in dispatch:
@@ -305,6 +308,29 @@ class ContentLinter:
                         "接口章节「{0}」缺少接口表格（应包含表头与数据行）。".format(heading.text),
                         "interface_table_structure", rule.severity,
                     ))
+        return issues
+
+    def check_markdown_structure(self, rule) -> List[LintIssue]:
+        """表格结构契约检查（与构建内核同一份规则）。
+
+        阻断类结论（元数据语法无效、元数据后没有紧跟表格）按规则配置的严重度
+        报告（默认 error）——这些问题不修就一定合并失败；不阻断的结论（声明列宽
+        数与实际列数不符、行列不齐、缺少分隔行）固定为 warning：它们不会阻断构建，
+        但会让列宽退回默认值或表头不被识别，与作者意图不符。
+        """
+        from doc_tool.domain.markdown_structure import check_table_structure
+
+        issues: List[LintIssue] = []
+        for rel_path, lines in self._index.lines.items():
+            for finding in check_table_structure(lines):
+                issues.append(LintIssue(
+                    rule="markdown_structure",
+                    rel_path=rel_path,
+                    line_no=finding.line_no,
+                    message=finding.text,
+                    rule_id="markdown_structure",
+                    severity=rule.severity if finding.blocking else "warning",
+                ))
         return issues
 
     def check_sensitive_info(self, rule) -> List[LintIssue]:
