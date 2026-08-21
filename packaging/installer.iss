@@ -1,4 +1,4 @@
-; -*- coding: utf-8 -*-
+﻿; -*- coding: utf-8 -*-
 ; Inno Setup 脚本：Doc Tool Windows 安装器
 ;
 ; 任务 8.5：稳定 AppId、按用户安装、开始菜单和可选桌面快捷方式。
@@ -30,7 +30,7 @@
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "1.4.2"
+#define MyAppVersion "1.4.3"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"
@@ -93,6 +93,11 @@ Source: "..\dist\{#MyAppNameEn}\*"; DestDir: "{app}"; Flags: ignoreversion recur
 Source: "installed\启动DocTool.cmd"; DestDir: "{app}"; Flags: ignoreversion
 ; 诊断工具：成员双击运行后回传 DocTool-diagnose.txt（基线由打包流水线刷新）
 Source: "..\dist\diagnose.cmd"; DestDir: "{app}"; Flags: ignoreversion
+; 成员引导与公司自签名证书（1.4.3）：首次一键导入信任后已签名 exe 不再被拦截；
+; CI 无本地证书目录，找不到 codesign.cer 时自动跳过。
+Source: "portable\请先读我.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "portable\安装证书.cmd"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\scripts\cert-out\codesign.cer"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 ; 开始菜单快捷方式：经启动器运行（%TEMP% 复制启动，规避安全软件拦截）

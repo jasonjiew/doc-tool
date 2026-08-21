@@ -79,11 +79,17 @@ popd
 >>"%LOG%" echo exit code: %RC%
 >>"%LOG%" echo.
 
->>"%LOG%" echo --- 5. same thing from a fresh %%TEMP%% copy (what the launcher does) ---
+>>"%LOG%" echo --- 5. same thing from a fresh %%TEMP%% copy (same path as the launcher: PowerShell Copy-Item) ---
 set "TGT=%TEMP%\dt_diag_%RANDOM%_%RANDOM%"
 >>"%LOG%" echo target: %TGT%
-robocopy "%APP%" "%TGT%" /E /R:0 /W:0 /NFL /NDL /NJH /NJS /NP >nul 2>&1
->>"%LOG%" echo robocopy exit: %ERRORLEVEL%   (0-7 = ok, 8+ = copy failed)
+rem 1.4.3: robocopy/xcopy copies get mangled by the AV file filter (+4 KB,
+rem headers broken), which made this stage report false corruption that the
+rem real launcher never produced. Use Copy-Item here too - it is the exact
+rem copy path the launcher uses, so this stage now measures what users run.
+set "DT_DSRC=%APP%"
+set "DT_DTGT=%TGT%"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Copy-Item -LiteralPath $env:DT_DSRC -Destination $env:DT_DTGT -Recurse -Force" >nul 2>&1
+>>"%LOG%" echo Copy-Item exit: %ERRORLEVEL%   (0 = ok)
 if not exist "%TGT%\doc-tool-cli.exe" (
     >>"%LOG%" echo copy FAILED - doc-tool-cli.exe did not arrive in TEMP
     goto :cleanup5

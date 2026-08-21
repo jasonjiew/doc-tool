@@ -203,6 +203,13 @@ if (-not $SkipTests) {
     }
     Write-Host "  产物内容校验通过。" -ForegroundColor Green
 
+    # 1.4.3 起：对全部未签名 PE 做公司自签名（scripts\cert-out 缺失时自动跳过）。
+    # 已签名 exe 不再触发安全软件的加载拦截/复制改写；signtool 拒签 .pyd 扩展名
+    # 的问题由 sign_artifacts.ps1 的替身法处理。
+    Write-Host "  代码签名..." -ForegroundColor Yellow
+    $signTarget = if ($OneFile) { $GuiExe } else { "$RepoRoot\dist\DocTool" }
+    & (Join-Path $RepoRoot "packaging\sign_artifacts.ps1") -Target $signTarget
+
     if (-not $OneFile) {
         Write-Host "[5/5] 冻结冒烟测试..." -ForegroundColor Yellow
         Push-Location $RepoRoot

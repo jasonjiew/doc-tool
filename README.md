@@ -9,7 +9,7 @@
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.4.2-blue)
+![Version](https://img.shields.io/badge/version-1.4.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 [功能](#功能亮点) · [快速开始](#快速开始) · [工作原理](#工作原理) · [命令行](#命令行) · [参与贡献](#参与贡献) · [迁移指南](docs/migration-guide.md) · [GitHub](https://github.com/wangjie0721666-web/doc-tool)
@@ -134,7 +134,7 @@ python scripts\setup_pyside6.py
 
 项目支持通过 PyInstaller 和 Inno Setup 生成独立安装包，最终用户无需安装 Python。公开 Release 建立后，可在这里提供下载入口和 SHA-256 校验说明。
 
-安装器与便携包同策略：开始菜单/桌面快捷方式通过启动器把程序复制到 `%TEMP%` 下全新随机目录再启动，规避安全软件对未签名 exe 的拦截；安装时若默认目录含中文等非 ASCII 字符（如中文 Windows 用户名导致 `C:\Users\张三\...`），会自动改用 `C:\ProgramData\DocTool` 并提示——PyInstaller 引导程序在非 ASCII 路径下初始化内嵌 Python 会失败，报 `Failed to start embedded python interpreter!`。
+安装器与便携包同策略：开始菜单/桌面快捷方式通过启动器把程序复制到 `%TEMP%` 下全新随机目录再启动，规避安全软件对未签名 exe 的拦截；安装时若默认目录含中文等非 ASCII 字符（如中文 Windows 用户名导致 `C:\Users\张三\...`），会自动改用 `C:\ProgramData\DocTool` 并提示。自 1.4.3 起，产物内所有 exe/dll/pyd 均带公司自签名证书签名，安装目录内置 `安装证书.cmd`（一键导入信任，做一次即可），导入信任后的机器可直接双击 `DocTool.exe` 启动。
 
 ```powershell
 Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
@@ -142,9 +142,9 @@ Get-FileHash .\DocTool-Setup-X.Y.Z.exe -Algorithm SHA256
 
 ### 免安装（便携包）
 
-Release 同时提供 `DocTool-X.Y.Z-portable.zip`：解压到任意目录，双击其中的 `启动DocTool.cmd` 即可，不需要管理员权限，也不写注册表。
+Release 同时提供 `DocTool-X.Y.Z-portable.zip`：解压到任意目录（不要只拎出 `DocTool.exe`，它依赖同目录的 `_internal\`），按根部的「请先读我.txt」操作：首次双击 `安装证书.cmd` 导入公司证书（一次即可），之后双击 `启动DocTool.cmd` 启动，不需要管理员权限，也不写注册表。
 
-`DocTool.exe` 依赖同目录的 `_internal\`，两者不要拆散。自 1.4.2 起，即使直接双击 `DocTool.exe`，程序在检测到扩展模块被安全软件拦截时也会自动把整个目录迁移到 `%TEMP%` 下的稳定目录并自行重启（失败会弹窗并写 `DocTool-startup.log`）；`启动DocTool.cmd` 仍作为预置迁移路径保留，双击它同样可用。zip 根部的 `diagnose.cmd` 是诊断工具：遇到问题时双击运行，把生成的 `DocTool-diagnose.txt` 发给维护人员。
+自 1.4.2 起，即使直接双击 `DocTool.exe`，程序在检测到扩展模块被安全软件拦截时也会自动把整个目录迁移到 `%TEMP%` 下的稳定目录并自行重启（失败会弹窗并写 `DocTool-startup.log`）；导入公司证书后即可直接双击 `DocTool.exe`。zip 根部的 `diagnose.cmd` 是诊断工具：遇到问题时双击运行，把生成的 `DocTool-diagnose.txt` 发给维护人员。
 
 如果安全软件仍然拦截，请联系 IT 把安装目录加入信任区/执行控制白名单，或为 exe 配置代码签名证书（见 `docs/code-signing-certificate.md`）。
 

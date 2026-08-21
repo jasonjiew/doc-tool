@@ -14,12 +14,14 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：1.4.2 冻结启动自愈（安全软件拦截扩展模块加载时自动迁移到
+# 应用语义版本：1.4.3 分发产物全量 PE 代码签名（江苏康尚生物医疗科技有限公司自签名证书，
+# scripts/cert-out 可复用），便携包/安装器随附信任证书与成员引导说明；
+# 1.4.2 冻结启动自愈（安全软件拦截扩展模块加载时自动迁移到
 # %TEMP% 稳定目录重启；彻底失败时弹窗报错并写日志）与随包诊断脚本；
 # 1.4.0 为修订记录以 _revision_record.md 为唯一维护点，并修复修订表
 # 回填、排版与换行；1.3.0 的 mermaid 官方网页渲染后端已撤销（ad5c1fd），未发布；
 # 1.2.0 为多窗口、版本控制变更、mermaid-cli 渲染与机器可读 CLI 发布。
-APP_VERSION = "1.4.2"
+APP_VERSION = "1.4.3"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
 PROJECT_SCHEMA_VERSION = 1

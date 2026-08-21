@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 # fallback corrupting captured output in PowerShell-driven release builds.
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "1.4.2"
+$Version = "1.4.3"
 
 # --- vendored 运行时（优先使用，规避安全软件对 pip 的拦截与本机残缺安装）---
 $VendoredQt = "$RepoRoot\build\pyside-runtime"
@@ -139,6 +139,10 @@ try {
 }
 
 # --- 阶段 3：冒烟测试 ---
+# 1.4.3 起：先对全部未签名 PE 做代码签名（scripts\cert-out 或 CODE_SIGNING_*
+# 环境变量提供签名材料，二者都缺时自动跳过），让冻结冒烟测试签后产物。
+& "$PSScriptRoot\sign_artifacts.ps1" -Target "$RepoRoot\dist\DocTool"
+
 if (-not $SkipTests) {
     Write-Host "[3/5] 冻结应用冒烟测试..." -ForegroundColor Yellow
     Push-Location $RepoRoot
@@ -195,6 +199,8 @@ if ($SkipInstaller) {
     if (Test-Path $SetupExe) {
         $Size = [math]::Round((Get-Item $SetupExe).Length / 1MB, 1)
         Write-Host "  安装器构建完成: $SetupExe ($Size MB)" -ForegroundColor Green
+        # 安装器自签名：必须在安装级冒烟与最终 SHA-256 之前完成。
+        & "$PSScriptRoot\sign_artifacts.ps1" -Target $SetupExe
         if (-not $SkipTests) {
             & powershell -NoProfile -ExecutionPolicy Bypass -File `
                 "$RepoRoot\scripts\tests\test_installer_smoke.ps1" -InstallerPath $SetupExe
