@@ -132,7 +132,7 @@ python scripts\setup_pyside6.py
 
 ### 安装版
 
-项目支持通过 PyInstaller 和 Inno Setup 生成独立安装包，最终用户无需安装 Python。公开 Release 建立后，可在这里提供下载入口和 SHA-256 校验说明。
+项目支持通过 PyInstaller 和 Inno Setup 生成独立安装包，最终用户无需安装 Python。下载入口与 SHA-256 校验说明见 GitLab Releases：<http://192.168.0.242:8899/application/ai/doc-tool/-/releases>。
 
 安装器与便携包同策略：开始菜单/桌面快捷方式通过启动器把程序复制到 `%TEMP%` 下全新随机目录再启动，规避安全软件对未签名 exe 的拦截；安装时若默认目录含中文等非 ASCII 字符（如中文 Windows 用户名导致 `C:\Users\张三\...`），会自动改用 `C:\ProgramData\DocTool` 并提示。自 1.4.3 起，产物内所有 exe/dll/pyd 均带公司自签名证书签名，安装目录内置 `安装证书.cmd`（一键导入信任，做一次即可），导入信任后的机器可直接双击 `DocTool.exe` 启动。
 
