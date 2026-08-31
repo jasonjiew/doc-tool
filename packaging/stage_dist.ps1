@@ -33,6 +33,9 @@ foreach ($Need in @(
     if (-not (Test-Path $Need)) { throw "dist 未就绪，缺少: $Need（请先完成 PyInstaller 构建）" }
 }
 
+# 0) 透明加密加固（幂等）：主构建流程已执行过；单独跑 stage_dist/make_portable 时兜底
+& "$PSScriptRoot\harden_dist.ps1" -RepoRoot $RepoRoot
+
 # 1) 启动脚本 + 预检脚本（1.4.4：启动前校验关键文件并自修复 base_library.zip）
 Copy-Item (Join-Path $RepoRoot "packaging\portable\启动DocTool.cmd") $DistRoot -Force
 Copy-Item (Join-Path $RepoRoot "packaging\portable\preflight.ps1") $DistRoot -Force

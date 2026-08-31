@@ -13,7 +13,7 @@ doc-tool-cli.exe
 
 # === Python 运行时和标准库 ===
 _internal/python313.dll
-_internal/_*.pyd
+_internal/_*.dll
 _internal/*.dll
 _internal/base_library.zip
 _internal/base_library.zip.bak
@@ -25,9 +25,9 @@ _internal/zlib1.dll
 _internal/ucrtbase.dll
 _internal/VCRUNTIME*.dll
 _internal/api-ms-win-*.dll
-_internal/pyexpat.pyd
-_internal/select.pyd
-_internal/unicodedata.pyd
+_internal/pyexpat.dll
+_internal/select.dll
+_internal/unicodedata.dll
 
 # === 第三方库 ===
 _internal/lxml/**
@@ -52,13 +52,13 @@ _internal/_tcl_data/**
 _internal/_tk_data/**
 _internal/tcl86t.dll
 _internal/tk86t.dll
-_internal/_tkinter.pyd
+_internal/_tkinter.dll
 
 # === 应用代码 ===
 _internal/doc_tool/**
 
 # === 内核脚本 ===
-_internal/scripts/*.py
+_internal/scripts/*.pyc
 
 # === 许可文件 ===
 _internal/THIRD_PARTY_LICENSES.txt

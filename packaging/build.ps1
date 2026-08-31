@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 # fallback corrupting captured output in PowerShell-driven release builds.
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "2.0.0"
+$Version = "2.0.1"
 
 # --- vendored 运行时（优先使用，规避安全软件对 pip 的拦截与本机残缺安装）---
 $VendoredQt = "$RepoRoot\build\pyside-runtime"
@@ -125,6 +125,13 @@ if (-not $SkipPyInstaller) {
         }
     }
     Write-Host "  产物内容校验通过。" -ForegroundColor Green
+}
+
+# --- 透明加密加固：.pyd -> .dll、scripts/*.py -> .pyc ---
+# 亿赛通 DocGuard 类客户端会把 .pyd/.py 密文落盘且不给 DocTool.exe 透明解密，
+# 原地启动报 "%1 不是有效的 Win32 应用程序"；改写为策略不加密的扩展名后规避。
+if (-not $SkipPyInstaller) {
+    & "$PSScriptRoot\harden_dist.ps1" -RepoRoot $RepoRoot
 }
 
 # 构建后必须扫描本次产物；只在构建前扫描旧 dist 无法阻断本次意外打包。
