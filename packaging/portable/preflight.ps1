@@ -86,7 +86,7 @@ $repaired = $false
 
 # NOTE: avoid '@($b+'\x', $b+'\y')' - the comma operator binds tighter than '+'
 # in PowerShell and would concatenate the paths into one mangled string.
-$peFiles = ($b + '\DocTool.exe|' + $b + '\doc-tool-cli.exe|' + $b + '\_internal\python313.dll|' + $b + '\_internal\shiboken6\Shiboken.pyd|' + $b + '\_internal\PySide6\QtCore.pyd|' + $b + '\_internal\PySide6\QtGui.pyd|' + $b + '\_internal\PySide6\QtWidgets.pyd').Split('|')
+$peFiles = ($b + '\DocTool.exe|' + $b + '\doc-tool-cli.exe|' + $b + '\_internal\python313.dll|' + $b + '\_internal\shiboken6\Shiboken.dll|' + $b + '\_internal\PySide6\QtCore.dll|' + $b + '\_internal\PySide6\QtGui.dll|' + $b + '\_internal\PySide6\QtWidgets.dll').Split('|')
 foreach ($f in $peFiles) {
     if (-not (Test-Pe $f)) { $bad += $f }
 }

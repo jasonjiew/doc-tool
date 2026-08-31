@@ -166,6 +166,11 @@ if (-not (Test-Path $GuiExe)) {
 $SizeMB = [math]::Round((Get-Item $GuiExe).Length / 1MB, 1)
 Write-Host "  $GuiExe 生成成功 ($SizeMB MB)" -ForegroundColor Green
 
+# --- 透明加密加固：.pyd -> .dll、scripts/*.py -> .pyc（onefile 时自动跳过）---
+# 亿赛通 DocGuard 类客户端会把 .pyd/.py 密文落盘且不给 DocTool.exe 透明解密，
+# 原地启动报 "%1 不是有效的 Win32 应用程序"；改写为策略不加密的扩展名后规避。
+& (Join-Path $RepoRoot "packaging\harden_dist.ps1") -RepoRoot $RepoRoot
+
 # --- 4/5. 产物内容校验 + 冻结冒烟测试 ---
 function Assert-NoMultiprocessingRthook([string]$ExePath) {
     # 冻结 exe 若仍带 pyi_rth_multiprocessing 钩子，启动时会 import socket->_socket，

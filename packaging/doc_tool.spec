@@ -114,7 +114,7 @@ a = Analysis(
     hiddenimports=all_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(REPO_ROOT / "packaging" / "rthook_hardened_runtime.py")],
     excludes=[
         # 排除开发/测试专用模块，减小体积
         "pytest",
@@ -167,7 +167,7 @@ cli_analysis = Analysis(
     hiddenimports=all_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(REPO_ROOT / "packaging" / "rthook_hardened_runtime.py")],
     excludes=a.excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

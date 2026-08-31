@@ -62,10 +62,12 @@ class FrozenAppStructureTests(unittest.TestCase):
         """内核脚本已打包到 _internal/scripts/。"""
         scripts = os.path.join(INTERNAL_DIR, "scripts")
         self.assertTrue(os.path.isdir(scripts))
-        for name in ("docx_common.py", "build_docx.py", "validate_docx.py",
-                     "refresh_fields.py"):
-            self.assertTrue(os.path.isfile(os.path.join(scripts, name)),
-                            "缺少内核脚本: {0}".format(name))
+        for stem in ("docx_common", "build_docx", "validate_docx",
+                     "refresh_fields"):
+            py = os.path.join(scripts, stem + ".py")
+            pyc = os.path.join(scripts, stem + ".pyc")
+            self.assertTrue(os.path.isfile(py) or os.path.isfile(pyc),
+                            "缺少内核脚本: {0}".format(stem))
 
     def test_templates_and_config_not_packed(self):
         """公司模板与文档配置不被隐式打包（任务 8.2：绝不隐式打包）。
