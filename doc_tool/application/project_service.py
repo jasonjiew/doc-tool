@@ -89,6 +89,9 @@ class RecentEntry:
     name: str  # 项目目录名
     document_name: str = ""
     document_no: str = ""
+    # 文档类型（requirement/design/general）；旧版记录缺省为空，首页隐藏类型徽章，
+    # 再次打开项目时由 add_recent_project 补写（向后兼容迁移）。
+    document_type: str = ""
     last_opened: str = ""
 
     def to_dict(self) -> dict:
@@ -97,6 +100,7 @@ class RecentEntry:
             "name": self.name,
             "documentName": self.document_name,
             "documentNo": self.document_no,
+            "documentType": self.document_type,
             "lastOpened": self.last_opened,
         }
 
@@ -107,6 +111,7 @@ class RecentEntry:
             name=str(data.get("name", "")),
             document_name=str(data.get("documentName", "")),
             document_no=str(data.get("documentNo", "")),
+            document_type=str(data.get("documentType", "")),
             last_opened=str(data.get("lastOpened", "")),
         )
 
@@ -232,6 +237,7 @@ def add_recent_project(project_root: str, manifest: ProjectManifest) -> None:
         name=root.name,
         document_name=manifest.documentName,
         document_no=manifest.documentNo,
+        document_type=manifest.documentType,
         last_opened=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
     entries = load_recent_projects()

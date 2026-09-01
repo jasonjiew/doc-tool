@@ -63,6 +63,10 @@ desktop.ini
 probe-*.py
 probe-*/
 
+# --- 首页视觉稿比对截图（scripts/tests/shot_home.py 产物，不入库） ---
+/home_draft_*.png
+/home_final_*.png
+
 # --- 测试产物与本地会话数据 ---
 test-results.xml
 .coverage

@@ -93,7 +93,94 @@ def build_parser() -> argparse.ArgumentParser:
         help="确认并应用重编号（缺省仅预览，不写盘）",
     )
     _add_output(renumber_p)
+
+    convert_p = sub.add_parser(
+        "convert", help="文档互转：Word/PDF/Markdown/HTML/TXT/表格/RTF/ODT（任意文件，无需项目）"
+    )
+    from doc_tool.application.convert import TARGET_FORMATS
+
+    convert_p.add_argument(
+        "sources", nargs="+",
+        help="待转换文件或文件夹（.docx/.doc/.pdf/.md/.html/.txt/.xlsx/.csv/.rtf/.odt）",
+    )
+    convert_p.add_argument(
+        "--to", choices=list(TARGET_FORMATS), default=None,
+        help="转出格式（pdf/md/html/docx/txt/csv/xlsx）；仅对存在该方向的源生效，"
+             "其余源按缺省方向转换（Word/PDF/MD/HTML 缺省见使用说明第 6 节）",
+    )
+    convert_p.add_argument(
+        "--toc", action="store_true",
+        help="Markdown/HTML → Word 时在文首插入 1~3 级目录",
+    )
+    convert_p.add_argument(
+        "--pages", default="",
+        help="页范围（如 1-5 或 3）；仅对转出 PDF 的方向生效，留空表示全部页面",
+    )
+    convert_p.add_argument(
+        "--target-dir", default="", help="输出目录；缺省与各源文件同目录"
+    )
+    convert_p.add_argument("--overwrite", action="store_true", help="覆盖同名输出文件")
+    convert_p.add_argument(
+        "--timeout", type=int, default=0,
+        help="单个文件超时秒数；0 = 按方向自动（导出 300，PDF 重排 900）",
+    )
+    _add_output(convert_p)
     return parser
+
+
+def _convert_command(args) -> int:
+    """文档互转：不依赖项目上下文，方向由注册表（扩展名 + --to）判定。"""
+    from doc_tool.application.convert import convert_paths, expand_sources
+
+    sources = expand_sources(args.sources)
+    if not sources:
+        print(
+            "没有可转换的文件（支持 .docx/.doc/.pdf/.md/.html/.txt/.xlsx/.csv/.rtf/.odt）。",
+            file=sys.stderr,
+        )
+        return 2
+
+    def _progress(done, total, record):
+        print(
+            "[{0}/{1}] {2} → {3} {4}".format(
+                done,
+                total,
+                record.source.name,
+                record.target.name or "（未生成）",
+                record.status,
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+
+    result = convert_paths(
+        sources,
+        args.target_dir or None,
+        overwrite=args.overwrite,
+        target_format=args.to,
+        with_toc=args.toc,
+        page_range=args.pages or None,
+        timeout_seconds=float(args.timeout) if args.timeout else None,
+        on_progress=_progress,
+    )
+    if getattr(args, "output", "human") == "json":
+        import json
+
+        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        return 0 if result.success else 1
+    for record in result.records:
+        line = "{0} {1} → {2}".format(
+            "OK" if record.ok else "FAIL",
+            record.source.name,
+            record.target.name or "（未生成）",
+        )
+        if not record.ok:
+            line += "  [{0}] {1}".format(record.error_code, record.detail)
+        print(line)
+        if record.note:
+            print("    {0}".format(record.note))
+    print(result.summary())
+    return 0 if result.success else 1
 
 
 def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
@@ -146,6 +233,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "convert":
+        # 互转不依赖项目，也不走质量命令的序列化通道。
+        return _convert_command(args)
 
     from doc_tool.application.cli_commands import (
         import_command, lint_command, migrate_command, preflight_command,
