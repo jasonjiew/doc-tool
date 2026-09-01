@@ -37,6 +37,8 @@ VOCAB_FILE = HERE / "scan_vocabulary.txt"
 ALLOWED_DOCX_PATTERNS = [
     r".*templates[/\\].*-template\.docx$",
     r".*scripts[/\\]tests[/\\]fixtures[/\\].*\.docx$",
+    # PyInstaller 收集的 python-docx 自带空白模板（_internal/docx/templates/default.docx）
+    r"_internal[/\\]docx[/\\]templates[/\\]default\.docx$",
 ]
 
 # 禁止的目录名
