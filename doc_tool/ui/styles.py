@@ -62,6 +62,7 @@ _LIGHT = {
     "accent": "#2563eb",
     "accent_hover": "#1d4ed8",
     "accent_press": "#1e40af",
+    "accent_soft": "#dbeafe",
     "selection_bg": "#dbeafe",
     "selection_fg": "#1f2328",
     "input_bg": "#ffffff",
@@ -81,6 +82,7 @@ _DARK = {
     "accent": "#3b82f6",
     "accent_hover": "#2563eb",
     "accent_press": "#1d4ed8",
+    "accent_soft": "#26334a",
     "selection_bg": "#2b3a5a",
     "selection_fg": "#e5e7eb",
     "input_bg": "#1b1c21",
@@ -209,14 +211,28 @@ QLabel#resultTitle, QLabel#recentTitle {{ {font_heading} color: {text}; }}
 QLabel#statusMuted, QLabel#techDetail {{ {font_small} color: {text_muted}; }}
 QLabel#statusWarning {{ {font_small} color: {warning}; }}
 
+/* --- 首页任务页（项目 + 工具双栏） --- */
+/* 页面自绘 window 底色：裸 QWidget 顶层不画 QSS 背景（embedded/截图态也正确）。 */
+QWidget#homeRoot {{ background: {window}; }}
+QLabel#homeSubtitle {{ {font_body} color: {text_muted}; }}
+QLabel#homeSubheading {{ {font_body_bold} color: {text}; }}
+QLabel#homeMuted {{ {font_small} color: {text_muted}; }}
+QLabel#homeAccent {{ {font_small} color: {accent}; }}
+QLabel[pill="true"] {{ {font_small} background: {panel_alt}; border: 1px solid {border}; border-radius: 8px; padding: 1px 8px; }}
+QLabel[pill="true"][pillTone="muted"] {{ color: {text_muted}; }}
+QFrame#convertCard {{ border: 2px dashed {accent}; }}
+QFrame#convertCard[dragOver="true"] {{ border: 2px solid {accent}; background: {accent_soft}; }}
+
 /* --- 语义色标签 --- */
 {tone_rules}
 """.format(
         font_body=_font_rule(FONT_BODY),
         font_small=_font_rule(FONT_SMALL),
         font_small_pt=FONT_SMALL,
+        font_body_bold=_font_rule(FONT_BODY, bold=True),
         font_heading=_font_rule(FONT_HEADING, bold=True),
         title=_font_rule(FONT_TITLE, bold=True),
+        accent_soft=c["accent_soft"],
         mono=FONT_FAMILY_MONO,
         tone_rules=tone_qss,
         window=c["window"],

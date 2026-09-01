@@ -8,6 +8,7 @@
 - ``E3xxx`` Word 刷新
 - ``E4xxx`` 项目模型与锁
 - ``E5xxx`` 文件系统与资源
+- ``E6xxx`` 文档互转（Word ↔ PDF ↔ Markdown）
 - ``E9xxx`` 内部错误
 """
 
@@ -172,3 +173,59 @@ class CancelledError(DocToolError):
     code = "E5003"
     user_message = "任务已被取消。"
     suggested_action = "可在安全阶段后重新启动任务。"
+
+
+# --- 文档互转（E6xxx） ---
+
+
+class UnsupportedConversionError(DocToolError):
+    code = "E6001"
+    user_message = "不支持的转换类型。"
+    suggested_action = (
+        "请使用支持的源格式（Word/PDF/Markdown/HTML/TXT/XLSX/CSV/RTF/ODT），"
+        "并用「转换为」下拉或 CLI 的 --to 给出该源支持的转出格式；"
+        "完整方向矩阵见使用说明第 6 节。"
+    )
+
+
+class ConversionTargetExistsError(DocToolError):
+    code = "E6002"
+    user_message = "同名输出文件已存在。"
+    suggested_action = "请勾选「覆盖同名文件」，或改用其他输出目录后重试。"
+
+
+class WordConvertError(DocToolError):
+    code = "E6003"
+    user_message = "Word 转换失败。"
+    suggested_action = "请确认该文档能在 Word 中正常打开、未被加密锁定，且没有被其他程序占用。"
+
+
+class WordConvertTimeoutError(DocToolError):
+    code = "E6004"
+    user_message = "Word 转换超时，本次专用 Word 进程已被终止。"
+    suggested_action = "请增大单文件超时时间，或先拆出需要转换的章节再试。"
+
+
+class WordConvertOutputMissingError(DocToolError):
+    code = "E6005"
+    user_message = "Word 未产出可用的输出文件。"
+    suggested_action = "请检查输出目录的写入权限与磁盘空间后重试。"
+
+
+class TableConvertError(DocToolError):
+    code = "E6006"
+    user_message = "表格文件读取失败或没有可导出的内容。"
+    suggested_action = "请确认文件能被 Excel 正常打开且工作表非空；CSV 请确认编码为 UTF-8 或 GBK。"
+
+
+class TextEncodingError(DocToolError):
+    code = "E6007"
+    user_message = "无法识别的文本文件编码。"
+    suggested_action = "请将文本文件另存为 UTF-8（推荐）或 GBK 后重试。"
+
+
+class PageRangeError(DocToolError):
+    code = "E6008"
+    user_message = "页范围无效。"
+    suggested_action = "页范围格式如「1-5」或「3」，起始页不能大于结束页；留空表示全部页面。"
+

@@ -196,6 +196,10 @@ class MainWindow(QMainWindow):
             on_new_project=self._on_new_project,
             on_open_project=self._on_open_project,
             on_open_recent=self._on_open_recent,
+            on_convert=self._on_convert_documents,
+            on_drop_files=self._on_convert_documents,
+            on_show_help=self._on_open_help,
+            on_about=self._on_about,
         )
         self._stack.addWidget(self._empty_state)
 
@@ -340,6 +344,11 @@ class MainWindow(QMainWindow):
         self._reimport_action = QAction("重新导入更新源 Word…", self)
         self._reimport_action.triggered.connect(self._on_reimport_source)
         tools_menu.addAction(self._reimport_action)
+        # 互转面向任意文件，不需要打开项目，因此不受项目状态门控。
+        self._convert_action = QAction("文档互转（Word / PDF / Markdown）…", self)
+        # lambda 包装：triggered 自带 checked 参数，避免混入 _on_convert_documents 的 paths 形参。
+        self._convert_action.triggered.connect(lambda: self._on_convert_documents())
+        tools_menu.addAction(self._convert_action)
         tools_menu.addSeparator()
         self._theme_action = QAction("切换深色主题", self)
         self._theme_action.triggered.connect(self._toggle_theme)
@@ -1561,6 +1570,36 @@ class MainWindow(QMainWindow):
         if result.conflicts:
             detail += "\n{0} 个冲突章节默认保留本地内容。".format(len(result.conflicts))
         QMessageBox.information(self, "重新导入完成", detail)
+
+    def _on_convert_documents(self, paths: Optional[List[Path]] = None) -> None:
+        """文档互转：处理任意文件（Word/PDF/Markdown），无需打开项目。
+
+        工具菜单、首页互转卡与首页拖放共用此入口；拖放路径（文件夹由
+        ``ConvertDialog._ingest_paths`` 展开一层）在打开对话框前填入清单。
+        """
+        from doc_tool.ui.convert_dialog import ConvertDialog
+
+        dialog = ConvertDialog(parent=self, busy_check=lambda: self.runner.is_running)
+        if paths:
+            dialog._ingest_paths(list(paths))
+        dialog.exec()
+
+    def _on_open_help(self) -> None:
+        """打开《使用说明》帮助文档（系统默认程序）；缺失时给出可见提示。"""
+        help_path = Path(__file__).resolve().parents[2] / "docs" / "使用说明.md"
+        if not help_path.is_file():
+            self._show_error(
+                "帮助文档不存在",
+                "未找到帮助文档：{0}".format(help_path),
+                "完整源码检出的 docs/ 目录应包含使用说明。",
+            )
+            return
+        if not self._open_file(help_path):
+            self._show_error(
+                "无法打开帮助文档",
+                "系统没有关联程序可打开：{0}".format(help_path),
+                "请用文本编辑器手动打开该文件。",
+            )
 
     def _on_open_validation_report(self) -> None:
         path = self._validation_report_path()

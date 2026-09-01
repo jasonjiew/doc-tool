@@ -549,6 +549,43 @@ class ProjectServiceTests(unittest.TestCase):
         entries = load_recent_projects()
         self.assertEqual(len(entries), 0)
 
+    def test_recent_entry_document_type_roundtrip_and_legacy_default(self):
+        """documentType 序列化往返；旧版记录缺该字段时回退空串（向后兼容）。"""
+        from doc_tool.application.project_service import RecentEntry
+
+        entry = RecentEntry(
+            path="C:/p", name="p", document_name="d", document_no="n",
+            document_type="requirement", last_opened="2026-08-01T00:00:00+00:00",
+        )
+        data = entry.to_dict()
+        self.assertEqual(data["documentType"], "requirement")
+        restored = RecentEntry.from_dict(data)
+        self.assertEqual(restored.document_type, "requirement")
+        self.assertEqual(restored.last_opened, entry.last_opened)
+
+        legacy = RecentEntry.from_dict({"path": "C:/p", "name": "p"})
+        self.assertEqual(legacy.document_type, "")
+        self.assertEqual(legacy.last_opened, "")
+
+    def test_add_recent_project_stamps_document_type_and_last_opened(self):
+        """打开项目补写文档类型与最近打开时间戳（首页徽章/「N 天前打开」数据源）。"""
+        from datetime import datetime
+
+        from doc_tool.application.project_service import (
+            add_recent_project,
+            load_recent_projects,
+        )
+        from doc_tool.domain.manifest import ProjectManifest
+
+        manifest = ProjectManifest.load(self._tmp)
+        add_recent_project(self._tmp, manifest)
+        entries = load_recent_projects()
+        resolved = str(Path(self._tmp).resolve())
+        entry = next(e for e in entries if e.path == resolved)
+        self.assertEqual(entry.document_type, manifest.documentType)
+        self.assertTrue(entry.last_opened)
+        datetime.fromisoformat(entry.last_opened)  # 必须可解析为 ISO 时间戳
+
 
 class HighDpiTests(unittest.TestCase):
     """任务 6.1：高 DPI 适配不报错。"""
@@ -2408,6 +2445,505 @@ class LogStreamReplayTests(unittest.TestCase):
         self.assertIn("第二行", text)
         self.assertEqual(stream.pending_unread, 0)
         stream.close()
+
+
+
+class ConvertDialogTests(unittest.TestCase):
+    """文档互转对话框：方向判定、Word 源转出格式切换与 Markdown 体量摘要。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        (self.root / "a.docx").write_bytes(b"stub")
+        (self.root / "b.pdf").write_bytes(b"stub")
+        (self.root / "c.md").write_text("# 标题\n\n| 一 | 二 |\n| --- | --- |\n", encoding="utf-8")
+        (self.root / "old.doc").write_bytes(b"stub")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _dialog(self):
+        from doc_tool.ui.convert_dialog import ConvertDialog
+
+        return ConvertDialog()
+
+    def test_rows_and_direction_labels(self):
+        dlg = self._dialog()
+        dlg._append([str(self.root / "a.docx"), str(self.root / "b.pdf"), str(self.root / "c.md")])
+        labels = [dlg._table.item(r, 1).text() for r in range(dlg._table.rowCount())]
+        self.assertEqual(labels, ["Word → PDF", "PDF → Word", "Markdown → Word"])
+        # 下拉显式给目标格式；源族没有该方向时由注册表回落缺省（.pdf/.md 选 PDF 仍转 Word）。
+        self.assertEqual(dlg._target_format(), "pdf")
+        dlg.close()
+
+    def test_format_switch_updates_docx_rows(self):
+        dlg = self._dialog()
+        dlg._append([str(self.root / "a.docx")])
+        dlg._format_combo.setCurrentIndex(dlg._format_combo.findData("md"))
+        self.assertEqual(dlg._table.item(0, 1).text(), "Word → Markdown")
+        self.assertEqual(dlg._target_format(), "md")
+        dlg._format_combo.setCurrentIndex(dlg._format_combo.findData("pdf"))
+        self.assertEqual(dlg._table.item(0, 1).text(), "Word → PDF")
+        self.assertEqual(dlg._target_format(), "pdf")
+        dlg.close()
+
+    def test_legacy_doc_skipped_for_markdown_target(self):
+        from PySide6.QtWidgets import QMessageBox
+
+        dlg = self._dialog()
+        dlg._format_combo.setCurrentIndex(dlg._format_combo.findData("md"))
+        warned = []
+        original = QMessageBox.warning
+        QMessageBox.warning = staticmethod(
+            lambda *args, **kwargs: warned.append(args[2] if len(args) > 2 else "")
+        )
+        try:
+            dlg._append([str(self.root / "old.doc")])
+        finally:
+            QMessageBox.warning = original
+        self.assertEqual(dlg._table.rowCount(), 0)
+        self.assertTrue(warned, ".doc 在 Markdown 转出格式下必须被拦下并提示")
+        dlg.close()
+
+    def test_markdown_summary_logged_on_append(self):
+        dlg = self._dialog()
+        dlg._append([str(self.root / "c.md")])
+        text = dlg._details.toPlainText()
+        self.assertIn("c.md", text)
+        self.assertIn("表格 2 行", text)
+        dlg.close()
+
+    def test_markdown_summary_logs_encoding_failure(self):
+        """编码解不出的 .md：给可见的 E6007 提示，不在加入清单时抛异常。"""
+        dlg = self._dialog()
+        bad = self.root / "bad.md"
+        bad.write_bytes(b"\xff\xff\xff\xff")
+        dlg._append([str(bad)])
+        text = dlg._details.toPlainText()
+        self.assertIn("bad.md", text)
+        self.assertIn("E6007", text)
+        dlg.close()
+
+    def test_run_button_gates_on_sources(self):
+        dlg = self._dialog()
+        self.assertFalse(dlg._run_button.isEnabled(), "空清单时开始转换必须禁用")
+        dlg._append([str(self.root / "a.docx")])
+        self.assertTrue(dlg._run_button.isEnabled())
+        dlg._table.selectAll()
+        dlg._on_remove_selected()
+        self.assertFalse(dlg._run_button.isEnabled(), "移除全部文件后开始转换应回到禁用")
+        dlg.close()
+
+    def test_ingest_paths_expands_folder(self):
+        """拖放入口：文件夹要展开成一层内的可转换文件，不支持类型（notes.log）不算。
+
+        .txt 自 A 组起是合法源（文本 → PDF），因此改用 .log 当反例。
+        """
+        (self.root / "notes.log").write_text("x", encoding="utf-8")
+        (self.root / "说明.txt").write_text("正文", encoding="utf-8")
+        dlg = self._dialog()
+        dlg._ingest_paths([self.root])
+        names = sorted(
+            Path(dlg._table.item(r, 0).text()).name for r in range(dlg._table.rowCount())
+        )
+        self.assertEqual(names, ["a.docx", "b.pdf", "c.md", "old.doc", "说明.txt"])
+        self.assertTrue(dlg._run_button.isEnabled())
+        dlg.close()
+
+    def test_drop_zone_highlight_toggles(self):
+        dlg = self._dialog()
+        self.assertEqual(dlg._drop_zone.styleSheet(), "")
+        dlg._drop_zone.set_drag_over(True)
+        self.assertIn("dashed", dlg._drop_zone.styleSheet())
+        self.assertIn("松开鼠标", dlg._drop_zone._title.text())
+        dlg._drop_zone.set_drag_over(False)
+        self.assertEqual(dlg._drop_zone.styleSheet(), "")
+        dlg.close()
+
+    def test_done_enables_open_output_and_double_click(self):
+        from PySide6.QtGui import QDesktopServices
+
+        class _Record:
+            ok = True
+            note = ""
+            target = None
+
+            def __init__(self, target):
+                self.target = Path(target)
+
+        class _Result:
+            success = True
+            failed = 0
+            records = []
+
+            def summary(self):
+                return "成功 1 个，失败 0 个。"
+
+        dlg = self._dialog()
+        self.assertFalse(dlg._open_output_button.isEnabled())
+        (self.root / "out").mkdir()
+        result = _Result()
+        result.records = [_Record(self.root / "out" / "a.pdf")]
+        dlg._on_done(result)
+        self.assertTrue(dlg._open_output_button.isEnabled(), "有成功产物时应允许打开输出文件夹")
+
+        opened = []
+        original = QDesktopServices.openUrl
+        QDesktopServices.openUrl = staticmethod(lambda url: opened.append(url.toLocalFile()))
+        try:
+            # 双击「（待转换）」占位行：不应打开任何目录。
+            dlg._append([str(self.root / "a.docx")])
+            dlg._on_row_double_clicked(0, 2)
+            self.assertEqual(opened, [], "占位输出不允许触发打开文件夹")
+            # 真实产物行：打开其所在文件夹。
+            dlg._set_item(0, 2, str(self.root / "out" / "a.pdf"))
+            dlg._on_row_double_clicked(0, 2)
+            self.assertEqual([Path(opened[0])], [self.root / "out"])
+        finally:
+            QDesktopServices.openUrl = original
+        dlg.close()
+
+
+class HomeTaskPageTests(unittest.TestCase):
+    """首页任务页（EmptyState 改版）：双栏布局、互转接线、整页拖放与最近项目卡。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def _home(self, **callbacks):
+        from PySide6.QtWidgets import QApplication
+
+        from doc_tool.ui.empty_state import EmptyState
+
+        home = EmptyState(**callbacks)
+        # 在本用例边界内冲掉卡片重建积累的 deleteLater：延迟到下一用例的
+        # qWait 里析构会在 offscreen 下诱发原生崩溃（污染全局 Qt 状态）。
+        def _dispose():
+            home.deleteLater()
+            QApplication.processEvents()
+
+        self.addCleanup(_dispose)
+        return home
+
+    # --- 假拖放事件（duck-typed，参照 test_drop_image_file_calls_import_callback） ---
+
+    @staticmethod
+    def _fake_drag_event(urls):
+        from PySide6.QtCore import QUrl
+
+        class _Mime:
+            def hasUrls(self):
+                return bool(urls)
+
+            def urls(self):
+                return [QUrl.fromLocalFile(str(p)) for p in urls]
+
+        class _Event:
+            def __init__(self):
+                self.accepted = False
+
+            def mimeData(self):
+                return _Mime()
+
+            def acceptProposedAction(self):
+                self.accepted = True
+
+        return _Event()
+
+    def test_home_shows_convert_and_placeholder_cards(self):
+        from PySide6.QtWidgets import QLabel
+
+        from doc_tool.domain.version import APP_VERSION
+
+        home = self._home()
+        home.set_recent_projects([])
+        # 互转卡：标题、card 属性、格式 chips、accent 底部标注
+        self.assertEqual(home._convert_title.text(), "文档互转")
+        self.assertTrue(home._convert_card.property("card"))
+        chip_texts = [c.text() for c in home._convert_card.findChildren(QLabel)]
+        for chip in (".docx", ".pdf", ".md", ".html"):
+            self.assertIn(chip, chip_texts)
+        self.assertTrue(any("支持整个文件夹拖入" in t for t in chip_texts))
+        # 占位卡禁用
+        self.assertFalse(home._placeholder_card.isEnabled())
+        placeholder_texts = [c.text() for c in home._placeholder_card.findChildren(QLabel)]
+        self.assertIn("PDF 工具箱（规划中）", placeholder_texts)
+        self.assertIn("合并、拆分、加水印。", placeholder_texts)
+        # 版本徽章取自统一版本模块，不硬编码
+        self.assertEqual(home._version_badge.text(), "v{0}".format(APP_VERSION))
+        # 无最近项目 → 空态文案
+        self.assertIsNotNone(home._empty_label)
+        self.assertIn("会在这里列出最近项目", home._empty_label.text())
+
+    @staticmethod
+    def _click(widget):
+        """离屏下直接向控件派发左键按下。
+
+        QTest.mouseClick 走窗口管理器路径，在 offscreen 平台会给同一进程里
+        后续用例的 QTest.qWait/keySequence 留下损坏的窗口焦点状态（原生崩溃）；
+        直接派发 QMouseEvent 只测卡片自身的点击语义，无此副作用。
+        """
+        from PySide6.QtCore import QEvent, QPointF, Qt
+        from PySide6.QtGui import QMouseEvent
+
+        event = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(5.0, 5.0),
+            QPointF(5.0, 5.0),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        widget.mousePressEvent(event)
+
+    def test_convert_card_click_triggers_main_window_convert(self):
+        """点击互转卡 → EmptyState 回调 → 主窗口 _on_convert_documents → 打开互转对话框。
+
+        在链路终点（ConvertDialog 类）打桩：回调在构造时绑定，事后替换实例
+        属性不会生效；直接点真卡会弹出真实模态对话框阻塞离屏进程。
+        """
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        captured = {}
+
+        class _FakeDialog:
+            def __init__(self, parent=None, busy_check=None):
+                captured["parent"] = parent
+
+            def exec(self):
+                captured["exec_called"] = True
+
+        window = MainWindow()
+        self.addCleanup(window.close)
+        window.show()
+        with patch(
+            "doc_tool.ui.convert_dialog.ConvertDialog", _FakeDialog
+        ):
+            self._click(window._empty_state._convert_card)
+        self.assertTrue(captured.get("exec_called"))
+        self.assertIs(captured.get("parent"), window)
+
+    def test_convert_entry_accepts_paths_and_opens_dialog(self):
+        """_on_convert_documents(paths) 先把路径交给 _ingest_paths 再打开对话框。"""
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            docx = Path(tmp) / "dragged.docx"
+            docx.write_bytes(b"stub")
+            captured = {}
+
+            class _FakeDialog:
+                def __init__(self, parent=None, busy_check=None):
+                    captured["parent"] = parent
+                    captured["busy_check"] = busy_check
+                    captured["ingested"] = None
+                    captured["exec_called"] = False
+
+                def _ingest_paths(self, paths):
+                    captured["ingested"] = list(paths)
+
+                def exec(self):
+                    captured["exec_called"] = True
+
+            window = MainWindow()
+            self.addCleanup(window.close)
+            with patch(
+                "doc_tool.ui.convert_dialog.ConvertDialog", _FakeDialog
+            ):
+                window._on_convert_documents([docx])
+            self.assertEqual(captured["ingested"], [docx])
+            self.assertTrue(captured["exec_called"])
+            self.assertIs(captured["parent"], window)
+            self.assertFalse(captured["busy_check"]())
+
+    def test_home_drop_hands_paths_to_convert_dialog(self):
+        """首页整页拖放：drop 后路径送进 ConvertDialog 并打开，互转卡还原。"""
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            docx = Path(tmp) / "dropped.docx"
+            docx.write_bytes(b"stub")
+            captured = {}
+
+            class _FakeDialog:
+                def __init__(self, parent=None, busy_check=None):
+                    captured["ingested"] = None
+                    captured["exec_called"] = False
+
+                def _ingest_paths(self, paths):
+                    captured["ingested"] = list(paths)
+
+                def exec(self):
+                    captured["exec_called"] = True
+
+            window = MainWindow()
+            self.addCleanup(window.close)
+            home = window._empty_state
+            with patch(
+                "doc_tool.ui.convert_dialog.ConvertDialog", _FakeDialog
+            ):
+                home.dropEvent(self._fake_drag_event([docx]))
+            self.assertEqual(captured["ingested"], [docx])
+            self.assertTrue(captured["exec_called"])
+            # drop 后高亮还原
+            self.assertFalse(home._drag_over)
+            self.assertEqual(home._convert_title.text(), "文档互转")
+
+    def test_drag_enter_highlights_convert_card_and_leave_restores(self):
+        from PySide6.QtGui import QDragLeaveEvent
+        from PySide6.QtCore import QUrl
+
+        home = self._home()
+        event = self._fake_drag_event([QUrl.fromLocalFile("C:/x/a.docx")])
+        home.dragEnterEvent(event)
+        self.assertTrue(event.accepted)
+        self.assertTrue(home._drag_over)
+        self.assertEqual(home._convert_card.property("dragOver"), "true")
+        self.assertEqual(home._convert_title.text(), "松开鼠标，添加这些文件")
+        self.assertEqual(home._convert_desc.text(), "已识别拖入的文件，进入互转窗口。")
+        home.dragLeaveEvent(QDragLeaveEvent())
+        self.assertFalse(home._drag_over)
+        self.assertEqual(home._convert_card.property("dragOver"), "false")
+        self.assertEqual(home._convert_title.text(), "文档互转")
+
+    def test_drag_without_urls_is_ignored(self):
+        home = self._home()
+        event = self._fake_drag_event([])
+        home.dragEnterEvent(event)
+        self.assertFalse(event.accepted)
+        self.assertFalse(home._drag_over)
+
+    def test_only_home_view_accepts_drops(self):
+        """拖放只挂在首页视图，工作台视图不受影响。"""
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        self.addCleanup(window.close)
+        self.assertTrue(window._empty_state.acceptDrops())
+        self.assertFalse(window._ide_page.acceptDrops())
+
+    def test_recent_cards_render_click_and_exclude_empty_hint(self):
+        """最近项目卡片渲染（名称/时间/路径/类型徽章）与空态互斥；点击走打开回调。"""
+        from datetime import datetime, timedelta, timezone
+
+        from PySide6.QtWidgets import QLabel
+
+        from doc_tool.application.project_service import RecentEntry
+
+        opened = []
+        home = self._home(on_open_recent=opened.append)
+        home.set_recent_projects([])
+        self.assertIsNotNone(home._empty_label)
+        self.assertEqual(home._recent_cards, [])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root_a = Path(tmp) / "proj-a"
+            root_a.mkdir()
+            root_b = Path(tmp) / "proj-b"
+            root_b.mkdir()
+            now = datetime.now(timezone.utc)
+            entries = [
+                RecentEntry(
+                    path=str(root_a), name="proj-a",
+                    document_name="需求说明书（示例）",
+                    document_type="requirement",
+                    last_opened=(now - timedelta(days=3, minutes=5)).isoformat(timespec="seconds"),
+                ),
+                RecentEntry(path=str(root_b), name="proj-b"),
+            ]
+            home.set_recent_projects(entries)
+            self.assertEqual(len(home._recent_cards), 2)
+            self.assertIsNone(home._empty_label)  # 卡片与空态互斥
+            texts_a = [c.text() for c in home._recent_cards[0].findChildren(QLabel)]
+            self.assertIn("需求说明书（示例）", texts_a)
+            self.assertTrue(any("3 天前打开" in t and str(root_a) in t for t in texts_a))
+            self.assertIn("需求", texts_a)  # 类型徽章
+            self.assertIn("打开 →", texts_a)
+            # 第二张：无类型无时间戳（旧数据兼容）→ 无徽章、只显示路径
+            texts_b = [c.text() for c in home._recent_cards[1].findChildren(QLabel)]
+            self.assertIn(str(root_b), texts_b)
+            self.assertNotIn("需求", texts_b)
+            # 点击卡片走现有打开项目链路
+            self._click(home._recent_cards[0])
+            self.assertEqual(opened, [str(root_a)])
+            # 回到空态：卡片清理
+            home.set_recent_projects([])
+            self.assertEqual(home._recent_cards, [])
+            self.assertIsNotNone(home._empty_label)
+
+    def test_last_opened_formatting(self):
+        from datetime import datetime, timedelta, timezone
+
+        from doc_tool.ui.empty_state import _format_last_opened
+
+        now = datetime.now(timezone.utc)
+        self.assertEqual(_format_last_opened(""), "")
+        self.assertEqual(_format_last_opened("not-a-date"), "")
+        self.assertEqual(
+            _format_last_opened(now.isoformat(timespec="seconds")), "今天打开"
+        )
+        self.assertEqual(
+            _format_last_opened(
+                (now - timedelta(days=1, minutes=5)).isoformat(timespec="seconds")
+            ),
+            "昨天打开",
+        )
+        self.assertEqual(
+            _format_last_opened(
+                (now - timedelta(days=3, minutes=5)).isoformat(timespec="seconds")
+            ),
+            "3 天前打开",
+        )
+
+    def test_home_builds_under_light_and_dark_themes(self):
+        """浅/深两套主题下构建并切换拖放高亮态均不报错。"""
+        from doc_tool.ui.styles import apply_theme
+
+        app = _ensure_qapp()
+        for dark in (False, True):
+            apply_theme(app, dark=dark)
+            home = self._home(on_convert=lambda: None)
+            home.resize(1120, 720)
+            home.show()
+            app.processEvents()
+            self.assertEqual(home._convert_title.text(), "文档互转")
+            home.set_drag_over(True)
+            app.processEvents()
+            self.assertEqual(home._convert_card.property("dragOver"), "true")
+            home.set_drag_over(False)
+            home.close()
+        apply_theme(app, dark=False)
+
+    def test_help_and_about_links_wire_main_window_entries(self):
+        """底部「使用说明」「关于」分别接帮助文档打开与关于对话框，不新造对话框。"""
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        self.addCleanup(window.close)
+        home = window._empty_state
+        # 「关于」：打桩 show_about_dialog（回调构造时绑定，替换实例属性无效）。
+        with patch("doc_tool.ui.about_dialog.show_about_dialog") as show_about:
+            home._handle_about()
+        self.assertEqual(show_about.call_count, 1)
+        self.assertIs(show_about.call_args.args[0], window)
+        # 「使用说明」：解析到仓库 docs/使用说明.md 并交给系统关联程序打开。
+        with patch.object(MainWindow, "_open_file", return_value=True) as open_file:
+            home._handle_show_help()
+        self.assertTrue(open_file.called)
+        self.assertIn("使用说明", str(open_file.call_args.args[0]))
 
 
 if __name__ == "__main__":
