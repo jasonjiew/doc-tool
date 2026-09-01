@@ -37,6 +37,9 @@ _internal/win32/**
 _internal/win32com/**
 _internal/pythonwin/**
 _internal/pywin32_system32/**
+# python-docx：RTF→TXT 组合方向（docx_to_text）运行期读取 DOCX 用；
+# 其自带的 default 模板/类型标注随包收集
+_internal/docx/**
 _internal/setuptools/**
 
 # === PySide6 / shiboken6（Qt Widgets 绑定与翻译） ===
