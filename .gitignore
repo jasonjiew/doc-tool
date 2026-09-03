@@ -48,6 +48,7 @@ migration/legacy/binary-bat/*.bat
 .vscode/
 .idea/
 .learnings/
+.agent/
 
 # --- 协作/头脑风暴会话产物（可视化伴侣等） ---
 .superpowers/
