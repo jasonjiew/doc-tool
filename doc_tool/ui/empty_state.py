@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """首页任务页：「项目出稿 + 常用工具」双栏（无项目时显示，沿用 EmptyState 名）。
 
-自上而下：标题行（产品定位 + 版本徽章）、副标题、主体双栏（左 7 右 3）与
+自上而下：标题行（产品定位 + 版本徽章）、副标题、主体双栏（左 6 右 4）与
 底部锚定行。左栏是新建/打开入口与最近项目卡片（无条目时显示空态文案，
-卡片与空态互斥）；右栏是文档互转拖放卡与「规划中」占位卡。
+卡片与空态互斥）；右栏是文档互转拖放卡与 PDF 工具箱卡。
 
 互转卡可点击、且整页接受文件拖放：拖入时互转卡高亮（虚线切实线 +
 accent 浅底，标题切换为「松开鼠标，添加这些文件」），dragLeave/drop 还原；
@@ -53,6 +53,12 @@ CONVERT_CARD_DESC = (
 )
 CONVERT_DRAG_DESC = "已识别拖入的文件，进入互转窗口。"
 CONVERT_CARD_BADGE = "Word ↔ PDF ↔ Markdown · 支持整个文件夹拖入"
+PDF_TOOLBOX_CARD_TITLE = "PDF 工具箱"
+PDF_TOOLBOX_CARD_DESC = (
+    "合并、拆分、加水印、加密解密与页面组织。\n"
+    "纯离线处理，点击挑选 PDF 文件快速操作。"
+)
+PDF_TOOLBOX_CARD_BADGE = "14 项离线工具 · 批量安全处理"
 RECENT_EMPTY_TEXT = "把 Word 源文档用「新建项目」导入后，会在这里列出最近项目。"
 
 
@@ -136,6 +142,7 @@ class EmptyState(QWidget):
         on_open_project: Optional[Callable[[], None]] = None,
         on_open_recent: Optional[Callable[[str], None]] = None,
         on_convert: Optional[Callable[[], None]] = None,
+        on_pdf_toolbox: Optional[Callable[[], None]] = None,
         on_drop_files: Optional[Callable[[List[Path]], None]] = None,
         on_show_help: Optional[Callable[[], None]] = None,
         on_about: Optional[Callable[[], None]] = None,
@@ -150,6 +157,7 @@ class EmptyState(QWidget):
         self._on_open_project = on_open_project
         self._on_open_recent = on_open_recent
         self._on_convert = on_convert
+        self._on_pdf_toolbox = on_pdf_toolbox
         self._on_drop_files = on_drop_files
         self._on_show_help = on_show_help
         self._on_about = on_about
@@ -165,9 +173,12 @@ class EmptyState(QWidget):
         layout.setContentsMargins(48, 36, 48, 24)
         layout.setSpacing(12)
 
-        # 标题行：产品定位 + 版本徽章
+        # 标题行：品牌徽章 + 产品定位 + 版本徽章
         head = QHBoxLayout()
-        head.setSpacing(8)
+        head.setSpacing(10)
+        brand = QLabel("DocTool", self)
+        brand.setObjectName("homeBrandIcon")
+        head.addWidget(brand)
         title = QLabel(PRODUCT_DESCRIPTION_UI, self)
         title.setObjectName("welcomeTitle")
         head.addWidget(title)
@@ -189,10 +200,10 @@ class EmptyState(QWidget):
         layout.addSpacing(10)
 
         body = QHBoxLayout()
-        body.setSpacing(26)
+        body.setSpacing(28)
         layout.addLayout(body, 1)
-        body.addWidget(self._build_left_column(), 7)
-        body.addWidget(self._build_right_column(), 3)
+        body.addWidget(self._build_left_column(), 6)
+        body.addWidget(self._build_right_column(), 4)
 
         layout.addStretch(1)
         layout.addLayout(self._build_footer())
@@ -203,19 +214,29 @@ class EmptyState(QWidget):
         column = QWidget(self)
         inner = QVBoxLayout(column)
         inner.setContentsMargins(0, 0, 0, 0)
-        inner.setSpacing(10)
+        inner.setSpacing(12)
 
         section = QLabel("项目出稿", column)
         section.setObjectName("sectionTitle")
         inner.addWidget(section)
 
+        guide = QLabel(
+            "从 Word (.docx) 源文档一键拆解为规范 Markdown 项目，支持自动分章与排版校验。",
+            column,
+        )
+        guide.setObjectName("homeMuted")
+        guide.setWordWrap(True)
+        inner.addWidget(guide)
+
         actions = QHBoxLayout()
-        actions.setSpacing(10)
-        new_btn = QPushButton("新建项目…", column)
+        actions.setSpacing(12)
+        new_btn = QPushButton("＋  新建项目…", column)
         new_btn.setProperty("btnRole", "primary")
+        new_btn.setMinimumHeight(36)
         new_btn.clicked.connect(self._handle_new)
-        open_btn = QPushButton("打开项目…", column)
+        open_btn = QPushButton("📁  打开项目…", column)
         open_btn.setProperty("btnRole", "secondary")
+        open_btn.setMinimumHeight(36)
         open_btn.clicked.connect(self._handle_open)
         actions.addWidget(new_btn)
         actions.addWidget(open_btn)
@@ -223,6 +244,7 @@ class EmptyState(QWidget):
         inner.addLayout(actions)
         self._buttons = [new_btn, open_btn]
 
+        inner.addSpacing(6)
         recent_title = QLabel("最近项目", column)
         recent_title.setObjectName("homeSubheading")
         inner.addWidget(recent_title)
@@ -239,23 +261,37 @@ class EmptyState(QWidget):
         column = QWidget(self)
         inner = QVBoxLayout(column)
         inner.setContentsMargins(0, 0, 0, 0)
-        inner.setSpacing(10)
+        inner.setSpacing(12)
 
         section = QLabel("工具", column)
         section.setObjectName("sectionTitle")
         inner.addWidget(section)
 
-        # 互转卡（核心）：虚线 accent 边框，拖入时整卡高亮（QSS dragOver 态）。
+        # 互转卡（核心）：拖入时整卡高亮（QSS dragOver 态）。
         self._convert_card = _ClickableCard(column)
         self._convert_card.setObjectName("convertCard")
         self._convert_card.setProperty("card", True)
         self._convert_card.clicked.connect(self._handle_convert)
         convert_layout = QVBoxLayout(self._convert_card)
-        convert_layout.setContentsMargins(20, 20, 20, 20)
+        convert_layout.setContentsMargins(20, 18, 20, 18)
         convert_layout.setSpacing(8)
+
+        convert_head = QHBoxLayout()
+        convert_head.setSpacing(10)
+        convert_icon = QLabel("⇄", self._convert_card)
+        convert_icon.setObjectName("convertCardIcon")
+        convert_head.addWidget(convert_icon)
+        convert_title_box = QVBoxLayout()
+        convert_title_box.setSpacing(2)
         self._convert_title = QLabel(CONVERT_CARD_TITLE, self._convert_card)
         self._convert_title.setObjectName("sectionTitle")
-        convert_layout.addWidget(self._convert_title)
+        convert_title_box.addWidget(self._convert_title)
+        convert_sub = QLabel("多格式双向互转 · 批量处理", self._convert_card)
+        convert_sub.setObjectName("homeMuted")
+        convert_title_box.addWidget(convert_sub)
+        convert_head.addLayout(convert_title_box, 1)
+        convert_layout.addLayout(convert_head)
+
         self._convert_desc = QLabel(CONVERT_CARD_DESC, self._convert_card)
         self._convert_desc.setObjectName("homeMuted")
         convert_layout.addWidget(self._convert_desc)
@@ -272,22 +308,47 @@ class EmptyState(QWidget):
         convert_layout.addWidget(badge)
         inner.addWidget(self._convert_card)
 
-        # 规划中占位卡：禁用态。
-        placeholder = QFrame(column)
-        placeholder.setProperty("card", True)
-        placeholder.setEnabled(False)
-        placeholder_layout = QVBoxLayout(placeholder)
-        placeholder_layout.setContentsMargins(20, 18, 20, 18)
-        placeholder_layout.setSpacing(6)
-        placeholder_title = QLabel("PDF 工具箱（规划中）", placeholder)
-        placeholder_title.setObjectName("sectionTitle")
-        placeholder_layout.addWidget(placeholder_title)
-        placeholder_desc = QLabel("合并、拆分、加水印。", placeholder)
-        placeholder_desc.setObjectName("homeMuted")
-        placeholder_layout.addWidget(placeholder_desc)
-        placeholder_layout.addStretch(1)
-        self._placeholder_card = placeholder
-        inner.addWidget(placeholder)
+        # PDF 工具箱卡：可点击打开独立对话框。
+        self._pdf_card = _ClickableCard(column)
+        self._pdf_card.setObjectName("pdfCard")
+        self._pdf_card.setProperty("card", True)
+        self._pdf_card.clicked.connect(self._handle_pdf_toolbox)
+        pdf_layout = QVBoxLayout(self._pdf_card)
+        pdf_layout.setContentsMargins(20, 18, 20, 18)
+        pdf_layout.setSpacing(8)
+
+        pdf_head = QHBoxLayout()
+        pdf_head.setSpacing(10)
+        pdf_icon = QLabel("📑", self._pdf_card)
+        pdf_icon.setObjectName("pdfCardIcon")
+        pdf_head.addWidget(pdf_icon)
+        pdf_title_box = QVBoxLayout()
+        pdf_title_box.setSpacing(2)
+        self._pdf_title = QLabel(PDF_TOOLBOX_CARD_TITLE, self._pdf_card)
+        self._pdf_title.setObjectName("sectionTitle")
+        pdf_title_box.addWidget(self._pdf_title)
+        pdf_sub = QLabel("页面管理 · 安全水印 · 优化压缩", self._pdf_card)
+        pdf_sub.setObjectName("homeMuted")
+        pdf_title_box.addWidget(pdf_sub)
+        pdf_head.addLayout(pdf_title_box, 1)
+        pdf_layout.addLayout(pdf_head)
+
+        self._pdf_desc = QLabel(PDF_TOOLBOX_CARD_DESC, self._pdf_card)
+        self._pdf_desc.setObjectName("homeMuted")
+        pdf_layout.addWidget(self._pdf_desc)
+        pdf_layout.addSpacing(2)
+        chips = QHBoxLayout()
+        chips.setSpacing(6)
+        for chip in ("合并", "拆分", "水印", "加密", "解密", "压缩", "页码"):
+            chips.addWidget(_make_pill(chip, parent=self._pdf_card))
+        chips.addStretch(1)
+        pdf_layout.addLayout(chips)
+        pdf_layout.addStretch(1)
+        badge = QLabel(PDF_TOOLBOX_CARD_BADGE, self._pdf_card)
+        badge.setObjectName("homeAccent")
+        pdf_layout.addWidget(badge)
+        self._placeholder_card = self._pdf_card  # 向后兼容旧属性访问
+        inner.addWidget(self._pdf_card)
 
         inner.addStretch(1)
         return column
@@ -330,12 +391,18 @@ class EmptyState(QWidget):
 
     def _build_recent_card(self, entry: RecentEntry) -> QFrame:
         card = _ClickableCard(self._recent_frame)
+        card.setObjectName("recentCard")
         card.setProperty("card", True)
         card.setToolTip(entry.path)
         card.clicked.connect(lambda path=entry.path: self._handle_recent(path))
         row = QHBoxLayout(card)
-        row.setContentsMargins(16, 12, 14, 12)
-        row.setSpacing(10)
+        row.setContentsMargins(16, 12, 16, 12)
+        row.setSpacing(12)
+
+        file_icon = QLabel("📄", card)
+        file_icon.setObjectName("recentFileIcon")
+        row.addWidget(file_icon)
+
         column = QVBoxLayout()
         column.setSpacing(4)
         name = QLabel(entry.document_name or entry.name, card)
@@ -351,7 +418,7 @@ class EmptyState(QWidget):
         if badge_text:
             row.addWidget(_make_pill(badge_text, muted=True, parent=card))
         hint = QLabel("打开 →", card)
-        hint.setObjectName("homeMuted")
+        hint.setObjectName("homeAccent")
         row.addWidget(hint)
         return card
 
@@ -363,6 +430,8 @@ class EmptyState(QWidget):
         for card in self._recent_cards:
             card.setEnabled(self._enabled)
         self._convert_card.setEnabled(self._enabled)
+        if hasattr(self, "_pdf_card"):
+            self._pdf_card.setEnabled(self._enabled)
 
     # --- 拖放（整页接收，高亮互转卡） ---
 
@@ -415,6 +484,10 @@ class EmptyState(QWidget):
     def _handle_convert(self) -> None:
         if self._on_convert is not None:
             self._on_convert()
+
+    def _handle_pdf_toolbox(self) -> None:
+        if self._on_pdf_toolbox is not None:
+            self._on_pdf_toolbox()
 
     def _handle_show_help(self) -> None:
         if self._on_show_help is not None:
