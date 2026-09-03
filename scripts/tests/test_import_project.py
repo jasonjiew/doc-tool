@@ -369,6 +369,47 @@ class ExtractionRegressionTests(unittest.TestCase):
         self.assertLess(pos_img, pos_simple, "图片应在普通表格之前")
         self.assertLess(pos_simple, pos_complex, "普通表格应在复杂表格之前")
 
+    def test_paragraph_with_soft_break_extracted_as_br_and_roundtrips(self):
+        """段落内含软换行（<w:br/>）提取为 <br>，且完整导入能通过往返门禁。"""
+        src = os.path.join(self._tmp, "soft_break.docx")
+        body = (
+            _cover_table("GX-TEST-002", "1.0")
+            + _p("1", "引言")
+            + '<w:p><w:r><w:t>第一行</w:t><w:br/><w:t>第二行</w:t></w:r></w:p>'
+        )
+        with zipfile.ZipFile(src, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+            zf.writestr("word/document.xml", _document_xml(body))
+            zf.writestr("word/styles.xml", _styles_xml())
+            zf.writestr("word/settings.xml", _settings_xml())
+            zf.writestr("word/numbering.xml", _numbering_xml())
+            zf.writestr("word/_rels/document.xml.rels", _rels_xml(with_image=False))
+
+        # 1. 提取验证：Markdown 文件中包含第一行<br>第二行，且未被拆分成多行
+        content_dir = os.path.join(self._tmp, "sb_content")
+        extract_content(src, content_dir, self._images, self._tables, "general")
+        md_file = os.path.join(content_dir, "01-引言.md")
+        self.assertTrue(os.path.isfile(md_file))
+        text = Path(md_file).read_text(encoding="utf-8")
+        self.assertIn("第一行<br>第二行", text)
+        self.assertNotIn("第一行\n第二行", text)
+
+        # 2. 端到端首次导入验证：往返差异门禁必须通过，不能报 E2004
+        target = os.path.join(self._tmp, "sb_proj")
+        request = ImportRequest(
+            source_docx=Path(src),
+            target_project_root=Path(target),
+            document_type="general",
+            document_no="GX-TEST-002",
+            document_name="软换行测试",
+            document_version="1.0",
+        )
+        result = import_first_time(request)
+        self.assertTrue(result.success, "含软换行段落导入应成功且通过往返门禁：{0}".format(
+            [(e.stage, e.status, e.detail) for e in result.events]
+        ))
+
+
 
 # --- 4.9 端到端首次导入验收 ---
 

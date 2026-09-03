@@ -88,7 +88,7 @@ class _SourcePage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 1/5：选择源 Word 文档")
+        self.setTitle("步骤 1/6：选择源 Word 文档")
         layout = QVBoxLayout(self)
         hint = QLabel(
             "选择要导入的 .docx 文件。文件将被只读复制到项目中，源文件不会被修改。",

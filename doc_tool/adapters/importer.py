@@ -338,12 +338,12 @@ def extract_content(
             if lvl == 1:
                 if cur_file is not None and cur_lines is not None:
                     _write_chapter(cur_file, cur_lines)
-                cur_chapter = txt
-                fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(txt))
+                cur_chapter = re.sub(r"\r\n|\r|\n", " ", txt)
+                fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
                 cur_file = content_dir / fname
                 cur_lines = []
-                chapter_order.append({"chapter": txt, "file": fname})
-                cur_lines.append("# " + txt)
+                chapter_order.append({"chapter": cur_chapter, "file": fname})
+                cur_lines.append("# " + cur_chapter)
                 cur_lines.append("")
                 if has_img:
                     img_counter, img_map = _emit_images(
@@ -355,7 +355,7 @@ def extract_content(
                 continue  # 正文起点之前，跳过
 
             if lvl and 2 <= lvl <= 6:
-                cur_lines.append("#" * lvl + " " + txt)
+                cur_lines.append("#" * lvl + " " + re.sub(r"\r\n|\r|\n", "<br>", txt))
                 cur_lines.append("")
                 if has_img:
                     img_counter, img_map = _emit_images(
@@ -530,6 +530,7 @@ def _emit_images(
 
 
 def _emit_paragraph(el, txt, cur_lines) -> None:
+    txt = re.sub(r"\r\n|\r|\n", "<br>", txt)
     numPr = el.find(_qn("pPr") + "/" + _qn("numPr"))
     is_bullet = numPr is not None or (
         txt and txt[0] in "\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043\uf0d8\uF0B2\uF0A0"

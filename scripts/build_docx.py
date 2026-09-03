@@ -1318,7 +1318,7 @@ def process_markdown(
 
         heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
         if heading:
-            heading_text = heading.group(2).strip()
+            heading_text = re.sub(r"<br\s*/?>", "\n", heading.group(2).strip(), flags=re.IGNORECASE)
             insert_element(
                 insert_before,
                 make_heading(
