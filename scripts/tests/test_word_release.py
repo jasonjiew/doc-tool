@@ -856,6 +856,59 @@ class PipelineAtomicPublishTests(unittest.TestCase):
         self.assertEqual(loaded.lastSuccessfulBuildVersion, APP_VERSION)
 
 
+class WordDispatchFallbackAndFrozenTests(unittest.TestCase):
+    """验证 Word 预检在无 multiprocessing 时的回退及冻结态执行。"""
+
+    def test_check_word_dispatchable_fallback_when_multiprocessing_fails(self):
+        """multiprocessing 不可用时自动降级到 _dispatch_check_threaded。"""
+        from doc_tool.application import word_check
+
+        with patch.object(word_check, "check_pywin32", return_value=True):
+            with patch.dict("sys.modules", {"multiprocessing": None}):
+                with patch.object(word_check, "_dispatch_check_threaded", return_value=(True, "16.0")) as mock_threaded:
+                    success, version = word_check.check_word_dispatchable(timeout_seconds=5.0)
+                    self.assertTrue(success)
+                    self.assertEqual(version, "16.0")
+                    mock_threaded.assert_called_once()
+
+    def test_extract_word_pid_handles_hwnd_attribute_error(self):
+        """Word.Application 无 .Hwnd 属性时通过差集或 ActiveWindow 提取 PID。"""
+        from doc_tool.application.word_check import _extract_word_pid
+
+        class FakeWordWithoutHwnd:
+            @property
+            def Hwnd(self):
+                raise AttributeError("Word.Application.Hwnd not supported")
+
+        fake_word = FakeWordWithoutHwnd()
+        # 1. 启动前后进程快照差集命中
+        with patch("doc_tool.application.word_check._get_winword_pids", return_value={1234, 5678}):
+            pid = _extract_word_pid(fake_word, pids_before={1234})
+            self.assertEqual(pid, 5678)
+
+        # 2. 从 ActiveWindow 获取
+        class FakeActiveWindow:
+            Hwnd = 9999
+
+        fake_word.ActiveWindow = FakeActiveWindow()
+        with patch("win32process.GetWindowThreadProcessId", return_value=(0, 4321)):
+            pid = _extract_word_pid(fake_word, pids_before=None)
+            self.assertEqual(pid, 4321)
+
+    def test_supervise_uses_thread_when_frozen(self):
+        """冻结环境下 supervise 自动路由到 _supervise_in_thread。"""
+        import refresh_fields
+
+        with patch.object(refresh_fields, "_supervise_in_thread", return_value=(True, "ok")) as mock_thread:
+            with patch.object(sys, "frozen", True, create=True):
+                ok, reason = refresh_fields.supervise(
+                    output_path="C:\\dummy\\test.docx", timeout=30
+                )
+                self.assertTrue(ok)
+                self.assertEqual(reason, "ok")
+                mock_thread.assert_called_once()
+
+
 # === 任务 7.6 人工操作清单 ===
 # 在现有 349 页需求文档和 576 页详细设计文档上执行最终实机回归与视觉抽检。
 # 完整清单见 analysis/manual-checklist.md 第 3 节「任务 7.6 实机回归与视觉抽检清单」。

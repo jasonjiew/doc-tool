@@ -100,15 +100,17 @@ all_hiddenimports = (
     + pillow_hiddenimports
     + pywin32_hiddenimports
     + [
-        # scripts/ 下的内核模块作为数据文件打包，运行时由
-        # kernel.ensure_kernel_importable() 动态加入 sys.path，不作为 hidden import
         "yaml",
+        "docx_common",
+        "build_docx",
+        "validate_docx",
+        "refresh_fields",
     ]
 )
 
 a = Analysis(
     [str(REPO_ROOT / "doc_tool" / "app.py")],
-    pathex=[str(REPO_ROOT)],
+    pathex=[str(REPO_ROOT), str(REPO_ROOT / "scripts")],
     binaries=all_binaries,
     datas=all_datas,
     hiddenimports=all_hiddenimports,
@@ -160,7 +162,7 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 cli_analysis = Analysis(
     [str(REPO_ROOT / "doc_tool_cli.py")],
-    pathex=[str(REPO_ROOT)],
+    pathex=[str(REPO_ROOT), str(REPO_ROOT / "scripts")],
     binaries=all_binaries,
     datas=all_datas,
     hiddenimports=all_hiddenimports,

@@ -99,15 +99,17 @@ all_hiddenimports = (
     + pillow_hiddenimports
     + pywin32_hiddenimports
     + [
-        # scripts/ 下的内核模块作为数据文件打包，运行时由
-        # kernel.ensure_kernel_importable() 动态加入 sys.path，不作为 hidden import
         "yaml",
+        "docx_common",
+        "build_docx",
+        "validate_docx",
+        "refresh_fields",
     ]
 )
 
 a = Analysis(
     [str(REPO_ROOT / "doc_tool" / "app.py")],
-    pathex=[str(REPO_ROOT)],
+    pathex=[str(REPO_ROOT), str(REPO_ROOT / "scripts")],
     binaries=all_binaries,
     datas=all_datas,
     hiddenimports=all_hiddenimports,
