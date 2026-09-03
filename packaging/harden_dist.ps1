@@ -1,4 +1,4 @@
-# Transparent-encryption hardening for the dist tree (idempotent).
+﻿# Transparent-encryption hardening for the dist tree (idempotent).
 #
 # On machines with a transparent-encryption client (EsafeNet DocGuard and
 # similar), *.pyd / *.py files are stored encrypted at rest and DocTool.exe

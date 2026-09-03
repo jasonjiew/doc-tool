@@ -41,6 +41,9 @@ _internal/pywin32_system32/**
 # 其自带的 default 模板/类型标注随包收集
 _internal/docx/**
 _internal/setuptools/**
+# cryptography：PDF 工具箱 AES-256 加密解密支持
+_internal/cryptography/**
+_internal/cryptography-*.dist-info/**
 
 # === PySide6 / shiboken6（Qt Widgets 绑定与翻译） ===
 # PyInstaller 内置 PySide6 hook 按实际 import 收集 QtCore/QtGui/QtWidgets 的
