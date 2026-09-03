@@ -9,6 +9,7 @@
 - ``E4xxx`` 项目模型与锁
 - ``E5xxx`` 文件系统与资源
 - ``E6xxx`` 文档互转（Word ↔ PDF ↔ Markdown）
+- ``E7xxx`` PDF 工具箱（合并/拆分/水印/加密/压缩等）
 - ``E9xxx`` 内部错误
 """
 
@@ -229,3 +230,57 @@ class PageRangeError(DocToolError):
     user_message = "页范围无效。"
     suggested_action = "页范围格式如「1-5」或「3」，起始页不能大于结束页；留空表示全部页面。"
 
+
+
+# --- PDF 工具箱（E7xxx） ---
+
+
+class PdfFileError(DocToolError):
+    code = "E7001"
+    user_message = "不是合法的 PDF，或文件已损坏。"
+    suggested_action = "请确认文件扩展名为 .pdf 且能正常打开；损坏文件请先修复后重试。"
+
+
+class PdfPageSelectionError(DocToolError):
+    code = "E7002"
+    user_message = "页码选择无效。"
+    suggested_action = (
+        "页码写法如「1-5,8,10-12」（逗号分隔，从 1 起），"
+        "也可用 all 表示全部页面；请确认页码不超出该 PDF 的页数。"
+    )
+
+
+class PdfEncryptedError(DocToolError):
+    code = "E7003"
+    user_message = "该 PDF 已加密，需要先解除密码。"
+    suggested_action = "请先用「PDF 工具箱 → 解除密码」工具（需输入打开密码）处理后重试。"
+
+
+class PdfPasswordError(DocToolError):
+    code = "E7004"
+    user_message = "密码不正确。"
+    suggested_action = "请核对密码（区分大小写）后重试。"
+
+
+class PdfRenderError(DocToolError):
+    code = "E7005"
+    user_message = "PDF 页面渲染失败。"
+    suggested_action = "请确认文件未加密且页面内容正常；个别损坏页面会跳过并在结果中注明。"
+
+
+class PdfImageError(DocToolError):
+    code = "E7006"
+    user_message = "图片文件无法读取。"
+    suggested_action = "请确认图片未损坏，且格式为 JPG/PNG/BMP/TIF/WEBP 等常见类型。"
+
+
+class PdfWriteError(DocToolError):
+    code = "E7007"
+    user_message = "PDF 写入失败。"
+    suggested_action = "请确认输出文件未被其他程序打开（如 PDF 阅读器），并检查磁盘权限。"
+
+
+class PdfInputError(DocToolError):
+    code = "E7008"
+    user_message = "工具输入不满足要求。"
+    suggested_action = "请按工具要求提供输入（如合并至少需要 2 个 PDF、删除页面不能删空全部页面）。"

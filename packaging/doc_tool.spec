@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec：将 Doc Tool 打包为 Windows onedir 应用（PySide6）。
 
-任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets，排除未用的
+任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets/QtPdf，排除未用的
 QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积。
 
 构建命令：
@@ -122,7 +122,7 @@ a = Analysis(
         "unittest.test",
         "test",  # Python 标准库 test 套件
         "tests",
-        # 排除未使用的 PySide6 Addons 大件（仅保留 QtCore/QtGui/QtWidgets）
+        # 排除未使用的 PySide6 Addons 大件（仅保留 QtCore/QtGui/QtWidgets/QtPdf）
         "PySide6.QtWebEngineCore",
         "PySide6.QtWebEngineWidgets",
         "PySide6.QtWebEngineQuick",
@@ -142,7 +142,6 @@ a = Analysis(
         "PySide6.QtBluetooth",
         "PySide6.QtPositioning",
         "PySide6.QtWebSockets",
-        "PySide6.QtPdf",
         "PySide6.QtPdfWidgets",
         "PySide6.QtSvgWidgets",
         "shiboken6_tool",
