@@ -37,6 +37,10 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 def ensure_kernel_importable() -> None:
     """将 ``scripts/`` 加入 ``sys.path``，使内核模块可被导入（幂等）。"""
+    # 冻结环境下内核脚本已打包进 PYZ，直接由 FrozenImporter 加载，
+    # 避免在透明加密环境（如 EsafeNet DocGuard）下优先加载磁盘加密 pyc 导致魔数错误。
+    if getattr(sys, "frozen", False):
+        return
     scripts = str(_SCRIPTS_DIR)
     if scripts not in sys.path:
         sys.path.insert(0, scripts)

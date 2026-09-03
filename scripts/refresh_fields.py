@@ -17,13 +17,80 @@ from typing import Optional, Sequence, Tuple
 from docx_common import AutomationError, discover_document_types, load_config
 
 
-def _word_pid(word) -> Optional[int]:
+def _get_winword_pids() -> set:
+    """获取系统当前所有 WINWORD.EXE 进程的 PID 集合。"""
+    if os.name != "nt":
+        return set()
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        TH32CS_SNAPPROCESS = 0x00000002
+
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_char * 260),
+            ]
+
+        h_snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if h_snap == -1 or h_snap == 0xFFFFFFFF:
+            return set()
+        pe = PROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        pids = set()
+        try:
+            if kernel32.Process32First(h_snap, ctypes.byref(pe)):
+                while True:
+                    if pe.szExeFile.lower() == b"winword.exe":
+                        pids.add(int(pe.th32ProcessID))
+                    if not kernel32.Process32Next(h_snap, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(h_snap)
+        return pids
+    except Exception:
+        return set()
+
+
+def _word_pid(word, pids_before: Optional[set] = None) -> Optional[int]:
+    """精准获取 Word 进程的 PID。
+    
+    Word.Application 对象没有 .Hwnd 属性；通过启动前后差集与 ActiveWindow 提取 PID。
+    """
+    if pids_before is not None:
+        try:
+            pids_after = _get_winword_pids()
+            diff = pids_after - pids_before
+            if diff:
+                return next(iter(diff))
+        except Exception:
+            pass
     try:
         import win32process
 
-        return int(win32process.GetWindowThreadProcessId(int(word.Hwnd))[1])
+        if hasattr(word, "ActiveWindow") and word.ActiveWindow is not None:
+            return int(win32process.GetWindowThreadProcessId(int(word.ActiveWindow.Hwnd))[1])
     except Exception:
-        return None
+        pass
+    try:
+        import win32process
+
+        hwnd = getattr(word, "Hwnd", None)
+        if hwnd:
+            return int(win32process.GetWindowThreadProcessId(int(hwnd))[1])
+    except Exception:
+        pass
+    return None
 
 
 def _kill_process_tree(pid: Optional[int]) -> None:
@@ -115,7 +182,9 @@ def _update_all_story_fields(document) -> None:
 
 
 def refresh_worker(
-    document: Optional[str] = None, output_path: Optional[str] = None
+    document: Optional[str] = None,
+    output_path: Optional[str] = None,
+    pid_holder: Optional[dict] = None,
 ) -> int:
     try:
         import win32com.client
@@ -143,8 +212,11 @@ def refresh_worker(
     opened = None
     word_pid = None
     try:
+        pids_before = _get_winword_pids()
         word = win32com.client.DispatchEx("Word.Application")
-        word_pid = _word_pid(word)
+        word_pid = _word_pid(word, pids_before)
+        if pid_holder is not None and word_pid:
+            pid_holder["pid"] = word_pid
         word.Visible = False
         word.DisplayAlerts = 0  # wdAlertsNone
         # msoAutomationSecurityForceDisable: never execute document macros.
@@ -155,6 +227,10 @@ def refresh_worker(
 
         print("[{0}] Word 打开并刷新: {1}".format(document, output), flush=True)
         opened = _open_document(word, output, read_only=False)
+        if not word_pid:
+            word_pid = _word_pid(word)
+            if pid_holder is not None and word_pid:
+                pid_holder["pid"] = word_pid
         _update_all_story_fields(opened)
         for index in range(1, int(opened.TablesOfContents.Count) + 1):
             opened.TablesOfContents(index).Update()
@@ -193,6 +269,77 @@ def refresh_worker(
                 _kill_process_tree(word_pid)
 
 
+def _supervise_in_thread(
+    document: Optional[str],
+    output_path: str,
+    timeout: int,
+    label: str,
+) -> Tuple[bool, str]:
+    """在工作线程内监督 Word 刷新。
+    
+    用于 PyInstaller 冻结环境（此时 sys.executable 是 DocTool.exe，无法作为
+    Python 脚本执行器直接拉起 refresh_fields.py）或限制子进程时的安全执行。
+    """
+    import contextlib
+    import io
+    import threading
+
+    res = {"code": 1}
+    holder = {"pid": None}
+    stderr_buf = io.StringIO()
+
+    def _worker() -> None:
+        try:
+            try:
+                import pythoncom
+
+                pythoncom.CoInitialize()
+            except Exception:
+                pass
+            with contextlib.redirect_stderr(stderr_buf):
+                res["code"] = refresh_worker(
+                    document=document,
+                    output_path=output_path,
+                    pid_holder=holder,
+                )
+        except Exception as exc:
+            stderr_buf.write("[{0}] [FAIL] Word 刷新失败: {1!r}\n".format(label, exc))
+            stderr_buf.write("{0}{1}\n".format(_REASON_MARKER, _classify_failure(exc)))
+            res["code"] = 1
+        finally:
+            try:
+                import pythoncom
+
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    thread = threading.Thread(
+        target=_worker, name="doc-tool-word-refresh-thread", daemon=True
+    )
+    thread.start()
+    thread.join(float(timeout))
+
+    if thread.is_alive():
+        print(
+            "[{0}] [FAIL] Word 刷新超过 {1} 秒，已终止本次专用进程".format(label, timeout),
+            file=sys.stderr,
+            flush=True,
+        )
+        _kill_process_tree(holder.get("pid"))
+        thread.join(10.0)
+        return (False, REASON_TIMEOUT)
+
+    err_text = stderr_buf.getvalue()
+    if err_text:
+        sys.stderr.write(err_text)
+        sys.stderr.flush()
+
+    if res["code"] == 0:
+        return (True, REASON_OK)
+    return (False, _scan_reason(err_text.encode("utf-8", errors="replace")))
+
+
 def supervise(
     document: Optional[str] = None,
     output_path: Optional[str] = None,
@@ -217,6 +364,22 @@ def supervise(
         if timeout is None:
             timeout = int(config.get("refresh", {}).get("timeoutSeconds", 900))
     label = document or os.path.basename(output_path)
+
+    # 在 PyInstaller 冻结环境下，sys.executable 是 DocTool.exe 而非 python 解释器；
+    # 重新拉起会导致重复启动图形主窗口或命令行参数不识别。
+    # 此时切换为线程监督模式，同样具备超时看门狗与专用 Word 进程清理保护。
+    is_frozen = bool(getattr(sys, "frozen", False)) or (
+        os.path.basename(sys.executable).lower()
+        not in ("python.exe", "pythonw.exe", "python3.exe", "python")
+    )
+    if is_frozen:
+        return _supervise_in_thread(
+            document=document,
+            output_path=output_path,
+            timeout=timeout,
+            label=label,
+        )
+
     command = [
         sys.executable,
         os.path.abspath(__file__),

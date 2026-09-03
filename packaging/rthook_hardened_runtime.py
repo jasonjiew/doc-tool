@@ -19,8 +19,19 @@ import importlib._bootstrap_external as _be
 import sys
 
 _suffixes = list(importlib.machinery.EXTENSION_SUFFIXES)
+for _s in list(_suffixes):
+    if _s.endswith(".pyd"):
+        _dll_s = _s[:-4] + ".dll"
+        if _dll_s not in _suffixes:
+            _suffixes.append(_dll_s)
 if ".dll" not in _suffixes:
     _suffixes.append(".dll")
+try:
+    for _s in _suffixes:
+        if _s not in importlib.machinery.EXTENSION_SUFFIXES:
+            importlib.machinery.EXTENSION_SUFFIXES.append(_s)
+except Exception:
+    pass
 
 _loaders = [
     (importlib.machinery.ExtensionFileLoader, _suffixes),

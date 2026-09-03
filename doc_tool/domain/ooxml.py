@@ -196,11 +196,14 @@ def read_docx_package(path: Union[str, Path]) -> DocxPackage:
             part_name="",
             reason="extension",
         )
+    h = b""
     try:
+        with open(str(file_path), "rb") as test_f:
+            h = test_f.read(16)
         handle = zipfile.ZipFile(str(file_path), "r")
     except (zipfile.BadZipFile, OSError) as exc:
         raise OOXMLSecurityError(
-            "文件不是有效的 ZIP 包或不存在：{0}".format(exc),
+            "文件不是有效的 ZIP 包或不存在（路径={0}，前16字节={1!r}）：{2}".format(file_path, h, exc),
             part_name="",
             reason="zip",
             cause=exc,

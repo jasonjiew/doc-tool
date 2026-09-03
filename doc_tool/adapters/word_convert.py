@@ -138,8 +138,8 @@ class _WordHandle:
         self._pid: Optional[int] = None
         self._lock = threading.Lock()
 
-    def attach(self, word) -> None:
-        pid = _word_pid(word)
+    def attach(self, word, pids_before: Optional[set] = None) -> None:
+        pid = _word_pid(word, pids_before)
         with self._lock:
             self._pid = pid
 
@@ -154,13 +154,80 @@ class _WordHandle:
         _kill_process_tree(pid)
 
 
-def _word_pid(word) -> Optional[int]:
+def _get_winword_pids() -> set:
+    """获取系统当前所有 WINWORD.EXE 进程的 PID 集合。"""
+    if os.name != "nt":
+        return set()
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        TH32CS_SNAPPROCESS = 0x00000002
+
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_char * 260),
+            ]
+
+        h_snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if h_snap == -1 or h_snap == 0xFFFFFFFF:
+            return set()
+        pe = PROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        pids = set()
+        try:
+            if kernel32.Process32First(h_snap, ctypes.byref(pe)):
+                while True:
+                    if pe.szExeFile.lower() == b"winword.exe":
+                        pids.add(int(pe.th32ProcessID))
+                    if not kernel32.Process32Next(h_snap, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(h_snap)
+        return pids
+    except Exception:
+        return set()
+
+
+def _word_pid(word, pids_before: Optional[set] = None) -> Optional[int]:
+    """精准获取 Word 进程的 PID。
+    
+    Word.Application 对象没有 .Hwnd 属性；通过启动前后差集与 ActiveWindow 提取 PID。
+    """
+    if pids_before is not None:
+        try:
+            pids_after = _get_winword_pids()
+            diff = pids_after - pids_before
+            if diff:
+                return next(iter(diff))
+        except Exception:
+            pass
     try:
         import win32process
 
-        return int(win32process.GetWindowThreadProcessId(int(word.Hwnd))[1])
+        if hasattr(word, "ActiveWindow") and word.ActiveWindow is not None:
+            return int(win32process.GetWindowThreadProcessId(int(word.ActiveWindow.Hwnd))[1])
     except Exception:
-        return None
+        pass
+    try:
+        import win32process
+
+        hwnd = getattr(word, "Hwnd", None)
+        if hwnd:
+            return int(win32process.GetWindowThreadProcessId(int(hwnd))[1])
+    except Exception:
+        pass
+    return None
 
 
 def _kill_process_tree(pid: Optional[int]) -> None:
@@ -384,8 +451,9 @@ def _run_session(
     try:
         pythoncom.CoInitialize()
         try:
+            pids_before = _get_winword_pids()
             word = win32com.client.DispatchEx("Word.Application")
-            handle.attach(word)
+            handle.attach(word, pids_before)
             word.Visible = False
             word.DisplayAlerts = 0  # wdAlertsNone
             try:
@@ -397,6 +465,8 @@ def _run_session(
                 os.makedirs(parent, exist_ok=True)
 
             opened = _open_word_document(word, source, mode)
+            if handle._pid is None:
+                handle.attach(word)
 
             if mode in PDF_EXPORT_MODES:
                 # 页数是廉价的（实测 1.2 秒），给用户一个体量读数；DOCX 源

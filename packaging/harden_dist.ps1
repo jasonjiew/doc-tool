@@ -70,7 +70,12 @@ for p in sorted(glob.glob(os.path.join(d, "*.py"))):
         foreach ($f in $pyFiles) {
             $pyc = Join-Path $f.Directory.FullName ($f.BaseName + ".pyc")
             if (-not (Test-Path -LiteralPath $pyc)) { throw "compile produced no .pyc for $($f.FullName)" }
-            Remove-Item -LiteralPath $f.FullName -Force
+            try {
+                Remove-Item -LiteralPath $f.FullName -Force
+            } catch {
+                Start-Sleep -Milliseconds 200
+                Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
+            }
             $pyCount++
         }
     }

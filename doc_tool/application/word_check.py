@@ -121,6 +121,83 @@ def check_interactive_session() -> bool:
     return True
 
 
+def _get_winword_pids() -> set:
+    """获取系统当前所有 WINWORD.EXE 进程的 PID 集合。"""
+    if os.name != "nt":
+        return set()
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        TH32CS_SNAPPROCESS = 0x00000002
+
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_char * 260),
+            ]
+
+        h_snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if h_snap == -1 or h_snap == 0xFFFFFFFF:
+            return set()
+        pe = PROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        pids = set()
+        try:
+            if kernel32.Process32First(h_snap, ctypes.byref(pe)):
+                while True:
+                    if pe.szExeFile.lower() == b"winword.exe":
+                        pids.add(int(pe.th32ProcessID))
+                    if not kernel32.Process32Next(h_snap, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(h_snap)
+        return pids
+    except Exception:
+        return set()
+
+
+def _extract_word_pid(word, pids_before: Optional[set] = None) -> Optional[int]:
+    """精准获取 Word 进程的 PID。
+    
+    Word.Application 对象本身没有 .Hwnd 属性，直接访问会抛 AttributeError。
+    这里通过启动前后进程快照差集以及 ActiveWindow.Hwnd 准确提取 PID。
+    """
+    if pids_before is not None:
+        try:
+            pids_after = _get_winword_pids()
+            diff = pids_after - pids_before
+            if diff:
+                return next(iter(diff))
+        except Exception:
+            pass
+    try:
+        import win32process
+
+        if hasattr(word, "ActiveWindow") and word.ActiveWindow is not None:
+            return int(win32process.GetWindowThreadProcessId(int(word.ActiveWindow.Hwnd))[1])
+    except Exception:
+        pass
+    try:
+        import win32process
+
+        hwnd = getattr(word, "Hwnd", None)
+        if hwnd:
+            return int(win32process.GetWindowThreadProcessId(int(hwnd))[1])
+    except Exception:
+        pass
+    return None
+
+
 def _dispatch_check_worker(result_queue) -> None:
     """子进程内执行 Word DispatchEx，确保父进程可以施加真实超时。"""
     word = None
@@ -128,14 +205,11 @@ def _dispatch_check_worker(result_queue) -> None:
     try:
         import win32com.client
 
+        pids_before = _get_winword_pids()
         word = win32com.client.DispatchEx("Word.Application")
-        try:
-            import win32process
-
-            word_pid = int(win32process.GetWindowThreadProcessId(int(word.Hwnd))[1])
+        word_pid = _extract_word_pid(word, pids_before)
+        if word_pid:
             result_queue.put(("pid", word_pid))
-        except Exception:
-            word_pid = None
         word.Visible = False
         word.DisplayAlerts = 0
         try:
@@ -159,6 +233,75 @@ def _dispatch_check_worker(result_queue) -> None:
                 _kill_process_tree(word_pid)
 
 
+def _dispatch_check_threaded(timeout_seconds: float = 10.0) -> tuple:
+    """在工作线程内执行 Word DispatchEx 探针。
+
+    用于 PyInstaller 冻结环境（排除了 multiprocessing 避免触发安全软件拦截）
+    或系统限制 spawn 子进程时的轻量物理探针，同样施加真实超时并负责清理。
+    """
+    import threading
+
+    res = {"success": False, "version": ""}
+    holder = {"pid": None}
+
+    def _worker() -> None:
+        word = None
+        try:
+            try:
+                import pythoncom
+
+                pythoncom.CoInitialize()
+            except Exception:
+                pass
+            import win32com.client
+
+            pids_before = _get_winword_pids()
+            word = win32com.client.DispatchEx("Word.Application")
+            word_pid = _extract_word_pid(word, pids_before)
+            holder["pid"] = word_pid
+
+            word.Visible = False
+            word.DisplayAlerts = 0
+            try:
+                word.AutomationSecurity = 3
+            except Exception:
+                pass
+            try:
+                res["version"] = str(word.Version)
+            except Exception:
+                res["version"] = ""
+            word.Quit(SaveChanges=False)
+            word = None
+            res["success"] = True
+        except Exception:
+            res["success"] = False
+        finally:
+            if word is not None:
+                try:
+                    word.Quit(SaveChanges=False)
+                except Exception:
+                    _kill_process_tree(holder.get("pid"))
+            try:
+                import pythoncom
+
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    thread = threading.Thread(
+        target=_worker, name="doc-tool-word-check-thread", daemon=True
+    )
+    thread.start()
+    thread.join(timeout_seconds)
+
+    if thread.is_alive():
+        _kill_process_tree(holder.get("pid"))
+        thread.join(2.0)
+        return False, ""
+
+    return bool(res["success"]), str(res["version"])
+
+
 def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
     """尝试启动专用 Word 进程并立即退出。
 
@@ -174,17 +317,18 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
         import multiprocessing
 
         context = multiprocessing.get_context("spawn")
-    except ImportError:
-        # multiprocessing 不可用（如冻结环境下 _socket 被安全软件拦截）：
-        # 跳过物理 Word DispatchEx 探测，由上层转为静态不可用。
-        return False, ""
-    result_queue = context.Queue()
-    process = context.Process(
-        target=_dispatch_check_worker,
-        args=(result_queue,),
-        name="doc-tool-word-check",
-    )
-    process.daemon = True
+        result_queue = context.Queue()
+        process = context.Process(
+            target=_dispatch_check_worker,
+            args=(result_queue,),
+            name="doc-tool-word-check",
+        )
+        process.daemon = True
+    except (ImportError, OSError, ValueError):
+        # 冻结环境下（如 PyInstaller 排除了 multiprocessing 规避安全软件拦截）
+        # 或 spawn 句柄受限：自动降级为线程级物理 DispatchEx 探针
+        return _dispatch_check_threaded(timeout_seconds)
+
     word_pid = None
     try:
         process.start()
@@ -218,7 +362,8 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
     except (OSError, RuntimeError):
         if process.is_alive():
             _kill_process_tree(process.pid)
-        return False, ""
+        # 如果子进程启动异常（例如在受限环境中拒绝 fork/spawn），回退到线程探针
+        return _dispatch_check_threaded(timeout_seconds)
     finally:
         result_queue.close()
 
