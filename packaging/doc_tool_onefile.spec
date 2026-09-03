@@ -121,7 +121,7 @@ a = Analysis(
         "unittest.test",
         "test",  # Python 标准库 test 套件
         "tests",
-        # 排除未使用的 PySide6 Addons 大件（仅保留 QtCore/QtGui/QtWidgets）
+        # 排除未使用的 PySide6 Addons 大件（仅保留 QtCore/QtGui/QtWidgets/QtPdf）
         "PySide6.QtWebEngineCore",
         "PySide6.QtWebEngineWidgets",
         "PySide6.QtWebEngineQuick",
@@ -141,7 +141,6 @@ a = Analysis(
         "PySide6.QtBluetooth",
         "PySide6.QtPositioning",
         "PySide6.QtWebSockets",
-        "PySide6.QtPdf",
         "PySide6.QtPdfWidgets",
         "PySide6.QtSvgWidgets",
         "shiboken6_tool",

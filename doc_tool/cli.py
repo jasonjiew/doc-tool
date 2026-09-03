@@ -125,6 +125,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="单个文件超时秒数；0 = 按方向自动（导出 300，PDF 重排 900）",
     )
     _add_output(convert_p)
+
+    pdf_p = sub.add_parser(
+        "pdf",
+        help="PDF 工具箱：合并/拆分/提取/删除/旋转/转图片/图片转PDF/转文本/水印/页码/元数据/加密/解密/压缩",
+    )
+    from doc_tool.application.pdf_tools import add_pdf_tool_arguments
+
+    add_pdf_tool_arguments(pdf_p)
+    _add_output(pdf_p)
     return parser
 
 
@@ -176,6 +185,69 @@ def _convert_command(args) -> int:
         )
         if not record.ok:
             line += "  [{0}] {1}".format(record.error_code, record.detail)
+        print(line)
+        if record.note:
+            print("    {0}".format(record.note))
+    print(result.summary())
+    return 0 if result.success else 1
+
+
+def _pdf_command(args) -> int:
+    """PDF 工具箱：面向任意 PDF 或图片文件，不依赖项目上下文。"""
+    from doc_tool.application.pdf_tools import (
+        expand_sources,
+        pdf_options_from_args,
+        run_pdf_tool,
+    )
+
+    sources = expand_sources(args.sources, tool_id=args.tool)
+    if not sources:
+        print("没有可处理的有效源文件。", file=sys.stderr)
+        return 2
+
+    def _progress(done, total, record):
+        targets_str = "、".join(p.name for p in record.outputs) if record.outputs else "（无产物）"
+        print(
+            "[{0}/{1}] {2} {3} → {4} {5}".format(
+                done,
+                total,
+                record.label,
+                record.source.name,
+                targets_str,
+                record.status,
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+
+    options = pdf_options_from_args(args)
+    result = run_pdf_tool(
+        args.tool,
+        sources,
+        output_dir=args.target_dir or None,
+        overwrite=args.overwrite,
+        options=options,
+        on_progress=_progress,
+    )
+
+    if getattr(args, "output", "human") == "json":
+        import json
+
+        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        return 0 if result.success else 1
+
+    for record in result.records:
+        targets_str = "、".join(p.name for p in record.outputs) if record.outputs else "（无产物）"
+        line = "{0} [{1}] {2} → {3}".format(
+            "OK" if record.ok else "FAIL",
+            record.label,
+            record.source.name,
+            targets_str,
+        )
+        if not record.ok:
+            line += "  [{0}] {1}".format(record.error_code, record.detail)
+        elif record.detail:
+            line += "  {0}".format(record.detail)
         print(line)
         if record.note:
             print("    {0}".format(record.note))
@@ -236,6 +308,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.command == "convert":
         # 互转不依赖项目，也不走质量命令的序列化通道。
         return _convert_command(args)
+    if args.command == "pdf":
+        return _pdf_command(args)
 
     from doc_tool.application.cli_commands import (
         import_command, lint_command, migrate_command, preflight_command,

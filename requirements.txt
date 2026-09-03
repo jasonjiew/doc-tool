@@ -22,3 +22,6 @@ PySide6==6.8.3
 # Review PDF export and verification.
 reportlab==4.4.3
 pypdf==6.0.0
+
+# PDF 加密 AES-256 支持（未安装时自动降级 RC4-128）
+cryptography==50.0.1

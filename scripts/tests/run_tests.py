@@ -22,7 +22,7 @@ DEFAULT_TESTS = [
     "test_issues.py", "test_markdown_structure.py", "test_cli_machine.py", "test_quality_gates.py", "test_quality_traceability.py",
     "test_gui_services.py", "test_content_operations.py", "test_safety_recovery.py",
     "test_vcs_changes.py", "test_revision_record.py", "test_multi_window.py",
-    "test_lock_log_cancel.py", "test_word_release.py", "test_convert.py", "test_packaging.py",
+    "test_lock_log_cancel.py", "test_word_release.py", "test_convert.py", "test_pdf_toolbox.py", "test_packaging.py",
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
     "test_migration.py", "test_self_heal.py", "test_public_export.py",
 ]
@@ -58,6 +58,12 @@ def run_one(name: str, coverage: bool) -> dict:
         paths.insert(0, str(vendor))
     if existing_pythonpath:
         paths.append(existing_pythonpath)
+    for candidate in [
+        Path.home() / "AppData" / "Roaming" / "Python" / "Python313" / "site-packages",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python313" / "Lib" / "site-packages",
+    ]:
+        if candidate.is_dir() and str(candidate) not in paths:
+            paths.append(str(candidate))
     env["PYTHONPATH"] = os.pathsep.join(paths)
     started = time.monotonic()
     completed = subprocess.run(

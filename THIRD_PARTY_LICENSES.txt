@@ -38,17 +38,32 @@
    用途：应用运行时（由 PyInstaller 冻结分发）
    https://www.python.org/
 
+7. pypdf 6.0.0
+   许可：BSD-3-Clause License
+   用途：PDF 页面组织、加解密、压缩与文本提取
+   https://pypi.org/project/pypdf/
+
+8. reportlab 4.4.3
+   许可：BSD License
+   用途：评审意见 PDF 导出与版面排版
+   https://pypi.org/project/reportlab/
+
+9. cryptography 50.0.1
+   许可：Apache-2.0 / BSD-3-Clause
+   用途：PDF AES-256 加密与高级解密支持
+   https://pypi.org/project/cryptography/
+
 构建依赖（不打包进最终应用）
 ----------------------------
 
-6. PyInstaller 6.14.0
+10. PyInstaller 6.14.0
    许可：GPL-2.0-or-later License (PyInstaller bootstrap code),
          BSD License (PyInstaller hooks)
    用途：将 Python 应用冻结为 Windows onedir 可执行包
    注：PyInstaller 的 bootstrap 代码随应用分发，但其许可允许非 GPL 应用使用。
    https://pyinstaller.org/
 
-7. Inno Setup 6
+11. Inno Setup 6
    许可：Inno Setup License (BSD-like, 免费商用)
    用途：将 onedir 包封装为单个 Setup EXE 安装器
    https://jrsoftware.org/isinfo.php

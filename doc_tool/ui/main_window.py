@@ -349,6 +349,9 @@ class MainWindow(QMainWindow):
         # lambda 包装：triggered 自带 checked 参数，避免混入 _on_convert_documents 的 paths 形参。
         self._convert_action.triggered.connect(lambda: self._on_convert_documents())
         tools_menu.addAction(self._convert_action)
+        self._pdf_toolbox_action = QAction("PDF 工具箱（合并 / 拆分 / 水印 / 加密）…", self)
+        self._pdf_toolbox_action.triggered.connect(lambda: self._on_pdf_toolbox())
+        tools_menu.addAction(self._pdf_toolbox_action)
         tools_menu.addSeparator()
         self._theme_action = QAction("切换深色主题", self)
         self._theme_action.triggered.connect(self._toggle_theme)
@@ -1580,6 +1583,15 @@ class MainWindow(QMainWindow):
         from doc_tool.ui.convert_dialog import ConvertDialog
 
         dialog = ConvertDialog(parent=self, busy_check=lambda: self.runner.is_running)
+        if paths:
+            dialog._ingest_paths(list(paths))
+        dialog.exec()
+
+    def _on_pdf_toolbox(self, paths: Optional[List[Path]] = None) -> None:
+        """PDF 工具箱：页面组织、转换、编辑与安全优化（无需打开项目）。"""
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+
+        dialog = PdfToolboxDialog(parent=self, busy_check=lambda: self.runner.is_running)
         if paths:
             dialog._ingest_paths(list(paths))
         dialog.exec()

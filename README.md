@@ -21,7 +21,8 @@
   Word（本机 Word 完成并自带排版样式：宋体/Times、内置标题层级、表格边框、代码块底纹、图片内嵌）、
   Word → Markdown（离线完成，单文件 .md + assets 资源目录）、Markdown/Word/Excel → HTML、
   XLSX↔CSV、TXT/Excel/CSV → PDF（经 Word 排版导出）、RTF/ODT 导入；
-- **安全编辑**：自动草稿、崩溃恢复、变更对比与回滚、项目锁与只读模式。
+- **安全编辑**：自动草稿、崩溃恢复、变更对比与回滚、项目锁与只读模式；
+- **PDF 工具箱**：纯离线、不依赖本机 Word 的高频 PDF 工具集（合并、拆分、提取/删除页面、旋转、PDF↔图片、图片→PDF、PDF→纯文本、添加文字水印、添加页码、元数据编辑、AES-256 加密与权限控制、解密、无损压缩），支持 GUI 与 CLI `pdf` 子命令。
 
 ## 系统要求
 
@@ -89,4 +90,5 @@ openspec/       功能规格、设计文档与变更任务
 - Markdown → Word 走 HTML 导入，落的是通用排版样式，源文件里的精细排版无法一一保留；Word → Markdown 导出的图片不保留显示尺寸方言（通用 Markdown 不认 `=96x96` 后缀）；
 - 公司透明加密（亿赛通 DocGuard）环境下 Python 侧读不到 Word 生成的 PDF，因此 PDF 一律交由 Word 读写，产物只做存在性校验；
 - MHT (.mht/.mhtml) 经真机探针验证本机 Word 无法打开，互转不提供该格式；XLSX 转 CSV 只导第一个工作表，公式单元格取的是 Excel 上次保存的缓存值；
-- 极复杂的 Word 对象只能作为 OOXML 资源保留，不能在 Markdown 中直接编辑。
+- 极复杂的 Word 对象只能作为 OOXML 资源保留，不能在 Markdown 中直接编辑；
+- PDF 工具箱定位为纯离线结构与页面操作，不包含 OCR 文字识别、批注图形编辑、电子签名与页面裁剪；水印不透明度以颜色向白色减淡模拟；加密算法优先采用 AES-256（未安装 cryptography 时自动降级为 RC4-128）；在受管 DocGuard 环境下 Word 直接生成的 PDF 为密文，工具箱适用于非加密来源 PDF（如浏览器下载、本工具生成、未受管进程产出）。
