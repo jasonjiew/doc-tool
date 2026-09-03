@@ -68,6 +68,8 @@ _LIGHT = {
     "input_bg": "#ffffff",
     "disabled_text": "#9ca3af",
     "running_hl": "#eff6ff",
+    "pdf_icon_bg": "#fee2e2",
+    "pdf_icon_fg": "#dc2626",
 }
 
 # 深色主题面板色板
@@ -88,6 +90,8 @@ _DARK = {
     "input_bg": "#1b1c21",
     "disabled_text": "#6b7280",
     "running_hl": "#26334a",
+    "pdf_icon_bg": "#3c2125",
+    "pdf_icon_fg": "#f87171",
 }
 
 
@@ -116,7 +120,7 @@ def build_qss(dark: bool = False) -> str:
     return """
 QWidget {{ {font_body} color: {text}; }}
 QMainWindow, QDialog, QWizard {{ background: {window}; }}
-QWidget[card="true"] {{ background: {panel}; border: 1px solid {border}; border-radius: 6px; }}
+QWidget[card="true"] {{ background: {panel}; border: 1px solid {border}; border-radius: 8px; }}
 
 /* --- 菜单栏 / 菜单 --- */
 QMenuBar {{ {font_body} background: {panel}; border-bottom: 1px solid {border}; }}
@@ -136,7 +140,7 @@ QToolBar#projectBar {{ background: {panel}; border-bottom: 1px solid {border}; s
 QToolBar#projectBar QLabel {{ color: {text}; }}
 
 /* --- 按钮层级 --- */
-QPushButton {{ {font_body} background: {panel_alt}; border: 1px solid {border}; border-radius: 4px; padding: 5px 14px; }}
+QPushButton {{ {font_body} background: {panel_alt}; border: 1px solid {border}; border-radius: 6px; padding: 6px 16px; }}
 QPushButton:hover {{ background: {panel}; border-color: {accent}; }}
 QPushButton:pressed {{ background: {accent_press}; color: {text_on_accent}; }}
 QPushButton:disabled {{ color: {disabled_text}; background: {panel_alt}; border-color: {border}; }}
@@ -218,10 +222,22 @@ QLabel#homeSubtitle {{ {font_body} color: {text_muted}; }}
 QLabel#homeSubheading {{ {font_body_bold} color: {text}; }}
 QLabel#homeMuted {{ {font_small} color: {text_muted}; }}
 QLabel#homeAccent {{ {font_small} color: {accent}; }}
-QLabel[pill="true"] {{ {font_small} background: {panel_alt}; border: 1px solid {border}; border-radius: 8px; padding: 1px 8px; }}
+QLabel[pill="true"] {{ {font_small} background: {panel_alt}; border: 1px solid {border}; border-radius: 10px; padding: 2px 9px; }}
 QLabel[pill="true"][pillTone="muted"] {{ color: {text_muted}; }}
-QFrame#convertCard {{ border: 2px dashed {accent}; }}
-QFrame#convertCard[dragOver="true"] {{ border: 2px solid {accent}; background: {accent_soft}; }}
+
+/* 图标徽标容器 */
+QLabel#homeBrandIcon {{ {font_small} font-weight: bold; background: {accent}; color: {text_on_accent}; border-radius: 6px; padding: 3px 8px; }}
+QLabel#convertCardIcon {{ font-size: 14pt; font-weight: bold; background: {accent_soft}; color: {accent}; border-radius: 8px; padding: 4px 10px; }}
+QLabel#pdfCardIcon {{ font-size: 14pt; font-weight: bold; background: {pdf_icon_bg}; color: {pdf_icon_fg}; border-radius: 8px; padding: 4px 10px; }}
+QLabel#recentFileIcon {{ font-size: 13pt; background: {panel_alt}; border-radius: 6px; padding: 4px 7px; }}
+
+QFrame#convertCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}
+QFrame#convertCard:hover {{ border-color: {accent}; }}
+QFrame#convertCard[dragOver="true"] {{ border: 2px dashed {accent}; background: {accent_soft}; }}
+QFrame#pdfCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}
+QFrame#pdfCard:hover {{ border-color: {accent}; }}
+QFrame#recentCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}
+QFrame#recentCard:hover {{ border-color: {accent}; }}
 
 /* --- 语义色标签 --- */
 {tone_rules}
@@ -250,6 +266,8 @@ QFrame#convertCard[dragOver="true"] {{ border: 2px solid {accent}; background: {
         input_bg=c["input_bg"],
         disabled_text=c["disabled_text"],
         running_hl=running_hl,
+        pdf_icon_bg=c["pdf_icon_bg"],
+        pdf_icon_fg=c["pdf_icon_fg"],
         success=sem["success"],
         failure=sem["failure"],
         warning=sem["warning"],

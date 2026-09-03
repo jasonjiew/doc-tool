@@ -2655,7 +2655,7 @@ class HomeTaskPageTests(unittest.TestCase):
 
         return _Event()
 
-    def test_home_shows_convert_and_placeholder_cards(self):
+    def test_home_shows_convert_and_pdf_toolbox_cards(self):
         from PySide6.QtWidgets import QLabel
 
         from doc_tool.domain.version import APP_VERSION
@@ -2669,11 +2669,15 @@ class HomeTaskPageTests(unittest.TestCase):
         for chip in (".docx", ".pdf", ".md", ".html"):
             self.assertIn(chip, chip_texts)
         self.assertTrue(any("支持整个文件夹拖入" in t for t in chip_texts))
-        # 占位卡禁用
-        self.assertFalse(home._placeholder_card.isEnabled())
-        placeholder_texts = [c.text() for c in home._placeholder_card.findChildren(QLabel)]
-        self.assertIn("PDF 工具箱（规划中）", placeholder_texts)
-        self.assertIn("合并、拆分、加水印。", placeholder_texts)
+        # PDF 工具箱卡已激活且可点击
+        self.assertTrue(home._pdf_card.isEnabled())
+        self.assertEqual(home._pdf_title.text(), "PDF 工具箱")
+        pdf_texts = [c.text() for c in home._pdf_card.findChildren(QLabel)]
+        for chip in ("合并", "拆分", "水印", "加密", "解密", "压缩", "页码"):
+            self.assertIn(chip, pdf_texts)
+        self.assertTrue(any("14 项离线工具" in t for t in pdf_texts))
+        # 兼容旧属性名
+        self.assertIs(home._placeholder_card, home._pdf_card)
         # 版本徽章取自统一版本模块，不硬编码
         self.assertEqual(home._version_badge.text(), "v{0}".format(APP_VERSION))
         # 无最近项目 → 空态文案
@@ -2727,6 +2731,31 @@ class HomeTaskPageTests(unittest.TestCase):
             "doc_tool.ui.convert_dialog.ConvertDialog", _FakeDialog
         ):
             self._click(window._empty_state._convert_card)
+        self.assertTrue(captured.get("exec_called"))
+        self.assertIs(captured.get("parent"), window)
+
+    def test_pdf_toolbox_card_click_triggers_main_window_pdf_toolbox(self):
+        """点击 PDF 工具箱卡 → EmptyState 回调 → 主窗口 _on_pdf_toolbox → 打开工具箱对话框。"""
+        from unittest.mock import patch
+
+        from doc_tool.ui.main_window import MainWindow
+
+        captured = {}
+
+        class _FakeDialog:
+            def __init__(self, parent=None, busy_check=None):
+                captured["parent"] = parent
+
+            def exec(self):
+                captured["exec_called"] = True
+
+        window = MainWindow()
+        self.addCleanup(window.close)
+        window.show()
+        with patch(
+            "doc_tool.ui.pdf_toolbox_dialog.PdfToolboxDialog", _FakeDialog
+        ):
+            self._click(window._empty_state._pdf_card)
         self.assertTrue(captured.get("exec_called"))
         self.assertIs(captured.get("parent"), window)
 

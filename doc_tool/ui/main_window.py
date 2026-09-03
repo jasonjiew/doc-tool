@@ -197,6 +197,7 @@ class MainWindow(QMainWindow):
             on_open_project=self._on_open_project,
             on_open_recent=self._on_open_recent,
             on_convert=self._on_convert_documents,
+            on_pdf_toolbox=self._on_pdf_toolbox,
             on_drop_files=self._on_convert_documents,
             on_show_help=self._on_open_help,
             on_about=self._on_about,
