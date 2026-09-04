@@ -40,6 +40,8 @@ EXCLUDED_PREFIXES = (
     "migration/legacy/",
     "scripts/migration/",
     "docs/release/",
+    "docs/diagnostics/",
+    "方案评审/",
     "openspec/changes/",
     ".claude/",
     ".codex/",
