@@ -14,7 +14,7 @@ if not exist "%CER%" (
     exit /b 1
 )
 
-echo Installing the Jiangsu Konsung code-signing certificate for user %USERNAME%.
+echo Installing the code-signing certificate for user %USERNAME%.
 echo When Windows asks to confirm the certificate, click Yes.
 echo.
 

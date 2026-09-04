@@ -11,8 +11,8 @@ import urllib.parse
 import urllib.request
 
 
-GITLAB_BASE = "http://192.168.0.242:8899"
-PROJECT_ID = 119
+GITLAB_BASE = os.getenv("GITLAB_BASE", "http://127.0.0.1:8899")
+PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
 VERSION = "2.3.0"
 TAG_NAME = "v2.3.0"
 PACKAGE_NAME = "DocTool"
