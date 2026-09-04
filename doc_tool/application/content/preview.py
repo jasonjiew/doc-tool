@@ -45,6 +45,279 @@ _IMAGE_OUTER_SIZE_SUFFIX_RE = re.compile(
 )
 # 围栏行：3 个及以上反引号或波浪号（CommonMark 两种围栏均合法）。
 _FENCE_LINE_RE = re.compile(r"^(?:`{3,}|~{3,})")
+# GitHub 级 Callout 警告块标记行：>[!NOTE] 等
+_CALLOUT_RE = re.compile(r"^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s*(.*))?$", re.IGNORECASE)
+
+_CALLOUT_META = {
+    "note": ("ℹ️ NOTE", "#3b82f6", "#eff6ff", "#1d4ed8", "#1e293b", "#60a5fa"),
+    "tip": ("💡 TIP", "#16a34a", "#f0fdf4", "#15803d", "#064e3b", "#4ade80"),
+    "warning": ("⚠️ WARNING", "#d97706", "#fffbeb", "#b45309", "#451a03", "#fbbf24"),
+    "important": ("📌 IMPORTANT", "#7c3aed", "#f5f3ff", "#6d28d9", "#2e1065", "#c084fc"),
+    "caution": ("🛑 CAUTION", "#dc2626", "#fef2f2", "#b91c1c", "#450a0a", "#f87171"),
+}
+
+_CSS_LIGHT = """
+body {
+    font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: #1f2328;
+    background-color: #ffffff;
+    margin: 8px 12px;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #0f172a;
+    font-weight: 600;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    color: inherit;
+    text-decoration: none;
+}
+h1 a:hover, h2 a:hover, h3 a:hover, h4 a:hover, h5 a:hover, h6 a:hover {
+    color: #2563eb;
+}
+h1 { font-size: 16pt; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+h2 { font-size: 13pt; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+h3 { font-size: 11.5pt; }
+h4 { font-size: 10.5pt; }
+p { margin-top: 6px; margin-bottom: 8px; }
+a { color: #2563eb; text-decoration: none; }
+table.doc-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    border: 1px solid #cbd5e1;
+}
+table.doc-table th {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+}
+table.doc-table td {
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+}
+pre {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: Consolas, monospace;
+    font-size: 9.5pt;
+    color: #1e293b;
+    margin: 8px 0;
+}
+code {
+    background-color: #f1f5f9;
+    color: #b91c1c;
+    font-family: Consolas, monospace;
+    font-size: 9.5pt;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+blockquote {
+    border-left: 4px solid #94a3b8;
+    background-color: #f8fafc;
+    margin: 8px 0;
+    padding: 6px 12px;
+    color: #475569;
+}
+hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 16px 0;
+}
+"""
+
+_CSS_DARK = """
+body {
+    font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: #e5e7eb;
+    background-color: #26272e;
+    margin: 8px 12px;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #f3f4f6;
+    font-weight: 600;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    color: inherit;
+    text-decoration: none;
+}
+h1 a:hover, h2 a:hover, h3 a:hover, h4 a:hover, h5 a:hover, h6 a:hover {
+    color: #60a5fa;
+}
+h1 { font-size: 16pt; border-bottom: 1px solid #3a3b44; padding-bottom: 6px; }
+h2 { font-size: 13pt; border-bottom: 1px solid #32333b; padding-bottom: 4px; }
+h3 { font-size: 11.5pt; }
+h4 { font-size: 10.5pt; }
+p { margin-top: 6px; margin-bottom: 8px; }
+a { color: #60a5fa; text-decoration: none; }
+table.doc-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    border: 1px solid #3a3b44;
+}
+table.doc-table th {
+    background-color: #1e1f24;
+    color: #f3f4f6;
+    font-weight: 600;
+    padding: 6px 10px;
+    border: 1px solid #3a3b44;
+}
+table.doc-table td {
+    padding: 6px 10px;
+    border: 1px solid #3a3b44;
+    color: #e5e7eb;
+}
+pre {
+    background-color: #1b1c21;
+    border: 1px solid #3a3b44;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: Consolas, monospace;
+    font-size: 9.5pt;
+    color: #e5e7eb;
+    margin: 8px 0;
+}
+code {
+    background-color: #1e1f24;
+    color: #f87171;
+    font-family: Consolas, monospace;
+    font-size: 9.5pt;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+blockquote {
+    border-left: 4px solid #4b5563;
+    background-color: #1e1f24;
+    margin: 8px 0;
+    padding: 6px 12px;
+    color: #9ca3af;
+}
+hr {
+    border: none;
+    border-top: 1px solid #3a3b44;
+    margin: 16px 0;
+}
+"""
+
+
+_PY_KEYWORDS = {
+    "def", "class", "import", "from", "return", "if", "elif", "else", "while",
+    "for", "in", "try", "except", "finally", "with", "as", "lambda", "yield",
+    "none", "true", "false", "is", "not", "and", "or", "pass", "break", "continue",
+    "async", "await", "self"
+}
+_SQL_KEYWORDS = {
+    "select", "from", "where", "insert", "into", "values", "update", "set",
+    "delete", "join", "left", "right", "inner", "outer", "on", "group", "by",
+    "order", "having", "limit", "create", "table", "drop", "alter", "index",
+    "and", "or", "not", "in", "is", "null", "as", "union", "all", "distinct",
+    "case", "when", "then", "end", "primary", "key", "foreign", "references"
+}
+_JSON_KEYWORDS = {"true", "false", "null"}
+_CPP_KEYWORDS = {
+    "int", "void", "char", "float", "double", "bool", "class", "struct", "template",
+    "typename", "public", "private", "protected", "virtual", "const", "if", "else",
+    "for", "while", "return", "new", "delete", "namespace", "using", "include", "auto"
+}
+_SH_KEYWORDS = {
+    "echo", "cd", "ls", "mkdir", "rm", "cp", "mv", "if", "then", "else", "elif",
+    "fi", "for", "do", "done", "while", "case", "esac", "export", "set", "exit"
+}
+_YAML_KEYWORDS = {"true", "false", "yes", "no", "null"}
+
+_LANG_SPECS = {
+    "py": (_PY_KEYWORDS, r"#.*$"),
+    "python": (_PY_KEYWORDS, r"#.*$"),
+    "sql": (_SQL_KEYWORDS, r"--.*$|/\*[\s\S]*?\*/"),
+    "json": (_JSON_KEYWORDS, None),
+    "cpp": (_CPP_KEYWORDS, r"//.*$|/\*[\s\S]*?\*/"),
+    "c": (_CPP_KEYWORDS, r"//.*$|/\*[\s\S]*?\*/"),
+    "sh": (_SH_KEYWORDS, r"#.*$"),
+    "bash": (_SH_KEYWORDS, r"#.*$"),
+    "shell": (_SH_KEYWORDS, r"#.*$"),
+    "yaml": (_YAML_KEYWORDS, r"#.*$"),
+    "yml": (_YAML_KEYWORDS, r"#.*$"),
+    "xml": (set(), r"<!--[\s\S]*?-->"),
+    "html": (set(), r"<!--[\s\S]*?-->"),
+}
+
+
+def highlight_code_html(source: str, lang: str = "", dark: bool = False) -> str:
+    """轻量代码语法高亮：输出带内联样式的 HTML。
+
+    支持多行三引号字符串、跨行块注释、单行注释、关键字与数字染色。
+    """
+    lang = (lang or "").strip().lower()
+    spec = _LANG_SPECS.get(lang)
+    if not spec:
+        return html.escape(source)
+
+    keywords, comment_pat = spec
+    c_kw = "#79c0ff" if dark else "#0550ae"
+    c_str = "#7ee787" if dark else "#116329"
+    c_cmt = "#8b949e" if dark else "#6e7781"
+    c_num = "#a5d6ff" if dark else "#0550ae"
+
+    patterns = [
+        r'(?P<STR>"""(?:\\.|[\s\S])*?"""|\'\'\'(?:\\.|[\s\S])*?\'\'\'|"(?:\\.|[^"\n\\])*"|\'(?:\\.|[^\'\n\\])*\')'
+    ]
+    if comment_pat:
+        patterns.append(r'(?P<CMT>' + comment_pat + r')')
+    patterns.append(r'(?P<WORD>\b[a-zA-Z_]\w*\b)')
+    patterns.append(r'(?P<NUM>\b(?:0[xX][0-9a-fA-F]+|0[bB][01]+|\d+(?:\.\d+)?)\b)')
+
+    token_re = re.compile("|".join(patterns), re.MULTILINE)
+
+    parts: List[str] = []
+    last_idx = 0
+    for match in token_re.finditer(source):
+        start, end = match.span()
+        if start > last_idx:
+            parts.append(html.escape(source[last_idx:start]))
+        last_idx = end
+
+        group_name = match.lastgroup
+        val = match.group(0)
+        if group_name == "CMT":
+            parts.append(
+                f'<span style="color: {c_cmt}; font-style: italic;">{html.escape(val)}</span>'
+            )
+        elif group_name == "STR":
+            parts.append(
+                f'<span style="color: {c_str};">{html.escape(val)}</span>'
+            )
+        elif group_name == "NUM":
+            parts.append(
+                f'<span style="color: {c_num};">{html.escape(val)}</span>'
+            )
+        elif group_name == "WORD":
+            if val.lower() in keywords:
+                parts.append(
+                    f'<span style="color: {c_kw}; font-weight: bold;">{html.escape(val)}</span>'
+                )
+            else:
+                parts.append(html.escape(val))
+        else:
+            parts.append(html.escape(val))
+
+    if last_idx < len(source):
+        parts.append(html.escape(source[last_idx:]))
+
+    return "".join(parts)
+
 
 
 @dataclass
@@ -137,7 +410,12 @@ def normalize_markdown_for_preview(md_text: str) -> str:
     )
 
 
-def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
+def render_markdown_html(
+    md_text: str,
+    *,
+    use_cli: bool = False,
+    dark: bool = False,
+) -> str:
     """把项目 Markdown 转为 Qt 可稳定渲染的受控 HTML。
 
     Qt 原生 Markdown 解析器在长文档包含大量表格时会丢失后半部分内容。这里
@@ -147,6 +425,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
     ``use_cli`` 默认 False：实时预览用内置渲染器（mermaid 不启动 mmdc 子进程，
     避免 UI 线程被最长 30s 的同步 CLI 渲染冻结）。导出等后台路径可传 True
     以使用 mermaid-cli 的高质量渲染。
+    ``dark`` 默认 False：控制是否注入深色主题 CSS 样式。
 
     每个标题/段落/图片块把文本内容包进 ``<a name="line-N" href="#line-N">``
     锚点：预览点击块时 ``anchorClicked`` 携带 ``#line-N``，编辑器据此定位
@@ -159,6 +438,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
     list_items: List[str] = []
     list_tag: Optional[str] = None
     list_line: Optional[int] = None
+    quote_lines: List[tuple[int, str]] = []
     code_lines: List[str] = []
     in_code = False
     code_language = ""
@@ -169,8 +449,6 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
 
         def image(match: re.Match) -> str:
             alt, path = match.groups()
-            # alt/path 来自已整体转义后的文本；直接嵌入属性即可，二次转义
-            # 会把含 & 的路径变成 &amp;amp;，导致预览图片/链接失效。
             return '<img src="{0}" alt="{1}"/>'.format(path, alt)
 
         def link(match: re.Match) -> str:
@@ -179,8 +457,6 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
 
         escaped = _IMAGE_INLINE_RE.sub(image, escaped)
         escaped = _LINK_INLINE_RE.sub(link, escaped)
-        # 代码跨度先占位再还原：粗体/斜体正则会处理 <code> 内的 ``**x**``
-        # 文本，把代码内容渲染成 `<code><b>x</b></code>`，与源码不符。
         code_spans: List[str] = []
 
         def capture_code(match: re.Match) -> str:
@@ -208,7 +484,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
         ]
         if rows:
             header, body = rows[0], rows[1:]
-            parts.append('<table border="1" cellspacing="0" cellpadding="4" width="100%">')
+            parts.append('<table class="doc-table" border="1" cellspacing="0" cellpadding="5" width="100%">')
             parts.append("<tr>{0}</tr>".format("".join("<th>{0}</th>".format(inline(cell)) for cell in header)))
             for row in body:
                 parts.append("<tr>{0}</tr>".format("".join("<td>{0}</td>".format(inline(cell)) for cell in row)))
@@ -232,34 +508,91 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
         list_tag = None
         list_line = None
 
+    def flush_quote() -> None:
+        nonlocal quote_lines
+        if not quote_lines:
+            return
+        start_line, first_text = quote_lines[0]
+        m = _CALLOUT_RE.match(first_text.strip())
+        if m:
+            kind = m.group(1).lower()
+            inline_tail = m.group(2) or ""
+            meta = _CALLOUT_META.get(kind, _CALLOUT_META["note"])
+            title_text = meta[0]
+            border_color = meta[1]
+            bg_color = meta[4] if dark else meta[2]
+            title_color = meta[5] if dark else meta[3]
+
+            body_lines = []
+            if inline_tail.strip():
+                body_lines.append((start_line, inline_tail.strip()))
+            for q_ln, q_text in quote_lines[1:]:
+                body_lines.append((q_ln, q_text))
+
+            body_html = "<br/>".join(
+                '<a name="line-{0}" href="#line-{0}">{1}</a>'.format(ln, inline(lt))
+                for ln, lt in body_lines
+            ) if body_lines else ""
+
+            content_html = (
+                '<div class="callout callout-{0}" style="border-left: 4px solid {1}; background-color: {2}; padding: 8px 12px; margin: 10px 0; border-radius: 4px;">'
+                '<div class="callout-title" style="color: {3}; font-weight: bold; margin-bottom: 4px;">'
+                '<a name="line-{4}" href="#line-{4}" style="color: {3}; text-decoration: none;">{5}</a>'
+                '</div>'
+                '{6}'
+                '</div>'
+            ).format(
+                kind,
+                border_color,
+                bg_color,
+                title_color,
+                start_line,
+                title_text,
+                ('<div class="callout-body">' + body_html + '</div>') if body_html else "",
+            )
+            parts.append(content_html)
+        else:
+            inner = "<br/>".join(
+                '<a name="line-{0}" href="#line-{0}">{1}</a>'.format(ln, inline(lt))
+                for ln, lt in quote_lines
+            )
+            parts.append('<blockquote>{0}</blockquote>'.format(inner))
+        quote_lines = []
+
     def flush_code() -> None:
         nonlocal code_lines, code_language, code_start_line
-        if code_lines:
-            source = "\n".join(code_lines)
-            if code_language == "mermaid":
-                from doc_tool.application.content.mermaid import render
+        source = "\n".join(code_lines)
+        if code_language == "mermaid":
+            from doc_tool.application.content.mermaid import render
 
-                result = render(source, use_cli=use_cli)
-                if result.ok and result.png:
-                    encoded = base64.b64encode(result.png).decode("ascii")
-                    parts.append(
-                        '<p><a name="line-{0}" href="#line-{0}">'
-                        '<img src="data:image/png;base64,{1}" alt="Mermaid 图"/></a></p>'.format(
-                            code_start_line, encoded
-                        )
+            result = render(source, use_cli=use_cli)
+            if result.ok and result.png:
+                encoded = base64.b64encode(result.png).decode("ascii")
+                parts.append(
+                    '<p><a name="line-{0}" href="#line-{0}">'
+                    '<img src="data:image/png;base64,{1}" alt="Mermaid 图"/></a></p>'.format(
+                        code_start_line, encoded
                     )
-                elif result.svg and result.png is None:
-                    # 有 SVG 但无 PNG（QtSvg 后端缺失或 CLI 栅格化失败）时
-                    # 保守回退源码代码块，不影响普通预览。
-                    parts.append("<pre>{0}</pre>".format(html.escape(source)))
-                else:
-                    parts.append(
-                        '<p><a name="line-{0}" href="#line-{0}"><b>Mermaid 渲染失败：</b> {1}</a></p>'.format(
-                            code_start_line, html.escape(result.error or "未知原因")
-                        )
+                )
+            elif result.svg and result.png is None:
+                parts.append(
+                    '<pre><a name="line-{0}"></a>{1}</pre>'.format(
+                        code_start_line, html.escape(source)
                     )
+                )
             else:
-                parts.append("<pre>{0}</pre>".format(html.escape(source)))
+                parts.append(
+                    '<p><a name="line-{0}" href="#line-{0}"><b>Mermaid 渲染失败：</b> {1}</a></p>'.format(
+                        code_start_line, html.escape(result.error or "未知原因")
+                    )
+                )
+        else:
+            highlighted = highlight_code_html(source, code_language, dark=dark)
+            parts.append(
+                '<pre class="code-block language-{0}"><a name="line-{1}"></a>{2}</pre>'.format(
+                    html.escape(code_language or "text"), code_start_line, highlighted
+                )
+            )
         code_lines = []
         code_language = ""
         code_start_line = 0
@@ -276,6 +609,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
         if fence:
             flush_table()
             flush_list()
+            flush_quote()
             if in_code:
                 flush_code()
                 in_code = False
@@ -291,16 +625,19 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
             continue
         if stripped.startswith("|"):
             flush_list()
+            flush_quote()
             table_rows.append([cell.strip() for cell in stripped.strip("|").split("|")])
             continue
         flush_table()
         if not stripped:
             flush_list()
+            flush_quote()
             continue
 
         heading = _HEADING_RE.match(stripped)
         if heading is not None:
             flush_list()
+            flush_quote()
             level = len(heading.group(1))
             parts.append(
                 '<h{0}><a name="line-{1}" href="#line-{1}">{2}</a></h{0}>'.format(
@@ -312,6 +649,7 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
         unordered = _UNORDERED_LIST_RE.match(stripped)
         ordered = _ORDERED_LIST_RE.match(stripped)
         if unordered is not None or ordered is not None:
+            flush_quote()
             tag = "ul" if unordered is not None else "ol"
             item = (unordered or ordered).group(1)
             if list_tag is not None and list_tag != tag:
@@ -324,14 +662,12 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
 
         flush_list()
         if stripped in ("---", "***", "___"):
+            flush_quote()
             parts.append('<hr id="line-{0}"/>'.format(source_line))
         elif stripped.startswith("> "):
-            parts.append(
-                '<blockquote><a name="line-{0}" href="#line-{0}">{1}</a></blockquote>'.format(
-                    source_line, inline(stripped[2:])
-                )
-            )
+            quote_lines.append((source_line, stripped[2:]))
         else:
+            flush_quote()
             parts.append(
                 '<p><a name="line-{0}" href="#line-{0}">{1}</a></p>'.format(
                     source_line, inline(stripped)
@@ -340,9 +676,13 @@ def render_markdown_html(md_text: str, *, use_cli: bool = False) -> str:
 
     flush_table()
     flush_list()
+    flush_quote()
     if in_code:
         flush_code()
-    return "<html><body>{0}</body></html>".format("\n".join(parts))
+    css = _CSS_DARK if dark else _CSS_LIGHT
+    return "<html><head><style>{0}</style></head><body>{1}</body></html>".format(
+        css, "\n".join(parts)
+    )
 
 
 def preview_summary(md_text: str) -> str:

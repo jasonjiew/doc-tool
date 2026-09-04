@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -70,8 +72,11 @@ class ChangesPanel(QWidget):
         on_restored: Optional[Callable[[], None]] = None,
         writable: bool = True,
         rollback_all: Optional[Callable[[], List[str]]] = None,
+        rollback_single: Optional[Callable[[ChangeItem], Optional[str]]] = None,
+        on_open_file: Optional[Callable[[str], None]] = None,
         on_commit: Optional[Callable[[str], List[str]]] = None,
         on_pull: Optional[Callable[[], PullResult]] = None,
+        on_export_review: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -82,9 +87,12 @@ class ChangesPanel(QWidget):
         self._writable = writable
         # VCS 模式下由上层提供版本控制回滚实现（否则用本地 .bak 清单）。
         self._rollback_all = rollback_all
+        self._rollback_single = rollback_single
+        self._on_open_file = on_open_file
         # 提交/拉取仅 Git/SVN 项目可用，由上层提供实现（git > svn）。
         self._on_commit = on_commit
         self._on_pull = on_pull
+        self._on_export_review = on_export_review
         self._items: List[ChangeItem] = []
         self._source = "local"
         self._source_note = ""
@@ -122,10 +130,18 @@ class ChangesPanel(QWidget):
         self._list = QListWidget(splitter)
         self._list.setAlternatingRowColors(True)
         self._list.currentItemChanged.connect(self._on_item_selected)
+        self._list.itemDoubleClicked.connect(self._on_item_double_clicked)
+        self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._list.customContextMenuRequested.connect(self._show_list_context_menu)
         splitter.addWidget(self._list)
         self._diff_view = QPlainTextEdit(splitter)
         self._diff_view.setReadOnly(True)
         self._diff_view.setObjectName("logView")
+        from doc_tool.ui.content.editor_highlight import DiffHighlighter
+        from doc_tool.ui.styles import is_dark_theme
+        app = QApplication.instance()
+        is_dark = is_dark_theme(app) if app is not None else False
+        self._diff_highlighter = DiffHighlighter(self._diff_view.document(), dark=is_dark)
         splitter.addWidget(self._diff_view)
         splitter.setSizes([280, 420])
         outer.addWidget(splitter, 1)
@@ -135,18 +151,28 @@ class ChangesPanel(QWidget):
         actions.setContentsMargins(0, 0, 0, 0)
         self._restore_btn = QPushButton("恢复到基线", self)
         self._restore_btn.setProperty("btnRole", "primary")
+        self._restore_btn.setToolTip("撤销当前选中文件的改动并恢复到基线/版本控制状态")
         self._restore_btn.clicked.connect(self._on_restore_clicked)
         actions.addWidget(self._restore_btn)
         self._status_label = QLabel("", self)
         self._status_label.setObjectName("statusMuted")
         self._status_label.setWordWrap(True)
         actions.addWidget(self._status_label, 1)
+        self._export_review_btn = QPushButton("导出评审稿", self)
+        self._export_review_btn.setProperty("btnRole", "secondary")
+        self._export_review_btn.setToolTip("提取当前改动章节并导出会议评审稿 Word")
+        self._export_review_btn.clicked.connect(self._on_export_review_clicked)
+        actions.addWidget(self._export_review_btn)
         self._revision_btn = QPushButton("生成修订记录", self)
         self._revision_btn.setProperty("btnRole", "secondary")
         self._revision_btn.clicked.connect(self._on_generate_revision_record)
         actions.addWidget(self._revision_btn)
         outer.addLayout(actions)
         self._update_action_state()
+
+    def _on_export_review_clicked(self) -> None:
+        if self._on_export_review is not None:
+            self._on_export_review()
 
     # --- 数据 ---
 
@@ -200,6 +226,11 @@ class ChangesPanel(QWidget):
         self._writable = writable
         self._update_action_state()
 
+    def set_dark(self, dark: bool) -> None:
+        """更新暗黑模式状态。"""
+        if hasattr(self, "_diff_highlighter") and self._diff_highlighter is not None:
+            self._diff_highlighter.set_dark(dark)
+
     # --- 选中 → diff ---
 
     def _selected_item(self) -> Optional[ChangeItem]:
@@ -245,11 +276,11 @@ class ChangesPanel(QWidget):
 
     def _update_action_state(self) -> None:
         item = self._selected_item()
+        can_restore_rename = bool(item and item.is_rename and self._rollback_single is not None)
         restorable = bool(
             self._writable
             and item is not None
-            and not item.is_rename
-            and item.restorable
+            and (item.restorable or can_restore_rename)
         )
         self._restore_btn.setEnabled(restorable)
         self._rollback_all_btn.setEnabled(self._writable and bool(self._items))
@@ -258,12 +289,16 @@ class ChangesPanel(QWidget):
         if item is None:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("")
-        elif not item.restorable:
+        elif not item.restorable and not can_restore_rename:
             self._restore_btn.setText("恢复到基线")
             self._status_label.setText("该条目仅展示，不提供单文件恢复")
         elif item.is_rename:
-            self._restore_btn.setText("恢复到基线")
-            self._status_label.setText("重命名文件请使用「回滚全部会话改动」")
+            if can_restore_rename:
+                self._restore_btn.setText("撤销重命名")
+                self._status_label.setText("")
+            else:
+                self._restore_btn.setText("恢复到基线")
+                self._status_label.setText("重命名文件请使用「回滚全部会话改动」")
         else:
             self._restore_btn.setText(
                 {
@@ -295,14 +330,93 @@ class ChangesPanel(QWidget):
             self._commit_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
             self._pull_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
 
+    def _on_item_double_clicked(self, list_item: QListWidgetItem) -> None:
+        item: Optional[ChangeItem] = list_item.data(Qt.ItemDataRole.UserRole)
+        if item and item.status != "deleted" and self._on_open_file is not None:
+            self._on_open_file(item.rel_path)
+
+    def _show_list_context_menu(self, pos) -> None:
+        item_widget = self._list.itemAt(pos)
+        if item_widget is None:
+            return
+        item: Optional[ChangeItem] = item_widget.data(Qt.ItemDataRole.UserRole)
+        if item is None:
+            return
+
+        menu = QMenu(self)
+
+        # 撤销改动
+        label_map = {
+            "added": "撤销新增（删除文件）…",
+            "deleted": "恢复已删除文件…",
+            "modified": "撤销此修改（恢复基线）…",
+        }
+        revert_label = "撤销重命名…" if item.is_rename else label_map.get(item.status, "撤销此文件改动…")
+        revert_act = QAction(revert_label, menu)
+        can_restore = self._writable and (
+            item.restorable or (item.is_rename and self._rollback_single is not None)
+        )
+        revert_act.setEnabled(can_restore)
+        revert_act.triggered.connect(lambda: self._confirm_and_restore(item))
+        menu.addAction(revert_act)
+
+        menu.addSeparator()
+
+        # 打开文件
+        if item.status != "deleted":
+            open_act = QAction("在编辑器中打开", menu)
+            open_act.triggered.connect(
+                lambda: self._on_open_file and self._on_open_file(item.rel_path)
+            )
+            menu.addAction(open_act)
+
+        # 复制相对路径
+        copy_act = QAction("复制相对路径", menu)
+        copy_act.triggered.connect(
+            lambda: QApplication.clipboard().setText(item.rel_path)
+        )
+        menu.addAction(copy_act)
+
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        menu.exec(QCursor.pos())
+
+    def _confirm_and_restore(self, item: ChangeItem) -> None:
+        ans = QMessageBox.question(
+            self,
+            "撤销改动确认",
+            f"确定要撤销「{item.rel_path}」的改动吗？\n\n此操作将放弃所有未提交修改并恢复到基线内容，此操作无法撤销。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if ans == QMessageBox.StandardButton.Yes:
+            self._do_restore_item(item)
+
     def _on_restore_clicked(self) -> None:
         item = self._selected_item()
-        if (
-            item is None
-            or item.is_rename
-            or not item.restorable
-            or not self._writable
-        ):
+        if item is None:
+            return
+        self._do_restore_item(item)
+
+    def _do_restore_item(self, item: ChangeItem) -> None:
+        if not self._writable:
+            return
+        can_restore_rename = bool(item.is_rename and self._rollback_single is not None)
+        if not item.restorable and not can_restore_rename:
+            return
+
+        if self._rollback_single is not None:
+            err = self._rollback_single(item)
+            if err:
+                self._status_label.setText(f"撤销失败：{err}")
+                return
+            if self._on_restored is not None:
+                self._on_restored()
+            self._status_label.setText(f"已撤销改动：{item.rel_path}")
+            self._update_action_state()
+            return
+
+        # 回退到原有 writer.restore_file 逻辑（用于未传 rollback_single 的场景/单测）
+        if item.is_rename:
             return
         baseline = None
         if item.status == "modified":

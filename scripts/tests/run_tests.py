@@ -25,6 +25,7 @@ DEFAULT_TESTS = [
     "test_lock_log_cancel.py", "test_word_release.py", "test_convert.py", "test_pdf_toolbox.py", "test_packaging.py",
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
     "test_migration.py", "test_self_heal.py", "test_public_export.py",
+    "test_review_docx.py", "test_table_format.py", "test_command_palette.py",
 ]
 
 

@@ -158,6 +158,8 @@ class MainWindow(QMainWindow):
         self._close_after_task = False
         self._task_started_at: Optional[float] = None
         self._dark = False
+        self._zen_mode = False
+        self._zen_prev_state: dict[str, bool] = {}
 
         # 阶段事件累积（供 derive_step_list 派生步骤清单）
         self._stage_events: List[tuple] = []
@@ -319,10 +321,31 @@ class MainWindow(QMainWindow):
         self._open_external_action.triggered.connect(self._on_content_open_external)
         content_menu.addAction(self._open_external_action)
 
-        # 视图：Dock 显隐开关。QDockWidget 关闭后仅保留标题栏上的 X，必须
-        # 通过 toggleViewAction 重新打开——这里为每个 Dock 提供菜单项。
+        # 视图：Dock 显隐开关、专注模式与全局命令面板
         self._view_menu = QMenu("视图", self)
         menubar.insertMenu(content_menu.menuAction(), self._view_menu)
+
+        self._cmd_palette_action = QAction("命令面板…", self)
+        self._cmd_palette_action.setShortcut(QKeySequence("Ctrl+K"))
+        self._cmd_palette_action.triggered.connect(self.open_command_palette)
+        self.addAction(self._cmd_palette_action)
+
+        self._cmd_palette_shift_action = QAction("命令面板 (Shift)…", self)
+        self._cmd_palette_shift_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        self._cmd_palette_shift_action.triggered.connect(self.open_command_palette)
+        self.addAction(self._cmd_palette_shift_action)
+
+        self._quick_open_action = QAction("快速打开章节…", self)
+        self._quick_open_action.setShortcut(QKeySequence("Ctrl+P"))
+        self._quick_open_action.triggered.connect(self.open_quick_open)
+        self.addAction(self._quick_open_action)
+
+        self._zen_mode_action = QAction("专注写作模式", self)
+        self._zen_mode_action.setShortcut(QKeySequence("F11"))
+        self._zen_mode_action.setCheckable(True)
+        self._zen_mode_action.setChecked(False)
+        self._zen_mode_action.triggered.connect(self.toggle_zen_mode)
+        self.addAction(self._zen_mode_action)
         self._rebuild_view_menu()
 
         # 工具
@@ -339,9 +362,6 @@ class MainWindow(QMainWindow):
         self._settings_action = QAction("项目设置…", self)
         self._settings_action.triggered.connect(self._on_project_settings)
         tools_menu.addAction(self._settings_action)
-        self._review_action = QAction("评审意见…", self)
-        self._review_action.triggered.connect(self._on_review_panel)
-        tools_menu.addAction(self._review_action)
         self._reimport_action = QAction("重新导入更新源 Word…", self)
         self._reimport_action.triggered.connect(self._on_reimport_source)
         tools_menu.addAction(self._reimport_action)
@@ -379,18 +399,28 @@ class MainWindow(QMainWindow):
 
         self._dark = toggle_theme(QApplication.instance())
         self._task_dock.set_dark(self._dark)
+        if getattr(self, "_content_workspace", None) is not None:
+            self._content_workspace.set_dark(self._dark)
         self._theme_action.setText("切换浅色主题" if self._dark else "切换深色主题")
 
-    # --- 视图菜单（Dock 显隐） ---
+    # --- 视图菜单（Dock 显隐与专注模式） ---
 
     def _rebuild_view_menu(self) -> None:
-        """重建「视图」菜单：为当前存在的每个 Dock 提供显隐开关。
+        """重建「视图」菜单：为专注模式与当前存在的每个 Dock 提供显隐开关。
 
         章节树/工具面板 Dock 在项目打开时才创建，因此每次打开项目都要
-        重建；右键侧任务 Dock 始终存在。QDockWidget 被用户关闭后，唯一
+        重建；右侧任务 Dock 始终存在。QDockWidget 被用户关闭后，唯一
         的恢复途径就是这里的 ``toggleViewAction()``。
         """
         self._view_menu.clear()
+        if hasattr(self, "_cmd_palette_action"):
+            self._view_menu.addAction(self._cmd_palette_action)
+        if hasattr(self, "_quick_open_action"):
+            self._view_menu.addAction(self._quick_open_action)
+        self._view_menu.addSeparator()
+        if hasattr(self, "_zen_mode_action"):
+            self._view_menu.addAction(self._zen_mode_action)
+            self._view_menu.addSeparator()
         entries = []
         task = getattr(self, "_task_dock_widget", None)
         if task is not None:
@@ -409,6 +439,307 @@ class MainWindow(QMainWindow):
             action = dock.toggleViewAction()
             action.setText(label)
             self._view_menu.addAction(action)
+
+    def toggle_zen_mode(self) -> None:
+        """切换 F11 专注写作模式（隐藏/恢复外围面板与项目条）。"""
+        self._zen_mode = not getattr(self, "_zen_mode", False)
+        if hasattr(self, "_zen_mode_action"):
+            self._zen_mode_action.setChecked(self._zen_mode)
+            self._zen_mode_action.setText(
+                "退出专注写作模式 (F11)" if self._zen_mode else "专注写作模式 (F11)"
+            )
+
+        tree = getattr(self, "_tree_dock", None)
+        task = getattr(self, "_task_dock_widget", None)
+        panels = getattr(self, "_panels_dock", None)
+        pbar = getattr(self, "_project_bar", None)
+
+        if self._zen_mode:
+            self._zen_prev_state = {
+                "tree": tree.isVisible() if tree is not None else False,
+                "task": task.isVisible() if task is not None else False,
+                "panels": panels.isVisible() if panels is not None else False,
+                "pbar": pbar.isVisible() if pbar is not None else False,
+            }
+            if tree is not None:
+                tree.hide()
+            if task is not None:
+                task.hide()
+            if panels is not None:
+                panels.hide()
+            if pbar is not None:
+                pbar.hide()
+            self._status_label.setText("已进入专注写作模式，按 F11 退出并恢复完整布局")
+        else:
+            prev = getattr(self, "_zen_prev_state", {})
+            if tree is not None and prev.get("tree", True):
+                tree.show()
+            if task is not None and prev.get("task", True):
+                task.show()
+            if panels is not None and prev.get("panels", False):
+                panels.show()
+            if pbar is not None and prev.get("pbar", True):
+                pbar.show()
+            self._status_label.setText("已退出专注模式")
+
+    def open_command_palette(self) -> None:
+        """打开全局命令面板 (Ctrl+K / Ctrl+Shift+P)。"""
+        from doc_tool.ui.command_palette import CommandPaletteDialog, PaletteItem
+
+        items: List[PaletteItem] = []
+
+        # 文件 / 项目操作
+        items.append(
+            PaletteItem(
+                title="新建项目…",
+                category="文件",
+                shortcut="Ctrl+N",
+                callback=self._on_new_project,
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="打开项目…",
+                category="文件",
+                shortcut="Ctrl+O",
+                callback=self._on_open_project,
+            )
+        )
+        if self._project_summary:
+            items.append(
+                PaletteItem(
+                    title="快速打开章节…",
+                    category="导航",
+                    shortcut="Ctrl+P",
+                    callback=self.open_quick_open,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="全部保存",
+                    category="编辑",
+                    shortcut="Ctrl+Shift+S",
+                    callback=self._on_content_save_all,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="重新导入更新源 Word…",
+                    category="文件",
+                    callback=self._on_reimport_source,
+                )
+            )
+
+        # 构建 / 校验
+        if self._project_summary:
+            items.append(
+                PaletteItem(
+                    title="正式合并出稿",
+                    category="构建",
+                    shortcut="Ctrl+Shift+B",
+                    callback=self._on_merge_task,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="诊断构建（草稿）",
+                    category="构建",
+                    callback=self._on_diag_task,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="项目结构与资源校验",
+                    category="校验",
+                    shortcut="F5",
+                    callback=self._on_validate_task,
+                )
+            )
+
+        # 视图
+        items.append(
+            PaletteItem(
+                title="专注写作模式",
+                category="视图",
+                shortcut="F11",
+                callback=self.toggle_zen_mode,
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="切换浅色主题" if self._dark else "切换深色主题",
+                category="视图",
+                callback=self._toggle_theme,
+            )
+        )
+
+        # 常用工具
+        items.append(
+            PaletteItem(
+                title="文档互转（Word / PDF / Markdown 等）…",
+                category="工具",
+                callback=lambda: self._on_convert_documents(),
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="PDF 工具箱（合并/拆分/水印/加密等）…",
+                category="工具",
+                callback=lambda: self._on_pdf_toolbox(),
+            )
+        )
+
+        if self._project_summary:
+            items.append(
+                PaletteItem(
+                    title="打开 Markdown 正文目录",
+                    category="目录",
+                    callback=self._on_open_content,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="打开输出目录 output/",
+                    category="目录",
+                    callback=self._on_open_output,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="打开日志目录 logs/",
+                    category="目录",
+                    callback=self._on_open_logs,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="项目设置…",
+                    category="设置",
+                    callback=self._on_project_settings,
+                )
+            )
+
+            # 编辑器联动命令
+            ws = getattr(self, "_content_workspace", None)
+            if ws is not None:
+                editor = ws.current_editor()
+                if editor is not None:
+                    items.append(
+                        PaletteItem(
+                            title="美化对齐当前表格",
+                            category="编辑",
+                            shortcut="Ctrl+Alt+T",
+                            callback=editor.format_table_at_cursor,
+                        )
+                    )
+                    items.append(
+                        PaletteItem(
+                            title="插入表格骨架",
+                            category="编辑",
+                            callback=editor._insert_table,
+                        )
+                    )
+                    items.append(
+                        PaletteItem(
+                            title="打开 Mermaid 图形工作台",
+                            category="编辑",
+                            callback=editor.open_mermaid_workbench,
+                        )
+                    )
+                    items.append(
+                        PaletteItem(
+                            title="代码片段管理器",
+                            category="编辑",
+                            callback=editor.open_snippet_manager,
+                        )
+                    )
+                items.append(
+                    PaletteItem(
+                        title="全文搜索 (Search)",
+                        category="搜索",
+                        callback=self._on_content_search,
+                    )
+                )
+                items.append(
+                    PaletteItem(
+                        title="全局替换 (Replace)",
+                        category="搜索",
+                        callback=self._on_content_replace,
+                    )
+                )
+                items.append(
+                    PaletteItem(
+                        title="重构与重命名 (Refactor)",
+                        category="编辑",
+                        callback=self._on_content_refactor,
+                    )
+                )
+                items.append(
+                    PaletteItem(
+                        title="运行正文检查 (Lint)",
+                        category="质量",
+                        callback=self._on_content_lint,
+                    )
+                )
+
+        items.append(
+            PaletteItem(
+                title="关于 Doc Tool / 环境诊断",
+                category="帮助",
+                shortcut="F1",
+                callback=self._on_about,
+            )
+        )
+
+        dlg = CommandPaletteDialog(items, mode="command", dark=self._dark, parent=self)
+        dlg.exec()
+
+    def open_quick_open(self) -> None:
+        """打开章节快速跳转 (Ctrl+P)。"""
+        if not self._project_summary:
+            self.open_command_palette()
+            return
+
+        from doc_tool.ui.command_palette import CommandPaletteDialog, PaletteItem
+
+        items: List[PaletteItem] = []
+        c_root = self._project_summary.paths.content_root
+
+        if c_root.exists():
+            for p in sorted(c_root.rglob("*.md")):
+                rel = p.relative_to(c_root).as_posix()
+                if "/." in ("/" + rel):
+                    continue
+                title = rel
+                try:
+                    lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    for line in lines[:5]:
+                        s = line.strip()
+                        if s.startswith("#"):
+                            title = s.lstrip("#").strip()
+                            break
+                except OSError:
+                    pass
+
+                def make_cb(target_rel: str):
+                    return (
+                        lambda: self._content_workspace.open_file(target_rel)
+                        if self._content_workspace
+                        else None
+                    )
+
+                items.append(
+                    PaletteItem(
+                        title=title,
+                        category="章节",
+                        shortcut=rel,
+                        description=rel,
+                        callback=make_cb(rel),
+                    )
+                )
+
+        dlg = CommandPaletteDialog(items, mode="file", dark=self._dark, parent=self)
+        dlg.exec()
 
     def _show_panels_dock(self) -> None:
         """内容操作入口被触发时确保底部工具面板可见（用户可能已关闭它）。"""
@@ -450,7 +781,6 @@ class MainWindow(QMainWindow):
         self._output_action.setEnabled(state.actions["output"].enabled)
         self._logs_action.setEnabled(state.actions["logs"].enabled)
         self._settings_action.setEnabled(bool(self._project_summary) and not running)
-        self._review_action.setEnabled(bool(self._project_summary) and not running)
         self._reimport_action.setEnabled(bool(self._project_summary) and not running)
 
         self._refresh_content_menu_state(running)
@@ -1535,26 +1865,6 @@ class MainWindow(QMainWindow):
             summary.manifest = dialog.manifest
             self._project_bar.render(summary, self._workbench_state)
             self._status_label.setText("项目设置已保存")
-
-    def _on_review_panel(self) -> None:
-        if not self._project_summary:
-            return
-        from PySide6.QtWidgets import QInputDialog
-        from doc_tool.application.review.review_store import ReviewStore
-
-        store = ReviewStore(self._project_summary.paths.state_dir)
-        comments = store.comments()
-        summary = "\n".join(
-            "[{0}] {1}:{2} {3}".format(item.status, item.rel_path, item.line_no, item.text)
-            for item in comments
-        ) or "暂无评审意见"
-        if not self._project_summary.is_writable:
-            QMessageBox.information(self, "评审意见", summary)
-            return
-        text, accepted = QInputDialog.getMultiLineText(self, "评审意见", summary + "\n\n新增意见：", "")
-        if accepted and text.strip():
-            store.add_comment(text, os.environ.get("USERNAME", "local"), self._content_current_file or "", 1)
-            self._status_label.setText("评审意见已添加")
 
     def _on_reimport_source(self) -> None:
         if not self._project_summary or not self._project_summary.is_writable:

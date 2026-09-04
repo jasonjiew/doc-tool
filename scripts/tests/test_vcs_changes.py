@@ -48,6 +48,7 @@ from doc_tool.application.content.vcs_changes import (  # noqa: E402
     parse_svn_status_xml,
     pull_changes as vcs_pull_changes,
     rollback_all,
+    rollback_single_file,
 )
 
 PROJECT_YML = (
@@ -856,6 +857,21 @@ class VcsRollbackTests(RepoFixtureMixin, unittest.TestCase):
             capture_output=True, text=True, check=True,
         ).stdout.strip()
         self.assertEqual(status, "", "回滚后工作树应干净")
+
+    def test_git_rollback_single_file_restores_target_file_only(self):
+        pa = make_project(self.repo, "proj_a", {
+            "content/a.md": "v1",
+            "content/b.md": "b1",
+        })
+        commit_all(self.repo, "init")
+        (pa / "content/a.md").write_text("v2", encoding="utf-8")
+        (pa / "content/b.md").write_text("b2", encoding="utf-8")
+
+        report = self.service(pa).detect()
+        err = rollback_single_file(report, "a.md", content_root=pa / "content")
+        self.assertIsNone(err)
+        self.assertEqual((pa / "content/a.md").read_text(encoding="utf-8"), "v1")
+        self.assertEqual((pa / "content/b.md").read_text(encoding="utf-8"), "b2")
 
     def test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked(self):
         """delete_untracked=False（改动面板 VCS 模式）时，staged 新增文件

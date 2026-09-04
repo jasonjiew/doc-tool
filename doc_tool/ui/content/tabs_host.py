@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional
 
+from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QTabWidget, QWidget
+from PySide6.QtWidgets import QApplication, QMenu, QTabWidget, QWidget
 
 from doc_tool.ui.content.editor_panel import EditorPanel
 
@@ -44,13 +45,23 @@ class TabsHost(QWidget):
         self._tabs.tabCloseRequested.connect(self._close_tab)
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
-        # Ctrl+S 保存当前标签页（按钮文案已声明，此前未绑定）。
+        tab_bar = self._tabs.tabBar()
+        tab_bar.setMovable(True)
+        tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
+        tab_bar.installEventFilter(self)
+
+        # 快捷键：保存/关闭/替换/切换
         self._save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
         self._save_shortcut.activated.connect(self.save_current)
-
-        # Ctrl+H 文件内替换条（焦点在当前编辑器时激活）。
+        self._close_shortcut = QShortcut(QKeySequence("Ctrl+W"), self)
+        self._close_shortcut.activated.connect(self.close_current)
         self._replace_shortcut = QShortcut(QKeySequence("Ctrl+H"), self)
         self._replace_shortcut.activated.connect(self.focus_replace_current)
+        self._next_tab_shortcut = QShortcut(QKeySequence("Ctrl+Tab"), self)
+        self._next_tab_shortcut.activated.connect(self.next_tab)
+        self._prev_tab_shortcut = QShortcut(QKeySequence("Ctrl+Shift+Tab"), self)
+        self._prev_tab_shortcut.activated.connect(self.prev_tab)
 
         layout = self._make_layout()
         layout.addWidget(self._tabs)
@@ -127,6 +138,26 @@ class TabsHost(QWidget):
             self._tabs.setCurrentIndex(index)
         return True
 
+    def reload_file(self, rel_path: str, text: Optional[str] = None) -> None:
+        """重新加载指定已打开标签页的文件内容（如撤销改动后）。"""
+        editor = self._editors.get(rel_path)
+        if editor is None:
+            return
+        if text is not None:
+            editor.load(rel_path, text)
+        else:
+            try:
+                target = self._writer.resolve(rel_path)
+                if target.exists():
+                    editor.load(rel_path, target.read_text(encoding="utf-8"))
+                else:
+                    idx = self._tabs.indexOf(editor)
+                    if idx >= 0:
+                        self._tabs.removeTab(idx)
+                    self._editors.pop(rel_path, None)
+            except (OSError, UnicodeDecodeError):
+                pass
+
     def editors(self) -> List[EditorPanel]:
         """返回全部已打开编辑器（保持打开顺序，供未保存收集）。"""
         return list(self._editors.values())
@@ -138,6 +169,11 @@ class TabsHost(QWidget):
         self._writable = writable
         for editor in self._editors.values():
             editor.set_writable(writable)
+
+    def set_dark(self, dark: bool) -> None:
+        """广播暗黑模式状态至全部已打开的编辑器。"""
+        for editor in self._editors.values():
+            editor.set_dark(dark)
 
     def save_current(self) -> bool:
         """保存当前标签页。"""
@@ -198,6 +234,98 @@ class TabsHost(QWidget):
     def close_file(self, rel_path: str) -> None:
         """关闭指定文件的标签（删除文件时清理已打开标签）。"""
         self._close_tab_by_path(rel_path)
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched == self._tabs.tabBar() and event.type() == QEvent.Type.MouseButtonRelease:
+            if event.button() == Qt.MouseButton.MiddleButton:
+                index = self._tabs.tabBar().tabAt(event.pos())
+                if index >= 0:
+                    self._close_tab(index)
+                    return True
+        return super().eventFilter(watched, event)
+
+    def close_current(self) -> bool:
+        """关闭当前活动的标签页（Ctrl+W）。"""
+        index = self._tabs.currentIndex()
+        if index >= 0:
+            self._close_tab(index)
+            return True
+        return False
+
+    def next_tab(self) -> None:
+        """切换到下一个标签页（Ctrl+Tab）。"""
+        count = self._tabs.count()
+        if count > 1:
+            self._tabs.setCurrentIndex((self._tabs.currentIndex() + 1) % count)
+
+    def prev_tab(self) -> None:
+        """切换到上一个标签页（Ctrl+Shift+Tab）。"""
+        count = self._tabs.count()
+        if count > 1:
+            self._tabs.setCurrentIndex((self._tabs.currentIndex() - 1) % count)
+
+    def close_other_tabs(self, target_index: int) -> None:
+        """关闭除目标标签页之外的所有标签页。"""
+        for i in range(self._tabs.count() - 1, -1, -1):
+            if i != target_index:
+                self._close_tab(i)
+
+    def close_right_tabs(self, target_index: int) -> None:
+        """关闭目标标签页右侧的所有标签页。"""
+        for i in range(self._tabs.count() - 1, target_index, -1):
+            self._close_tab(i)
+
+    def close_all_user_tabs(self) -> None:
+        """用户显式触发关闭全部标签页。"""
+        for i in range(self._tabs.count() - 1, -1, -1):
+            self._close_tab(i)
+
+    def _show_tab_context_menu(self, pos: QPoint) -> None:
+        """右键点击标签页时弹出上下文菜单。"""
+        tab_bar = self._tabs.tabBar()
+        index = tab_bar.tabAt(pos)
+        if index < 0:
+            return
+        widget = self._tabs.widget(index)
+        if not isinstance(widget, EditorPanel):
+            return
+
+        menu = QMenu(self)
+        close_act = menu.addAction("关闭标签页 (Ctrl+W)")
+        close_others_act = menu.addAction("关闭其他标签页")
+        close_right_act = menu.addAction("关闭右侧标签页")
+        close_all_act = menu.addAction("关闭全部标签页")
+        menu.addSeparator()
+
+        copy_rel_act = menu.addAction("复制相对路径")
+        copy_abs_act = menu.addAction("复制绝对路径")
+        reveal_act = menu.addAction("在文件资源管理器中定位")
+
+        total = self._tabs.count()
+        close_others_act.setEnabled(total > 1)
+        close_right_act.setEnabled(index < total - 1)
+
+        action = menu.exec(tab_bar.mapToGlobal(pos))
+        if action == close_act:
+            self._close_tab(index)
+        elif action == close_others_act:
+            self.close_other_tabs(index)
+        elif action == close_right_act:
+            self.close_right_tabs(index)
+        elif action == close_all_act:
+            self.close_all_user_tabs()
+        elif action == copy_rel_act:
+            rel = widget.current_rel_path() or ""
+            QApplication.clipboard().setText(rel)
+        elif action == copy_abs_act:
+            rel = widget.current_rel_path() or ""
+            abs_p = str(self._writer.resolve(rel))
+            QApplication.clipboard().setText(abs_p)
+        elif action == reveal_act:
+            rel = widget.current_rel_path() or ""
+            abs_p = self._writer.resolve(rel)
+            from doc_tool.ui.content.review_panel import reveal_in_file_manager
+            reveal_in_file_manager(abs_p)
 
     # --- 内部 ---
 

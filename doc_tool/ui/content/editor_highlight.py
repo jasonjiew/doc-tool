@@ -27,6 +27,10 @@ _SPELL_TOKEN_RE = re.compile(r"\b[a-zA-Z][a-zA-Z'-]{1,}\b")
 class MarkdownHighlighter(QSyntaxHighlighter):
     """Markdown 语法高亮。"""
 
+    STATE_NORMAL = 0
+    STATE_IN_CODE = 1
+    STATE_IN_COMMENT = 2
+
     _HEADING_RE = QRegularExpression(r"^#{1,6}\s+.*$")
     _BOLD_RE = QRegularExpression(r"\*\*[^*]+\*\*")
     _INLINE_CODE_RE = QRegularExpression(r"`[^`]+`")
@@ -34,25 +38,72 @@ class MarkdownHighlighter(QSyntaxHighlighter):
     _LIST_RE = QRegularExpression(r"^(\s*[-*+]|\s*\d+\.)\s+")
     _QUOTE_RE = QRegularExpression(r"^>\s?")
     _FENCE_RE = QRegularExpression(r"^```")
+    _EMPTY_PAR_RE = QRegularExpression(r"<EMPTY_PAR\s*/?>")
 
     def __init__(self, document) -> None:
         super().__init__(document)
         self._in_code = False
 
     def highlightBlock(self, text: str) -> None:
+        prev_state = self.previousBlockState()
+        if prev_state == -1:
+            prev_state = self.STATE_NORMAL
+
+        # 1. 代码围栏 (```)
+        if prev_state == self.STATE_IN_CODE:
+            self.setFormat(0, len(text), self._code_fmt())
+            if self._FENCE_RE.match(text).hasMatch():
+                self.setCurrentBlockState(self.STATE_NORMAL)
+                self._in_code = False
+            else:
+                self.setCurrentBlockState(self.STATE_IN_CODE)
+                self._in_code = True
+            return
+
         if self._FENCE_RE.match(text).hasMatch():
-            self._in_code = not self._in_code
             self.setFormat(0, len(text), self._code_fmt())
+            self.setCurrentBlockState(self.STATE_IN_CODE)
+            self._in_code = True
             return
-        if self._in_code:
-            self.setFormat(0, len(text), self._code_fmt())
-            return
-        # 行级规则互斥：命中即整行上色
+
+        self._in_code = False
+
+        # 2. 跨行 HTML 注释处理 (如 <!-- TBL:style=... -->)
+        if prev_state == self.STATE_IN_COMMENT:
+            end_idx = text.find("-->")
+            if end_idx != -1:
+                self.setFormat(0, end_idx + 3, self._comment_fmt())
+                self.setCurrentBlockState(self.STATE_NORMAL)
+            else:
+                self.setFormat(0, len(text), self._comment_fmt())
+                self.setCurrentBlockState(self.STATE_IN_COMMENT)
+                return
+        else:
+            self.setCurrentBlockState(self.STATE_NORMAL)
+
+        # 3. 行级规则互斥：命中即整行上色
         for regex, fmt in self._line_rules():
             if regex.match(text).hasMatch():
                 self.setFormat(0, len(text), fmt)
                 return
-        # 词内规则叠加
+
+        # 4. 单行/行内 HTML 注释及开启跨行注释
+        comment_start = text.find("<!--")
+        if comment_start != -1:
+            comment_end = text.find("-->", comment_start + 4)
+            if comment_end != -1:
+                self.setFormat(comment_start, comment_end + 3 - comment_start, self._comment_fmt())
+            else:
+                self.setFormat(comment_start, len(text) - comment_start, self._comment_fmt())
+                self.setCurrentBlockState(self.STATE_IN_COMMENT)
+
+        # 5. 空段落标记 <EMPTY_PAR/>
+        it_par = self._EMPTY_PAR_RE.globalMatch(text)
+        while it_par.hasNext():
+            m = it_par.next()
+            self.setFormat(m.capturedStart(), m.capturedLength(), self._comment_fmt())
+
+        # 6. 词内规则叠加
         for regex, fmt in self._inline_rules():
             it = regex.globalMatch(text)
             while it.hasNext():
@@ -76,6 +127,12 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             (self._INLINE_CODE_RE, self._inline_code_fmt()),
             (self._LINK_RE, self._link_fmt()),
         ]
+
+    def _comment_fmt(self) -> QTextCharFormat:
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(True)
+        fmt.setForeground(QColor("#94a3b8"))
+        return fmt
 
     def _heading_fmt(self) -> QTextCharFormat:
         fmt = QTextCharFormat()
@@ -101,7 +158,10 @@ class MarkdownHighlighter(QSyntaxHighlighter):
 
     def _inline_code_fmt(self) -> QTextCharFormat:
         fmt = QTextCharFormat()
-        fmt.setFontFamily("Consolas")
+        if hasattr(fmt, "setFontFamilies"):
+            fmt.setFontFamilies(["Consolas"])
+        else:
+            fmt.setFontFamily("Consolas")
         fmt.setBackground(QColor("#eef1f4"))
         return fmt
 
@@ -113,9 +173,53 @@ class MarkdownHighlighter(QSyntaxHighlighter):
 
     def _code_fmt(self) -> QTextCharFormat:
         fmt = QTextCharFormat()
-        fmt.setFontFamily("Consolas")
+        if hasattr(fmt, "setFontFamilies"):
+            fmt.setFontFamilies(["Consolas"])
+        else:
+            fmt.setFontFamily("Consolas")
         fmt.setBackground(QColor("#eef1f4"))
         return fmt
+
+
+# --- Diff 语法高亮 ---
+
+class DiffHighlighter(QSyntaxHighlighter):
+    """Unified Diff 语法高亮器（支持浅色/深色主题）。"""
+
+    def __init__(self, document, dark: bool = False) -> None:
+        super().__init__(document)
+        self._dark = dark
+
+    def set_dark(self, dark: bool) -> None:
+        """切换高亮器暗黑模式。"""
+        if self._dark != dark:
+            self._dark = dark
+            self.rehighlight()
+
+    def highlightBlock(self, text: str) -> None:
+        if not text:
+            return
+        if text.startswith("+++") or text.startswith("---") or text.startswith("diff "):
+            fmt = QTextCharFormat()
+            fmt.setFontWeight(QFont.Weight.Bold)
+            fmt.setForeground(QColor("#94a3b8" if self._dark else "#475569"))
+            self.setFormat(0, len(text), fmt)
+        elif text.startswith("+"):
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor("#86efac" if self._dark else "#166534"))
+            fmt.setBackground(QColor("#14532d" if self._dark else "#dcfce7"))
+            self.setFormat(0, len(text), fmt)
+        elif text.startswith("-"):
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor("#fca5a5" if self._dark else "#991b1b"))
+            fmt.setBackground(QColor("#450a0a" if self._dark else "#fee2e2"))
+            self.setFormat(0, len(text), fmt)
+        elif text.startswith("@@"):
+            fmt = QTextCharFormat()
+            fmt.setFontWeight(QFont.Weight.Bold)
+            fmt.setForeground(QColor("#60a5fa" if self._dark else "#1d4ed8"))
+            fmt.setBackground(QColor("#1e293b" if self._dark else "#eff6ff"))
+            self.setFormat(0, len(text), fmt)
 
 
 # --- 行号槽 ---
@@ -147,6 +251,7 @@ class _LineNumberedEdit(QPlainTextEdit):
 
     addWordRequested = Signal(str)
     mermaidEditRequested = Signal(int)
+    formatTableRequested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -225,6 +330,11 @@ class _LineNumberedEdit(QPlainTextEdit):
                 add_action.triggered.connect(
                     lambda _=False, w=word: self.addWordRequested.emit(w)
                 )
+        from doc_tool.application.content.table_format import is_table_row
+        cursor_at_pos = self.cursorForPosition(event.pos())
+        if is_table_row(cursor_at_pos.block().text()) and not self.isReadOnly():
+            table_action = menu.addAction("美化当前表格 (Ctrl+Alt+T)")
+            table_action.triggered.connect(lambda _=False: self.formatTableRequested.emit())
         menu.exec(event.globalPos())
 
     # --- 代码片段占位符跳转 ---
@@ -282,11 +392,127 @@ class _LineNumberedEdit(QPlainTextEdit):
                 self.setTextCursor(sel)
                 return
 
+    @staticmethod
+    def _get_unescaped_pipes(text: str) -> List[int]:
+        """获取文本中所有未被反斜杠转义的管道符索引列表。"""
+        pipes: List[int] = []
+        escaped = False
+        for i, ch in enumerate(text):
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == "|":
+                pipes.append(i)
+        return pipes
+
+    def _handle_table_tab(self, shift: bool) -> bool:
+        """在 Markdown 表格中拦截 Tab/Shift+Tab 进行单元格跳转与末行自动加行。"""
+        if self.isReadOnly():
+            return False
+
+        cursor = self.textCursor()
+        block = cursor.block()
+        line_text = block.text()
+        from doc_tool.application.content.table_format import is_table_row
+
+        if not is_table_row(line_text):
+            return False
+
+        pipes = self._get_unescaped_pipes(line_text)
+        if len(pipes) < 2:
+            return False
+
+        cells: List[Tuple[int, int]] = []
+        for idx in range(len(pipes) - 1):
+            c_start = pipes[idx] + 1
+            c_end = pipes[idx + 1]
+            cells.append((c_start, c_end))
+
+        pos = cursor.positionInBlock()
+
+        current_cell_idx = 0
+        for idx, (c_start, c_end) in enumerate(cells):
+            if pos <= c_end:
+                current_cell_idx = idx
+                break
+        else:
+            current_cell_idx = len(cells) - 1
+
+        def select_cell(target_block, cell_span):
+            s, e = cell_span
+            txt = target_block.text()
+            raw = txt[s:e]
+            l_strip = len(raw) - len(raw.lstrip())
+            r_strip = len(raw) - len(raw.rstrip())
+            act_s = s + l_strip
+            act_e = e - r_strip
+            if act_s >= act_e:
+                act_s, act_e = s, e
+            tc = self.textCursor()
+            tc.setPosition(target_block.position() + act_s)
+            tc.setPosition(target_block.position() + act_e, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(tc)
+
+        if shift:
+            if current_cell_idx > 0:
+                select_cell(block, cells[current_cell_idx - 1])
+                return True
+            else:
+                prev_b = block.previous()
+                if prev_b.isValid() and is_table_row(prev_b.text()):
+                    prev_pipes = self._get_unescaped_pipes(prev_b.text())
+                    if len(prev_pipes) >= 2:
+                        prev_last_cell = (prev_pipes[-2] + 1, prev_pipes[-1])
+                        select_cell(prev_b, prev_last_cell)
+                        return True
+            return False
+        else:
+            if current_cell_idx < len(cells) - 1:
+                select_cell(block, cells[current_cell_idx + 1])
+                return True
+            else:
+                next_b = block.next()
+                if next_b.isValid() and is_table_row(next_b.text()):
+                    next_pipes = self._get_unescaped_pipes(next_b.text())
+                    if len(next_pipes) >= 2:
+                        next_first_cell = (next_pipes[0] + 1, next_pipes[1])
+                        select_cell(next_b, next_first_cell)
+                        return True
+                else:
+                    num_cols = len(cells)
+                    new_row_text = "\n| " + " | ".join(["   "] * num_cols) + " |"
+                    tc = self.textCursor()
+                    tc.beginEditBlock()
+                    tc.setPosition(block.position() + len(line_text))
+                    tc.insertText(new_row_text)
+                    tc.endEditBlock()
+                    new_block = block.next()
+                    if new_block.isValid():
+                        new_pipes = self._get_unescaped_pipes(new_block.text())
+                        if len(new_pipes) >= 2:
+                            select_cell(new_block, (new_pipes[0] + 1, new_pipes[1]))
+                    return True
+
     def keyPressEvent(self, event) -> None:
         if self._snippet_active and event.key() == Qt.Key.Key_Tab:
             self._advance_snippet()
             event.accept()
             return
+
+        is_backtab = event.key() == Qt.Key.Key_Backtab or (
+            event.key() == Qt.Key.Key_Tab
+            and bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        )
+        if is_backtab:
+            if self._handle_table_tab(shift=True):
+                event.accept()
+                return
+        elif event.key() == Qt.Key.Key_Tab:
+            if self._handle_table_tab(shift=False):
+                event.accept()
+                return
+
         super().keyPressEvent(event)
 
     # --- 图片导入钩子 ---

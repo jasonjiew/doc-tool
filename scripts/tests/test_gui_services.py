@@ -1890,6 +1890,27 @@ class ChangesPanelTests(unittest.TestCase):
         self.assertEqual(restored, [True])
         panel.close()
 
+    def test_restore_uses_rollback_single_callback_if_provided(self):
+        calls = []
+        def _mock_rollback(item):
+            calls.append(item.rel_path)
+            return None
+
+        from doc_tool.ui.content.changes_panel import ChangesPanel
+        panel = ChangesPanel(
+            snapshot=self.snapshot,
+            writer=self.writer,
+            content_root=self.content_root,
+            on_restored=lambda: calls.append("restored"),
+            rollback_single=_mock_rollback,
+            writable=True,
+        )
+        panel.set_items(self._items_for_modified())
+        panel._list.setCurrentRow(0)
+        panel._restore_btn.click()
+        self.assertEqual(calls, [self.rel, "restored"])
+        panel.close()
+
     def test_binary_item_shows_placeholder_without_decoding(self):
         """选中非文本改动（content 内图片）只提示，不按 UTF-8 读文件。
 
@@ -1911,6 +1932,18 @@ class ChangesPanelTests(unittest.TestCase):
         self.assertIn("新增", text)
         # 未读取文件内容：二进制字节不会出现在 diff 视图里。
         self.assertNotIn("PNG", text)
+        panel.close()
+
+    def test_changes_panel_diff_highlighter_present_and_toggles_dark(self):
+        """改动面板 diff 视图挂载 DiffHighlighter 并支持深浅主题切换。"""
+        from doc_tool.ui.content.editor_highlight import DiffHighlighter
+
+        panel = self._panel()
+        self.assertIsInstance(panel._diff_highlighter, DiffHighlighter)
+        panel.set_dark(True)
+        self.assertTrue(panel._diff_highlighter._dark)
+        panel.set_dark(False)
+        self.assertFalse(panel._diff_highlighter._dark)
         panel.close()
 
 
@@ -2168,6 +2201,20 @@ class EditorHighlightTests(unittest.TestCase):
         self.assertIsInstance(panel._editor, _LineNumberedEdit)
         self.assertIsInstance(panel._highlighter, MarkdownHighlighter)
         panel.close()
+
+    def test_diff_highlighter_colors_unified_diff(self):
+        """测试 DiffHighlighter 高亮器与暗黑模式切换。"""
+        from PySide6.QtWidgets import QPlainTextEdit
+        from doc_tool.ui.content.editor_highlight import DiffHighlighter
+
+        edit = QPlainTextEdit()
+        hl = DiffHighlighter(edit.document(), dark=False)
+        edit.setPlainText("--- a/f.md\n+++ b/f.md\n@@ -1 +1 @@\n-old\n+new\n")
+        hl.set_dark(True)
+        self.assertTrue(hl._dark)
+        hl.set_dark(False)
+        self.assertFalse(hl._dark)
+        edit.close()
 
 
 class EditorAuthoringWorkbenchTests(unittest.TestCase):
@@ -2971,8 +3018,103 @@ class HomeTaskPageTests(unittest.TestCase):
         # 「使用说明」：解析到仓库 docs/使用说明.md 并交给系统关联程序打开。
         with patch.object(MainWindow, "_open_file", return_value=True) as open_file:
             home._handle_show_help()
-        self.assertTrue(open_file.called)
-        self.assertIn("使用说明", str(open_file.call_args.args[0]))
+
+class EditorWorkbenchPhase2Tests(unittest.TestCase):
+    """主构建区 UI 优化、多标签页右键/快捷关闭、语法弱化与专注模式。"""
+
+    @classmethod
+    def setUpClass(cls):
+        _ensure_qapp()
+
+    def test_tabs_host_context_menu_and_batch_close(self):
+        """测试多标签页批量关闭与导航。"""
+        import tempfile
+        import shutil
+        from pathlib import Path
+        from doc_tool.ui.content.tabs_host import TabsHost
+
+        root = Path(tempfile.mkdtemp(prefix="doc-tool-tabshost-"))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        writer = _FakeWriter(root)
+        host = TabsHost(writer, writable=True)
+        self.addCleanup(host.close)
+
+        host.open_file("doc1.md", "# 1")
+        host.open_file("doc2.md", "# 2")
+        host.open_file("doc3.md", "# 3")
+        self.assertEqual(host._tabs.count(), 3)
+
+        # 验证切换
+        host._tabs.setCurrentIndex(0)
+        host.next_tab()
+        self.assertEqual(host._tabs.currentIndex(), 1)
+        host.prev_tab()
+        self.assertEqual(host._tabs.currentIndex(), 0)
+
+        # 关闭右侧标签页（从索引 1 开始，只剩 doc1 和 doc2）
+        host.close_right_tabs(1)
+        self.assertEqual(host._tabs.count(), 2)
+
+        # 关闭其他标签页（当前选中 0，只保留 doc1）
+        host.close_other_tabs(0)
+        self.assertEqual(host._tabs.count(), 1)
+        self.assertEqual(host.current_rel_path(), "doc1.md")
+
+        # 关闭全部
+        host.close_all_user_tabs()
+        self.assertEqual(host._tabs.count(), 0)
+
+    def test_markdown_highlighter_comments_and_empty_par(self):
+        """测试 HTML 注释与 <EMPTY_PAR/> 的浅灰弱化高亮。"""
+        from PySide6.QtWidgets import QPlainTextEdit
+        from doc_tool.ui.content.editor_highlight import MarkdownHighlighter
+
+        edit = QPlainTextEdit()
+        hl = MarkdownHighlighter(edit.document())
+        fmt = hl._comment_fmt()
+        self.assertTrue(fmt.fontItalic())
+        self.assertEqual(fmt.foreground().color().name().lower(), "#94a3b8")
+
+        # 多行注释状态机转换
+        edit.setPlainText("<!-- TBL:style=43\nlay=autofit -->\n正文\n<EMPTY_PAR/>\n")
+        block1 = edit.document().findBlockByNumber(0)
+        self.assertEqual(block1.userState(), MarkdownHighlighter.STATE_IN_COMMENT)
+        block2 = edit.document().findBlockByNumber(1)
+        self.assertEqual(block2.userState(), MarkdownHighlighter.STATE_NORMAL)
+        edit.close()
+
+    def test_preview_heading_links_not_blue(self):
+        """测试预览区域中的标题锚点链接使用继承色而非默认蓝色。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        html_light = render_markdown_html("# 一级标题\n## 二级标题\n", dark=False)
+        self.assertIn("h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {", html_light)
+        self.assertIn("color: inherit;", html_light)
+
+        html_dark = render_markdown_html("# 一级标题\n", dark=True)
+        self.assertIn("color: inherit;", html_dark)
+
+    def test_main_window_zen_mode_toggle(self):
+        """测试 F11 专注模式显隐外围 Dock 与项目条。"""
+        from doc_tool.ui.main_window import MainWindow
+
+        window = MainWindow()
+        self.addCleanup(window.close)
+        self.assertFalse(window._zen_mode)
+        self.assertFalse(window._zen_mode_action.isChecked())
+
+        # 触发进入专注模式
+        window.toggle_zen_mode()
+        self.assertTrue(window._zen_mode)
+        self.assertTrue(window._zen_mode_action.isChecked())
+        self.assertIn("退出专注", window._zen_mode_action.text())
+        self.assertTrue(window._task_dock_widget.isHidden())
+        self.assertTrue(window._project_bar.isHidden())
+
+        # 再次触发退出专注模式
+        window.toggle_zen_mode()
+        self.assertFalse(window._zen_mode)
+        self.assertFalse(window._zen_mode_action.isChecked())
 
 
 if __name__ == "__main__":

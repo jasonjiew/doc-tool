@@ -41,6 +41,7 @@ from doc_tool.application.content.vcs_changes import (
     commit_all,
     pull_changes,
     rollback_all,
+    rollback_single_file,
 )
 from doc_tool.application.content.unsaved import (
     UnsavedChoice,
@@ -58,12 +59,15 @@ from doc_tool.application.content.writer import (
 )
 from doc_tool.domain.content_index import ContentIndex
 
+from doc_tool.domain.paths import ProjectPaths
+from doc_tool.application.review.review_store import ReviewStore
 from doc_tool.ui.content.changes_panel import ChangesPanel
 from doc_tool.ui.content.lint_panel import LintPanel
 from doc_tool.ui.content.image_assets_panel import ImageAssetsPanel
 from doc_tool.ui.content.issues_panel import IssuesPanel
 from doc_tool.ui.content.refactor_panel import RefactorPanel
 from doc_tool.ui.content.replace_panel import ReplacePanel
+from doc_tool.ui.content.review_panel import ReviewPanel
 from doc_tool.ui.content.search_panel import SearchPanel
 from doc_tool.ui.content.tabs_host import TabsHost
 from doc_tool.ui.content.tree_panel import ChapterTree
@@ -193,6 +197,7 @@ class ContentWorkspace(QWidget):
             on_clear_markers=self._on_clear_markers,
             on_open_external=self._on_open_external,
             on_open_directory=self._on_open_directory,
+            on_rollback_file=self._on_tree_rollback_file,
             content_root=self._content_root,
             writable=self._writable,
         )
@@ -216,7 +221,7 @@ class ContentWorkspace(QWidget):
         panels_layout.addWidget(self._panels)
         # 索引就绪前的占位
         self._placeholder_tabs: Dict[str, QWidget] = {}
-        for name in ("搜索", "替换", "重命名/重编号", "检查", "问题", "图片", "改动"):
+        for name in ("搜索", "替换", "重命名/重编号", "检查", "问题", "图片", "改动", "评审"):
             placeholder = QWidget(self.panels_host)
             self._panels.addTab(placeholder, name)
             self._placeholder_tabs[name] = placeholder
@@ -367,13 +372,35 @@ class ContentWorkspace(QWidget):
             on_restored=self._after_restore,
             writable=self._writable,
             rollback_all=self._rollback_all_changes,
+            rollback_single=self._rollback_single_change,
+            on_open_file=self.open_file,
             on_commit=self._commit_all_changes,
             on_pull=self._pull_changes,
+            on_export_review=self._on_export_review_clicked,
         )
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
         self._changes_panel = changes
         self._refresh_changes_panel()
+
+        project_paths = (
+            ProjectPaths(self._project_root)
+            if hasattr(self, "_project_root") and self._project_root
+            else None
+        )
+        review = ReviewPanel(
+            store=ReviewStore(self._state_dir),
+            content_root=self._content_root,
+            snapshot=self._snapshot,
+            index=self._index,
+            project_paths=project_paths,
+            on_open_file=self.open_file,
+            writable=self._writable,
+            parent=self,
+        )
+        self._panels.addTab(review, "评审")
+        self._remove_placeholder("评审")
+        self._review_panel = review
 
         self._search_panel = search
         self._replace_panel = replace
@@ -413,6 +440,14 @@ class ContentWorkspace(QWidget):
     def _open_and_locate(self, rel_path: str, line_no: int) -> None:
         self.open_file(rel_path, line_no)
 
+    def set_dark(self, dark: bool) -> None:
+        """暗黑模式状态变更通知：广播给各子面板。"""
+        if hasattr(self, "tabs_host") and self.tabs_host is not None:
+            self.tabs_host.set_dark(dark)
+        changes = getattr(self, "_changes_panel", None)
+        if changes is not None and hasattr(changes, "set_dark"):
+            changes.set_dark(dark)
+
     # --- 菜单联动（面板选择） ---
 
     def focus_search(self) -> None:
@@ -439,6 +474,17 @@ class ContentWorkspace(QWidget):
     def show_issues(self) -> None:
         """把「问题」面板推到前台（任务失败后由主窗口调用）。"""
         self._select_panel("问题")
+
+    def show_review(self) -> None:
+        """把「评审」面板推到前台。"""
+        self._select_panel("评审")
+
+    def _on_export_review_clicked(self) -> None:
+        """改动面板点击「导出评审稿」时唤起评审稿向导。"""
+        self.show_review()
+        panel = getattr(self, "_review_panel", None)
+        if panel is not None:
+            panel._on_export_draft()
 
     def run_lint(self) -> None:
         self._select_panel("检查")
@@ -667,9 +713,11 @@ class ContentWorkspace(QWidget):
         panel.set_source(self._change_source, self._change_source_note)
         panel.set_items(self._change_items(status))
 
-    def _after_restore(self) -> None:
+    def _after_restore(self, rel_path: Optional[str] = None) -> None:
         """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
         self._vcs.invalidate_cache()
+        if rel_path is not None and hasattr(self, "tabs_host"):
+            self.tabs_host.reload_file(rel_path)
         if self._index is None:
             return
         self._index_service.refresh(self._index)
@@ -680,6 +728,106 @@ class ContentWorkspace(QWidget):
         panel = getattr(self, "_image_assets_panel", None)
         if panel is not None:
             panel.set_index(self._index)
+
+    def _rollback_single_change(self, item: ChangeItem) -> Optional[str]:
+        """单文件撤销改动：VCS 模式用版本控制恢复，否则本地清单/快照恢复。
+
+        返回 None 表示成功；返回错误说明表示失败。
+        """
+        if not self._writable:
+            return "项目为只读状态，无法撤销改动"
+
+        report = self._vcs.detect()
+        if report.source in ("git", "svn"):
+            err = rollback_single_file(
+                report, item.rel_path, content_root=self._content_root
+            )
+            if err:
+                return err
+            # 清理可能存在的本地会话清单记录
+            try:
+                self._writer.manifest.load()
+                self._writer.manifest.drop(OP_CREATE, item.rel_path)
+                self._writer.manifest.drop(OP_EDIT, item.rel_path)
+                self._writer.manifest.drop(OP_DELETE, item.rel_path)
+                self._writer.manifest.drop(OP_RENAME, item.rel_path)
+            except Exception:
+                pass
+            self._vcs.invalidate_cache()
+            self._after_restore(item.rel_path)
+            return None
+
+        # 本地快照模式
+        if item.is_rename:
+            self._writer.manifest.load()
+            for entry in list(self._writer.manifest.entries):
+                if entry.operation == OP_RENAME and (
+                    entry.rel_path == item.rel_path
+                    or entry.original_path == item.rel_path
+                ):
+                    self._writer._rollback_entry(entry)
+                    self._writer.manifest.drop(OP_RENAME, entry.rel_path)
+                    break
+            self._after_restore(item.rel_path)
+            return None
+
+        baseline = None
+        if item.status == "modified":
+            baseline = self._snapshot.content_of(item.baseline_rel_path)
+            if baseline is None:
+                # 尝试从同名 .bak 备份恢复
+                target = self._writer.resolve(item.rel_path)
+                bak = target.with_name(target.name + ".bak")
+                if bak.exists():
+                    try:
+                        baseline = bak.read_text(encoding="utf-8")
+                    except OSError:
+                        pass
+            if baseline is None:
+                return "基线内容不可用，无法恢复到基线"
+
+        result = self._writer.restore_file(
+            item.rel_path,
+            status=item.status,
+            baseline_text=baseline,
+            trash_path=item.trash_path,
+        )
+        if not result.written:
+            return result.error or "未知原因"
+
+        self._after_restore(item.rel_path)
+        return None
+
+    def _on_tree_rollback_file(self, rel_path: str) -> None:
+        """从章节树右键菜单触发撤销单文件改动。"""
+        if not self._writable:
+            return
+        status_map = self._status_map()
+        status = status_map.get(rel_path)
+        if not status or status == "normal":
+            return
+
+        items = self._change_items(status_map)
+        target_item = None
+        for it in items:
+            if it.rel_path == rel_path:
+                target_item = it
+                break
+
+        if target_item is None:
+            target_item = ChangeItem(
+                rel_path=rel_path,
+                status=status,
+                baseline_rel_path=rel_path,
+            )
+
+        err = self._rollback_single_change(target_item)
+        if err:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "撤销失败", f"撤销文件改动失败：{err}")
+        else:
+            if self._on_status is not None:
+                self._on_status(f"已撤销改动：{rel_path}")
 
     def _rebuild_index(self) -> None:
         """手动刷新：非破坏性重扫索引 + 重扫引用 + 重绘树。"""
@@ -1382,8 +1530,9 @@ class ContentWorkspace(QWidget):
             getattr(self, "_refactor_panel", None),
             getattr(self, "_lint_panel", None),
             getattr(self, "_changes_panel", None),
+            getattr(self, "_review_panel", None),
         ):
-            if panel is not None:
+            if panel is not None and hasattr(panel, "set_writable"):
                 panel.set_writable(writable)
 
     def is_index_ready(self) -> bool:

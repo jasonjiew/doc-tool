@@ -1131,6 +1131,154 @@ def rollback_all(
     return ["当前项目不在版本控制内，无法执行版本控制回滚"]
 
 
+def rollback_single_file(
+    report: ChangeReport,
+    rel_path: str,
+    *,
+    content_root: Path,
+    timeout: float = 60.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Optional[str]:
+    """VCS 模式下回滚单个文件的改动。
+
+    返回 None 表示成功；返回错误字符串表示失败。
+    若项目不在版本控制内，返回错误说明供调用方回退本地快照。
+    """
+    if report.source not in ("git", "svn"):
+        return "当前项目不在版本控制内"
+
+    target_abs = (Path(content_root) / rel_path).resolve()
+    repo_root = Path(report.repository_root or "")
+
+    matched_item: Optional[ChangedFile] = None
+    for item in report.files:
+        if item.abs_path and Path(item.abs_path).resolve() == target_abs:
+            matched_item = item
+            break
+        if item.old_path and (repo_root / item.old_path).resolve() == target_abs:
+            matched_item = item
+            break
+
+    if report.source == "git":
+        git_bin = shutil.which("git") or "git"
+        if matched_item is None:
+            # 文件未在 report 中直接匹配到，尝试按相对仓库路径直接 restore
+            try:
+                git_rel = target_abs.relative_to(repo_root).as_posix()
+            except ValueError:
+                return f"文件不在 Git 仓库内: {rel_path}"
+            return _restore_tracked_paths(
+                [git_bin, "restore", "--staged", "--worktree"],
+                repo_root,
+                [git_rel],
+                timeout,
+                runner=runner,
+            )
+
+        if matched_item.untracked:
+            try:
+                if target_abs.is_file() or target_abs.is_symlink():
+                    target_abs.unlink()
+                return None
+            except OSError as exc:
+                return f"删除未跟踪文件失败: {exc}"
+
+        if matched_item.change_type == "renamed":
+            err = _restore_tracked_paths(
+                [git_bin, "rm", "--cached"],
+                repo_root,
+                [matched_item.path],
+                timeout,
+                runner=runner,
+            )
+            if err:
+                return f"git rm --cached 失败: {err}"
+            try:
+                if target_abs.is_file() or target_abs.is_symlink():
+                    target_abs.unlink()
+            except OSError:
+                pass
+            if matched_item.old_path:
+                return _restore_tracked_paths(
+                    [git_bin, "restore", "--staged", "--worktree"],
+                    repo_root,
+                    [matched_item.old_path],
+                    timeout,
+                    runner=runner,
+                )
+            return None
+
+        if matched_item.change_type == "added":
+            if matched_item.staged:
+                err = _restore_tracked_paths(
+                    [git_bin, "rm", "--cached"],
+                    repo_root,
+                    [matched_item.path],
+                    timeout,
+                    runner=runner,
+                )
+                if err:
+                    return f"git rm --cached 失败: {err}"
+            try:
+                if target_abs.is_file() or target_abs.is_symlink():
+                    target_abs.unlink()
+                return None
+            except OSError as exc:
+                return f"删除新增文件失败: {exc}"
+
+        # modified 或 deleted
+        return _restore_tracked_paths(
+            [git_bin, "restore", "--staged", "--worktree"],
+            repo_root,
+            [matched_item.path],
+            timeout,
+            runner=runner,
+        )
+
+    if report.source == "svn":
+        svn_bin = shutil.which("svn") or "svn"
+        if matched_item is None:
+            try:
+                svn_rel = target_abs.relative_to(repo_root).as_posix()
+            except ValueError:
+                return f"文件不在 SVN 工作副本内: {rel_path}"
+            return _restore_tracked_paths(
+                [svn_bin, "revert"],
+                repo_root,
+                [svn_rel],
+                timeout,
+                runner=runner,
+            )
+
+        if matched_item.untracked:
+            try:
+                if target_abs.is_file() or target_abs.is_symlink():
+                    target_abs.unlink()
+                return None
+            except OSError as exc:
+                return f"删除未版本化文件失败: {exc}"
+
+        err = _restore_tracked_paths(
+            [svn_bin, "revert"],
+            repo_root,
+            [matched_item.path],
+            timeout,
+            runner=runner,
+        )
+        if err:
+            return f"svn revert 失败: {err}"
+
+        if matched_item.change_type == "added":
+            try:
+                if target_abs.is_file() or target_abs.is_symlink():
+                    target_abs.unlink()
+            except OSError:
+                pass
+        return None
+
+    return "未知版本控制系统"
+
+
 # ---------------------------------------------------------------------------
 # 版本控制提交与拉取（改动面板「提交改动」/「拉取更新」）
 # ---------------------------------------------------------------------------
