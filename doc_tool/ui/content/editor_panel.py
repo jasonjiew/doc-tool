@@ -17,11 +17,14 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
+    QKeySequence,
+    QShortcut,
     QTextCharFormat,
     QTextCursor,
     QTextDocument,
 )
 from PySide6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -126,8 +129,13 @@ class EditorPanel(QWidget):
         self._flash_timer.timeout.connect(self._clear_flash)
         # 已提示过「外部修改」的 (rel_path, mtime) 集合：用户拒绝重载后，
         # 同一外部变更不再重复弹框；save() 仍独立做 mtime 校验，不削弱
-        # 覆盖保护。load()/save() 后清除（基准已刷新）。
         self._dismissed_external: set = set()
+        self._dark = False
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is not None:
+            from doc_tool.ui.styles import is_dark_theme
+            self._dark = is_dark_theme(app)
 
         self._build_toolbar()
         self._build_panes()
@@ -136,11 +144,51 @@ class EditorPanel(QWidget):
 
     def _build_toolbar(self) -> None:
         bar = QWidget(self)
+        bar.setObjectName("editorToolbar")
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(0, 0, 0, 4)
-        layout.setSpacing(8)
+        layout.setContentsMargins(4, 3, 4, 3)
+        layout.setSpacing(6)
 
+        # Markdown 常用格式快捷操作组（单行工具栏左侧）
+        self._md_toolbar = QWidget(bar)
+        md_layout = QHBoxLayout(self._md_toolbar)
+        md_layout.setContentsMargins(0, 0, 0, 0)
+        md_layout.setSpacing(2)
+
+        def md_btn(text: str, slot: Callable, tip: str) -> QPushButton:
+            btn = QPushButton(text, self._md_toolbar)
+            btn.setProperty("btnRole", "compact")
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            md_layout.addWidget(btn)
+            return btn
+
+        md_btn("H2", self._toolbar_heading, "标题（当前行前置 ## ）")
+        md_btn("B", lambda: self.wrap_selection("**", "**"), "粗体 (**)")
+        md_btn("I", lambda: self.wrap_selection("*", "*"), "斜体 (*)")
+        md_btn("代码", lambda: self.wrap_selection("`", "`"), "行内代码 (`)")
+        md_btn("•列表", lambda: self._prefix_lines("- "), "无序列表 (- )")
+        md_btn("1.列表", lambda: self._prefix_lines("1. "), "有序列表 (1. )")
+        md_btn("引用", lambda: self._prefix_lines("> "), "引用 (> )")
+        md_btn("表格", self._insert_table, "插入表格骨架")
+        md_btn("美化表", self.format_table_at_cursor, "美化对齐当前表格 (Ctrl+Alt+T)")
+        md_btn("链接", self._insert_link, "插入链接")
+        md_btn("图片", self._on_insert_image, "插入图片（粘贴/选择文件）")
+        md_btn("Mermaid", self.open_mermaid_workbench, "Mermaid 图形工作台")
+        md_btn("批量转图", self.batch_convert_mermaid, "转换当前文档中的历史 Mermaid 源码")
+        md_btn("片段", self.open_snippet_manager, "代码片段管理器")
+
+        layout.addWidget(self._md_toolbar)
+
+        # 竖向微分隔线
+        sep = QFrame(bar)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep)
+
+        # 中部：文件名/相对路径 + 未保存状态 + 结构摘要
         self._file_label = QLabel("未打开文件", bar)
+        self._file_label.setObjectName("statusMuted")
         layout.addWidget(self._file_label)
 
         self._dirty_label = QLabel("", bar)
@@ -150,33 +198,39 @@ class EditorPanel(QWidget):
         self._status_label = QLabel("", bar)
         self._status_label.setObjectName("statusMuted")
         layout.addWidget(self._status_label)
+
         layout.addStretch(1)
 
-        self._rollback_btn = QPushButton("回滚上次保存", bar)
+        # 右侧快捷动作组：回滚、外部打开、隐藏/显示预览、保存
+        self._rollback_btn = QPushButton("回滚", bar)
         self._rollback_btn.setProperty("btnRole", "compact")
+        self._rollback_btn.setToolTip("回滚上次保存（用 .bak 恢复）")
         self._rollback_btn.clicked.connect(self.rollback_last)
         layout.addWidget(self._rollback_btn)
 
-        self._ext_btn = QPushButton("在外部编辑器打开", bar)
+        self._ext_btn = QPushButton("外部打开", bar)
         self._ext_btn.setProperty("btnRole", "compact")
+        self._ext_btn.setToolTip("在系统外部编辑器中打开当前文件")
         self._ext_btn.clicked.connect(self.open_external)
         layout.addWidget(self._ext_btn)
 
         self._preview_btn = QPushButton("隐藏预览", bar)
         self._preview_btn.setProperty("btnRole", "compact")
+        self._preview_btn.setToolTip("切换双栏实时预览显示/隐藏")
         self._preview_btn.clicked.connect(self._toggle_preview)
         layout.addWidget(self._preview_btn)
 
         self._save_btn = QPushButton("保存 (Ctrl+S)", bar)
         self._save_btn.setProperty("btnRole", "primary")
+        self._save_btn.setToolTip("保存修改并原子写入磁盘 (Ctrl+S)")
         self._save_btn.clicked.connect(self.save)
         layout.addWidget(self._save_btn)
 
         self._toolbar = bar
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(4, 4, 4, 4)
+        outer.setContentsMargins(4, 2, 4, 4)
+        outer.setSpacing(2)
         outer.addWidget(bar)
-        outer.addWidget(self._build_markdown_toolbar())
         self._find_bar = self._build_find_bar()
         outer.addWidget(self._find_bar)
         self._replace_bar = self._build_replace_bar()
@@ -185,37 +239,8 @@ class EditorPanel(QWidget):
         outer.addWidget(self._body_host, 1)
 
     def _build_markdown_toolbar(self) -> QWidget:
-        """常用 Markdown 格式化工具栏（标题/粗体/斜体/行内代码/列表/引用/表格/链接/图片）。"""
-        bar = QWidget(self)
-        layout = QHBoxLayout(bar)
-        layout.setContentsMargins(0, 0, 0, 4)
-        layout.setSpacing(4)
-        layout.addWidget(QLabel("格式：", bar))
-
-        def button(text: str, slot: Callable, tip: str) -> QPushButton:
-            btn = QPushButton(text, bar)
-            btn.setProperty("btnRole", "compact")
-            btn.setToolTip(tip)
-            btn.clicked.connect(slot)
-            layout.addWidget(btn)
-            return btn
-
-        button("H2", self._toolbar_heading, "标题（当前行前置 ## ）")
-        button("B", lambda: self.wrap_selection("**", "**"), "粗体")
-        button("I", lambda: self.wrap_selection("*", "*"), "斜体")
-        button("代码", lambda: self.wrap_selection("`", "`"), "行内代码")
-        button("•列表", lambda: self._prefix_lines("- "), "无序列表")
-        button("1.列表", lambda: self._prefix_lines("1. "), "有序列表")
-        button("引用", lambda: self._prefix_lines("> "), "引用")
-        button("表格", self._insert_table, "插入表格骨架")
-        button("链接", self._insert_link, "链接")
-        button("图片", self._on_insert_image, "插入图片（粘贴/选择文件）")
-        button("Mermaid", self.open_mermaid_workbench, "Mermaid 图形工作台")
-        button("批量转图", self.batch_convert_mermaid, "转换当前文档中的历史 Mermaid 源码（裸 flowchart/sequenceDiagram）")
-        button("片段", self.open_snippet_manager, "代码片段管理器")
-        layout.addStretch(1)
-        self._md_toolbar = bar
-        return bar
+        """向后兼容：返回已集成在单行工具栏中的 Markdown 快捷操作部件。"""
+        return self._md_toolbar
 
     def _build_find_bar(self) -> QWidget:
         """文件内查找条：输入 + 上/下导航 + 关闭。默认隐藏。"""
@@ -296,6 +321,10 @@ class EditorPanel(QWidget):
         self._editor.addWordRequested.connect(self._on_add_word_to_dict)
         self._editor.set_image_import_callback(self.import_image)
         self._editor.mermaidEditRequested.connect(self._open_mermaid_at_position)
+        self._editor.formatTableRequested.connect(self.format_table_at_cursor)
+        self._format_table_shortcut = QShortcut(
+            QKeySequence("Ctrl+Alt+T"), self, self.format_table_at_cursor
+        )
         self._highlighter = MarkdownHighlighter(self._editor.document())
         self._find_selections: List[QTextEdit.ExtraSelection] = []
         self._spell_selections: List[QTextEdit.ExtraSelection] = []
@@ -332,8 +361,12 @@ class EditorPanel(QWidget):
         self._editor.setPlainText(text)
         self._dirty = False
         self._draft_loaded = False
-        self._file_label.setText(rel_path)
-        self._status_label.setText("已加载 · " + preview_summary(text))
+        short_name = rel_path.split("/")[-1] if "/" in rel_path else rel_path
+        self._file_label.setText(short_name)
+        self._file_label.setToolTip("完整相对路径：" + rel_path)
+        summary = preview_summary(text)
+        self._status_label.setText(summary)
+        self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
         self._refresh_preview(text)
         self._update_dirty()
         self._update_save_state()
@@ -349,8 +382,12 @@ class EditorPanel(QWidget):
         self._editor.setPlainText(text)
         self._dirty = True
         self._draft_loaded = True
-        self._file_label.setText(rel_path)
-        self._status_label.setText("已加载 · " + preview_summary(text))
+        short_name = rel_path.split("/")[-1] if "/" in rel_path else rel_path
+        self._file_label.setText(short_name)
+        self._file_label.setToolTip("完整相对路径：" + rel_path)
+        summary = preview_summary(text)
+        self._status_label.setText(summary)
+        self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
         self._refresh_preview(text)
         self._update_dirty()
         self._update_save_state()
@@ -831,6 +868,45 @@ class EditorPanel(QWidget):
             cursor_offset=2,
         )
 
+    def format_table_at_cursor(self) -> bool:
+        """格式化光标所在的连续表格并接入撤销栈（Ctrl+Alt+T）。"""
+        if not self._writable:
+            return False
+        cursor = self._editor.textCursor()
+        block_idx = cursor.blockNumber()
+        doc = self._editor.document()
+        lines = [doc.findBlockByNumber(i).text() for i in range(doc.blockCount())]
+        from doc_tool.application.content.table_format import (
+            find_table_range_at_line,
+            format_markdown_table,
+        )
+
+        rng = find_table_range_at_line(lines, block_idx)
+        if rng is None:
+            self._status_label.setText("光标所在行未检测到连续表格")
+            return False
+
+        start, end = rng
+        sub_lines = lines[start:end + 1]
+        formatted = format_markdown_table(sub_lines)
+
+        start_block = doc.findBlockByNumber(start)
+        end_block = doc.findBlockByNumber(end)
+
+        start_pos = start_block.position()
+        end_pos = end_block.position() + len(end_block.text())
+
+        c = QTextCursor(doc)
+        c.setPosition(start_pos)
+        c.setPosition(end_pos, QTextCursor.MoveMode.KeepAnchor)
+        c.beginEditBlock()
+        c.insertText(formatted)
+        c.endEditBlock()
+        self._editor.setTextCursor(c)
+
+        self._status_label.setText("已美化表格（第 {0} ~ {1} 行）".format(start + 1, end + 1))
+        return True
+
     def _insert_link(self) -> None:
         if self._editor.textCursor().hasSelection():
             self.wrap_selection("[", "](链接)")
@@ -1183,8 +1259,14 @@ class EditorPanel(QWidget):
     def _refresh_preview(self, text: str) -> None:
         document = self._preview.document()
         document.setBaseUrl(self._preview_base_url())
-        document.setHtml(render_markdown_html(text))
+        document.setHtml(render_markdown_html(text, dark=self._dark))
         self._preview.moveCursor(QTextCursor.MoveOperation.Start)
+
+    def set_dark(self, dark: bool) -> None:
+        """更新暗黑模式状态并刷新当前预览。"""
+        if self._dark != dark:
+            self._dark = dark
+            self._refresh_preview(self._editor.toPlainText())
 
     def _preview_base_url(self) -> QUrl:
         """返回当前文档图片等相对资源的解析目录。"""

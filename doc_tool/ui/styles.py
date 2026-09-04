@@ -40,6 +40,7 @@ SEMANTIC_COLORS = {
     "success": "#176b3a",
     "warning": "#8a5a00",
     "failure": "#a12622",
+    "purple": "#7c3aed",
 }
 
 # --- 语义色（深色主题） ---
@@ -48,6 +49,7 @@ SEMANTIC_COLORS_DARK = {
     "success": "#4ade80",
     "warning": "#fbbf24",
     "failure": "#f87171",
+    "purple": "#c084fc",
 }
 
 # 浅色主题面板色板
@@ -181,11 +183,17 @@ QFrame[cardClass="result"] {{ background: {panel}; border: 1px solid {border}; b
 QFrame[cardClass="resultSuccess"] {{ background: {panel}; border: 1px solid {success}; border-radius: 6px; }}
 QFrame[cardClass="resultFailure"] {{ background: {panel}; border: 1px solid {failure}; border-radius: 6px; }}
 
+/* --- 编辑器操作栏 --- */
+QWidget#editorToolbar {{ background: {panel}; border-bottom: 1px solid {border}; border-radius: 4px; }}
+QWidget#editorToolbar QPushButton {{ padding: 2px 7px; font-size: {font_small_pt}pt; }}
+
 /* --- 标签页 / Dock --- */
 QTabWidget::pane {{ border: 1px solid {border}; border-radius: 4px; top: -1px; }}
 QTabBar::tab {{ {font_body} background: {panel_alt}; border: 1px solid {border}; padding: 4px 12px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; }}
-QTabBar::tab:selected {{ background: {panel}; color: {text}; border-bottom-color: {panel}; }}
+QTabBar::tab:selected {{ background: {panel}; color: {text}; border-bottom-color: {panel}; font-weight: 500; }}
 QTabBar::tab:hover:!selected {{ background: {panel}; }}
+QTabBar::close-button {{ margin: 2px; border-radius: 3px; }}
+QTabBar::close-button:hover {{ background: {selection_bg}; }}
 QDockWidget {{ {font_body} titlebar-close-icon: none; }}
 QDockWidget::title {{ background: {panel_alt}; border-bottom: 1px solid {border}; padding: 4px 8px; font-weight: 600; }}
 QDockWidget::close-button, QDockWidget::float-button {{ background: transparent; border: none; padding: 2px; }}
@@ -214,6 +222,7 @@ QLabel#barTitle, QLabel#dockTitle, QLabel#sectionTitle {{ {font_heading} color: 
 QLabel#resultTitle, QLabel#recentTitle {{ {font_heading} color: {text}; }}
 QLabel#statusMuted, QLabel#techDetail {{ {font_small} color: {text_muted}; }}
 QLabel#statusWarning {{ {font_small} color: {warning}; }}
+QLabel[strong="true"] {{ font-weight: 600; }}
 
 /* --- 首页任务页（项目 + 工具双栏） --- */
 /* 页面自绘 window 底色：裸 QWidget 顶层不画 QSS 背景（embedded/截图态也正确）。 */

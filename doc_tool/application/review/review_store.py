@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
@@ -28,6 +28,14 @@ class ReviewComment:
     status: str = "unresolved"
     resolved_at: str = ""
     association_changed: bool = False
+    seq: int = 1
+    chapter_no: str = ""
+    assignee: str = ""
+    planned_date: str = ""
+    confirm_status: str = "未确认"
+    review_note: str = ""
+    evidence: str = ""
+    open_issue: str = ""
 
 
 @dataclass(frozen=True)
@@ -53,7 +61,13 @@ class ReviewStore:
             return []
 
     def comments(self) -> List[ReviewComment]:
-        return [ReviewComment(**item) for item in self._read(self.comments_file, "comments") if isinstance(item, dict)]
+        valid_keys = {f.name for f in fields(ReviewComment)}
+        result: List[ReviewComment] = []
+        for item in self._read(self.comments_file, "comments"):
+            if isinstance(item, dict):
+                filtered = {k: v for k, v in item.items() if k in valid_keys}
+                result.append(ReviewComment(**filtered))
+        return result
 
     def signoffs(self) -> List[Signoff]:
         return [Signoff(**item) for item in self._read(self.signoffs_file, "signoffs") if isinstance(item, dict)]
@@ -61,14 +75,94 @@ class ReviewStore:
     def _save_comments(self, comments: Sequence[ReviewComment]) -> None:
         atomic_write(self.comments_file, json.dumps({"comments": [asdict(item) for item in comments]}, ensure_ascii=False, indent=2))
 
-    def add_comment(self, text: str, author: str, rel_path: str, line_no: int) -> ReviewComment:
+    def save_comments(self, comments: Sequence[ReviewComment]) -> None:
+        self._save_comments(comments)
+
+    def next_seq(self) -> int:
+        existing = [item.seq for item in self.comments() if isinstance(item.seq, int)]
+        return max(existing, default=0) + 1
+
+    def stats(self) -> dict:
+        items = self.comments()
+        total = len(items)
+        confirmed = sum(1 for c in items if c.confirm_status == "已确认" or c.status == "confirmed")
+        open_issues = sum(1 for c in items if c.confirm_status == "遗留" or (c.open_issue and c.open_issue.strip() not in ("", "无")))
+        unconfirmed = sum(1 for c in items if c.confirm_status == "待确认" or (c.confirm_status == "未确认" and c.status != "confirmed"))
+        return {
+            "total": total,
+            "confirmed": confirmed,
+            "unconfirmed": unconfirmed,
+            "open_issues": open_issues,
+        }
+
+    def add_comment(
+        self,
+        text: str,
+        author: str,
+        rel_path: str = "",
+        line_no: int = 1,
+        *,
+        chapter_no: str = "",
+        assignee: str = "",
+        planned_date: str = "",
+        confirm_status: str = "未确认",
+        review_note: str = "",
+        evidence: str = "",
+        open_issue: str = "",
+        seq: Optional[int] = None,
+    ) -> ReviewComment:
         if not str(text).strip() or not str(author).strip():
             raise ValueError("评审意见和作者不能为空。")
-        item = ReviewComment(str(uuid.uuid4()), text.strip(), author.strip(), _now(), rel_path, max(1, int(line_no)))
+        seq_val = seq if seq is not None else self.next_seq()
+        item = ReviewComment(
+            comment_id=str(uuid.uuid4()),
+            text=text.strip(),
+            author=author.strip(),
+            created_at=_now(),
+            rel_path=rel_path or "",
+            line_no=max(1, int(line_no)),
+            seq=seq_val,
+            chapter_no=chapter_no.strip(),
+            assignee=assignee.strip(),
+            planned_date=planned_date.strip(),
+            confirm_status=confirm_status.strip() or "未确认",
+            review_note=review_note.strip(),
+            evidence=evidence.strip(),
+            open_issue=open_issue.strip(),
+        )
         comments = self.comments()
         comments.append(item)
         self._save_comments(comments)
         return item
+
+    def update_comment(self, comment_id: str, **kwargs) -> ReviewComment:
+        comments = self.comments()
+        for item in comments:
+            if item.comment_id == comment_id:
+                for k, v in kwargs.items():
+                    if hasattr(item, k):
+                        setattr(item, k, v)
+                self._save_comments(comments)
+                return item
+        raise KeyError(comment_id)
+
+    def import_comments(self, new_comments: Sequence[ReviewComment]) -> int:
+        comments = self.comments()
+        existing_signatures = {(c.author, c.text, c.chapter_no) for c in comments}
+        added_count = 0
+        current_seq = self.next_seq()
+        for item in new_comments:
+            sig = (item.author, item.text, item.chapter_no)
+            if sig not in existing_signatures and item.text.strip():
+                if not item.seq or item.seq <= 0:
+                    item.seq = current_seq
+                    current_seq += 1
+                comments.append(item)
+                existing_signatures.add(sig)
+                added_count += 1
+        if added_count > 0:
+            self._save_comments(comments)
+        return added_count
 
     def delete_comment(self, comment_id: str) -> bool:
         comments = self.comments()
@@ -84,6 +178,8 @@ class ReviewStore:
             if item.comment_id == comment_id:
                 item.status = "resolved" if resolved else "unresolved"
                 item.resolved_at = _now() if resolved else ""
+                if resolved:
+                    item.confirm_status = "已确认"
                 self._save_comments(comments)
                 return item
         raise KeyError(comment_id)
@@ -111,7 +207,7 @@ class ReviewStore:
 
     @property
     def unresolved_count(self) -> int:
-        return sum(item.status != "resolved" for item in self.comments())
+        return sum(item.status != "resolved" and item.confirm_status != "已确认" for item in self.comments())
 
 
 @dataclass(frozen=True)

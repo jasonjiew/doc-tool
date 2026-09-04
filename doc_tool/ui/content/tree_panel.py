@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QTreeView,
     QVBoxLayout,
@@ -275,7 +276,8 @@ class ChapterTree(QWidget):
         on_clear_markers: Optional[Callable[[], None]] = None,
         on_open_external: Optional[Callable[[str], None]] = None,
         on_open_directory: Optional[Callable[[str], None]] = None,
-        content_root: Optional[Path] = None,
+        on_rollback_file: Optional[Callable[[str], None]] = None,
+        content_root=None,
         writable: bool = True,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -290,6 +292,7 @@ class ChapterTree(QWidget):
         self._on_clear_markers = on_clear_markers
         self._on_open_external = on_open_external
         self._on_open_directory = on_open_directory
+        self._on_rollback_file = on_rollback_file
         self._content_root = Path(content_root) if content_root else None
         self._writable = writable
         self._current: Optional[str] = None
@@ -556,6 +559,13 @@ class ChapterTree(QWidget):
             menu.addAction(copy_link)
             if self._writable:
                 menu.addSeparator()
+                file_status = self._status_map.get(rel_path)
+                if file_status and file_status != "normal" and self._on_rollback_file is not None:
+                    revert_action = QAction("撤销此文件改动…", menu)
+                    revert_action.triggered.connect(
+                        lambda checked=False, r=rel_path: self._confirm_and_rollback(r)
+                    )
+                    menu.addAction(revert_action)
                 rename_action = QAction("重命名…", menu)
                 rename_action.triggered.connect(
                     lambda: self._on_rename_file
@@ -600,6 +610,19 @@ class ChapterTree(QWidget):
         # 打开次数累积控件树（资源泄漏）。
         menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         menu.exec(QCursor.pos())
+
+    def _confirm_and_rollback(self, rel_path: str) -> None:
+        if self._on_rollback_file is None:
+            return
+        ans = QMessageBox.question(
+            self,
+            "撤销文件改动",
+            f"确定要撤销文件「{rel_path}」的改动吗？\n\n此操作将放弃所有未提交修改并恢复到基线内容，此操作无法撤销。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if ans == QMessageBox.StandardButton.Yes:
+            self._on_rollback_file(rel_path)
 
     def _markdown_link(self, rel_path: str) -> str:
         """生成章节引用链接：[标题](相对路径)。"""

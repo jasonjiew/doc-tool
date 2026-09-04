@@ -1166,6 +1166,33 @@ class PreviewRendererTests(unittest.TestCase):
         self.assertIn('<img src="images/a.png" alt="图"/>', rendered)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", rendered)
 
+    def test_render_markdown_html_callouts_and_dark_mode(self):
+        """测试 Callout 警告块渲染与深浅主题自适应样式。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        # 浅色 Callout 渲染
+        light_out = render_markdown_html(
+            "> [!NOTE]\n> 这里是重要提示信息\n\n> [!WARNING]\n> 警告注意点\n",
+            dark=False,
+        )
+        self.assertIn('class="callout callout-note"', light_out)
+        self.assertIn("ℹ️ NOTE", light_out)
+        self.assertIn("这里是重要提示信息", light_out)
+        self.assertIn('class="callout callout-warning"', light_out)
+        self.assertIn("⚠️ WARNING", light_out)
+        self.assertIn("color: #1f2328;", light_out)
+
+        # 深色 Callout 渲染
+        dark_out = render_markdown_html(
+            "> [!TIP]\n> 技巧说明\n",
+            dark=True,
+        )
+        self.assertIn('class="callout callout-tip"', dark_out)
+        self.assertIn("💡 TIP", dark_out)
+        self.assertIn("技巧说明", dark_out)
+        self.assertIn("color: #e5e7eb;", dark_out)
+        self.assertIn("background-color: #26272e;", dark_out)
+
 
 class ReplaceServiceTests(unittest.TestCase):
     """任务 7.x：全局替换服务。"""
@@ -2905,5 +2932,43 @@ class RenumberDirTests(unittest.TestCase):
         info.assert_called_once()
 
 
+class PreviewCodeHighlightTests(unittest.TestCase):
+    def test_highlight_python_keywords_and_comments(self):
+        from doc_tool.application.content.preview import highlight_code_html
+        code = "def foo():\n    # this is a comment\n    return 'bar'"
+        html_out = highlight_code_html(code, "python", dark=False)
+        self.assertIn("#0550ae", html_out)  # keyword color
+        self.assertIn("#6e7781", html_out)  # comment color
+        self.assertIn("#116329", html_out)  # string color
+        self.assertIn("def", html_out)
+
+    def test_highlight_dark_mode(self):
+        from doc_tool.application.content.preview import highlight_code_html
+        code = "SELECT id, name FROM users WHERE id = 1"
+        html_dark = highlight_code_html(code, "sql", dark=True)
+        self.assertIn("#79c0ff", html_dark)  # keyword color in dark
+
+    def test_highlight_python_builtins_and_hex(self):
+        from doc_tool.application.content.preview import highlight_code_html
+        code = "x = None\ny = True\nz = 0x1f"
+        html_out = highlight_code_html(code, "python", dark=False)
+        # None 和 True 必须被识别为关键字染色
+        self.assertIn('<span style="color: #0550ae; font-weight: bold;">None</span>', html_out)
+        self.assertIn('<span style="color: #0550ae; font-weight: bold;">True</span>', html_out)
+        # 0x1f 必须作为完整数值染色，不被拆裂
+        self.assertIn('<span style="color: #0550ae;">0x1f</span>', html_out)
+
+    def test_preview_code_block_line_anchor_and_empty(self):
+        from doc_tool.application.content.preview import render_markdown_html
+        md = "```python\nprint(123)\n```\n\n```bash\n```"
+        html_out = render_markdown_html(md)
+        # 普通代码块需带有行锚点供定位
+        self.assertIn('<pre class="code-block language-python"><a name="line-1"></a>', html_out)
+        # 空代码块需正确闭合
+        self.assertIn('<pre class="code-block language-bash"><a name="line-5"></a>', html_out)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
