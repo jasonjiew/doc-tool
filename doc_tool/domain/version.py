@@ -14,7 +14,8 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：2.3.0 为全局命令面板（Ctrl+K/Ctrl+P 秒级直达）、Markdown 表格智能编辑与等宽对齐、
+# 应用语义版本：2.3.1 为原生支持 graph TD 语法与 Word 遗留段落注释裸流程图自愈提取；
+# 2.3.0 为全局命令面板（Ctrl+K/Ctrl+P 秒级直达）、Markdown 表格智能编辑与等宽对齐、
 # 预览区轻量代码语法高亮、以及改动评审稿导出与闭环；
 # 2.2.0 为 PDF 工具箱集成上线、首页高定视觉重构与 COM 进程假死防护自愈；
 # 2.1.0 为文档互转——Word/PDF/Markdown/HTML/TXT/表格/RTF/ODT 任意互转
@@ -29,7 +30,7 @@ from typing import Dict
 # 1.4.0 为修订记录以 _revision_record.md 为唯一维护点，并修复修订表
 # 回填、排版与换行；1.3.0 的 mermaid 官方网页渲染后端已撤销（ad5c1fd），未发布；
 # 1.2.0 为多窗口、版本控制变更、mermaid-cli 渲染与机器可读 CLI 发布。
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.1"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
 PROJECT_SCHEMA_VERSION = 1
