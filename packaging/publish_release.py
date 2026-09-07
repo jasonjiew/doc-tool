@@ -13,8 +13,8 @@ import urllib.request
 
 GITLAB_BASE = os.getenv("GITLAB_BASE", "http://127.0.0.1:8899")
 PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
-VERSION = "2.3.0"
-TAG_NAME = "v2.3.0"
+VERSION = "2.3.1"
+TAG_NAME = "v2.3.1"
 PACKAGE_NAME = "DocTool"
 
 
@@ -127,13 +127,13 @@ def main():
     out_dir = os.path.join(repo_root, "packaging", "Output")
 
     files_to_upload = [
-        ("DocTool-Setup-2.3.0.exe", os.path.join(out_dir, "DocTool-Setup-2.3.0.exe")),
-        ("DocTool-Setup-2.3.0.exe.sha256", os.path.join(out_dir, "DocTool-Setup-2.3.0.exe.sha256")),
-        ("DocTool-2.3.0-portable.zip", os.path.join(out_dir, "DocTool-2.3.0-portable.zip")),
-        ("DocTool-2.3.0-portable.zip.sha256", os.path.join(out_dir, "DocTool-2.3.0-portable.zip.sha256")),
-        ("DocTool-2.3.0-sbom.txt", os.path.join(out_dir, "DocTool-2.3.0-sbom.txt")),
-        ("DocTool-2.3.0.cdx.json", os.path.join(out_dir, "DocTool-2.3.0.cdx.json")),
-        ("DocTool-2.3.0.spdx.json", os.path.join(out_dir, "DocTool-2.3.0.spdx.json")),
+        (f"DocTool-Setup-{VERSION}.exe", os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe")),
+        (f"DocTool-Setup-{VERSION}.exe.sha256", os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe.sha256")),
+        (f"DocTool-{VERSION}-portable.zip", os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip")),
+        (f"DocTool-{VERSION}-portable.zip.sha256", os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip.sha256")),
+        (f"DocTool-{VERSION}-sbom.txt", os.path.join(out_dir, f"DocTool-{VERSION}-sbom.txt")),
+        (f"DocTool-{VERSION}.cdx.json", os.path.join(out_dir, f"DocTool-{VERSION}.cdx.json")),
+        (f"DocTool-{VERSION}.spdx.json", os.path.join(out_dir, f"DocTool-{VERSION}.spdx.json")),
     ]
 
     cer_path = os.path.join(repo_root, "scripts", "cert-out", "codesign.cer")
@@ -149,21 +149,21 @@ def main():
     package_files = get_package_files(token)
     name_to_file = {f["file_name"]: f for f in package_files}
 
-    exe_file = name_to_file.get("DocTool-Setup-2.3.0.exe")
-    zip_file = name_to_file.get("DocTool-2.3.0-portable.zip")
+    exe_file = name_to_file.get(f"DocTool-Setup-{VERSION}.exe")
+    zip_file = name_to_file.get(f"DocTool-{VERSION}-portable.zip")
 
     exe_mb = f"{exe_file['size'] / (1024 * 1024):.1f}" if exe_file else "45.7"
     zip_mb = f"{zip_file['size'] / (1024 * 1024):.1f}" if zip_file else "73.0"
 
     links = []
     link_specs = [
-        ("DocTool-Setup-2.3.0.exe", f"DocTool-Setup-2.3.0.exe（安装版，{exe_mb} MB）"),
-        ("DocTool-Setup-2.3.0.exe.sha256", "安装版 SHA-256"),
-        ("DocTool-2.3.0-portable.zip", f"DocTool-2.3.0-portable.zip（免安装便携版，{zip_mb} MB）"),
-        ("DocTool-2.3.0-portable.zip.sha256", "便携版 SHA-256"),
-        ("DocTool-2.3.0-sbom.txt", "依赖清单 SBOM"),
-        ("DocTool-2.3.0.cdx.json", "CycloneDX SBOM"),
-        ("DocTool-2.3.0.spdx.json", "SPDX SBOM"),
+        (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（安装版，{exe_mb} MB）"),
+        (f"DocTool-Setup-{VERSION}.exe.sha256", "安装版 SHA-256"),
+        (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）"),
+        (f"DocTool-{VERSION}-portable.zip.sha256", "便携版 SHA-256"),
+        (f"DocTool-{VERSION}-sbom.txt", "依赖清单 SBOM"),
+        (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM"),
+        (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM"),
         ("codesign.cer", "codesign.cer（公司证书公钥）"),
     ]
 
@@ -177,10 +177,10 @@ def main():
                 "link_type": "other"
             })
 
-    setup_sha = calc_sha256(os.path.join(out_dir, "DocTool-Setup-2.3.0.exe"))
-    portable_sha = calc_sha256(os.path.join(out_dir, "DocTool-2.3.0-portable.zip"))
+    setup_sha = calc_sha256(os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe"))
+    portable_sha = calc_sha256(os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip"))
 
-    description = f"""# Doc Tool v2.3.0
+    description = f"""# Doc Tool v{VERSION}
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
