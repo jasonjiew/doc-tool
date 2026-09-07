@@ -756,5 +756,91 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertIn("校验通过?", svg)
         self.assertIn("启动", svg)
 
+    def test_graph_td_supported_and_renders(self):
+        """支持 graph TD 别名，校验通过并能使用内置 SVG 渲染。"""
+        from doc_tool.application.content.mermaid import detect_kind, render, validate
+
+        source = "graph TD\n  A[开始] --> B[结束]"
+        self.assertEqual(detect_kind(source), "flowchart")
+        self.assertEqual(validate(source), [])
+        result = render(source, use_cli=False)
+        self.assertTrue(result.ok, result.error)
+        self.assertEqual(result.backend, "builtin")
+        self.assertTrue(result.svg.startswith(b"<svg"))
+
+    def test_extract_bare_blocks_with_interleaved_html_comments(self):
+        """Word 导入产生的 <!-- P:... --> 注释与空行交错的裸流程图能被完整提取并清洗。"""
+        from doc_tool.application.content.mermaid import extract_blocks, render, validate
+
+        text = (
+            "#### 数据接收处理流程图\n\n"
+            "![img_0001](images/img_0001.png =184x500)\n\n"
+            "<!-- P:line=285;lr=atLeast -->\n"
+            "graph TD\n\n"
+            "<!-- P:line=285;lr=atLeast -->\n"
+            "A[开始] --> B[netty接收数据]\n\n"
+            "<!-- P:line=285;lr=atLeast -->\n"
+            "B --> C[提取帧数据]\n\n"
+            "<!-- P:line=285;lr=atLeast -->\n"
+            "C --> D{检查校验和是否通过}\n\n"
+            "#### 下一章节\n"
+        )
+        blocks = extract_blocks(text)
+        self.assertEqual(len(blocks), 1)
+        block = blocks[0]
+        self.assertFalse(block.fenced)
+        self.assertEqual(block.kind, "flowchart")
+        self.assertEqual(block.start_line, 5)  # 包含紧邻前一行的 <!-- P:... -->
+        self.assertEqual(block.end_line, 15)
+        self.assertNotIn("<!-- P:", block.source)
+        self.assertIn("A[开始] --> B[netty接收数据]", block.source)
+        self.assertEqual(validate(block.source), [])
+        result = render(block.source, use_cli=False)
+        self.assertTrue(result.ok, result.error)
+
+    def test_batch_convert_word_imported_flowchart(self):
+        """批量转换带有 Word 遗留段落注释的裸流程图，替换为图片引用。"""
+        from doc_tool.application.content.mermaid import (
+            batch_convert,
+            image_reference,
+        )
+
+        counter = 0
+
+        def exporter(_block, result):
+            nonlocal counter
+            counter += 1
+            return image_reference("images/mermaid_{0:04d}.png".format(counter), result)
+
+        text = (
+            "#### 流程图\n\n"
+            "<!-- P:line=240;lr=auto -->\n"
+            "graph TD\n\n"
+            "<!-- P:line=240;lr=auto -->\n"
+            "Start[开始] --> Login[登录]\n\n"
+            "<!-- P:line=240;lr=auto -->\n"
+            "Login --> End[结束]\n\n"
+            "#### 下节\n"
+        )
+        converted = batch_convert(text, exporter, use_cli=False)
+        self.assertEqual(converted.success_count, 1)
+        self.assertEqual(len(converted.failures), 0)
+        self.assertIn("![图](images/mermaid_0001.png", converted.text)
+        self.assertNotIn("graph TD", converted.text)
+        self.assertNotIn("<!-- P:line=240;lr=auto -->", converted.text)
+        self.assertIn("#### 流程图\n\n![图](images/mermaid_0001.png", converted.text)
+        self.assertIn("#### 下节", converted.text)
+
+    def test_preview_renders_fenced_graph_td(self):
+        """HTML 预览对 ```mermaid 围栏中的 graph TD 能正常渲染。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        md = "```mermaid\ngraph TD\n  A[开始] --> B[结束]\n```\n"
+        rendered = render_markdown_html(md, use_cli=False)
+        self.assertIn("data:image/png;base64,", rendered)
+        self.assertNotIn("Mermaid 渲染失败", rendered)
+
+
 if __name__ == "__main__":
     unittest.main()
+
