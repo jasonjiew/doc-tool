@@ -20,11 +20,23 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 _QT_APP_REF = None
 
-_KIND_RE = re.compile(r"^\s*(flowchart|sequenceDiagram)\b")
+_HTML_COMMENT_RE = re.compile(r"^\s*<!--[\s\S]*?-->\s*$")
+_KIND_RE = re.compile(
+    r"^\s*(flowchart|sequenceDiagram|graph\s+(?:TD|TB|BT|LR|RL)|graph\b)",
+    re.I,
+)
 _FENCE_OPEN_RE = re.compile(r"^(?:`{3,}|~{3,})\s*mermaid\s*$", re.I)
 _FENCE_CHAR_RE = re.compile(r"^(?P<char>`{3,}|~{3,})")
-_FLOW_HEADER_RE = re.compile(r"^flowchart\s+(TD|TB|BT|LR|RL)\s*$", re.I)
-_SEQ_HEADER_RE = re.compile(r"^sequenceDiagram\s*$")
+_FLOW_HEADER_RE = re.compile(r"^(?:flowchart|graph)\s+(TD|TB|BT|LR|RL)\s*$", re.I)
+_SEQ_HEADER_RE = re.compile(r"^sequenceDiagram\s*$", re.I)
+_FLOW_KEYWORDS_RE = re.compile(
+    r"^(?:subgraph\b|end$|direction\b|classDef\b|class\b|style\b|linkStyle\b|click\b)",
+    re.I,
+)
+_SEQ_KEYWORDS_RE = re.compile(
+    r"^(?:participant|actor|activate|deactivate|Note\b|alt\b|else\b|opt\b|loop\b|par\b|and\b|rect\b|end$|autonumber$)",
+    re.I,
+)
 _NODE_RE = re.compile(
     r"(?P<id>[A-Za-z_][\w-]*)"
     r"(?:\[\[(?P<sub>.*?)\]\]"
@@ -63,6 +75,36 @@ _SEQ_MESSAGE_RE = re.compile(
     r"^\s*([A-Za-z_][\w-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
     r"([A-Za-z_][\w-]*)\s*:\s*(.+?)\s*$"
 )
+
+
+def _is_flowchart_line(line: str) -> bool:
+    s = line.strip()
+    if not s or s.startswith("%%"):
+        return True
+    if _FLOW_KEYWORDS_RE.match(s):
+        return True
+    if _EDGE_RE.match(s):
+        return True
+    if _split_chain_edges(s) is not None:
+        return True
+    m = _NODE_RE.fullmatch(s)
+    if m is not None and any(
+        m.group(g) is not None
+        for g in ("sub", "circle", "cyl", "box", "round", "diamond")
+    ):
+        return True
+    return False
+
+
+def _is_sequence_line(line: str) -> bool:
+    s = line.strip()
+    if not s or s.startswith("%%"):
+        return True
+    if _SEQ_MESSAGE_RE.match(s):
+        return True
+    if _SEQ_KEYWORDS_RE.match(s):
+        return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -105,8 +147,20 @@ class BatchConversionResult:
 
 
 def detect_kind(source: str) -> str:
-    match = _KIND_RE.match(source or "")
-    return match.group(1) if match else ""
+    for line in (source or "").splitlines():
+        s = line.strip()
+        if not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s):
+            continue
+        match = _KIND_RE.match(s)
+        if match:
+            token = match.group(1).split()[0].lower()
+            if token in ("flowchart", "graph"):
+                return "flowchart"
+            if token == "sequencediagram":
+                return "sequenceDiagram"
+            return token
+        break
+    return ""
 
 
 def extract_blocks(md_text: str) -> List[MermaidBlock]:
@@ -136,26 +190,76 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
             continue
         kind_match = _KIND_RE.match(lines[index])
         if kind_match:
-            start = index
-            body = [lines[index]]
-            index += 1
-            while index < len(lines):
-                candidate = lines[index]
-                if not candidate.strip() or _FENCE_CHAR_RE.match(candidate.strip()):
+            raw_kind = kind_match.group(1).split()[0].lower()
+            kind = "flowchart" if raw_kind in ("flowchart", "graph") else "sequenceDiagram"
+            is_stmt = _is_flowchart_line if kind == "flowchart" else _is_sequence_line
+
+            block_start = index
+            if index > 0 and _HTML_COMMENT_RE.match(lines[index - 1].strip()):
+                if index == 1 or not lines[index - 2].strip():
+                    block_start = index - 1
+
+            clean_body: List[str] = [lines[index].strip()]
+            last_content_idx = index
+            scan = index + 1
+
+            while scan < len(lines):
+                candidate = lines[scan]
+                cand_strip = candidate.strip()
+                if (
+                    _FENCE_CHAR_RE.match(cand_strip)
+                    or cand_strip.startswith("#")
+                    or cand_strip.startswith("|")
+                    or cand_strip.startswith("<!-- TBL:")
+                    or cand_strip.startswith("![")
+                    or _KIND_RE.match(cand_strip)
+                ):
                     break
-                if candidate.lstrip().startswith("#"):
+
+                if not cand_strip or _HTML_COMMENT_RE.match(cand_strip):
+                    # 向前探测后续是否有属于本图的有效语句
+                    peek = scan + 1
+                    found_next = False
+                    while peek < len(lines):
+                        p_strip = lines[peek].strip()
+                        if not p_strip or _HTML_COMMENT_RE.match(p_strip):
+                            peek += 1
+                            continue
+                        if (
+                            _FENCE_CHAR_RE.match(p_strip)
+                            or p_strip.startswith("#")
+                            or p_strip.startswith("|")
+                            or p_strip.startswith("<!-- TBL:")
+                            or p_strip.startswith("![")
+                            or _KIND_RE.match(p_strip)
+                        ):
+                            break
+                        if is_stmt(p_strip):
+                            found_next = True
+                        break
+                    if not found_next:
+                        break
+                    scan += 1
+                    continue
+
+                if is_stmt(cand_strip):
+                    clean_body.append(cand_strip)
+                    last_content_idx = scan
+                    scan += 1
+                else:
                     break
-                body.append(candidate)
-                index += 1
+
+            source = "\n".join(clean_body)
             blocks.append(
                 MermaidBlock(
-                    start + 1,
-                    start + len(body),
-                    "\n".join(body),
-                    kind_match.group(1),
+                    block_start + 1,
+                    last_content_idx + 1,
+                    source,
+                    kind,
                     False,
                 )
             )
+            index = last_content_idx + 1
             continue
         index += 1
     return blocks
@@ -198,15 +302,35 @@ def validate(source: str, kind: Optional[str] = None) -> List[MermaidError]:
     if not lines or not source.strip():
         return [MermaidError(1, "Mermaid 源码为空")]
     if actual not in ("flowchart", "sequenceDiagram"):
-        return [MermaidError(1, "不支持的图类型；当前支持 flowchart 与 sequenceDiagram")]
-    header_ok = _FLOW_HEADER_RE.match(lines[0].strip()) if actual == "flowchart" else _SEQ_HEADER_RE.match(lines[0].strip())
+        return [MermaidError(1, "不支持的图类型；当前支持 flowchart、graph 与 sequenceDiagram")]
+
+    header_idx = 0
+    while header_idx < len(lines):
+        s = lines[header_idx].strip()
+        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
+            break
+        header_idx += 1
+    if header_idx >= len(lines):
+        return [MermaidError(1, "Mermaid 源码为空")]
+
+    header_line = lines[header_idx].strip()
+    header_ok = (
+        _FLOW_HEADER_RE.match(header_line)
+        if actual == "flowchart"
+        else _SEQ_HEADER_RE.match(header_line)
+    )
     errors: List[MermaidError] = []
     if not header_ok:
-        expected = "flowchart TD/LR/RL/BT/TB" if actual == "flowchart" else "sequenceDiagram"
-        errors.append(MermaidError(1, "图类型声明无效，应为 {0}".format(expected)))
-    for number, raw in enumerate(lines[1:], start=2):
+        expected = (
+            "flowchart TD/LR/RL/BT/TB 或 graph TD/LR/RL/BT/TB"
+            if actual == "flowchart"
+            else "sequenceDiagram"
+        )
+        errors.append(MermaidError(header_idx + 1, "图类型声明无效，应为 {0}".format(expected)))
+
+    for number, raw in enumerate(lines[header_idx + 1:], start=header_idx + 2):
         line = raw.strip()
-        if not line or line.startswith("%%"):
+        if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
             continue
         balance = _balanced_error(line)
         if balance:
@@ -374,12 +498,22 @@ def _merge_node(nodes: Dict, parsed) -> None:
 
 def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
     lines = source.splitlines()
-    direction = _FLOW_HEADER_RE.match(lines[0].strip()).group(1).upper()
+    header_idx = 0
+    while header_idx < len(lines):
+        s = lines[header_idx].strip()
+        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
+            break
+        header_idx += 1
+    if header_idx >= len(lines):
+        raise ValueError("flowchart 源码为空")
+
+    direction_match = _FLOW_HEADER_RE.match(lines[header_idx].strip())
+    direction = direction_match.group(1).upper() if direction_match else "TD"
     nodes = {}
     edges = []
-    for raw in lines[1:]:
+    for raw in lines[header_idx + 1:]:
         line = raw.strip()
-        if not line or line.startswith("%%"):
+        if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
             continue
         edge = _EDGE_RE.match(line)
         if edge:
@@ -571,8 +705,17 @@ def _render_sequence_svg(source: str) -> Tuple[bytes, int, int]:
     participants: List[str] = []
     labels = {}
     messages = []
-    for raw in source.splitlines()[1:]:
+    lines = source.splitlines()
+    header_idx = 0
+    while header_idx < len(lines):
+        s = lines[header_idx].strip()
+        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
+            break
+        header_idx += 1
+    for raw in lines[header_idx + 1:]:
         line = raw.strip()
+        if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
+            continue
         participant = re.match(r"^(?:participant|actor)\s+([A-Za-z_][\w-]*)(?:\s+as\s+(.+))?$", line)
         if participant:
             name = participant.group(1)
@@ -671,6 +814,16 @@ def cli_available() -> bool:
     return _find_mmdc() is not None
 
 
+def _clean_source_for_cli(source: str) -> str:
+    cleaned = []
+    for line in source.splitlines():
+        s = line.strip()
+        if _HTML_COMMENT_RE.match(s):
+            continue
+        cleaned.append(line)
+    return "\n".join(cleaned)
+
+
 def _render_with_cli(source: str) -> Optional[RenderResult]:
     executable = _find_mmdc()
     if not executable:
@@ -678,7 +831,7 @@ def _render_with_cli(source: str) -> Optional[RenderResult]:
     with tempfile.TemporaryDirectory(prefix="doc-tool-mermaid-") as temp:
         input_path = Path(temp) / "diagram.mmd"
         output_path = Path(temp) / "diagram.svg"
-        input_path.write_text(source, encoding="utf-8")
+        input_path.write_text(_clean_source_for_cli(source), encoding="utf-8")
         command = [executable, "-i", str(input_path), "-o", str(output_path), "-b", "white"]
         puppeteer_config = _cli_puppeteer_config()
         if puppeteer_config:
