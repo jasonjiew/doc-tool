@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 
 
-GITLAB_BASE = os.getenv("GITLAB_BASE", "http://127.0.0.1:8899")
+GITLAB_BASE = os.getenv("GITLAB_BASE", "http://192.168.0.242:8899")
 PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
 VERSION = "2.3.2"
 TAG_NAME = "v2.3.2"
@@ -216,8 +216,8 @@ def main():
 
 ## 安装
 
-- **安装版**：下载 `DocTool-Setup-2.3.0.exe`，双击运行，按提示安装（默认安装到 `%LOCALAPPDATA%\\DocTool`，无需管理员权限）；
-- **免安装便携版**：下载 `DocTool-2.3.0-portable.zip`，解压到任意目录，首次先双击「安装证书.cmd」导入公司证书，之后双击「启动DocTool.cmd」启动。
+- **安装版**：下载 `DocTool-Setup-{VERSION}.exe`，双击运行，按提示安装（默认安装到 `%LOCALAPPDATA%\\DocTool`，无需管理员权限）；
+- **免安装便携版**：下载 `DocTool-{VERSION}-portable.zip`，解压到任意目录，首次先双击「安装证书.cmd」导入公司证书，之后双击「启动DocTool.cmd」启动。
 
 > 遇到启动问题，双击安装目录/便携包根部的 `diagnose.cmd`，把生成的 `DocTool-diagnose.txt` 发给维护人员。
 
@@ -228,8 +228,8 @@ def main():
 
 ## 构建来源
 
-- 标签：v2.3.0
-- 提交：3ed8394（main）
+- 标签：{TAG_NAME}
+- 提交：44034f9（main）
 - 构建环境：Windows 11 / Python 3.13 / PyInstaller 6.22.1 / Inno Setup 6
 
 ## 已知限制
