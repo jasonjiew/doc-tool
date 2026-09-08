@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 # fallback corrupting captured output in PowerShell-driven release builds.
 $env:PYTHONUTF8 = "1"
 $RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$Version = "2.3.1"
+$Version = "2.3.2"
 
 # --- vendored 运行时（优先使用，规避安全软件对 pip 的拦截与本机残缺安装）---
 $VendoredQt = "$RepoRoot\build\pyside-runtime"

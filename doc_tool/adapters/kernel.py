@@ -205,19 +205,68 @@ def build_with_project(
     return output
 
 
+def infer_require_refreshed(output_path: Union[str, Path]) -> bool:
+    """根据产物状态元数据或 DOCX 部件特征推断是否已由 Word 刷新。
+
+    1. 若存在同名 ``.state.json``：
+       - ``formal=True`` 且 ``diagnostic=False``：正式产物（已由 Word 刷新）-> True
+       - ``diagnostic=True``：诊断构建草稿（未刷新）-> False
+    2. 若状态文件不存在，探测 DOCX 内 ``word/settings.xml``：
+       - 若不含 ``updateFields``：表示已被 Word 消费并保存，属于刷新后正式态 -> True
+       - 若包含 ``updateFields``：表示待 Word 刷新，属于草稿态 -> False
+    3. 文件不存在或探测异常时退回 False。
+    """
+    path = Path(output_path)
+    if not path.is_file():
+        return False
+    try:
+        from doc_tool.domain.output_state import read_state
+
+        state = read_state(path)
+        if state is not None:
+            if state.formal and not state.diagnostic:
+                return True
+            if state.diagnostic:
+                return False
+    except Exception:
+        pass
+
+    try:
+        from doc_tool.domain.ooxml import read_docx_package
+
+        with read_docx_package(path) as pkg:
+            try:
+                settings_xml = pkg.read("word/settings.xml")
+                return b"updateFields" not in settings_xml
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return False
+
+
 def validate_with_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
     baseline: bool = False,
-    require_refreshed: bool = False,
+    require_refreshed: Optional[bool] = None,
     report_override: Optional[Union[str, Path]] = None,
 ) -> bool:
-    """以项目上下文调用 ``validate_docx.validate``，返回是否通过。"""
+    """以项目上下文调用 ``validate_docx.validate``，返回是否通过。
+
+    ``require_refreshed`` 为 None 时，自动根据产物状态（``.state.json`` 或 DOCX
+    内 updateFields 状态）自适应推断：正式产物走语义门禁，草稿产物走前置严格门禁。
+    """
     ensure_kernel_importable()
     from validate_docx import validate  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
+    output_path = config["paths"]["output"]
+    if require_refreshed is None:
+        require_refreshed = infer_require_refreshed(output_path)
+
     if report_override is None:
         paths.logs_dir.mkdir(parents=True, exist_ok=True)
         report_override = paths.logs_dir / (

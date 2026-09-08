@@ -1184,13 +1184,47 @@ class MainWindow(QMainWindow):
         if not self._project_summary or self.runner.is_running:
             return
         summary = self._project_summary
-        from doc_tool.adapters.kernel import ensure_kernel_importable, validate_with_project
+        from doc_tool.adapters.kernel import (
+            config_from_project,
+            ensure_kernel_importable,
+            validate_with_project,
+        )
 
         try:
             ensure_kernel_importable()
         except Exception as exc:  # noqa: BLE001
             self._show_error("内核不可用", str(exc)[:200])
             return
+
+        try:
+            config = config_from_project(summary.manifest, summary.paths)
+            target_output = Path(config["paths"]["output"])
+        except Exception:
+            target_output = None
+
+        if target_output is None or not target_output.exists():
+            display_name = target_output.name if target_output else "Word 产物"
+            self._show_error(
+                "Word 产物不存在",
+                "尚未生成 Word 产物（{0} 不存在）。".format(display_name),
+                "请先执行「操作 → 诊断构建（无 Word）」或「操作 → 正式合并」生成产物后再进行校验。",
+            )
+            return
+
+        # 检查源 Markdown 是否在产物生成后被修改过（消除用户关于“缓存”的误解）
+        stale_notice = False
+        try:
+            content_root = summary.paths.resolve(summary.manifest.relative_content_root())
+            if content_root.is_dir() and target_output.is_file():
+                md_files = [p for p in content_root.glob("**/*.md") if p.is_file()]
+                if md_files:
+                    latest_md_mtime = max(p.stat().st_mtime for p in md_files)
+                    output_mtime = target_output.stat().st_mtime
+                    if latest_md_mtime > output_mtime:
+                        stale_notice = True
+        except Exception:
+            pass
+
         self._stage_progress_enabled = TASK_UI["validate"]["stage_progress"]
         spec = TaskSpec(
             name="validate",
@@ -1199,6 +1233,10 @@ class MainWindow(QMainWindow):
             timeout_seconds=TASK_UI["validate"]["timeout"],
         )
         self._start_task(spec)
+        if stale_notice:
+            self._append_log(
+                "⚠ 提示：检测到源 Markdown 的修改时间晚于当前 Word 产物。当前校验基于磁盘已有产物；若需验证最新改动，请先执行「诊断构建」或「正式合并」。"
+            )
 
     def _on_merge(self) -> None:
         if not self._project_summary or self.runner.is_running:

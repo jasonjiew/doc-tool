@@ -26,6 +26,7 @@ DEFAULT_TESTS = [
     "test_installer.py", "test_brand_consistency.py", "test_settings_migration.py",
     "test_migration.py", "test_self_heal.py", "test_public_export.py",
     "test_review_docx.py", "test_table_format.py", "test_command_palette.py",
+    "test_validate_adaptation.py",
 ]
 
 
