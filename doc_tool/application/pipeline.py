@@ -717,7 +717,11 @@ def _run_pipeline_inner(
     log.info(STAGE_VALIDATE_PRE, "started")
     try:
         ok = validate_with_project(
-            manifest, paths, output_override=str(temp_output), baseline=baseline,
+            manifest,
+            paths,
+            output_override=str(temp_output),
+            baseline=baseline,
+            require_refreshed=False,
         )
         result.events.append(StageEvent(
             STAGE_VALIDATE_PRE,
