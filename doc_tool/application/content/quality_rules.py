@@ -48,6 +48,8 @@ def default_rules(document_type: str) -> List[QualityRule]:
         # 表格结构契约：阻断类问题按 error（不修必定合并失败），
         # 不阻断的排版偏差由检查器内部固定为 warning。
         QualityRule("markdown_structure", True, "error"),
+        # Mermaid 流程图与图表语法：错误语法阻断合并。
+        QualityRule("mermaid_syntax", True, "error"),
         QualityRule("sensitive_info", True, "warning", {"patterns": [
             {"name": "手机号", "regex": r"(?<!\d)1[3-9]\d{9}(?!\d)"},
             {"name": "身份证号", "regex": r"(?<!\d)\d{17}[0-9Xx](?!\d)"},

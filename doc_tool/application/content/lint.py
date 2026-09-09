@@ -83,6 +83,7 @@ class ContentLinter:
             "sensitive_info": self.check_sensitive_info,
             "interface_table_structure": self.check_interface_table_structure,
             "markdown_structure": self.check_markdown_structure,
+            "mermaid_syntax": self.check_mermaid_syntax,
         }
         for rule in self._rules().values():
             if rule.enabled and rule.rule_id in dispatch:
@@ -329,6 +330,23 @@ class ContentLinter:
                     line_no=finding.line_no,
                     message=finding.text,
                     rule_id="markdown_structure",
+                    severity=rule.severity if finding.blocking else "warning",
+                ))
+        return issues
+
+    def check_mermaid_syntax(self, rule) -> List[LintIssue]:
+        """Mermaid 流程图与图表语法检查（与构建前校验使用同一套规则）。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        issues: List[LintIssue] = []
+        for rel_path, lines in self._index.lines.items():
+            for finding in check_mermaid_structure(lines):
+                issues.append(LintIssue(
+                    rule="mermaid_syntax",
+                    rel_path=rel_path,
+                    line_no=finding.line_no,
+                    message=finding.text,
+                    rule_id="mermaid_syntax",
                     severity=rule.severity if finding.blocking else "warning",
                 ))
         return issues

@@ -420,6 +420,43 @@ class MarkdownStructureLintRuleTests(unittest.TestCase):
             "| 1 | 2 |",
         ])), [])
 
+    def test_check_mermaid_structure_blocking_on_syntax_error(self):
+        """Mermaid 语法错误在构建前契约中被标记为 blocking=True。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "# 1. 章节",
+            "",
+            "```mermaid",
+            "flowchart TD",
+            "  A[开始) --> B",
+            "```",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].rule, "mermaid_syntax")
+        self.assertEqual(findings[0].line_no, 5)
+        self.assertTrue(findings[0].blocking)
+        self.assertIn("括号不匹配", findings[0].message)
+
+    def test_check_bare_mermaid_structure_with_preceding_comment(self):
+        """裸 Mermaid 块前带注释时，行号精确指向错误代码行且 blocking=True。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "# 1. 章节",
+            "",
+            "<!-- EMPTY_PAR -->",
+            "flowchart TD",
+            "  A[开始) --> B",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].rule, "mermaid_syntax")
+        self.assertEqual(findings[0].line_no, 5)  # 第 5 行是 A[开始) --> B
+        self.assertTrue(findings[0].blocking)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

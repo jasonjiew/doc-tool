@@ -1604,6 +1604,29 @@ class LintTests(unittest.TestCase):
         """无清单文件时返回空列表。"""
         self.assertEqual(self.store.load(), [])
 
+    def test_mermaid_syntax_detected_by_linter(self):
+        """Mermaid 语法错误被 ContentLinter 作为 mermaid_syntax 规则标记。"""
+        from doc_tool.application.content.index import ContentIndexService
+        from doc_tool.application.content.lint import ContentLinter
+        from doc_tool.application.content.quality_rules import QualityRule
+
+        files = {
+            "requirement/01.md": "# 1. 标题\n\n```mermaid\nflowchart TD\n  A[未闭合 --> B\n```\n"
+        }
+        root = make_project(files)
+        try:
+            index = ContentIndexService(root).build()
+            linter = ContentLinter(index)
+            rule = QualityRule("mermaid_syntax", True, "error")
+            issues = linter.check_mermaid_syntax(rule)
+            self.assertEqual(len(issues), 1)
+            self.assertEqual(issues[0].rule, "mermaid_syntax")
+            self.assertEqual(issues[0].line_no, 5)
+            self.assertIn("未闭合", issues[0].message)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+
 
 class ChangeManifestSerializationTests(unittest.TestCase):
     """改动清单条目 JSON 往返（新增 trash_path 字段必须持久化）。"""
