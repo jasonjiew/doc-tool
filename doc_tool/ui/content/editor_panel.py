@@ -122,6 +122,12 @@ class EditorPanel(QWidget):
         self._spell_timer = QTimer(self)
         self._spell_timer.setSingleShot(True)
         self._spell_timer.timeout.connect(self._scan_spelling)
+        self._mermaid_timer = QTimer(self)
+        self._mermaid_timer.setSingleShot(True)
+        self._mermaid_timer.timeout.connect(self._scan_mermaid_syntax)
+        self._mermaid_selections: List[QTextEdit.ExtraSelection] = []
+        self._mermaid_errors: List[Tuple[int, str]] = []
+        self._had_mermaid_errors = False
         # 行锚点闪烁定时器必须挂在本面板（QTimer(self)）而非无父 singleShot：
         # 否则面板 deleteLater 后回调访问已销毁的 _editor，抛 RuntimeError。
         self._flash_timer = QTimer(self)
@@ -322,6 +328,7 @@ class EditorPanel(QWidget):
         self._editor.set_image_import_callback(self.import_image)
         self._editor.mermaidEditRequested.connect(self._open_mermaid_at_position)
         self._editor.formatTableRequested.connect(self.format_table_at_cursor)
+        self._editor.cursorPositionChanged.connect(self._on_cursor_moved)
         self._format_table_shortcut = QShortcut(
             QKeySequence("Ctrl+Alt+T"), self, self.format_table_at_cursor
         )
@@ -368,6 +375,7 @@ class EditorPanel(QWidget):
         self._status_label.setText(summary)
         self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
         self._refresh_preview(text)
+        self._scan_mermaid_syntax()
         self._update_dirty()
         self._update_save_state()
 
@@ -389,6 +397,7 @@ class EditorPanel(QWidget):
         self._status_label.setText(summary)
         self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
         self._refresh_preview(text)
+        self._scan_mermaid_syntax()
         self._update_dirty()
         self._update_save_state()
 
@@ -623,8 +632,12 @@ class EditorPanel(QWidget):
         self._apply_extra_selections()
 
     def _apply_extra_selections(self) -> None:
-        """合并查找 + 拼写 + 临时高亮三组 ExtraSelections（避免互相覆盖）。"""
-        combined = self._find_selections + self._spell_selections
+        """合并查找 + 拼写 + Mermaid 诊断 + 临时高亮多组 ExtraSelections（避免互相覆盖）。"""
+        combined = (
+            self._find_selections
+            + self._spell_selections
+            + getattr(self, "_mermaid_selections", [])
+        )
         if getattr(self, "_flash_selection", None) is not None:
             combined = combined + [self._flash_selection]
         self._editor.setExtraSelections(combined)
@@ -768,6 +781,73 @@ class EditorPanel(QWidget):
         self._spell_checker.add_user_word(word)
         self._status_label.setText("已加入词典：{0}".format(word))
         self._spell_timer.start(0)
+
+    # --- Mermaid 流程图与图表语法诊断 ---
+
+    def _scan_mermaid_syntax(self) -> None:
+        """扫描当前文档中的所有 Mermaid 块，标记语法错误波浪线并在状态栏提示。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        doc = self._editor.document()
+        text = self._editor.toPlainText()
+        lines = text.splitlines()
+        findings = check_mermaid_structure(lines)
+
+        self._mermaid_errors = [(f.line_no, f.message) for f in findings]
+        selections: List[QTextEdit.ExtraSelection] = []
+
+        fmt = QTextCharFormat()
+        fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+        fmt.setUnderlineColor(QColor("#e03131"))
+
+        for line_no, _msg in self._mermaid_errors:
+            block = doc.findBlockByNumber(max(0, line_no - 1))
+            if block.isValid():
+                cursor = QTextCursor(block)
+                cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+                selection = QTextEdit.ExtraSelection()
+                selection.cursor = cursor
+                selection.format = fmt
+                selections.append(selection)
+
+        self._mermaid_selections = selections
+        self._apply_extra_selections()
+
+        if self._mermaid_errors:
+            first_line, first_msg = self._mermaid_errors[0]
+            self._status_label.setText(
+                "⚠ Mermaid 语法错误（第 {0} 行）：{1}".format(first_line, first_msg)
+            )
+            self._status_label.setToolTip(
+                "当前文档存在 {0} 处 Mermaid 语法错误，合并或构建前必须修复：\n{1}".format(
+                    len(self._mermaid_errors),
+                    "\n".join(
+                        "第 {0} 行：{1}".format(l, m) for l, m in self._mermaid_errors[:5]
+                    ),
+                )
+            )
+            self._had_mermaid_errors = True
+        elif getattr(self, "_had_mermaid_errors", False):
+            self._status_label.setText("Mermaid 语法错误已修复")
+            self._status_label.setToolTip("")
+            self._had_mermaid_errors = False
+
+    def _on_cursor_moved(self) -> None:
+        """光标移动时，若落在 Mermaid 错误行，在状态栏即时提示该行详细错误。"""
+        if not getattr(self, "_mermaid_errors", None):
+            return
+        cursor = self._editor.textCursor()
+        cur_line = cursor.blockNumber() + 1
+        matched = [msg for line_no, msg in self._mermaid_errors if line_no == cur_line]
+        if matched:
+            self._status_label.setText(
+                "⚠ Mermaid 语法错误（第 {0} 行）：{1}".format(cur_line, matched[0])
+            )
+        elif self._mermaid_errors:
+            first_line, first_msg = self._mermaid_errors[0]
+            self._status_label.setText(
+                "⚠ Mermaid 语法错误（第 {0} 行）：{1}".format(first_line, first_msg)
+            )
 
     # --- 代码片段 ---
 
@@ -1047,12 +1127,10 @@ class EditorPanel(QWidget):
             target = export_png(result, self._assets_root, self._document_type())
             return image_reference(target, result)
 
-        # 仅转换历史遗留的裸 flowchart/sequenceDiagram 源码（围栏块属现代写法，
-        # 阅读预览已渲染，不在批量转换范围内）。批量优先 mermaid-cli（若已安装，
-        # 单块约 1~3s，用户主动触发可接受）；未安装 mmdc 时自动回退内置渲染器，
-        # 行为与之前完全一致。
+        # 批量转换所有 Mermaid 源码（包含裸源码与围栏块）为图片。批量优先
+        # mermaid-cli（若已安装，单块约 1~3s）；未安装 mmdc 时自动回退内置渲染器。
         converted = batch_convert(
-            self._editor.toPlainText(), exporter, include_fenced=False, use_cli=True
+            self._editor.toPlainText(), exporter, include_fenced=True, use_cli=True
         )
         if converted.success_count:
             cursor = self._editor.textCursor()
@@ -1202,9 +1280,10 @@ class EditorPanel(QWidget):
         self._draft_timer.stop()
 
     def showEvent(self, event) -> None:
-        """显示时（标签切换/首次打开）重扫拼写，确保波浪线在可见后出现。"""
+        """显示时（标签切换/首次打开）重扫拼写与 Mermaid 语法，确保波浪线在可见后出现。"""
         super().showEvent(event)
         self._spell_timer.start(0)
+        self._mermaid_timer.start(0)
 
     # --- 内部 ---
 
@@ -1219,6 +1298,9 @@ class EditorPanel(QWidget):
         # 拼写检查独立去抖（只扫可见行，控制大文档开销）。
         self._spell_timer.stop()
         self._spell_timer.start(_SPELL_DEBOUNCE_MS)
+        # Mermaid 语法检查去抖。
+        self._mermaid_timer.stop()
+        self._mermaid_timer.start(_PREVIEW_DEBOUNCE_MS)
         # 草稿写入独立去抖：编辑停止一段时间后落盘最近内容。
         self._draft_timer.stop()
         self._draft_timer.start(_DRAFT_DEBOUNCE_MS)
