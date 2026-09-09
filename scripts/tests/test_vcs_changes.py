@@ -37,18 +37,26 @@ from doc_tool.application.content.vcs_changes import (  # noqa: E402
     ChangeDetectionService,
     ChangedFile,
     ChangeReport,
+    GitBranch,
     GitChangeDetector,
+    PushResult,
     SvnChangeDetector,
     clear_vcs_cache,
     commit_all as vcs_commit_all,
+    commit_files as vcs_commit_files,
     find_git_repo_root,
     find_svn_wc_root,
+    git_stash_pop,
+    git_stash_save,
+    list_git_branches,
     parse_git_name_status_z,
     parse_git_status_z,
     parse_svn_status_xml,
     pull_changes as vcs_pull_changes,
+    push_changes as vcs_push_changes,
     rollback_all,
     rollback_single_file,
+    switch_git_branch,
 )
 
 PROJECT_YML = (
@@ -1457,6 +1465,217 @@ class VcsCommitPullTests(RepoFixtureMixin, unittest.TestCase):
         result = vcs_pull_changes(report, runner=fake)
         self.assertFalse(result.ok)
         self.assertIn("svn update", result.error or "")
+
+
+class GitBranchAndWorkflowTests(RepoFixtureMixin, unittest.TestCase):
+    """Git 分支管理、暂存、部分提交与推送测试。"""
+
+    def test_list_git_branches_and_current(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+        _run_git(self.repo, "branch", "feature/awesome")
+        _run_git(self.repo, "branch", "release-1.0")
+
+        # 修改文件制造未提交改动
+        (project / "content" / "a.md").write_text("v2\n", encoding="utf-8")
+
+        branches, err = list_git_branches(self.repo, uncommitted_count=1)
+        self.assertIsNone(err)
+        self.assertTrue(len(branches) >= 3)
+
+        current = next(b for b in branches if b.is_current)
+        self.assertEqual(current.uncommitted_count, 1)
+
+        names = [b.name for b in branches]
+        self.assertIn("feature/awesome", names)
+        self.assertIn("release-1.0", names)
+
+    def test_switch_git_branch_existing(self):
+        make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+        _run_git(self.repo, "branch", "dev")
+
+        ok, err = switch_git_branch(self.repo, "dev")
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+        branches, _ = list_git_branches(self.repo)
+        cur = next(b for b in branches if b.is_current)
+        self.assertEqual(cur.name, "dev")
+
+    def test_create_and_checkout_branch(self):
+        make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        ok, err = switch_git_branch(self.repo, "feature/new-topic", create=True)
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+        branches, _ = list_git_branches(self.repo)
+        cur = next(b for b in branches if b.is_current)
+        self.assertEqual(cur.name, "feature/new-topic")
+
+    def test_switch_git_branch_invalid_names(self):
+        ok, err = switch_git_branch(self.repo, "bad name with spaces", create=True)
+        self.assertFalse(ok)
+        self.assertIn("非法字符", err or "")
+
+        ok, err = switch_git_branch(self.repo, "bad..double.dot", create=True)
+        self.assertFalse(ok)
+        self.assertIn("不合法", err or "")
+
+        ok, err = switch_git_branch(self.repo, "", create=True)
+        self.assertFalse(ok)
+        self.assertIn("不能为空", err or "")
+
+    def test_git_stash_and_pop(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        target_file = project / "content" / "a.md"
+        target_file.write_text("v2 modified\n", encoding="utf-8")
+
+        # 暂存
+        ok, err = git_stash_save(self.repo, "save changes before checkout")
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+        # 工作区应恢复干净（v1）
+        self.assertEqual(target_file.read_text(encoding="utf-8"), "v1\n")
+
+        # 恢复暂存
+        ok, err = git_stash_pop(self.repo)
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+        # 改动被恢复
+        self.assertEqual(target_file.read_text(encoding="utf-8"), "v2 modified\n")
+
+    def test_commit_files_selective(self):
+        project = make_project(
+            self.repo, "doc", {"content/a.md": "a1\n", "content/b.md": "b1\n"}
+        )
+        commit_all(self.repo, "init")
+
+        # 修改两个文件
+        (project / "content" / "a.md").write_text("a2\n", encoding="utf-8")
+        (project / "content" / "b.md").write_text("b2\n", encoding="utf-8")
+
+        svc = self.service(project)
+        report = svc.detect()
+        self.assertEqual(len(report.files), 2)
+
+        # 仅勾选并提交 a.md
+        failures = vcs_commit_files(report, ["content/a.md", "doc/content/a.md"], "commit only a")
+        self.assertEqual(failures, [])
+
+        # 再次检测，a.md 已入库，只剩下 b.md
+        svc.invalidate_cache()
+        report_after = svc.detect()
+        self.assertEqual(len(report_after.files), 1)
+        self.assertIn("b.md", report_after.files[0].path)
+
+    def test_push_changes_with_fake_runner(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        svc = self.service(project)
+        report = svc.detect()
+
+        commands_run = []
+
+        def fake_git(args, cwd):
+            commands_run.append(args)
+            if "rev-parse" in args:
+                if "@{u}" in args:
+                    return subprocess.CompletedProcess(args, 0, b"origin/master\n", b"")
+                return subprocess.CompletedProcess(args, 0, b"master\n", b"")
+            if "push" in args:
+                return subprocess.CompletedProcess(args, 0, b"Everything up-to-date\n", b"")
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+
+        res = vcs_push_changes(report, runner=fake_git)
+        self.assertTrue(res.ok)
+        self.assertIn("已成功推送", res.summary)
+        self.assertTrue(any("push" in cmd for cmd in commands_run))
+
+    def test_service_branches_and_switch_integration(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        svc = self.service(project)
+        branches, err = svc.branches()
+        self.assertIsNone(err)
+        self.assertTrue(len(branches) >= 1)
+
+        ok, err = svc.switch_branch("test-svc-branch", create=True)
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+        branches_after, _ = svc.branches()
+        cur = next(b for b in branches_after if b.is_current)
+        self.assertEqual(cur.name, "test-svc-branch")
+
+    def test_list_git_branches_detached_head(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+        # 游离头指针
+        _run_git(self.repo, "checkout", "--detach", "HEAD")
+
+        branches, err = list_git_branches(self.repo)
+        self.assertIsNone(err)
+        self.assertTrue(any(b.is_current for b in branches), "游离状态下必须包含 is_current=True 分支")
+        cur = next(b for b in branches if b.is_current)
+        self.assertTrue(cur.name.startswith("HEAD"), f"分支名应为 HEAD 标识，实际为: {cur.name}")
+
+    def test_push_changes_detached_head_blocked(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+        _run_git(self.repo, "checkout", "--detach", "HEAD")
+
+        svc = self.service(project)
+        report = svc.detect()
+        res = vcs_push_changes(report)
+        self.assertFalse(res.ok)
+        self.assertIn("游离头指针", res.error or "")
+
+    def test_commit_files_with_nested_project_and_relative_paths(self):
+        project = make_project(self.repo, "sub/my_doc", {"content/page.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        # 修改页面
+        (project / "content" / "page.md").write_text("v2 updated\n", encoding="utf-8")
+
+        svc = self.service(project)
+        report = svc.detect()
+        self.assertEqual(len(report.files), 1)
+
+        # 传递相对 content 或相对 project 的路径（如 UI 传过来的 "page.md"）
+        failures = vcs_commit_files(report, ["page.md"], "nested commit test")
+        self.assertEqual(failures, [])
+
+        svc.invalidate_cache()
+        report_after = svc.detect()
+        self.assertEqual(len(report_after.files), 0, "提交后工作区应干净")
+
+    def test_commit_files_with_both_reported_and_unreported_files(self):
+        """同时包含 report 内与 report 缓存外文件时，两者均正确入库，不丢文件。"""
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n", "content/b.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        (project / "content" / "a.md").write_text("v2\n", encoding="utf-8")
+        svc = self.service(project)
+        # report 此时只包含了 a.md
+        report = svc.detect()
+        self.assertEqual(len(report.files), 1)
+
+        # 此时磁盘上新建了 c.md（不在之前的 report.files 中）
+        (project / "content" / "c.md").write_text("v1 new\n", encoding="utf-8")
+
+        # 同时勾选 a.md 与 c.md 提交：两者均应被成功 commit，c.md 不会被丢弃
+        failures = vcs_commit_files(report, ["content/a.md", "content/c.md"], "commit both a and c")
+        self.assertEqual(failures, [])
+
+        svc.invalidate_cache()
+        report_after = svc.detect()
+        # a.md 和 c.md 都已入库，工作区干净
+        self.assertEqual(len(report_after.files), 0)
 
 
 if __name__ == "__main__":
