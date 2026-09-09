@@ -141,6 +141,22 @@ QStatusBar::item {{ border: none; }}
 QToolBar#projectBar {{ background: {panel}; border-bottom: 1px solid {border}; spacing: 8px; padding: 4px 8px; }}
 QToolBar#projectBar QLabel {{ color: {text}; }}
 
+/* --- 分支胶囊按钮 (状态栏 & 项目条) --- */
+QPushButton#statusBranchBtn, QPushButton#barBranchBtn {{
+    background: transparent;
+    border: 1px solid {border};
+    border-radius: 11px;
+    padding: 2px 10px;
+    font-size: 8.5pt;
+    font-weight: 500;
+    color: {text};
+}}
+QPushButton#statusBranchBtn:hover, QPushButton#barBranchBtn:hover {{
+    background: {selection_bg};
+    border-color: {accent};
+    color: {accent};
+}}
+
 /* --- 按钮层级 --- */
 QPushButton {{ {font_body} background: {panel_alt}; border: 1px solid {border}; border-radius: 6px; padding: 6px 16px; }}
 QPushButton:hover {{ background: {panel}; border-color: {accent}; }}
