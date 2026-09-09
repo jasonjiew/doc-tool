@@ -37,8 +37,11 @@ from doc_tool.application.content.snapshot import (
 from doc_tool.application.content.tree import build_tree
 from doc_tool.application.content.vcs_changes import (
     ChangeDetectionService,
+    GitBranch,
     PullResult,
+    PushResult,
     commit_all,
+    commit_files,
     pull_changes,
     rollback_all,
     rollback_single_file,
@@ -54,6 +57,7 @@ from doc_tool.application.content.workspace_state import (
 from doc_tool.application.content.writer import (
     OP_CREATE,
     OP_DELETE,
+    OP_EDIT,
     OP_RENAME,
     ContentWriter,
 )
@@ -78,11 +82,24 @@ def build_content_context(
     content_root: Path,
     assets_root: Optional[Path] = None,
     cancel_token=None,
+    state_dir: Optional[Path] = None,
 ) -> ContentIndex:
-    """后台任务：构建索引 + 引用扫描（供 TaskRunner 执行）。"""
+    """后台任务：构建索引 + 引用扫描 + 快照基线维护（供 TaskRunner 执行）。"""
     service = ContentIndexService(content_root)
     index = service.build(cancel_token=cancel_token)
     ReferenceScanner(index, assets_root=assets_root).scan_all()
+    if state_dir is not None:
+        try:
+            snapshot = ContentSnapshot(state_dir)
+            snapshot.load()
+            rel_files = index.all_files()
+            if not snapshot.entries:
+                snapshot.take(content_root, rel_files)
+                snapshot.save()
+            else:
+                snapshot.ensure_baseline_content(content_root, rel_files)
+        except Exception:
+            pass
     return index
 
 
@@ -112,6 +129,8 @@ class ContentWorkspace(QWidget):
         on_open_file: Optional[Callable[[str], None]] = None,
         on_request_validate: Optional[Callable[[], None]] = None,
         on_index_ready: Optional[Callable[[], None]] = None,
+        on_branch_changed: Optional[Callable[[str], None]] = None,
+        on_stage: Optional[Callable[[str], None]] = None,
         unsaved_resolver: Optional[UnsavedResolver] = None,
         restore_drafts_choice=None,
         parent: Optional[QWidget] = None,
@@ -134,6 +153,8 @@ class ContentWorkspace(QWidget):
         self._on_open_file = on_open_file
         self._on_request_validate = on_request_validate
         self._on_index_ready = on_index_ready
+        self._on_branch_changed = on_branch_changed
+        self._on_stage = on_stage
         self._closing = False
         self._unsaved_resolver = unsaved_resolver or confirm_unsaved_dialog
         self._restore_drafts_choice = (
@@ -151,9 +172,14 @@ class ContentWorkspace(QWidget):
         )
         # VCS 管理下的项目不生成 .md.bak（版本控制已提供恢复能力），
         # 避免 .bak 污染 git/svn 工作树；本地项目保持原备份/回滚行为。
+        # 采用轻量化目录检查，杜绝在主线程构造函数中运行外部 git 子进程造成挂起。
         self._vcs_managed = False
         try:
-            self._vcs_managed = self._vcs.detect().source in ("git", "svn")
+            from doc_tool.application.content.vcs_changes import find_git_repo_root, find_svn_wc_root
+            self._vcs_managed = (
+                find_git_repo_root(self._project_root) is not None
+                or find_svn_wc_root(self._project_root) is not None
+            )
         except Exception:  # noqa: BLE001  # 检测失败不阻断打开
             self._vcs_managed = False
         self._writer.set_backup_enabled(not self._vcs_managed)
@@ -163,19 +189,19 @@ class ContentWorkspace(QWidget):
 
         # 内容快照基线：首次打开打基线（此后徽标=相对基线的所有真实变动，含外部编辑）。
         self._snapshot = ContentSnapshot(self._state_dir)
-        self._snapshot.load()
+        try:
+            self._snapshot.load()
+        except Exception:
+            pass
         if not self._snapshot.entries:
-            self._snapshot.take(
-                self._content_root,
-                [rel for rel, _ in self._index_service.discover_files()],
-            )
-            self._snapshot.save()
-        else:
-            # 旧项目升级：元数据已有但基线内容副本缺失时补拷（供改动面板 diff）。
-            self._snapshot.ensure_baseline_content(
-                self._content_root,
-                [rel for rel, _ in self._index_service.discover_files()],
-            )
+            try:
+                self._snapshot.take(
+                    self._content_root,
+                    [rel for rel, _ in self._index_service.discover_files()],
+                )
+                self._snapshot.save()
+            except Exception:
+                pass
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -235,6 +261,8 @@ class ContentWorkspace(QWidget):
 
         if self._on_status is not None:
             self._on_status("正在构建内容索引…")
+        if getattr(self, "_on_stage", None) is not None:
+            self._on_stage("正在构建内容全文索引…")
         self._runner.start(
             TaskSpec(
                 name="content-index",
@@ -242,6 +270,7 @@ class ContentWorkspace(QWidget):
                 kwargs={
                     "content_root": self._content_root,
                     "assets_root": self._assets_root,
+                    "state_dir": self._state_dir,
                 },
             ),
             on_done=self._on_index_done,
@@ -375,7 +404,9 @@ class ContentWorkspace(QWidget):
             rollback_single=self._rollback_single_change,
             on_open_file=self.open_file,
             on_commit=self._commit_all_changes,
+            on_commit_files=self._commit_selected_changes,
             on_pull=self._pull_changes,
+            on_push=self._push_changes,
             on_export_review=self._on_export_review_clicked,
         )
         self._panels.addTab(changes, "改动")
@@ -532,11 +563,26 @@ class ContentWorkspace(QWidget):
     def current_file(self) -> Optional[str]:
         return self.tabs_host.current_rel_path()
 
+    def current_editor(self):
+        """返回当前激活的编辑器实例（供主窗口及命令面板调用）。"""
+        return self.tabs_host.current_editor()
+
     def _select_panel(self, name: str) -> None:
         for index in range(self._panels.count()):
             if self._panels.tabText(index) == name:
                 self._panels.setCurrentIndex(index)
                 return
+
+    def show_changes(self) -> None:
+        """切换到改动汇总面板。"""
+        self._select_panel("改动")
+
+    def trigger_commit(self) -> None:
+        """聚焦改动面板并弹出提交对话框。"""
+        self.show_changes()
+        panel = getattr(self, "_changes_panel", None)
+        if panel is not None:
+            panel.trigger_commit()
 
     # --- 写后联动 ---
 
@@ -579,6 +625,11 @@ class ContentWorkspace(QWidget):
         status = self._status_map()
         self._tree.set_status_map(status)
         self._refresh_changes_panel(status)
+        if self._on_branch_changed is not None and self._change_source == "git":
+            try:
+                self._on_branch_changed(self.current_branch_name())
+            except Exception:
+                pass
 
     # --- 改动面板 ---
 
@@ -687,6 +738,117 @@ class ContentWorkspace(QWidget):
         self._vcs.invalidate_cache()
         return failures
 
+    def _commit_selected_changes(
+        self, files: Sequence[str], message: str
+    ) -> List[str]:
+        """改动面板提交勾选的文件改动。"""
+        report = self._vcs.detect()
+        if report.source not in ("git", "svn"):
+            return ["当前项目不在版本控制内，无法提交"]
+        failures = commit_files(report, files, message)
+        if not failures:
+            try:
+                self._writer.manifest.load()
+                for f in files:
+                    self._writer.manifest.drop(OP_CREATE, f)
+                    self._writer.manifest.drop(OP_EDIT, f)
+                    self._writer.manifest.drop(OP_DELETE, f)
+                    self._writer.manifest.drop(OP_RENAME, f)
+            except OSError:
+                pass
+        self._vcs.invalidate_cache()
+        return failures
+
+    def _push_changes(self) -> PushResult:
+        """改动面板「推送代码」：执行 git push。"""
+        report = self._vcs.detect()
+        if report.source != "git":
+            return PushResult(ok=False, error="当前项目不在 Git 版本控制内，无法推送")
+        result = self._vcs.push()
+        self._vcs.invalidate_cache()
+        return result
+
+    def list_branches(self) -> Tuple[List[GitBranch], Optional[str]]:
+        """获取当前仓库的分支列表。"""
+        return self._vcs.branches()
+
+    def current_branch_name(self) -> str:
+        """获取当前检出分支的名称。"""
+        branches, _ = self.list_branches()
+        for b in branches:
+            if b.is_current:
+                return b.name
+        return ""
+
+    def switch_branch(
+        self,
+        branch_name: str,
+        *,
+        create: bool = False,
+        base_branch: Optional[str] = None,
+        force: bool = False,
+    ) -> Tuple[bool, Optional[str]]:
+        """切换 Git 分支并在成功后重载所有打开文件、重刷章节树与索引。"""
+        ok, err = self._vcs.switch_branch(
+            branch_name, create=create, base_branch=base_branch, force=force
+        )
+        if not ok:
+            return False, err
+
+        # 重载所有已打开的文件标签页
+        if hasattr(self, "tabs_host"):
+            for rel in self.tabs_host.open_rel_paths():
+                self.tabs_host.reload_file(rel)
+
+        # 重建索引与树并刷新改动面板
+        self._rebuild_index()
+        self._refresh_changes_panel()
+
+        if self._on_branch_changed is not None:
+            self._on_branch_changed(branch_name)
+
+        if self._on_status is not None:
+            self._on_status(f"已切换至分支: {branch_name}")
+
+        return True, None
+
+    def fetch_branches(self, remote: str = "") -> Tuple[bool, Optional[str]]:
+        """从远端拉取最新分支信息 (git fetch --prune)。"""
+        return self._vcs.fetch_remotes(remote=remote)
+
+    def delete_branch(self, branch_name: str, force: bool = False) -> Tuple[bool, Optional[str]]:
+        """删除本地分支。"""
+        return self._vcs.delete_branch(branch_name, force=force)
+
+    def rename_branch(self, old_name: str, new_name: str) -> Tuple[bool, Optional[str]]:
+        """重命名本地分支。"""
+        ok, err = self._vcs.rename_branch(old_name, new_name)
+        if ok and self._on_branch_changed is not None:
+            self._on_branch_changed(new_name)
+        return ok, err
+
+    def stash_changes(self, message: str = "") -> Tuple[bool, Optional[str]]:
+        """暂存工作区未提交改动并刷新。"""
+        ok, err = self._vcs.stash(message)
+        if ok:
+            if hasattr(self, "tabs_host"):
+                for rel in self.tabs_host.open_rel_paths():
+                    self.tabs_host.reload_file(rel)
+            self._rebuild_index()
+            self._refresh_changes_panel()
+        return ok, err
+
+    def pop_stash(self) -> Tuple[bool, Optional[str]]:
+        """弹出恢复暂存改动并刷新。"""
+        ok, err = self._vcs.pop_stash()
+        if ok:
+            if hasattr(self, "tabs_host"):
+                for rel in self.tabs_host.open_rel_paths():
+                    self.tabs_host.reload_file(rel)
+            self._rebuild_index()
+            self._refresh_changes_panel()
+        return ok, err
+
     def _pull_changes(self) -> PullResult:
         """改动面板「拉取更新」：git pull / svn update，返回带统计的结果。
 
@@ -716,8 +878,12 @@ class ContentWorkspace(QWidget):
     def _after_restore(self, rel_path: Optional[str] = None) -> None:
         """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
         self._vcs.invalidate_cache()
-        if rel_path is not None and hasattr(self, "tabs_host"):
-            self.tabs_host.reload_file(rel_path)
+        if hasattr(self, "tabs_host"):
+            if rel_path is not None:
+                self.tabs_host.reload_file(rel_path)
+            else:
+                for p in self.tabs_host.open_rel_paths():
+                    self.tabs_host.reload_file(p)
         if self._index is None:
             return
         self._index_service.refresh(self._index)
@@ -828,6 +994,27 @@ class ContentWorkspace(QWidget):
         else:
             if self._on_status is not None:
                 self._on_status(f"已撤销改动：{rel_path}")
+
+    def reload_baseline(self) -> None:
+        """重新从磁盘加载内容基线快照并刷新树状态与改动面板（例如在正式合并之后）。"""
+        self._snapshot.load()
+        if not self._snapshot.entries and self._index is not None:
+            self._snapshot.take(
+                self._content_root, self._index.all_files()
+            )
+            self._snapshot.save()
+        if self._index is not None:
+            self._snapshot.ensure_baseline_content(
+                self._content_root, self._index.all_files()
+            )
+        self._vcs.invalidate_cache()
+        if hasattr(self._writer, "manifest"):
+            self._writer.manifest.load()
+            self._writer.manifest.clear()
+        if self._index is not None:
+            self._rebuild_index()
+        else:
+            self._apply_status_map()
 
     def _rebuild_index(self) -> None:
         """手动刷新：非破坏性重扫索引 + 重扫引用 + 重绘树。"""

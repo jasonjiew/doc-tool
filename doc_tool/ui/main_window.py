@@ -188,6 +188,15 @@ class MainWindow(QMainWindow):
         self._status_label = QLabel("就绪", self)
         self._status_label.setObjectName("statusMuted")
         status_bar.addWidget(self._status_label)
+
+        self._branch_btn = QPushButton("", self)
+        self._branch_btn.setObjectName("statusBranchBtn")
+        self._branch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._branch_btn.setToolTip("当前 Git 分支（点击切换分支）")
+        self._branch_btn.setVisible(False)
+        self._branch_btn.clicked.connect(self._on_switch_branch_clicked)
+        status_bar.addWidget(self._branch_btn)
+
         self._lock_label = QLabel("", self)
         self._lock_label.setObjectName("statusMuted")
         status_bar.addPermanentWidget(self._lock_label)
@@ -214,6 +223,7 @@ class MainWindow(QMainWindow):
             on_merge=self._on_merge,
             on_diag_build=self._on_diag_build,
             on_validate=self._on_validate,
+            on_switch_branch=self._on_switch_branch_clicked,
         )
         ide_layout.addWidget(self._project_bar)
         self._ide_center_host = QWidget(self._ide_page)
@@ -248,6 +258,11 @@ class MainWindow(QMainWindow):
         self._elapsed_timer = QTimer(self)
         self._elapsed_timer.setInterval(1000)
         self._elapsed_timer.timeout.connect(self._update_elapsed)
+
+        # 项目加载动效遮罩层
+        from doc_tool.ui.project_loading_overlay import ProjectLoadingOverlay
+
+        self._loading_overlay = ProjectLoadingOverlay(self, dark=self._dark)
 
     def _build_menu(self) -> None:
         from PySide6.QtGui import QAction, QKeySequence
@@ -320,6 +335,42 @@ class MainWindow(QMainWindow):
         self._open_external_action = QAction("在外部编辑器打开当前文件", self)
         self._open_external_action.triggered.connect(self._on_content_open_external)
         content_menu.addAction(self._open_external_action)
+
+        # 版本控制 (Git)
+        git_menu = menubar.addMenu("版本控制")
+        self._switch_branch_action = QAction("切换分支…", self)
+        self._switch_branch_action.setShortcut(QKeySequence("Ctrl+B"))
+        self._switch_branch_action.triggered.connect(self._on_switch_branch_clicked)
+        git_menu.addAction(self._switch_branch_action)
+
+        self._new_branch_action = QAction("新建并切换分支…", self)
+        self._new_branch_action.triggered.connect(self._on_new_branch_menu_clicked)
+        git_menu.addAction(self._new_branch_action)
+
+        git_menu.addSeparator()
+
+        self._git_commit_action = QAction("提交改动…", self)
+        self._git_commit_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        self._git_commit_action.triggered.connect(self._on_git_commit_menu_clicked)
+        git_menu.addAction(self._git_commit_action)
+
+        self._git_push_action = QAction("推送代码 (Git Push)", self)
+        self._git_push_action.triggered.connect(self._on_git_push_menu_clicked)
+        git_menu.addAction(self._git_push_action)
+
+        self._git_pull_action = QAction("拉取更新 (Git Pull)", self)
+        self._git_pull_action.triggered.connect(self._on_git_pull_menu_clicked)
+        git_menu.addAction(self._git_pull_action)
+
+        git_menu.addSeparator()
+
+        self._git_stash_action = QAction("暂存工作区改动 (Stash)", self)
+        self._git_stash_action.triggered.connect(self._on_git_stash_menu_clicked)
+        git_menu.addAction(self._git_stash_action)
+
+        self._git_pop_stash_action = QAction("恢复暂存改动 (Stash Pop)", self)
+        self._git_pop_stash_action.triggered.connect(self._on_git_pop_stash_menu_clicked)
+        git_menu.addAction(self._git_pop_stash_action)
 
         # 视图：Dock 显隐开关、专注模式与全局命令面板
         self._view_menu = QMenu("视图", self)
@@ -556,6 +607,60 @@ class MainWindow(QMainWindow):
                 )
             )
 
+        # 版本控制 (Git)
+        if self._project_summary:
+            items.append(
+                PaletteItem(
+                    title="Git: 切换分支…",
+                    category="Git",
+                    shortcut="Ctrl+B",
+                    callback=self._on_switch_branch_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 新建并切换分支…",
+                    category="Git",
+                    callback=self._on_new_branch_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 提交改动…",
+                    category="Git",
+                    shortcut="Ctrl+Shift+C",
+                    callback=self._on_git_commit_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 推送代码 (Push)",
+                    category="Git",
+                    callback=self._on_git_push_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 拉取更新 (Pull)",
+                    category="Git",
+                    callback=self._on_git_pull_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 暂存工作区改动 (Stash)",
+                    category="Git",
+                    callback=self._on_git_stash_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="Git: 恢复暂存改动 (Stash Pop)",
+                    category="Git",
+                    callback=self._on_git_pop_stash_menu_clicked,
+                )
+            )
+
         # 视图
         items.append(
             PaletteItem(
@@ -756,11 +861,15 @@ class MainWindow(QMainWindow):
             self._stack.setCurrentWidget(self._empty_state)
             self._task_dock_widget.hide()
             self._project_bar.reset()
+            if hasattr(self, "_branch_btn"):
+                self._branch_btn.setVisible(False)
+            self._set_git_menu_enabled(False)
         else:
             self._stack.setCurrentWidget(self._ide_page)
             # 离开空状态后重新显示右侧任务/结果 Dock（空状态会隐藏它）。
             self._task_dock_widget.show()
             self._project_bar.render(self._project_summary, state)
+            self._update_git_branch_ui()
             # 右侧 Dock 内容由任务生命周期驱动，不在此覆盖 running/result
             if state.view == WorkView.IDLE and not self.runner.is_running:
                 self._task_dock.show_idle(
@@ -850,9 +959,18 @@ class MainWindow(QMainWindow):
 
         # 未保存保护：当前工作区存在脏标签时先确认；取消则中止打开新项目。
         if not self._confirm_switch_project():
+            if hasattr(self, "_loading_overlay"):
+                self._loading_overlay.finish()
             return
         # 保存旧项目会话（在旧工作区销毁前收集）。
         self._persist_workspace_session()
+
+        if hasattr(self, "_loading_overlay"):
+            if not self._loading_overlay.isVisible():
+                self._loading_overlay.start(summary.project_root.name, "正在准备工作区…")
+            else:
+                self._loading_overlay.show_stage("正在准备工作区…")
+            QApplication.processEvents()
 
         self._project_summary = summary
         self._word_available = None
@@ -898,15 +1016,25 @@ class MainWindow(QMainWindow):
             if existing is not None and existing is not self:
                 self._activate_window(existing)
                 return
+
+        proj_name = Path(path).name
+        if hasattr(self, "_loading_overlay"):
+            self._loading_overlay.start(proj_name, "正在解析项目配置与元数据…")
+            QApplication.processEvents()
+
         from doc_tool.application.project_service import open_project
         from doc_tool.domain.errors import DocToolError
 
         try:
             summary = open_project(path)
         except DocToolError as exc:
+            if hasattr(self, "_loading_overlay"):
+                self._loading_overlay.finish()
             self._show_error("打开项目失败", exc.user_message, exc.suggested_action)
             return
         except Exception as exc:  # noqa: BLE001
+            if hasattr(self, "_loading_overlay"):
+                self._loading_overlay.finish()
             self._show_error("打开项目失败", str(exc)[:200])
             return
         self.show_project(summary)
@@ -953,6 +1081,8 @@ class MainWindow(QMainWindow):
             on_open_file=self._on_content_open_file,
             on_request_validate=self._on_content_request_validate,
             on_index_ready=self._on_content_index_ready,
+            on_branch_changed=self._on_branch_changed,
+            on_stage=lambda s: self._loading_overlay.show_stage(s) if hasattr(self, "_loading_overlay") else None,
             unsaved_resolver=self._unsaved_resolver,
         )
 
@@ -973,6 +1103,7 @@ class MainWindow(QMainWindow):
         self._panels_dock.setMinimumHeight(180)
 
         self._rebuild_view_menu()
+        QTimer.singleShot(0, self._update_git_branch_ui)
 
     def _remove_content_docks(self) -> None:
         for name in ("chapterTreeDock", "panelsDock"):
@@ -998,6 +1129,8 @@ class MainWindow(QMainWindow):
     def _on_content_index_ready(self) -> None:
         self._content_index_ready = True
         self._refresh_interaction_state()
+        if hasattr(self, "_loading_overlay"):
+            self._loading_overlay.finish()
 
     def _on_content_open_file(self, rel_path: str) -> None:
         self._content_current_file = rel_path
@@ -2278,6 +2411,11 @@ class MainWindow(QMainWindow):
         geometry = "{0}x{1}+{2}+{3}".format(rect.width(), rect.height(), rect.x(), rect.y())
         save_window_geometry(geometry, False)
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "_loading_overlay") and self._loading_overlay.isVisible():
+            self._loading_overlay.setGeometry(self.rect())
+
     def _finish_close(self) -> None:
         self._close_after_task = False
         try:
@@ -2285,6 +2423,373 @@ class MainWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             pass
         self.close()
+
+    # --- Git 分支与工作流 ---
+
+    def _on_branch_changed(self, new_branch: str) -> None:
+        """底层分支变更时刷新界面展示。"""
+        self._update_git_branch_ui()
+
+    def _update_git_branch_ui(self) -> None:
+        """刷新底部状态栏与顶部项目条的分支展示及菜单状态。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            if hasattr(self, "_branch_btn"):
+                self._branch_btn.setVisible(False)
+            if hasattr(self, "_project_bar"):
+                self._project_bar.set_branch("")
+            self._set_git_menu_enabled(False)
+            return
+
+        try:
+            branches, _ = ws.list_branches()
+        except Exception:  # noqa: BLE001
+            branches = []
+
+        if not branches:
+            if hasattr(self, "_branch_btn"):
+                self._branch_btn.setVisible(False)
+            if hasattr(self, "_project_bar"):
+                self._project_bar.set_branch("")
+            self._set_git_menu_enabled(False)
+            return
+
+        current_b = next((b for b in branches if b.is_current), None)
+        if current_b:
+            b_name = current_b.name
+            u_count = current_b.uncommitted_count
+            badge = f" ({u_count})" if u_count > 0 else ""
+            if hasattr(self, "_branch_btn"):
+                self._branch_btn.setText(f"⎇ {b_name}{badge}")
+                self._branch_btn.setToolTip(f"当前 Git 分支：{b_name}（点击切换分支）")
+                self._branch_btn.setVisible(True)
+            if hasattr(self, "_project_bar"):
+                self._project_bar.set_branch(b_name, u_count)
+            self._set_git_menu_enabled(True)
+        else:
+            if hasattr(self, "_branch_btn"):
+                self._branch_btn.setVisible(False)
+            if hasattr(self, "_project_bar"):
+                self._project_bar.set_branch("")
+            self._set_git_menu_enabled(False)
+
+    def _set_git_menu_enabled(self, enabled: bool) -> None:
+        for attr in (
+            "_switch_branch_action",
+            "_new_branch_action",
+            "_git_commit_action",
+            "_git_push_action",
+            "_git_pull_action",
+            "_git_stash_action",
+            "_git_pop_stash_action",
+        ):
+            act = getattr(self, attr, None)
+            if act is not None:
+                act.setEnabled(enabled)
+
+    def _on_switch_branch_clicked(self) -> None:
+        """点击状态栏分支胶囊或项目条分支按钮弹出 Codex 风格浮层。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        branches, err = ws.list_branches()
+        if not branches:
+            QMessageBox.information(self, "分支切换", "当前项目未纳入 Git 仓库或暂无可用的 Git 分支。")
+            return
+
+        from doc_tool.ui.content.branch_popover import BranchPopover
+
+        popover = BranchPopover(branches, dark=self._dark, parent=self)
+        popover.branch_selected.connect(self._handle_branch_selected)
+        popover.create_branch_requested.connect(self._on_new_branch_menu_clicked)
+        popover.create_from_branch_requested.connect(self._on_create_branch_from)
+        popover.refresh_requested.connect(lambda: self._handle_popover_refresh(popover))
+        popover.fetch_requested.connect(lambda: self._handle_popover_fetch(popover))
+        popover.delete_branch_requested.connect(lambda b: self._handle_popover_delete_branch(popover, b))
+        popover.rename_branch_requested.connect(lambda o, n: self._handle_popover_rename_branch(popover, o, n))
+
+        sender = self.sender()
+        anchor = getattr(self, "_branch_btn", None)
+        if hasattr(self, "_project_bar") and sender == getattr(self._project_bar, "_branch_btn", None):
+            anchor = self._project_bar.branch_anchor()
+        popover.show_anchored(anchor)
+
+    def _handle_popover_refresh(self, popover) -> None:
+        """刷新分支浮层与界面状态。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ws._vcs.invalidate_cache()
+        branches, _ = ws.list_branches()
+        popover.set_branches(branches)
+        self._update_git_branch_ui()
+
+    def _handle_popover_fetch(self, popover) -> None:
+        """从远端获取最新分支信息。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        popover.set_loading(True, "正在获取远端分支…")
+        QApplication.processEvents()
+        try:
+            ok, err = ws.fetch_branches()
+        finally:
+            popover.set_loading(False)
+        if not ok:
+            QMessageBox.warning(self, "获取远端分支失败", f"拉取分支失败：\n\n{err}")
+        else:
+            ws._vcs.invalidate_cache()
+            branches, _ = ws.list_branches()
+            popover.set_branches(branches)
+            self._update_git_branch_ui()
+
+    def _handle_popover_delete_branch(self, popover, branch_name: str) -> None:
+        """删除本地分支。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ok, err = ws.delete_branch(branch_name, force=False)
+        if not ok:
+            # 可能是未合并分支，询问是否强制删除
+            ans = QMessageBox.question(
+                self,
+                "强制删除分支",
+                f"分支「{branch_name}」包含尚未合并的提交，普通删除失败：\n\n{err}\n\n是否强制删除此分支？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if ans == QMessageBox.StandardButton.Yes:
+                ok, err = ws.delete_branch(branch_name, force=True)
+                if not ok:
+                    QMessageBox.warning(self, "删除分支失败", f"强制删除失败：\n\n{err}")
+                    return
+            else:
+                return
+
+        ws._vcs.invalidate_cache()
+        branches, _ = ws.list_branches()
+        popover.set_branches(branches)
+        self._update_git_branch_ui()
+
+    def _handle_popover_rename_branch(self, popover, old_name: str, new_name: str) -> None:
+        """重命名本地分支。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ok, err = ws.rename_branch(old_name, new_name)
+        if not ok:
+            QMessageBox.warning(self, "重命名分支失败", f"重命名失败：\n\n{err}")
+            return
+        ws._vcs.invalidate_cache()
+        branches, _ = ws.list_branches()
+        popover.set_branches(branches)
+        self._update_git_branch_ui()
+
+    def _on_create_branch_from(self, base_branch: str) -> None:
+        """基于指定基准分支新建并切换分支。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        branches, _ = ws.list_branches()
+        existing = [b.name for b in branches]
+
+        from doc_tool.ui.content.branch_popover import NewBranchDialog
+
+        dlg = NewBranchDialog(base_branch, existing, dark=self._dark, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_branch = dlg.branch_name
+        if not new_branch:
+            return
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            ok, err = ws.switch_branch(new_branch, create=True, base_branch=base_branch)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if not ok:
+            QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
+        else:
+            self._update_git_branch_ui()
+
+    def _handle_branch_selected(self, target_branch: str) -> None:
+        """处理选中的目标分支切换。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        cur_branch = ws.current_branch_name()
+        if cur_branch and target_branch == cur_branch:
+            return
+
+        # 检查未提交改动
+        branches, _ = ws.list_branches()
+        cur_b = next((b for b in branches if b.is_current), None)
+        uncommitted = cur_b.uncommitted_count if cur_b else 0
+
+        did_stash = False
+        if uncommitted > 0:
+            box = QMessageBox(self)
+            box.setWindowTitle("切换分支提示")
+            box.setText(
+                f"当前工作区有 <b>{uncommitted}</b> 个未提交的文件改动。<br><br>"
+                f"直接切换到分支「<b>{target_branch}</b>」可能会因文件冲突导致失败或覆盖修改。<br><br>"
+                "请选择处理方式："
+            )
+            stash_btn = box.addButton("暂存改动并切换 (Stash & Switch)", QMessageBox.ButtonRole.AcceptRole)
+            commit_btn = box.addButton("先提交改动 (Commit Changes)", QMessageBox.ButtonRole.ActionRole)
+            direct_btn = box.addButton("直接尝试切换 (Direct Checkout)", QMessageBox.ButtonRole.DestructiveRole)
+            cancel_btn = box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+
+            clicked = box.clickedButton()
+            if clicked == cancel_btn or clicked is None:
+                return
+            elif clicked == stash_btn:
+                ok, err = ws.stash_changes(f"Auto-stash before checkout {target_branch}")
+                if not ok:
+                    QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+                    return
+                did_stash = True
+            elif clicked == commit_btn:
+                self._on_git_commit_menu_clicked()
+                return
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            ok, err = ws.switch_branch(target_branch)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if not ok:
+            if did_stash:
+                try:
+                    ws.pop_stash()
+                except Exception:
+                    pass
+            QMessageBox.warning(self, "切换分支失败", f"无法切换到分支「{target_branch}」：\n\n{err}")
+        else:
+            self._update_git_branch_ui()
+
+    def _on_new_branch_menu_clicked(self) -> None:
+        """新建并切换分支对话框。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        cur_branch = ws.current_branch_name()
+        branches, _ = ws.list_branches()
+        existing = [b.name for b in branches]
+
+        from doc_tool.ui.content.branch_popover import NewBranchDialog
+
+        dlg = NewBranchDialog(cur_branch or "HEAD", existing, dark=self._dark, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_branch = dlg.branch_name
+        if not new_branch:
+            return
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            ok, err = ws.switch_branch(new_branch, create=True)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if not ok:
+            QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
+        else:
+            self._update_git_branch_ui()
+
+    def _on_git_commit_menu_clicked(self) -> None:
+        """菜单触发提交改动。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ws.trigger_commit()
+
+    def _on_git_push_menu_clicked(self) -> None:
+        """菜单触发推送代码。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ans = QMessageBox.question(
+            self,
+            "推送代码",
+            "确定要将当前分支的所有本地提交推送到远端仓库吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            res = ws._push_changes()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if res.ok:
+            QMessageBox.information(self, "推送成功", res.summary or "已成功推送到远端仓库！")
+            self._update_git_branch_ui()
+        else:
+            QMessageBox.warning(self, "推送失败", f"推送代码到远端失败：\n\n{res.error}")
+
+    def _on_git_pull_menu_clicked(self) -> None:
+        """菜单触发拉取更新。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ans = QMessageBox.question(
+            self,
+            "拉取更新",
+            "将执行 git pull，把远端最新变更合并到当前工作副本。\n\n请先保存所有打开的编辑内容。确认？",
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            res = ws._pull_changes()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if res.conflicts:
+            QMessageBox.warning(
+                self,
+                "拉取存在冲突",
+                f"以下 {len(res.conflicts)} 个文件有合并冲突，需要手工解决：\n\n"
+                + "\n".join(res.conflicts),
+            )
+        elif not res.ok:
+            QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{res.error}")
+        else:
+            QMessageBox.information(self, "拉取完成", res.summary or "已拉取最新更新！")
+            ws._after_restore()
+            self._update_git_branch_ui()
+
+    def _on_git_stash_menu_clicked(self) -> None:
+        """菜单触发暂存工作区改动。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ok, err = ws.stash_changes()
+        if ok:
+            QMessageBox.information(self, "暂存成功", "当前工作区的全部未提交改动已成功暂存 (git stash)。")
+            self._update_git_branch_ui()
+        else:
+            QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+
+    def _on_git_pop_stash_menu_clicked(self) -> None:
+        """菜单触发恢复暂存改动。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is None:
+            return
+        ok, err = ws.pop_stash()
+        if ok:
+            QMessageBox.information(self, "恢复暂存成功", "已成功恢复最近一次暂存的改动 (git stash pop)。")
+            self._update_git_branch_ui()
+        else:
+            QMessageBox.warning(self, "恢复暂存失败", f"恢复暂存改动失败：\n\n{err}")
 
     def closeEvent(self, event) -> None:
         """任务运行中先请求安全取消，终态回调到达后再关闭窗口。

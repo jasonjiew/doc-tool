@@ -36,12 +36,14 @@ class ProjectBar(QWidget):
         on_merge: Optional[Callable[[], None]] = None,
         on_diag_build: Optional[Callable[[], None]] = None,
         on_validate: Optional[Callable[[], None]] = None,
+        on_switch_branch: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._on_merge = on_merge
         self._on_diag_build = on_diag_build
         self._on_validate = on_validate
+        self._on_switch_branch = on_switch_branch
         self._summary_collapsed = False
 
         layout = QVBoxLayout(self)
@@ -63,6 +65,14 @@ class ProjectBar(QWidget):
         self._version_label = QLabel("", self)
         self._version_label.setObjectName("statusMuted")
         main.addWidget(self._version_label)
+
+        self._branch_btn = QPushButton("", self)
+        self._branch_btn.setObjectName("barBranchBtn")
+        self._branch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._branch_btn.setToolTip("当前 Git 分支（点击切换分支）")
+        self._branch_btn.setVisible(False)
+        self._branch_btn.clicked.connect(self._handle_switch_branch)
+        main.addWidget(self._branch_btn)
 
         self._readiness_label = QLabel("请选择或新建项目", self)
         self._readiness_label.setProperty("statusTone", "neutral")
@@ -197,16 +207,32 @@ class ProjectBar(QWidget):
         self._toggle_btn.setText("展开摘要" if self._summary_collapsed else "收起摘要")
 
     def reset(self) -> None:
-        """无项目时清空项目条。"""
+        """重设项目条展示为未打开项目状态。"""
         self._name_label.setText("未打开项目")
         self._type_label.setText("")
         self._version_label.setText("")
+        self._branch_btn.setVisible(False)
         self._readiness_label.setText("请选择或新建项目")
         self._readiness_label.setProperty("statusTone", "neutral")
         self._merge_btn.setEnabled(False)
         self._diag_btn.setEnabled(False)
         self._validate_btn.setEnabled(False)
         self._toggle_btn.setVisible(False)
+        for label in getattr(self, "_detail_labels", []):
+            label.setText("")
+
+    def set_branch(self, branch_name: str, uncommitted_count: int = 0) -> None:
+        """设置当前 Git 分支显示与改动角标。"""
+        if not branch_name:
+            self._branch_btn.setVisible(False)
+            return
+        badge = f" ({uncommitted_count})" if uncommitted_count > 0 else ""
+        self._branch_btn.setText(f"⎇ {branch_name}{badge}")
+        self._branch_btn.setVisible(True)
+
+    def branch_anchor(self) -> QWidget:
+        """返回供 Popover 锚定定位的控件。"""
+        return self._branch_btn
 
     # --- 事件转发 ---
 
@@ -221,3 +247,7 @@ class ProjectBar(QWidget):
     def _handle_validate(self) -> None:
         if self._on_validate is not None:
             self._on_validate()
+
+    def _handle_switch_branch(self) -> None:
+        if self._on_switch_branch is not None:
+            self._on_switch_branch()
