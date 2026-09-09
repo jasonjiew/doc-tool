@@ -115,6 +115,28 @@ class ChangeReport:
     error: Optional[str] = None  # 检测过程中的非致命错误说明
 
 
+@dataclass(frozen=True)
+class GitBranch:
+    """Git 分支信息。"""
+
+    name: str  # 分支名，如 "master", "feat/xxx"
+    is_current: bool = False  # 是否为当前检出分支
+    is_remote: bool = False  # 是否为远程分支
+    upstream: Optional[str] = None  # 关联的上游分支，如 "origin/master"
+    uncommitted_count: int = 0  # 当前工作区未提交改动数
+    ahead_count: int = 0  # 领先上游提交数
+    behind_count: int = 0  # 落后上游提交数
+
+
+@dataclass(frozen=True)
+class PushResult:
+    """一次推送的结果（改动面板「推送代码」的反馈）。"""
+
+    ok: bool
+    summary: str = ""
+    error: Optional[str] = None
+
+
 # 仓库级原始变更条目（未按项目过滤，缓存用）。
 # git: (path, change_type, old_path, staged, unstaged, untracked)
 # svn: (path, change_type, untracked)
@@ -667,6 +689,8 @@ class ChangeDetectionService:
         self._content_root = Path(content_root).resolve()
         self._timeout = timeout
         self._cache_ttl = cache_ttl
+        self._git_runner = git_runner
+        self._svn_runner = svn_runner
         self._git = GitChangeDetector(timeout=timeout, runner=git_runner)
         self._svn = SvnChangeDetector(timeout=timeout, runner=svn_runner)
         # 「项目是否被 git 跟踪」的窗口级缓存：(monotonic, tracked)。
@@ -793,6 +817,124 @@ class ChangeDetectionService:
         wc_root = find_svn_wc_root(self._project_root)
         if wc_root is not None:
             _SVN_CACHE.pop(str(wc_root), None)
+
+    # --- Git 分支与推送/暂存操作 ---
+
+    def branches(self) -> Tuple[List[GitBranch], Optional[str]]:
+        """列出当前项目的 Git 分支列表（含本地与远程分支）。"""
+        report = self.detect()
+        if report.source != "git":
+            return [], "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return [], "Git 仓库根不可用"
+        return list_git_branches(
+            Path(root_text),
+            runner=self._git_runner,
+            uncommitted_count=len(report.files),
+        )
+
+    def switch_branch(
+        self,
+        branch_name: str,
+        *,
+        create: bool = False,
+        base_branch: Optional[str] = None,
+        force: bool = False,
+    ) -> Tuple[bool, Optional[str]]:
+        """切换或新建并切换 Git 分支。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = switch_git_branch(
+            Path(root_text),
+            branch_name,
+            create=create,
+            base_branch=base_branch,
+            force=force,
+            runner=self._git_runner,
+        )
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def fetch_remotes(self, remote: str = "") -> Tuple[bool, Optional[str]]:
+        """执行 git fetch 同步远端分支信息。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = fetch_git_remotes(Path(root_text), remote=remote, runner=self._git_runner)
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def delete_branch(self, branch_name: str, force: bool = False) -> Tuple[bool, Optional[str]]:
+        """删除本地 Git 分支。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = delete_git_branch(Path(root_text), branch_name, force=force, runner=self._git_runner)
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def rename_branch(self, old_name: str, new_name: str) -> Tuple[bool, Optional[str]]:
+        """重命名本地 Git 分支。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = rename_git_branch(Path(root_text), old_name, new_name, runner=self._git_runner)
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def stash(self, message: str = "") -> Tuple[bool, Optional[str]]:
+        """暂存工作区未提交改动。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = git_stash_save(Path(root_text), message, runner=self._git_runner)
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def pop_stash(self) -> Tuple[bool, Optional[str]]:
+        """恢复最近一次暂存的改动。"""
+        report = self.detect()
+        if report.source != "git":
+            return False, "当前项目不在 Git 仓库内"
+        root_text = (report.repository_root or "").strip()
+        if not root_text:
+            return False, "Git 仓库根不可用"
+        ok, err = git_stash_pop(Path(root_text), runner=self._git_runner)
+        if ok:
+            self.invalidate_cache()
+        return ok, err
+
+    def push(
+        self, *, remote: str = "origin", branch: Optional[str] = None
+    ) -> PushResult:
+        """推送当前分支至远端。"""
+        report = self.detect()
+        res = push_changes(report, remote=remote, branch=branch, runner=self._git_runner)
+        if res.ok:
+            self.invalidate_cache()
+        return res
 
     # --- 映射到内容状态 ---
 
@@ -1622,3 +1764,542 @@ def pull_changes(
     if report.source == "git":
         return _git_pull_changes(report, timeout=timeout, runner=runner)
     return _svn_pull_changes(report, timeout=timeout, runner=runner)
+
+
+# ---------------------------------------------------------------------------
+# Git 分支管理与推送/暂存实现
+# ---------------------------------------------------------------------------
+
+
+def list_git_branches(
+    repo_root: Path,
+    *,
+    timeout: float = 10.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+    uncommitted_count: int = 0,
+) -> Tuple[List[GitBranch], Optional[str]]:
+    """列出仓库内的 Git 分支（本地分支 + 远程分支），并标注当前分支。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    if runner is None and shutil.which(git) is None:
+        return [], "git 命令不可用"
+
+    # 1. 获取当前分支名
+    current_branch = ""
+    try:
+        proc = _run([git, "symbolic-ref", "--short", "HEAD"], cwd=repo_root, timeout=timeout, runner=runner)
+        if proc.returncode == 0:
+            current_branch = _decode(proc.stdout).strip()
+        else:
+            proc_head = _run([git, "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root, timeout=timeout, runner=runner)
+            if proc_head.returncode == 0:
+                current_branch = _decode(proc_head.stdout).strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [], str(exc)[:200]
+
+    branches: List[GitBranch] = []
+    seen_names = set()
+
+    # 2. 本地分支 (refs/heads)
+    try:
+        proc = _run(
+            [git, "for-each-ref", "--format=%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track,nobracket)", "refs/heads"],
+            cwd=repo_root,
+            timeout=timeout,
+            runner=runner,
+        )
+        if proc.returncode == 0:
+            import re
+            lines = _decode(proc.stdout).splitlines()
+            for line in lines:
+                parts = line.strip().split("|")
+                if not parts or not parts[0]:
+                    continue
+                name = parts[0]
+                is_head = (len(parts) > 1 and parts[1] == "*") or (name == current_branch)
+                upstream = parts[2] if len(parts) > 2 and parts[2] else None
+                track = parts[3] if len(parts) > 3 and parts[3] else ""
+                ahead_count = 0
+                behind_count = 0
+                if track:
+                    m_ahead = re.search(r"ahead (\d+)", track)
+                    if m_ahead:
+                        ahead_count = int(m_ahead.group(1))
+                    m_behind = re.search(r"behind (\d+)", track)
+                    if m_behind:
+                        behind_count = int(m_behind.group(1))
+                seen_names.add(name)
+                branches.append(
+                    GitBranch(
+                        name=name,
+                        is_current=is_head,
+                        is_remote=False,
+                        upstream=upstream,
+                        uncommitted_count=uncommitted_count if is_head else 0,
+                        ahead_count=ahead_count,
+                        behind_count=behind_count,
+                    )
+                )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [], str(exc)[:200]
+
+    # 若还没有任何分支标记为 is_current（例如初始仓库、或处于游离头指针/Tag 状态）
+    if not any(b.is_current for b in branches):
+        detached_name = ""
+        if current_branch == "HEAD":
+            # 尝试获取短 commit hash 或 tag 标签
+            try:
+                proc_tag = _run(
+                    [git, "describe", "--tags", "--exact-match"],
+                    cwd=repo_root,
+                    timeout=timeout,
+                    runner=runner,
+                )
+                if proc_tag.returncode == 0 and _decode(proc_tag.stdout).strip():
+                    detached_name = f"HEAD (tag: {_decode(proc_tag.stdout).strip()})"
+                else:
+                    proc_sha = _run(
+                        [git, "rev-parse", "--short", "HEAD"],
+                        cwd=repo_root,
+                        timeout=timeout,
+                        runner=runner,
+                    )
+                    if proc_sha.returncode == 0 and _decode(proc_sha.stdout).strip():
+                        detached_name = f"HEAD ({_decode(proc_sha.stdout).strip()})"
+                    else:
+                        detached_name = "HEAD (detached)"
+            except (OSError, subprocess.SubprocessError):
+                detached_name = "HEAD (detached)"
+        elif current_branch:
+            detached_name = current_branch
+
+        if detached_name:
+            branches.append(
+                GitBranch(
+                    name=detached_name,
+                    is_current=True,
+                    is_remote=False,
+                    upstream=None,
+                    uncommitted_count=uncommitted_count,
+                )
+            )
+            seen_names.add(detached_name)
+
+    # 3. 远程分支 (refs/remotes)
+    try:
+        proc_remotes = _run(
+            [git, "for-each-ref", "--format=%(refname)|%(refname:short)", "refs/remotes"],
+            cwd=repo_root,
+            timeout=timeout,
+            runner=runner,
+        )
+        if proc_remotes.returncode == 0:
+            for line in _decode(proc_remotes.stdout).splitlines():
+                full_ref, _, name = line.strip().partition("|")
+                name = name.strip() or full_ref.strip()
+                # 排除 HEAD 符号引用（例如 refs/remotes/origin/HEAD，其短名为 origin，容易被误当成分支）
+                if not name or full_ref.endswith("/HEAD") or name.endswith("/HEAD") or "/" not in name:
+                    continue
+                if name not in seen_names:
+                    seen_names.add(name)
+                    branches.append(
+                        GitBranch(
+                            name=name,
+                            is_current=False,
+                            is_remote=True,
+                            upstream=None,
+                            uncommitted_count=0,
+                        )
+                    )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    # 当前分支排在最前，其余本地分支在前、远程分支在后，字母升序
+    branches.sort(key=lambda b: (not b.is_current, b.is_remote, b.name.lower()))
+    return branches, None
+
+
+def switch_git_branch(
+    repo_root: Path,
+    branch_name: str,
+    *,
+    create: bool = False,
+    base_branch: Optional[str] = None,
+    force: bool = False,
+    timeout: float = 30.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """切换或新建并切换 Git 分支。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    branch_name = branch_name.strip()
+    if not branch_name:
+        return False, "分支名不能为空"
+
+    # 分支名安全性校验
+    if any(ch in branch_name for ch in " ~^:?*[\\]"):
+        return False, "分支名包含非法字符"
+    if ".." in branch_name or branch_name.startswith("/") or branch_name.endswith("/") or branch_name.endswith(".lock"):
+        return False, "分支名格式不合法"
+
+    if create:
+        cmd = [git, "checkout", "-b", branch_name]
+        if base_branch:
+            cmd.append(base_branch)
+    else:
+        target = branch_name
+        # 兼容远端分支短名切换（如 origin/feature -> feature），触发 Git 自动建立跟踪分支
+        if "/" in target and not target.startswith("."):
+            parts = target.split("/")
+            if len(parts) >= 2:
+                proc_r = _run([git, "remote"], cwd=repo_root, timeout=5.0, runner=runner)
+                remotes = set(_decode(proc_r.stdout).split()) if proc_r.returncode == 0 else {"origin"}
+                if parts[0] in remotes:
+                    target = "/".join(parts[1:])
+        cmd = [git, "checkout"]
+        if force:
+            cmd.append("-f")
+        cmd.append(target)
+
+    try:
+        proc = _run(cmd, cwd=repo_root, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+
+    if proc.returncode != 0:
+        err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        return False, err or "切换分支失败"
+    return True, None
+
+
+def git_stash_save(
+    repo_root: Path,
+    message: str = "",
+    *,
+    timeout: float = 30.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """暂存当前未提交改动。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    cmd = [git, "stash", "push"]
+    if message:
+        cmd.extend(["-m", message])
+    try:
+        proc = _run(cmd, cwd=repo_root, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+    if proc.returncode != 0:
+        err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        return False, err or "暂存改动失败"
+    return True, None
+
+
+def git_stash_pop(
+    repo_root: Path,
+    *,
+    timeout: float = 30.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """恢复最近一次暂存的改动。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    try:
+        proc = _run([git, "stash", "pop"], cwd=repo_root, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+    if proc.returncode != 0:
+        err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        return False, err or "恢复暂存改动失败"
+    return True, None
+
+
+def fetch_git_remotes(
+    repo_root: Path,
+    *,
+    remote: str = "",
+    prune: bool = True,
+    timeout: float = 30.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """执行 git fetch 同步远端分支信息。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    cmd = [git, "fetch"]
+    if prune:
+        cmd.append("--prune")
+    if remote:
+        cmd.append(remote)
+    try:
+        proc = _run(cmd, cwd=repo_root, timeout=timeout, runner=runner)
+        if proc.returncode != 0:
+            err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+            return False, err or "git fetch 失败"
+        return True, None
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+
+
+def delete_git_branch(
+    repo_root: Path,
+    branch_name: str,
+    *,
+    force: bool = False,
+    timeout: float = 15.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """删除本地 Git 分支。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    branch_name = branch_name.strip()
+    if not branch_name:
+        return False, "分支名不能为空"
+    flag = "-D" if force else "-d"
+    try:
+        proc = _run([git, "branch", flag, branch_name], cwd=repo_root, timeout=timeout, runner=runner)
+        if proc.returncode != 0:
+            err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+            return False, err or "删除分支失败"
+        return True, None
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+
+
+def rename_git_branch(
+    repo_root: Path,
+    old_name: str,
+    new_name: str,
+    *,
+    timeout: float = 15.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> Tuple[bool, Optional[str]]:
+    """重命名本地 Git 分支。"""
+    repo_root = Path(repo_root).resolve()
+    git = shutil.which("git") or "git"
+    old_name = old_name.strip()
+    new_name = new_name.strip()
+    if not old_name or not new_name:
+        return False, "分支名不能为空"
+    try:
+        proc = _run([git, "branch", "-m", old_name, new_name], cwd=repo_root, timeout=timeout, runner=runner)
+        if proc.returncode != 0:
+            err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+            return False, err or "重命名分支失败"
+        return True, None
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)[:200]
+
+
+def push_changes(
+    report: ChangeReport,
+    *,
+    remote: str = "origin",
+    branch: Optional[str] = None,
+    timeout: float = 120.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> PushResult:
+    """执行 git push，将当前分支推送到远端仓库。"""
+    if report.source != "git":
+        return PushResult(ok=False, error="当前项目不在 Git 版本控制内，无法推送")
+    root_text = (report.repository_root or "").strip()
+    if not root_text:
+        return PushResult(ok=False, error="Git 仓库根不可用")
+    repo_root = Path(root_text)
+    if not repo_root.is_dir():
+        return PushResult(ok=False, error="Git 仓库根不可用")
+
+    git = shutil.which("git") or "git"
+
+    # 获取当前分支
+    current_branch = branch
+    if not current_branch:
+        proc_br = _run([git, "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root, timeout=10.0, runner=runner)
+        if proc_br.returncode == 0:
+            current_branch = _decode(proc_br.stdout).strip()
+        else:
+            return PushResult(ok=False, error="无法确定当前 Git 分支")
+
+    if not current_branch or current_branch == "HEAD" or current_branch.startswith("HEAD ("):
+        return PushResult(ok=False, error="当前处于游离头指针状态 (Detached HEAD)，无法直接推送，请先创建或切换到具体分支")
+
+    # 检查是否已设置 upstream
+    has_upstream = False
+    proc_u = _run([git, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=repo_root, timeout=10.0, runner=runner)
+    if proc_u.returncode == 0 and _decode(proc_u.stdout).strip():
+        has_upstream = True
+
+    if not has_upstream:
+        cmd = [git, "push", "-u", remote, current_branch]
+    else:
+        cmd = [git, "push", remote, current_branch]
+
+    try:
+        proc = _run(cmd, cwd=repo_root, timeout=timeout, runner=runner)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return PushResult(ok=False, error=str(exc)[:200])
+
+    if proc.returncode != 0:
+        err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        return PushResult(ok=False, error="git push 失败：{0}".format(err))
+
+    return PushResult(ok=True, summary="已成功推送至远端 ({0})".format(remote))
+
+
+def commit_files(
+    report: ChangeReport,
+    files: Sequence[str],
+    message: str,
+    *,
+    timeout: float = 60.0,
+    runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+) -> List[str]:
+    """按指定文件列表提交（支持按勾选文件进行提交）。"""
+    failures: List[str] = []
+    root_text = (report.repository_root or "").strip()
+    if not root_text:
+        return ["仓库根不可用"]
+    repo_root = Path(root_text).resolve()
+    if not repo_root.is_dir():
+        return ["仓库根不可用"]
+    if report.source not in ("git", "svn"):
+        return ["当前项目不在版本控制内，无法提交"]
+    message = (message or "").strip()
+    if not message:
+        return ["提交信息不能为空"]
+    if not files:
+        return ["未选择要提交的文件"]
+
+    proj_root = Path(report.project_root).resolve() if report.project_root else repo_root
+
+    # 构建目标匹配集（支持相对 content_root/project_root/repo_root 及绝对路径）
+    target_abs_set = set()
+    target_norm_set = set()
+    for f in files:
+        f_clean = str(f).strip()
+        if not f_clean:
+            continue
+        f_norm = f_clean.replace("\\", "/").strip("/")
+        target_norm_set.add(f_norm)
+
+        f_path = Path(f_clean)
+        if f_path.is_absolute():
+            try:
+                target_abs_set.add(f_path.resolve())
+            except Exception:
+                pass
+        else:
+            for base in (proj_root / "content", proj_root, repo_root):
+                try:
+                    target_abs_set.add((base / f_clean).resolve())
+                except Exception:
+                    pass
+
+    # 匹配所选文件在 report 中的实际仓库相对路径 (item.path)
+    paths: List[str] = []
+    matched_target_files = set()
+    for item in report.files:
+        item_path_norm = item.path.replace("\\", "/").strip("/")
+        item_abs = None
+        if item.abs_path:
+            try:
+                item_abs = Path(item.abs_path).resolve()
+            except Exception:
+                pass
+        if item_abs is None:
+            try:
+                item_abs = (repo_root / item.path).resolve()
+            except Exception:
+                pass
+
+        matched = False
+        if item_abs is not None and item_abs in target_abs_set:
+            matched = True
+        elif item_path_norm in target_norm_set:
+            matched = True
+        elif any(item_path_norm.endswith("/" + t) or item_path_norm == t for t in target_norm_set):
+            matched = True
+
+        if matched:
+            if item.path not in paths:
+                paths.append(item.path)
+            if item.old_path and item.old_path not in paths:
+                paths.append(item.old_path)
+            for f in files:
+                f_norm = str(f).replace("\\", "/").strip("/")
+                f_abs = (proj_root / f).resolve()
+                if item_abs == f_abs or item_path_norm == f_norm or item_path_norm.endswith("/" + f_norm):
+                    matched_target_files.add(f)
+
+    # 补充未在 report.files 中直接匹配到的文件（例如外部传入但 report 缓存未及时包含的新增/未跟踪文件）
+    for f in files:
+        if f in matched_target_files:
+            continue
+        f_p = Path(f)
+        cand_abs = None
+        if f_p.is_absolute():
+            cand_abs = f_p.resolve()
+        else:
+            for base in (proj_root / "content", proj_root, repo_root):
+                cand = (base / f).resolve()
+                if cand.exists():
+                    cand_abs = cand
+                    break
+            if cand_abs is None:
+                cand_abs = (repo_root / f).resolve()
+
+        try:
+            rel = str(cand_abs.relative_to(repo_root)).replace("\\", "/")
+            if rel not in paths:
+                paths.append(rel)
+        except ValueError:
+            rel = str(f).replace("\\", "/")
+            if rel not in paths:
+                paths.append(rel)
+
+    if not paths:
+        return ["没有匹配的可提交文件"]
+
+    paths.sort()
+    if report.source == "svn":
+        svn = shutil.which("svn") or "svn"
+        for item in report.files:
+            if item.path in paths:
+                if item.untracked:
+                    error = _run_vcs_command(
+                        [svn, "add", "--parents", "--force", item.path],
+                        repo_root,
+                        timeout,
+                        runner=runner,
+                    )
+                    if error:
+                        failures.append("svn add 失败（{0}）：{1}".format(item.path, error))
+                elif item.change_type == "deleted":
+                    error = _run_vcs_command(
+                        [svn, "rm", "--force", item.path],
+                        repo_root,
+                        timeout,
+                        runner=runner,
+                    )
+                    if error:
+                        failures.append("svn rm 失败（{0}）：{1}".format(item.path, error))
+        if failures:
+            return failures
+        error = _run_vcs_command(
+            [svn, "commit", "-m", message, "--"] + paths,
+            repo_root,
+            timeout,
+            runner=runner,
+        )
+        if error:
+            failures.append("svn commit 失败：{0}".format(error))
+        return failures
+
+    git = shutil.which("git") or "git"
+    error = _run_vcs_command([git, "add", "-A", "--"] + paths, repo_root, timeout, runner=runner)
+    if error:
+        failures.append("git add 失败：{0}".format(error))
+        return failures
+    error = _run_vcs_command([git, "commit", "-m", message, "--"] + paths, repo_root, timeout, runner=runner)
+    if error:
+        failures.append("git commit 失败：{0}".format(error))
+    return failures
