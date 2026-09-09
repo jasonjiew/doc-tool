@@ -32,6 +32,7 @@ if REPO_BASE not in sys.path:
     sys.path.insert(0, REPO_BASE)
 
 from doc_tool.domain.markdown_structure import (  # noqa: E402
+    check_mermaid_structure,
     check_table_structure,
     is_separator_row,
     split_table_row,
@@ -356,6 +357,11 @@ def _validate_markdown(
     # 表格结构契约：元数据语法、元数据后是否紧跟表格。不阻断的结论
     # （列数不符、行列不齐、缺分隔行）不在构建时报，由内容检查面板负责。
     for finding in check_table_structure(lines):
+        if finding.blocking:
+            add(finding.line_no, finding.message, finding.hint, finding.rule)
+
+    # Mermaid 流程图与图表语法校验：防止错误语法静默进入 Word。
+    for finding in check_mermaid_structure(lines):
         if finding.blocking:
             add(finding.line_no, finding.message, finding.hint, finding.rule)
 

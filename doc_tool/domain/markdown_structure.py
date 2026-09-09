@@ -323,3 +323,37 @@ def _excerpt(text: str, limit: int = 80) -> str:
     """截断过长原文，保证错误消息本身可读。"""
     value = " ".join(str(text).split())
     return value if len(value) <= limit else value[:limit] + "…"
+
+
+def check_mermaid_structure(lines: Sequence[str]) -> List[StructureFinding]:
+    """检查 Markdown 中的 Mermaid 图表结构与语法约束。
+
+    作为构建前校验（docx_common）与质量检查（lint）共用的单一事实源。
+    若存在语法错误（括号不匹配、图类型未识别、边定义错误等），返回 blocking=True 的结论，
+    在正式合并时拦截并给出具体修改建议。
+    """
+    from doc_tool.application.content.mermaid import extract_blocks, validate
+
+    findings: List[StructureFinding] = []
+    md_text = "\n".join(str(line).rstrip("\r\n") for line in lines)
+    blocks = extract_blocks(md_text)
+    for block in blocks:
+        issues = validate(block.source, block.kind)
+        for issue in issues:
+            content_start = (
+                getattr(block, "content_start_line", 0)
+                or ((block.start_line + 1) if block.fenced else block.start_line)
+            )
+            abs_line = content_start + issue.line - 1
+            findings.append(
+                StructureFinding(
+                    line_no=abs_line,
+                    rule="mermaid_syntax",
+                    message="Mermaid 语法错误：{0}".format(issue.message),
+                    hint="请检查 Mermaid 图表语法并修复，可在编辑器中排查或使用 Mermaid 工作台编辑。",
+                    blocking=True,
+                )
+            )
+    return findings
+
+
