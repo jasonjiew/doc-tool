@@ -2469,6 +2469,87 @@ class EditorAuthoringWorkbenchTests(unittest.TestCase):
         self.assertIn("编辑器修改", target.read_text(encoding="utf-8"))
         panel.close()
 
+    def test_editor_panel_mermaid_syntax_diagnostics_and_cursor_tracking(self):
+        """编辑器实时扫描 Mermaid 语法：错误行波浪线高亮，光标移动提示，修复后恢复。"""
+        panel = self._panel()
+        invalid_text = (
+            "# 架构\n"
+            "```mermaid\n"
+            "flowchart TD\n"
+            "  A[开始] --> B(不匹配括号]\n"
+            "```\n"
+        )
+        panel._editor.setPlainText(invalid_text)
+        panel._scan_mermaid_syntax()
+
+        # 存在语法错误
+        self.assertTrue(len(panel._mermaid_errors) > 0)
+        err_line, err_msg = panel._mermaid_errors[0]
+        self.assertEqual(err_line, 4)
+        self.assertIn("括号不匹配", err_msg)
+        self.assertTrue(len(panel._mermaid_selections) > 0)
+        self.assertIn("Mermaid 语法错误", panel._status_label.text())
+
+        # 光标移动到错误行，状态栏即时提醒
+        block = panel._editor.document().findBlockByNumber(err_line - 1)
+        cursor = panel._editor.textCursor()
+        cursor.setPosition(block.position())
+        panel._editor.setTextCursor(cursor)
+        panel._on_cursor_moved()
+        self.assertIn("第 4 行", panel._status_label.text())
+
+        # 光标移动到非错误行（第 1 行），状态栏依然提供总览提醒
+        block_first = panel._editor.document().findBlockByNumber(0)
+        cursor.setPosition(block_first.position())
+        panel._editor.setTextCursor(cursor)
+        panel._on_cursor_moved()
+        self.assertIn("Mermaid 语法错误", panel._status_label.text())
+
+        # 修复错误后重扫
+        fixed_text = (
+            "# 架构\n"
+            "```mermaid\n"
+            "flowchart TD\n"
+            "  A[开始] --> B[正常括号]\n"
+            "```\n"
+        )
+        panel._editor.setPlainText(fixed_text)
+        panel._scan_mermaid_syntax()
+        self.assertEqual(len(panel._mermaid_errors), 0)
+        self.assertEqual(len(panel._mermaid_selections), 0)
+        self.assertIn("Mermaid 语法错误已修复", panel._status_label.text())
+        panel.close()
+
+    def test_mermaid_dialog_templates_and_interactive_validation(self):
+        """Mermaid 工作台：支持模板下拉填入、语法错误双击定位与多图表类型校验。"""
+        from doc_tool.ui.content.mermaid_dialog import MermaidDialog
+
+        dlg = MermaidDialog("flowchart TD\n  A --> B")
+        # 选择模板：类图
+        idx = dlg.template_combo.findText("类图 (Class)")
+        self.assertGreater(idx, 0)
+        dlg.template_combo.setCurrentIndex(idx)
+        self.assertIn("classDiagram", dlg.source())
+
+        # 输入错误语法
+        dlg.source_edit.setPlainText("classDiagram\n  class Animal {\n    +name\n")  # 未闭合花括号
+        dlg.refresh_preview()
+        self.assertGreater(dlg.errors.count(), 0)
+        self.assertIn("语法存在错误", dlg.preview.text())
+        self.assertIn("发现", dlg.status.text())
+
+        # 双击错误条目定位到源码行
+        item = dlg.errors.item(0)
+        dlg._locate_error(item)
+        cur = dlg.source_edit.textCursor()
+        self.assertTrue(cur.hasSelection())
+
+        # 修复语法
+        dlg.source_edit.setPlainText("classDiagram\n  class Animal {\n    +String name\n  }\n")
+        dlg.refresh_preview()
+        self.assertTrue("渲染成功" in dlg.status.text() or "语法有效" in dlg.status.text())
+        dlg.close()
+
 
 class LogStreamReplayTests(unittest.TestCase):
     """任务详情日志折叠/展开回放。"""
