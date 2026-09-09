@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 )
 
 from doc_tool.application.content.changes import ChangeItem
-from doc_tool.application.content.vcs_changes import PullResult
+from doc_tool.application.content.vcs_changes import PullResult, PushResult
 
 _ITEM_LABELS = {"added": "新增", "modified": "已修改", "deleted": "已删除"}
 
@@ -75,7 +75,9 @@ class ChangesPanel(QWidget):
         rollback_single: Optional[Callable[[ChangeItem], Optional[str]]] = None,
         on_open_file: Optional[Callable[[str], None]] = None,
         on_commit: Optional[Callable[[str], List[str]]] = None,
+        on_commit_files: Optional[Callable[[Sequence[str], str], List[str]]] = None,
         on_pull: Optional[Callable[[], PullResult]] = None,
+        on_push: Optional[Callable[[], PushResult]] = None,
         on_export_review: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -89,13 +91,16 @@ class ChangesPanel(QWidget):
         self._rollback_all = rollback_all
         self._rollback_single = rollback_single
         self._on_open_file = on_open_file
-        # 提交/拉取仅 Git/SVN 项目可用，由上层提供实现（git > svn）。
+        # 提交/拉取/推送仅 Git/SVN 项目可用，由上层提供实现（git > svn）。
         self._on_commit = on_commit
+        self._on_commit_files = on_commit_files
         self._on_pull = on_pull
+        self._on_push = on_push
         self._on_export_review = on_export_review
         self._items: List[ChangeItem] = []
         self._source = "local"
         self._source_note = ""
+        self._dark = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
@@ -115,6 +120,10 @@ class ChangesPanel(QWidget):
         self._commit_btn.setProperty("btnRole", "secondary")
         self._commit_btn.clicked.connect(self._on_commit_clicked)
         top.addWidget(self._commit_btn)
+        self._push_btn = QPushButton("推送代码", self)
+        self._push_btn.setProperty("btnRole", "secondary")
+        self._push_btn.clicked.connect(self._on_push_clicked)
+        top.addWidget(self._push_btn)
         self._pull_btn = QPushButton("拉取更新", self)
         self._pull_btn.setProperty("btnRole", "secondary")
         self._pull_btn.clicked.connect(self._on_pull_clicked)
@@ -228,6 +237,7 @@ class ChangesPanel(QWidget):
 
     def set_dark(self, dark: bool) -> None:
         """更新暗黑模式状态。"""
+        self._dark = dark
         if hasattr(self, "_diff_highlighter") and self._diff_highlighter is not None:
             self._diff_highlighter.set_dark(dark)
 
@@ -310,24 +320,30 @@ class ChangesPanel(QWidget):
             self._status_label.setText("")
 
     def _update_vcs_buttons(self) -> None:
-        """提交/拉取仅 Git/SVN 项目可用；本地项目禁用并标注命令差异。"""
+        """提交/拉取/推送仅 Git/SVN 项目可用；本地项目禁用并标注命令差异。"""
         vcs_managed = self._source in ("git", "svn")
         self._commit_btn.setEnabled(
             self._writable and vcs_managed and bool(self._items)
         )
         self._pull_btn.setEnabled(self._writable and vcs_managed)
+        can_push = self._writable and (self._source == "git") and (self._on_push is not None)
+        self._push_btn.setEnabled(can_push)
+
         if self._source == "git":
             self._commit_btn.setToolTip(
-                "git add -A + git commit -m（限定当前项目路径）"
+                "git add -A + git commit -m（限定当前项目路径，支持复选文件）"
             )
+            self._push_btn.setToolTip("git push：推送当前分支改动至远端仓库")
             self._pull_btn.setToolTip("git pull：拉取远端最新变更")
         elif self._source == "svn":
             self._commit_btn.setToolTip(
                 "svn add + svn rm + svn commit -m（限定当前项目路径）"
             )
+            self._push_btn.setToolTip("仅在 Git 项目中可用")
             self._pull_btn.setToolTip("svn update：更新到远端最新版本")
         else:
             self._commit_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
+            self._push_btn.setToolTip("仅在 Git 项目中可用")
             self._pull_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
 
     def _on_item_double_clicked(self, list_item: QListWidgetItem) -> None:
@@ -467,29 +483,85 @@ class ChangesPanel(QWidget):
         self._update_action_state()
 
     def _on_commit_clicked(self) -> None:
-        """「提交改动」：弹窗收集提交信息后调用上层版本控制提交。"""
+        """「提交改动」：弹出专业 Git 提交对话框，收集勾选文件与提交信息后提交。"""
         if not self._writable or not self._items or self._source not in ("git", "svn"):
             return
-        if self._on_commit is None:
+        if self._on_commit is None and self._on_commit_files is None:
             self._status_label.setText("提交功能不可用（未配置版本控制提交）")
             return
-        message, ok = QInputDialog.getMultiLineText(
-            self, "提交改动", "提交信息（必填，将写入版本控制历史）：", ""
-        )
-        if not ok:
+
+        from doc_tool.ui.content.git_commit_dialog import GitCommitDialog
+
+        dark = getattr(self, "_dark", False)
+        can_push = bool(self._on_push is not None and self._source == "git")
+        dlg = GitCommitDialog(self._items, dark=dark, can_push=can_push, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        message = (message or "").strip()
-        if not message:
-            self._status_label.setText("提交信息不能为空")
+
+        message = dlg.commit_message.strip()
+        selected_paths = dlg.selected_paths
+        if not message or not selected_paths:
             return
-        failures = self._on_commit(message)
+
+        failures: List[str] = []
+        if self._on_commit_files is not None:
+            failures = self._on_commit_files(selected_paths, message)
+        elif self._on_commit is not None:
+            failures = self._on_commit(message)
+
         if failures:
             self._status_label.setText("提交失败：{0}".format("；".join(failures)))
             return
+
         if self._on_restored is not None:
             self._on_restored()
         self._update_action_state()
-        self._status_label.setText("已提交改动到版本控制")
+        self._status_label.setText(f"已提交 {len(selected_paths)} 个文件改动到版本控制")
+
+        # 若用户在弹窗中点击了「提交并推送」
+        if dlg.should_push:
+            self._do_push()
+
+    def _on_push_clicked(self) -> None:
+        """「推送代码」：确认后执行 git push，将本地提交推送到远端。"""
+        if not self._writable or self._source != "git":
+            return
+        if self._on_push is None:
+            self._status_label.setText("推送功能不可用（未配置推送实现）")
+            return
+        ans = QMessageBox.question(
+            self,
+            "推送代码",
+            "确定要将当前分支的所有本地提交推送到远端仓库吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        self._do_push()
+
+    def trigger_commit(self) -> None:
+        """程序化触发提交改动对话框。"""
+        self._on_commit_clicked()
+
+    def _do_push(self) -> None:
+        if self._on_push is None:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = self._on_push()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if result.ok:
+            if self._on_restored is not None:
+                self._on_restored()
+            self._update_action_state()
+            self._status_label.setText(result.summary or "推送成功")
+            QMessageBox.information(self, "推送成功", result.summary or "已成功推送到远端仓库！")
+        else:
+            self._status_label.setText("推送失败：{0}".format(result.error or "未知原因"))
+            QMessageBox.warning(self, "推送失败", f"推送代码到远端失败：\n\n{result.error}")
 
     def _on_pull_clicked(self) -> None:
         """「拉取更新」：确认后执行 git pull / svn update，并反馈结果。
