@@ -496,8 +496,12 @@ class MermaidServiceTests(unittest.TestCase):
 
         self.assertEqual(validate(self.FLOW), [])
         self.assertEqual(validate(self.SEQUENCE), [])
-        errors = validate("gantt\n  title demo")
-        self.assertIn("不支持", errors[0].message)
+        self.assertEqual(validate("gantt\n  title demo"), [])
+        self.assertEqual(validate("classDiagram\n  Animal <|-- Duck"), [])
+        self.assertEqual(validate("pie\n  \"A\" : 10"), [])
+        errors = validate("unknownDiagram\n  title demo")
+        self.assertTrue(len(errors) > 0)
+        self.assertIn("无法识别", errors[0].message)
 
     def test_validate_arrow_edge_labels(self):
         """标准 Mermaid 边标签 ``-->|label|`` 应通过校验并渲染。"""
@@ -840,7 +844,91 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertIn("data:image/png;base64,", rendered)
         self.assertNotIn("Mermaid 渲染失败", rendered)
 
+    def test_mermaid_all_formats_detection_and_frontmatter(self):
+        """验证所有主流 Mermaid 格式识别及跳过 YAML frontmatter/指令能力。"""
+        from doc_tool.application.content.mermaid import detect_kind, validate
+
+        samples = {
+            "flowchart": "---\ntitle: 流程图\n---\nflowchart LR\n  A --> B",
+            "sequenceDiagram": "%%{init: {'theme': 'default'}}%%\nsequenceDiagram\n  Alice->>Bob: Hi",
+            "classDiagram": "classDiagram\n  class BankAccount{\n    +String owner\n  }",
+            "stateDiagram": "stateDiagram-v2\n  [*] --> Still\n  Still --> [*]",
+            "erDiagram": "erDiagram\n  CUSTOMER ||--o{ ORDER : places",
+            "mindmap": "mindmap\n  root((中心主题))\n    分支1\n    分支2",
+            "timeline": "timeline\n  title 历史发展\n  2020 : 事件A\n  2021 : 事件B",
+            "gitGraph": "gitGraph\n  commit\n  branch develop\n  checkout develop",
+        }
+        for expected_kind, code in samples.items():
+            kind = detect_kind(code)
+            self.assertEqual(kind, expected_kind, f"检测类型失败: {expected_kind}")
+            errs = validate(code, kind)
+            self.assertEqual(errs, [], f"{expected_kind} 校验不应报错: {errs}")
+
+    def test_mermaid_syntax_error_reporting(self):
+        """验证各类 Mermaid 语法错误能精确定位行号与原因。"""
+        from doc_tool.application.content.mermaid import validate
+
+        # 1. 括号不匹配
+        errs = validate("flowchart TD\n  A[开始) --> B")
+        self.assertTrue(len(errs) > 0)
+        self.assertEqual(errs[0].line, 2)
+        self.assertIn("括号不匹配", errs[0].message)
+
+        # 2. 引号未闭合
+        errs = validate("flowchart TD\n  A[\"开始] --> B")
+        self.assertTrue(len(errs) > 0)
+        self.assertEqual(errs[0].line, 2)
+        self.assertIn("引号未闭合", errs[0].message)
+
+        # 3. 未知图类型
+        errs = validate("randomGraph\n  A --> B")
+        self.assertTrue(len(errs) > 0)
+        self.assertEqual(errs[0].line, 1)
+        self.assertIn("无法识别", errs[0].message)
+
+    def test_flowchart_without_explicit_direction_renders_cleanly(self):
+        """flowchart/graph 不带方向声明（flowchart / graph）默认 TD 且不抛异常。"""
+        from doc_tool.application.content.mermaid import render
+
+        # 之前 direction_match.group(1).upper() 会抛 AttributeError
+        res1 = render("flowchart\n  A --> B", use_cli=False)
+        self.assertTrue(res1.ok, f"渲染失败: {res1.error}")
+        self.assertIn(b"<svg", res1.svg)
+
+        res2 = render("graph\n  A --> B", use_cli=False)
+        self.assertTrue(res2.ok, f"渲染失败: {res2.error}")
+        self.assertIn(b"<svg", res2.svg)
+
+    def test_flowchart_and_sequence_frontmatter_and_keywords(self):
+        """测试带 frontmatter 与 subgraph/end 关键字的图渲染不生成假节点。"""
+        from doc_tool.application.content.mermaid import render
+
+        flow = (
+            "---\ntitle: 系统拓扑\n---\n"
+            "flowchart LR\n"
+            "  subgraph 模块一\n"
+            "    A --> B\n"
+            "  end\n"
+            "  style A fill:#fff\n"
+        )
+        res = render(flow, use_cli=False)
+        self.assertTrue(res.ok, f"渲染失败: {res.error}")
+        # 不应把 end / subgraph 误当成独立可渲染节点
+        svg_text = res.svg.decode("utf-8")
+        self.assertNotIn('>end<', svg_text)
+
+        seq = (
+            "---\ntitle: 时序图\n---\n"
+            "sequenceDiagram\n"
+            "  Alice->>Bob: Hello\n"
+        )
+        res_seq = render(seq, use_cli=False)
+        self.assertTrue(res_seq.ok, f"渲染失败: {res_seq.error}")
+        self.assertIn(b"Alice", res_seq.svg)
+        self.assertIn(b"Bob", res_seq.svg)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

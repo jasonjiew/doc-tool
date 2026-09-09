@@ -581,10 +581,20 @@ def render_markdown_html(
                     )
                 )
             else:
+                err_text = html.escape(result.error or "未知原因")
+                bg_color = "#3b1818" if dark else "#fef2f2"
+                border_color = "#ef4444"
+                text_color = "#f87171" if dark else "#991b1b"
                 parts.append(
-                    '<p><a name="line-{0}" href="#line-{0}"><b>Mermaid 渲染失败：</b> {1}</a></p>'.format(
-                        code_start_line, html.escape(result.error or "未知原因")
-                    )
+                    (
+                        '<div class="mermaid-error" style="border: 1px solid {0}; border-left: 4px solid {0}; '
+                        'background-color: {1}; color: {2}; padding: 8px 12px; margin: 10px 0; border-radius: 4px; font-size: 9.5pt;">'
+                        '<div style="font-weight: bold; margin-bottom: 4px;">'
+                        '⚠️ <a name="line-{3}" href="#line-{3}" style="color: {2}; text-decoration: underline;">'
+                        'Mermaid 语法或渲染提示（第 {3} 行）</a></div>'
+                        '<div style="font-family: monospace; white-space: pre-wrap;">{4}</div>'
+                        '</div>'
+                    ).format(border_color, bg_color, text_color, code_start_line, err_text)
                 )
         else:
             highlighted = highlight_code_html(source, code_language, dark=dark)

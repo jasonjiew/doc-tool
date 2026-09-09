@@ -20,15 +20,62 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 _QT_APP_REF = None
 
-_HTML_COMMENT_RE = re.compile(r"^\s*<!--[\s\S]*?-->\s*$")
+_HTML_COMMENT_RE = re.compile(r"^\s*(?:<!--[\s\S]*?-->|<EMPTY_PAR\s*/?>)\s*$", re.I)
+
+# 所有受支持的 Mermaid 标准图表类型字典（归一化为标准小驼峰/小写名）。
+_ALL_DIAGRAM_KINDS: Dict[str, str] = {
+    "flowchart": "flowchart",
+    "graph": "flowchart",
+    "sequencediagram": "sequenceDiagram",
+    "classdiagram": "classDiagram",
+    "classdiagram-v2": "classDiagram",
+    "statediagram": "stateDiagram",
+    "statediagram-v2": "stateDiagram",
+    "erdiagram": "erDiagram",
+    "gantt": "gantt",
+    "pie": "pie",
+    "gitgraph": "gitGraph",
+    "mindmap": "mindmap",
+    "timeline": "timeline",
+    "quadrantchart": "quadrantChart",
+    "requirementdiagram": "requirementDiagram",
+    "journey": "journey",
+    "zenuml": "zenuml",
+    "sankey-beta": "sankey",
+    "sankey": "sankey",
+    "xychart-beta": "xychart",
+    "xychart": "xychart",
+    "block-beta": "block",
+    "block": "block",
+    "packet-beta": "packet",
+    "kanban": "kanban",
+    "architecture-beta": "architecture",
+    "c4context": "c4",
+    "c4container": "c4",
+    "c4component": "c4",
+    "c4dynamic": "c4",
+    "c4deployment": "c4",
+}
+
 _KIND_RE = re.compile(
-    r"^\s*(flowchart|sequenceDiagram|graph\s+(?:TD|TB|BT|LR|RL)|graph\b)",
+    r"^\s*("
+    r"flowchart\b|graph\b|sequenceDiagram\b|classDiagram(?:-v2)?\b|"
+    r"stateDiagram(?:-v2)?\b|erDiagram\b|gantt\b|pie\b|gitGraph\b|"
+    r"mindmap\b|timeline\b|quadrantChart\b|requirementDiagram\b|"
+    r"journey\b|zenuml\b|sankey(?:-beta)?\b|xychart(?:-beta)?\b|"
+    r"block(?:-beta)?\b|packet(?:-beta)?\b|kanban\b|architecture(?:-beta)?\b|"
+    r"c4context\b|c4container\b|c4component\b|c4dynamic\b|c4deployment\b"
+    r")",
     re.I,
 )
 _FENCE_OPEN_RE = re.compile(r"^(?:`{3,}|~{3,})\s*mermaid\s*$", re.I)
 _FENCE_CHAR_RE = re.compile(r"^(?P<char>`{3,}|~{3,})")
-_FLOW_HEADER_RE = re.compile(r"^(?:flowchart|graph)\s+(TD|TB|BT|LR|RL)\s*$", re.I)
-_SEQ_HEADER_RE = re.compile(r"^sequenceDiagram\s*$", re.I)
+_FLOW_HEADER_RE = re.compile(r"^(?:flowchart|graph)(?:\s+(TD|TB|BT|LR|RL))?\s*;?$", re.I)
+_SEQ_HEADER_RE = re.compile(r"^sequenceDiagram\s*;?$", re.I)
+_PIE_HEADER_RE = re.compile(r"^pie(?:\s+showData)?(?:\s+title\s+.+)?\s*;?$", re.I)
+_PIE_LINE_RE = re.compile(r"^(?:title\s+.+|showData|(?:\".+?\"|[^:\n]+?)\s*:\s*[\d.]+\s*;?)$", re.I)
+_GIT_GRAPH_HEADER_RE = re.compile(r"^gitGraph(?:\s*:\s*)?$", re.I)
+_GIT_GRAPH_LINE_RE = re.compile(r"^(?:commit\b|branch\b|checkout\b|merge\b|cherry-pick\b)", re.I)
 _FLOW_KEYWORDS_RE = re.compile(
     r"^(?:subgraph\b|end$|direction\b|classDef\b|class\b|style\b|linkStyle\b|click\b)",
     re.I,
@@ -38,7 +85,7 @@ _SEQ_KEYWORDS_RE = re.compile(
     re.I,
 )
 _NODE_RE = re.compile(
-    r"(?P<id>[A-Za-z_][\w-]*)"
+    r"(?P<id>\w[\w/.-]*)"
     r"(?:\[\[(?P<sub>.*?)\]\]"
     r"|\(\((?P<circle>.*?)\)\)"
     r"|\[\((?P<cyl>.*?)\)\]"
@@ -49,10 +96,11 @@ _NODE_RE = re.compile(
 _EDGE_RE = re.compile(
     r"^(?P<left>.+?)\s*"
     r"(?:"
-    r"--(?:\|(?P<label>.*?)\|)?>"          # --> 或 --|label|>（标签在箭头前）
-    r"|--(?P<txt>[^-|>][^|>]*?)-->"          # -- text -->（无管道文本边）
+    r"--\s*(?:\|(?P<label>.*?)\|\s*)?-*>"
+    r"|--\s*(?P<txt>[^-|>][^|>]*?)\s*-->"
+    r"|--\s*(?P<txt2>[^-|>][^|>]*?)\s*---"
     r"|---|-.->|==>)"
-    r"(?:\|(?P<label2>.*?)\|)?\s*(?P<right>.+?)\s*$"
+    r"(?:\s*\|(?P<label2>.*?)\|)?\s*(?P<right>.+?)\s*;?$"
 )
 # 链式边拆解分隔符（A --> B --> C 按箭头切成节点序列）。
 _EDGE_SEP_RE = re.compile(r"(?:-->|---|-.->|==>)")
@@ -64,7 +112,8 @@ def _split_chain_edges(line: str):
     只处理连续箭头的链式边（``A --> B --> C``）；含文本的边（``A -- text --> B``）
     由 ``_EDGE_RE`` 的单边形态处理，此处返回 None 落入原有逻辑。
     """
-    parts = _EDGE_SEP_RE.split(line)
+    line_clean = line.rstrip(";").strip()
+    parts = _EDGE_SEP_RE.split(line_clean)
     if len(parts) < 2:
         return None
     segs = [part.strip() for part in parts if part.strip()]
@@ -72,22 +121,22 @@ def _split_chain_edges(line: str):
         return None
     return [(segs[i], segs[i + 1], "") for i in range(len(segs) - 1)]
 _SEQ_MESSAGE_RE = re.compile(
-    r"^\s*([A-Za-z_][\w-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
-    r"([A-Za-z_][\w-]*)\s*:\s*(.+?)\s*$"
+    r"^\s*(\w[\w/.-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
+    r"(\w[\w/.-]*)\s*:\s*(.+?)\s*$"
 )
 
 
 def _is_flowchart_line(line: str) -> bool:
     s = line.strip()
-    if not s or s.startswith("%%"):
+    if not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s):
         return True
     if _FLOW_KEYWORDS_RE.match(s):
         return True
-    if _EDGE_RE.match(s):
-        return True
     if _split_chain_edges(s) is not None:
         return True
-    m = _NODE_RE.fullmatch(s)
+    if _EDGE_RE.match(s):
+        return True
+    m = _NODE_RE.fullmatch(s.rstrip(";").strip())
     if m is not None and any(
         m.group(g) is not None
         for g in ("sub", "circle", "cyl", "box", "round", "diamond")
@@ -98,13 +147,42 @@ def _is_flowchart_line(line: str) -> bool:
 
 def _is_sequence_line(line: str) -> bool:
     s = line.strip()
-    if not s or s.startswith("%%"):
+    if not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s):
         return True
     if _SEQ_MESSAGE_RE.match(s):
         return True
     if _SEQ_KEYWORDS_RE.match(s):
         return True
     return False
+
+
+def _find_header_line(lines: Sequence[str]) -> Tuple[int, str]:
+    """寻找跳过 frontmatter、指令、注释后的 Mermaid 图表声明行；返回 (行下标, 去空白行内容)。"""
+    idx = 0
+    # 检查是否以 YAML frontmatter (---) 开头
+    while idx < len(lines):
+        line = lines[idx].strip()
+        if not line:
+            idx += 1
+            continue
+        if line == "---":
+            # 找到 frontmatter 结束
+            idx += 1
+            while idx < len(lines):
+                if lines[idx].strip() == "---":
+                    idx += 1
+                    break
+                idx += 1
+            continue
+        break
+
+    while idx < len(lines):
+        s = lines[idx].strip()
+        if not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s):
+            idx += 1
+            continue
+        return idx, s
+    return -1, ""
 
 
 @dataclass(frozen=True)
@@ -114,6 +192,7 @@ class MermaidBlock:
     source: str
     kind: str
     fenced: bool = False
+    content_start_line: int = 0
 
 
 @dataclass(frozen=True)
@@ -146,20 +225,21 @@ class BatchConversionResult:
     failures: Tuple[BatchFailure, ...]
 
 
+# 渲染结果内存缓存：避免编辑器敲字时频繁重复启动子进程渲染相同内容。
+_RENDER_CACHE: Dict[Tuple[str, str, bool], RenderResult] = {}
+_MAX_RENDER_CACHE = 128
+
+
 def detect_kind(source: str) -> str:
-    for line in (source or "").splitlines():
-        s = line.strip()
-        if not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s):
-            continue
-        match = _KIND_RE.match(s)
-        if match:
-            token = match.group(1).split()[0].lower()
-            if token in ("flowchart", "graph"):
-                return "flowchart"
-            if token == "sequencediagram":
-                return "sequenceDiagram"
-            return token
-        break
+    """检测 Mermaid 源码对应的图表类型（如 flowchart、sequenceDiagram、classDiagram 等）。"""
+    lines = (source or "").splitlines()
+    _, header_line = _find_header_line(lines)
+    if not header_line:
+        return ""
+    match = _KIND_RE.match(header_line)
+    if match:
+        token = match.group(1).split()[0].lower()
+        return _ALL_DIAGRAM_KINDS.get(token, token)
     return ""
 
 
@@ -182,17 +262,44 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
                 body.append(lines[index])
                 index += 1
             end = index if index < len(lines) else max(start, len(lines) - 1)
-            source = "\n".join(body).strip("\n")
+            source = "\n".join(body).rstrip()
             blocks.append(
-                MermaidBlock(start + 1, end + 1, source, detect_kind(source), True)
+                MermaidBlock(
+                    start + 1,
+                    end + 1,
+                    source,
+                    detect_kind(source),
+                    True,
+                    content_start_line=start + 2,
+                )
             )
             index = end + 1
             continue
         kind_match = _KIND_RE.match(lines[index])
         if kind_match:
             raw_kind = kind_match.group(1).split()[0].lower()
-            kind = "flowchart" if raw_kind in ("flowchart", "graph") else "sequenceDiagram"
-            is_stmt = _is_flowchart_line if kind == "flowchart" else _is_sequence_line
+            kind = _ALL_DIAGRAM_KINDS.get(raw_kind, raw_kind)
+            if kind == "flowchart":
+                is_stmt = _is_flowchart_line
+            elif kind == "sequenceDiagram":
+                is_stmt = _is_sequence_line
+            elif kind == "pie":
+                is_stmt = lambda s: bool(not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s) or _PIE_LINE_RE.match(s))
+            elif kind == "gitGraph":
+                is_stmt = lambda s: bool(not s or s.startswith("%%") or _HTML_COMMENT_RE.match(s) or _GIT_GRAPH_LINE_RE.match(s))
+            else:
+                is_stmt = lambda s: bool(
+                    not s
+                    or s.startswith("%%")
+                    or _HTML_COMMENT_RE.match(s)
+                    or (
+                        not s.startswith("#")
+                        and not s.startswith("|")
+                        and not s.startswith("<!-- TBL:")
+                        and not s.startswith("![")
+                        and not _KIND_RE.match(s)
+                    )
+                )
 
             block_start = index
             if index > 0 and _HTML_COMMENT_RE.match(lines[index - 1].strip()):
@@ -257,6 +364,7 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
                     source,
                     kind,
                     False,
+                    content_start_line=index + 1,
                 )
             )
             index = last_content_idx + 1
@@ -265,7 +373,10 @@ def extract_blocks(md_text: str) -> List[MermaidBlock]:
     return blocks
 
 
-def _balanced_error(line: str) -> Optional[str]:
+def _balanced_error(line: str, kind: str = "") -> Optional[str]:
+    # ER 关系图中的 cardinality 连线（如 ||--o{、}|..|{）将 {} 作为关系端点符，不作括号校验
+    if kind == "erDiagram":
+        return None
     pairs = {")": "(", "]": "[", "}": "{"}
     stack: List[str] = []
     quote: Optional[str] = None
@@ -284,8 +395,13 @@ def _balanced_error(line: str) -> Optional[str]:
         if char in ("'", '"'):
             quote = char
         elif char in "([{":
+            # 类图的多行花括号由外部跨行栈管理，行内不报未闭合
+            if kind == "classDiagram" and char == "{":
+                continue
             stack.append(char)
         elif char in ")]}":
+            if kind == "classDiagram" and char == "}":
+                continue
             if not stack or stack.pop() != pairs[char]:
                 return "括号不匹配"
     if quote:
@@ -296,70 +412,94 @@ def _balanced_error(line: str) -> Optional[str]:
 
 
 def validate(source: str, kind: Optional[str] = None) -> List[MermaidError]:
-    """校验 flowchart/sequenceDiagram 子集，错误行相对源码从 1 开始。"""
-    lines = source.splitlines()
-    actual = kind or detect_kind(source)
+    """校验 Mermaid 语法（兼容全量 Mermaid 图表格式），错误行相对源码从 1 开始。"""
+    lines = (source or "").splitlines()
     if not lines or not source.strip():
         return [MermaidError(1, "Mermaid 源码为空")]
-    if actual not in ("flowchart", "sequenceDiagram"):
-        return [MermaidError(1, "不支持的图类型；当前支持 flowchart、graph 与 sequenceDiagram")]
 
-    header_idx = 0
-    while header_idx < len(lines):
-        s = lines[header_idx].strip()
-        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
-            break
-        header_idx += 1
-    if header_idx >= len(lines):
+    header_idx, header_line = _find_header_line(lines)
+    if header_idx == -1 or not header_line:
         return [MermaidError(1, "Mermaid 源码为空")]
 
-    header_line = lines[header_idx].strip()
-    header_ok = (
-        _FLOW_HEADER_RE.match(header_line)
-        if actual == "flowchart"
-        else _SEQ_HEADER_RE.match(header_line)
-    )
+    match = _KIND_RE.match(header_line)
+    if not match:
+        return [MermaidError(header_idx + 1, "无法识别的 Mermaid 图类型声明: '{0}'".format(header_line))]
+
+    raw_token = match.group(1).split()[0].lower()
+    actual = kind or _ALL_DIAGRAM_KINDS.get(raw_token, raw_token)
+
     errors: List[MermaidError] = []
-    if not header_ok:
-        expected = (
-            "flowchart TD/LR/RL/BT/TB 或 graph TD/LR/RL/BT/TB"
-            if actual == "flowchart"
-            else "sequenceDiagram"
-        )
-        errors.append(MermaidError(header_idx + 1, "图类型声明无效，应为 {0}".format(expected)))
+
+    # 针对各类型声明行的特定检查
+    if actual == "flowchart":
+        if not _FLOW_HEADER_RE.match(header_line):
+            errors.append(MermaidError(header_idx + 1, "flowchart/graph 方向声明无效，应为 TD/TB/BT/LR/RL"))
+    elif actual == "sequenceDiagram":
+        if not _SEQ_HEADER_RE.match(header_line):
+            errors.append(MermaidError(header_idx + 1, "sequenceDiagram 声明语法无效"))
+    elif actual == "pie":
+        if not _PIE_HEADER_RE.match(header_line):
+            errors.append(MermaidError(header_idx + 1, "pie 声明语法无效，形如 pie 或 pie title 标题"))
+    elif actual == "gitGraph":
+        if not _GIT_GRAPH_HEADER_RE.match(header_line):
+            errors.append(MermaidError(header_idx + 1, "gitGraph 声明语法无效，形如 gitGraph:"))
+
+    # 类图跨行花括号栈
+    class_brace_stack: List[int] = []
 
     for number, raw in enumerate(lines[header_idx + 1:], start=header_idx + 2):
         line = raw.strip()
         if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
             continue
-        balance = _balanced_error(line)
+
+        balance = _balanced_error(line, actual)
         if balance:
             errors.append(MermaidError(number, balance))
             continue
-        if actual == "flowchart":
+
+        if actual == "classDiagram":
+            for ch in line:
+                if ch == "{":
+                    class_brace_stack.append(number)
+                elif ch == "}":
+                    if not class_brace_stack:
+                        errors.append(MermaidError(number, "括号不匹配（有多余的 '}'）"))
+                        break
+                    class_brace_stack.pop()
+        elif actual == "flowchart":
             if re.match(r"^(subgraph\b|end$|direction\b|classDef\b|class\b|style\b|linkStyle\b|click\b)", line):
+                continue
+            if _split_chain_edges(line) is not None:
+                # 链式边（A --> B --> C）是合法 Mermaid 语法：按箭头拆成
+                # 多条边校验，必须置于单边正则之前，避免右段被误判为单个节点。
                 continue
             edge = _EDGE_RE.match(line)
             if edge:
                 if _NODE_RE.fullmatch(edge.group("left").strip()) is None or _NODE_RE.fullmatch(edge.group("right").strip()) is None:
                     errors.append(MermaidError(number, "边定义的节点语法无效"))
                 continue
-            if _split_chain_edges(line) is not None:
-                # 链式边（A --> B --> C）是合法 Mermaid 语法：按箭头拆成
-                # 多条边校验，不再误报「无法识别的节点或边定义」。
-                continue
-            if _NODE_RE.fullmatch(line) is None:
+            if _NODE_RE.fullmatch(line.rstrip(";").strip()) is None:
                 errors.append(MermaidError(number, "无法识别的 flowchart 节点或边定义"))
-        else:
+        elif actual == "sequenceDiagram":
             if _SEQ_MESSAGE_RE.match(line):
                 continue
-            if re.match(r"^(participant|actor)\s+[A-Za-z_][\w-]*(?:\s+as\s+.+)?$", line):
+            if re.match(r"^(?:participant|actor)\s+\w[\w/.-]*(?:\s+as\s+.+)?$", line):
                 continue
-            if re.match(r"^(activate|deactivate)\s+[A-Za-z_][\w-]*$", line):
+            if re.match(r"^(?:activate|deactivate)\s+\w[\w/.-]*$", line):
                 continue
-            if re.match(r"^(Note\s+(?:left of|right of|over)\s+.+:.+|alt\b.*|else\b.*|opt\b.*|loop\b.*|par\b.*|and\b.*|rect\b.*|end$|autonumber$)", line):
+            if re.match(r"^(?:Note\s+(?:left of|right of|over)\s+.+:.+|alt\b.*|else\b.*|opt\b.*|loop\b.*|par\b.*|and\b.*|rect\b.*|end$|autonumber$)", line):
                 continue
             errors.append(MermaidError(number, "无法识别的 sequenceDiagram 语句"))
+        elif actual == "pie":
+            if not _PIE_LINE_RE.match(line):
+                errors.append(MermaidError(number, "无法识别的 pie 数据项语法，格式应为 \"标签\" : 数值"))
+        elif actual == "gitGraph":
+            if not _GIT_GRAPH_LINE_RE.match(line):
+                errors.append(MermaidError(number, "无法识别的 gitGraph 语句，支持 commit/branch/checkout/merge 等"))
+
+    if actual == "classDiagram" and class_brace_stack:
+        errors.append(MermaidError(class_brace_stack[-1], "类定义花括号 '{' 未闭合"))
+
     return errors
 
 
@@ -386,6 +526,9 @@ def _parse_node(text: str):
             label = value
             shape = name
             break
+    if (label.startswith('"') and label.endswith('"')) or (label.startswith("'") and label.endswith("'")):
+        if len(label) >= 2:
+            label = label[1:-1]
     return match.group("id"), label, shape
 
 
@@ -498,22 +641,34 @@ def _merge_node(nodes: Dict, parsed) -> None:
 
 def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
     lines = source.splitlines()
-    header_idx = 0
-    while header_idx < len(lines):
-        s = lines[header_idx].strip()
-        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
-            break
-        header_idx += 1
-    if header_idx >= len(lines):
+    header_idx, header_line = _find_header_line(lines)
+    if header_idx == -1 or not header_line:
         raise ValueError("flowchart 源码为空")
 
-    direction_match = _FLOW_HEADER_RE.match(lines[header_idx].strip())
-    direction = direction_match.group(1).upper() if direction_match else "TD"
+    direction_match = _FLOW_HEADER_RE.match(header_line)
+    direction = (
+        direction_match.group(1).upper()
+        if direction_match and direction_match.group(1)
+        else "TD"
+    )
     nodes = {}
     edges = []
     for raw in lines[header_idx + 1:]:
         line = raw.strip()
         if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
+            continue
+        if _FLOW_KEYWORDS_RE.match(line):
+            continue
+        chain = _split_chain_edges(line)
+        if chain is not None:
+            # 链式边（A --> B --> C）：拆成多条边渲染，优先于单边匹配。
+            for left_text, right_text, _label in chain:
+                left = _parse_node(left_text)
+                right = _parse_node(right_text)
+                if left and right:
+                    _merge_node(nodes, left)
+                    _merge_node(nodes, right)
+                    edges.append((left[0], right[0], ""))
             continue
         edge = _EDGE_RE.match(line)
         if edge:
@@ -526,22 +681,12 @@ def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
                     edge.group("label")
                     or edge.group("label2")
                     or edge.group("txt")
+                    or edge.group("txt2")
                     or ""
                 ).strip()
                 edges.append((left[0], right[0], label))
             continue
-        chain = _split_chain_edges(line)
-        if chain is not None:
-            # 链式边（A --> B --> C）：拆成多条边渲染，不再静默丢弃。
-            for left_text, right_text, _label in chain:
-                left = _parse_node(left_text)
-                right = _parse_node(right_text)
-                if left and right:
-                    _merge_node(nodes, left)
-                    _merge_node(nodes, right)
-                    edges.append((left[0], right[0], ""))
-            continue
-        _merge_node(nodes, _parse_node(line))
+        _merge_node(nodes, _parse_node(line.rstrip(";").strip()))
     if not nodes:
         raise ValueError("flowchart 中没有可渲染节点")
 
@@ -706,17 +851,14 @@ def _render_sequence_svg(source: str) -> Tuple[bytes, int, int]:
     labels = {}
     messages = []
     lines = source.splitlines()
-    header_idx = 0
-    while header_idx < len(lines):
-        s = lines[header_idx].strip()
-        if s and not s.startswith("%%") and not _HTML_COMMENT_RE.match(s):
-            break
-        header_idx += 1
+    header_idx, header_line = _find_header_line(lines)
+    if header_idx == -1 or not header_line:
+        raise ValueError("sequenceDiagram 源码为空")
     for raw in lines[header_idx + 1:]:
         line = raw.strip()
         if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
             continue
-        participant = re.match(r"^(?:participant|actor)\s+([A-Za-z_][\w-]*)(?:\s+as\s+(.+))?$", line)
+        participant = re.match(r"^(?:participant|actor)\s+(\w[\w/.-]*)(?:\s+as\s+(.+))?$", line)
         if participant:
             name = participant.group(1)
             if name not in participants:
@@ -850,7 +992,18 @@ def _render_with_cli(source: str) -> Optional[RenderResult]:
         except (OSError, subprocess.SubprocessError):
             return None
         if completed.returncode != 0 or not output_path.exists():
-            return None
+            err_text = completed.stderr or completed.stdout or ""
+            m = re.search(r"Parse error on line \d+:[\s\S]*?(?=\n\s*at\b|\Z)", err_text)
+            if m:
+                clean_err = m.group(0).strip()
+            else:
+                lines_err = [
+                    line.strip()
+                    for line in err_text.splitlines()
+                    if line.strip() and not line.strip().startswith("at ")
+                ]
+                clean_err = lines_err[0] if lines_err else "mermaid-cli 渲染失败"
+            return RenderResult(False, error=clean_err)
         svg = output_path.read_bytes()
         size = re.search(rb'<svg[^>]*viewBox="[^\"]*\s([\d.]+)\s([\d.]+)"', svg)
         width, height = (int(float(size.group(1))), int(float(size.group(2)))) if size else (960, 540)
@@ -868,22 +1021,41 @@ def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True) -> 
     if errors:
         first = errors[0]
         return RenderResult(False, error="第 {0} 行：{1}".format(first.line, first.message))
+
+    cache_key = (source.strip(), actual, use_cli)
+    if cache_key in _RENDER_CACHE:
+        return _RENDER_CACHE[cache_key]
+
+    # CLI 优先策略：若启用 CLI，走 CLI 官方渲染
     if use_cli:
         cli_result = _render_with_cli(source)
         if cli_result is not None:
-            return cli_result
+            if cli_result.ok:
+                if len(_RENDER_CACHE) >= _MAX_RENDER_CACHE:
+                    _RENDER_CACHE.pop(next(iter(_RENDER_CACHE)))
+                _RENDER_CACHE[cache_key] = cli_result
+                return cli_result
+            # 若 CLI 执行失败且图类型属于内置支持的 flowchart/sequenceDiagram，
+            # 自动回退内置渲染器，避免因环境问题导致渲染完全不可用
+            if actual not in ("flowchart", "sequenceDiagram"):
+                return cli_result
+
     try:
         if actual == "flowchart":
             svg, width, height = _render_flowchart_svg(source)
         elif actual == "sequenceDiagram":
             svg, width, height = _render_sequence_svg(source)
         else:
-            return RenderResult(False, error="无可用渲染后端：请安装 mermaid-cli 或改用受支持图类型")
+            return RenderResult(False, error="内置渲染器不支持此图类型「{0}」，需要启用 mermaid-cli 渲染".format(actual))
         try:
             png = svg_to_png(svg, width, height)
         except (ImportError, ValueError, RuntimeError) as exc:
             return RenderResult(False, svg=svg, width=width, height=height, backend="builtin-svg", error="QtSvg PNG 栅格化失败：{0}".format(exc))
-        return RenderResult(True, svg, png, width, height, "builtin", None)
+        result = RenderResult(True, svg, png, width, height, "builtin", None)
+        if len(_RENDER_CACHE) >= _MAX_RENDER_CACHE:
+            _RENDER_CACHE.pop(next(iter(_RENDER_CACHE)))
+        _RENDER_CACHE[cache_key] = result
+        return result
     except (ValueError, OSError) as exc:
         return RenderResult(False, error=str(exc))
 
