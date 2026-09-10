@@ -466,7 +466,9 @@ class MermaidServiceTests(unittest.TestCase):
             "# 标题\n\n~~~mermaid\n{0}\n~~~\n".format(self.FLOW),
             use_cli=False,
         )
-        self.assertIn("data:image/png;base64,", rendered)
+        self.assertTrue(
+            "data:image/svg+xml;base64," in rendered or "data:image/png;base64," in rendered
+        )
         self.assertNotIn("Mermaid 渲染失败", rendered)
 
     def test_tilde_fenced_blocks_excluded_from_batch_convert(self):
@@ -841,8 +843,22 @@ class MermaidServiceTests(unittest.TestCase):
 
         md = "```mermaid\ngraph TD\n  A[开始] --> B[结束]\n```\n"
         rendered = render_markdown_html(md, use_cli=False)
-        self.assertIn("data:image/png;base64,", rendered)
+        self.assertTrue(
+            "data:image/svg+xml;base64," in rendered or "data:image/png;base64," in rendered
+        )
         self.assertNotIn("Mermaid 渲染失败", rendered)
+
+    def test_preview_renders_mermaid_with_size_attributes(self):
+        """HTML 预览对 Mermaid 图输出逻辑宽高属性与 max-width CSS。"""
+        from doc_tool.application.content.preview import render_markdown_html
+
+        md = "```mermaid\nflowchart TD\n  A[开始] --> B[结束]\n```\n"
+        rendered = render_markdown_html(md, use_cli=False)
+        self.assertTrue(
+            "data:image/svg+xml;base64," in rendered or "data:image/png;base64," in rendered
+        )
+        self.assertRegex(rendered, r'<img\s+width="\d+"\s+height="\d+"\s+src="data:image/(?:svg\+xml|png);base64,')
+        self.assertIn("max-width: 100%", rendered)
 
     def test_mermaid_all_formats_detection_and_frontmatter(self):
         """验证所有主流 Mermaid 格式识别及跳过 YAML frontmatter/指令能力。"""
@@ -926,6 +942,251 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertTrue(res_seq.ok, f"渲染失败: {res_seq.error}")
         self.assertIn(b"Alice", res_seq.svg)
         self.assertIn(b"Bob", res_seq.svg)
+
+    def test_word_diff_and_side_by_side_rendering(self):
+        """测试字符/字级别差异高亮切片与分栏对比视图生成。"""
+        from doc_tool.application.content.changes import (
+            compute_word_diff_spans,
+            render_side_by_side_diff,
+        )
+
+        # 字级别切片测试
+        old_l = "系统支持导出 PDF 与 HTML 两种格式"
+        new_l = "系统支持导出 Word 与 HTML 两种格式"
+        old_spans, new_spans = compute_word_diff_spans(old_l, new_l)
+        self.assertTrue(len(old_spans) > 0)
+        self.assertTrue(len(new_spans) > 0)
+        # 确认提取的差异词包含变化部分
+        old_diff_text = "".join(old_l[span.start:span.end] for span in old_spans)
+        new_diff_text = "".join(new_l[span.start:span.end] for span in new_spans)
+        self.assertIn("PDF", old_diff_text)
+        self.assertIn("Word", new_diff_text)
+
+        # 统一 diff 转分栏测试
+        old_doc = "常规行1\n系统支持导出 PDF 格式\n常规行2\n"
+        new_doc = "常规行1\n系统支持导出 Word 格式\n常规行2\n"
+        sbs_lines = render_side_by_side_diff(old_doc, new_doc)
+        self.assertGreater(len(sbs_lines), 0)
+        # 找到变动行并校验两边行号及 word_spans
+        mod_line = next((l for l in sbs_lines if l.change_type == "replace"), None)
+        self.assertIsNotNone(mod_line)
+        self.assertEqual(mod_line.old_line_no, 2)
+        self.assertEqual(mod_line.new_line_no, 2)
+        self.assertIn("PDF", mod_line.old_text)
+        self.assertIn("Word", mod_line.new_text)
+        self.assertTrue(len(mod_line.old_spans) > 0)
+        self.assertTrue(len(mod_line.new_spans) > 0)
+
+    def test_lint_quick_fixes(self):
+        """测试格式诊断一键修复：标题空格、代码块闭合、表格分隔线等。"""
+        from doc_tool.application.content.lint import (
+            LintIssue,
+            apply_all_quick_fixes,
+            apply_quick_fix,
+            can_quick_fix,
+        )
+
+        # 1. 标题缺失空格修复
+        c1 = "#一级标题\n##二级标题\n内容"
+        issue_h1 = LintIssue("heading_format", "test.md", 1, "标题 '#' 后面必须有空格：'#一级标题'", "heading_format")
+        issue_h2 = LintIssue("heading_format", "test.md", 2, "标题 '#' 后面必须有空格：'##二级标题'", "heading_format")
+        self.assertTrue(can_quick_fix(issue_h1))
+        self.assertTrue(can_quick_fix(issue_h2))
+
+        fixed_all, count = apply_all_quick_fixes(c1, [issue_h1, issue_h2])
+        self.assertEqual(count, 2)
+        self.assertIn("# 一级标题", fixed_all)
+        self.assertIn("## 二级标题", fixed_all)
+
+        # 2. 未闭合代码块修复
+        c2 = "```python\nprint('hello')\n"
+        fence_issue = LintIssue("heading_format", "test.md", 1, "代码块未闭合，文档末尾缺少闭合标记 ```", "heading_format")
+        self.assertTrue(can_quick_fix(fence_issue))
+        fixed_fence, ok, _ = apply_quick_fix(c2, fence_issue)
+        self.assertTrue(ok)
+        self.assertTrue(fixed_fence.endswith("```\n") or "```" in fixed_fence)
+
+        # 3. 表格缺失分隔行修复
+        c3 = "| 姓名 | 年龄 |\n| 张三 | 18 |\n"
+        sep_issue = LintIssue("markdown_structure", "test.md", 1, "表格缺少分隔行（形如 `| --- | --- |`）", "markdown_structure")
+        self.assertTrue(can_quick_fix(sep_issue))
+        fixed_sep, ok2, _ = apply_quick_fix(c3, sep_issue)
+        self.assertTrue(ok2)
+        self.assertIn("| --- | --- |", fixed_sep)
+
+        # 4. 术语大小写修复（支持 check_terms 生成的标准格式与正文规范格式）
+        c4 = "这里提到了 word 和 pdf。\n"
+        term_issue = LintIssue("term_case", "test.md", 1, "术语大小写不一致：word（应为 Word）", "term_case")
+        self.assertTrue(can_quick_fix(term_issue))
+        fixed_term, ok3, _ = apply_quick_fix(c4, term_issue)
+        self.assertTrue(ok3)
+        self.assertIn("Word 和 pdf", fixed_term)
+
+    def test_path_natural_sort_key_none_and_empty(self):
+        """测试路径自然排序键对 None 和空字符串的防御能力。"""
+        from doc_tool.domain.content_index import path_natural_sort_key
+
+        k_none = path_natural_sort_key(None)
+        k_empty = path_natural_sort_key("")
+        self.assertEqual(k_none, k_empty)
+        # 验证 1.2 在 1.10 前面
+        self.assertLess(path_natural_sort_key("1.2_节.md"), path_natural_sort_key("1.10_节.md"))
+        self.assertLess(path_natural_sort_key("第2章/2.1.md"), path_natural_sort_key("第10章/10.1.md"))
+
+    def test_tree_filter_only_changed(self):
+        """测试章节树「仅看改动」筛选模式：仅保留有改动节点及其各级祖先。"""
+        from doc_tool.application.content.tree import TreeItem, filter_tree_items
+
+        items = [
+            TreeItem(node_id="c1", text="第一章", parent_id=None, rel_path=None, is_file=False),
+            TreeItem(node_id="c1/1.1.md", text="1.1 小节", parent_id="c1", rel_path="c1/1.1.md", is_file=True),
+            TreeItem(node_id="c1/1.2.md", text="1.2 小节", parent_id="c1", rel_path="c1/1.2.md", is_file=True),
+            TreeItem(node_id="c2", text="第二章", parent_id=None, rel_path=None, is_file=False),
+            TreeItem(node_id="c2/2.1.md", text="2.1 小节", parent_id="c2", rel_path="c2/2.1.md", is_file=True),
+        ]
+        status_map = {
+            "c1/1.2.md": "modified",
+        }
+        # 仅看改动：c1 必须保留（作为 c1/1.2.md 的父节点），c1/1.2.md 必须保留，1.1 和 c2 应被过滤
+        filtered = filter_tree_items(items, only_changed=True, status_map=status_map)
+        filtered_ids = [item.node_id for item in filtered]
+        self.assertIn("c1", filtered_ids)
+        self.assertIn("c1/1.2.md", filtered_ids)
+        self.assertNotIn("c1/1.1.md", filtered_ids)
+
+        # 搜索命中目录时，仅保留该目录下有改动的文件及其各级祖先
+        filtered_dir = filter_tree_items(items, query="第一章", only_changed=True, status_map=status_map)
+        dir_ids = [item.node_id for item in filtered_dir]
+        self.assertIn("c1", dir_ids)
+        self.assertIn("c1/1.2.md", dir_ids)
+        self.assertNotIn("c1/1.1.md", dir_ids)
+
+    def test_renumber_plan_after_delete_same_depth_only(self):
+        """测试删除编号章节后重排：严格限定相同编号层级，不跨层级误判。"""
+        from doc_tool.application.content.tree import renumber_plan_after_delete
+
+        files = [
+            "doc/1 概述.md",
+            "doc/2 架构.md",
+            "doc/3 模块.md",
+            "doc/1.1 背景.md",  # 同目录但更深层级，不应被当成同级误改
+        ]
+        plan = renumber_plan_after_delete("doc/1 概述.md", files)
+        # 2 架构 -> 1 架构, 3 模块 -> 2 模块；1.1 背景 不应被修改
+        expected = [
+            ("doc/2 架构.md", "doc/1 架构.md"),
+            ("doc/3 模块.md", "doc/2 模块.md"),
+        ]
+        self.assertEqual(plan, expected)
+
+    def test_batch_convert_mermaid_preserves_crlf(self):
+        """测试 batch_convert 保持原文档换行符（CRLF）。"""
+        from doc_tool.application.content.mermaid import batch_convert
+
+        text = "```mermaid\r\nflowchart TD\r\n  A --> B\r\n```\r\n\r\n普通段落\r\n"
+
+        def mock_exporter(_block, _result):
+            return "![图](images/test.png)"
+
+        converted = batch_convert(text, mock_exporter, include_fenced=True, use_cli=False)
+        self.assertEqual(converted.success_count, 1)
+        self.assertIn("\r\n", converted.text)
+        self.assertNotIn("![图](images/test.png)\n\r\n", converted.text)
+        self.assertTrue(converted.text.startswith("![图](images/test.png)\r\n"))
+
+    def test_revision_summary_cell_hyperlinks_with_parentheses(self):
+        """测试修订摘要行包含括号备注时精准为小节标题添加内部超链接。"""
+        from lxml import etree
+        from scripts.build_docx import _set_revision_summary_cell, qn
+
+        class MockExpressions:
+            def find_bookmark_for_section(self, token):
+                if token in ("4.8.4 APP 用户管理", "4.8.4"):
+                    return "_bm_sec_4_8_4"
+                return None
+
+        cell = etree.Element(qn("tc"))
+        text = "第 4 章 WEB 端功能设计 -> 4.8 Kmilight -> 4.8.4 APP 用户管理（Tab 复合标签页展现: 合并用户）"
+        _set_revision_summary_cell(cell, text, MockExpressions())
+
+        # 检查是否成功生成 w:hyperlink 且 anchor 对应书签
+        hyperlinks = cell.findall(f".//{qn('hyperlink')}")
+        self.assertEqual(len(hyperlinks), 1)
+        self.assertEqual(hyperlinks[0].get(qn("anchor")), "_bm_sec_4_8_4")
+        link_text = "".join(hyperlinks[0].itertext())
+        self.assertEqual(link_text, "4.8.4 APP 用户管理")
+        all_text = "".join(cell.itertext())
+        self.assertEqual(all_text, text)
+
+    def test_update_custom_properties_converts_r8_to_lpwstr(self):
+        """测试 update_custom_properties 将模板原有 <vt:r8> 替换为 <vt:lpwstr>。"""
+        from scripts.build_docx import update_custom_properties
+
+        custom_xml = (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            b'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" '
+            b'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">\n'
+            b'  <property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="\xe7\x89\x88\xe6\x9c\xac">\n'
+            b'    <vt:r8>2.5</vt:r8>\n'
+            b'  </property>\n'
+            b'</Properties>'
+        )
+        items = {"docProps/custom.xml": custom_xml}
+        config = {
+            "documentNo": "KF-2090-1-006",
+            "documentVersion": "2.6.0",
+            "documentName": "\xe5\xba\xb7\xe5\xb0\x9a\xe5\x81\xa5\xe5\xba\xb7\xe4\xba\x91",
+        }
+        update_custom_properties(items, config)
+        updated_xml = items["docProps/custom.xml"].decode("utf-8")
+        self.assertNotIn("vt:r8", updated_xml)
+        self.assertIn("<vt:lpwstr>2.6.0</vt:lpwstr>", updated_xml)
+
+    def test_update_custom_properties_registers_rels_and_content_types(self):
+        """测试 update_custom_properties 自动将 custom.xml 注册至 [Content_Types].xml 与 _rels/.rels。"""
+        from scripts.build_docx import update_custom_properties
+
+        items = {
+            "[Content_Types].xml": (
+                b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'
+            ),
+            "_rels/.rels": (
+                b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+                b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+            ),
+        }
+        config = {
+            "documentNo": "KF-2090-1-006",
+            "documentVersion": "2.6.0",
+            "documentName": "测试文档",
+        }
+        update_custom_properties(items, config)
+        self.assertIn("docProps/custom.xml", items)
+        ct_text = items["[Content_Types].xml"].decode("utf-8")
+        self.assertIn('/docProps/custom.xml"', ct_text)
+        self.assertIn("custom-properties+xml", ct_text)
+
+        rels_text = items["_rels/.rels"].decode("utf-8")
+        self.assertIn('Target="docProps/custom.xml"', rels_text)
+        self.assertIn("relationships/custom-properties", rels_text)
+
+    def test_term_case_quick_fix_with_backslashes(self):
+        """测试 term_case 一键修复在替换词包含反斜杠时不触发转义异常。"""
+        from doc_tool.application.content.lint import LintIssue, apply_quick_fix
+
+        issue = LintIssue(
+            rule="term_case",
+            rel_path="test.md",
+            line_no=1,
+            message="术语大小写不一致： OldTerm （应为 New\\1Term ）",
+            rule_id="term_case",
+            severity="warning",
+        )
+        content = "Here is OldTerm in text.\n"
+        fixed, ok, _ = apply_quick_fix(content, issue)
+        self.assertTrue(ok)
+        self.assertIn("New\\1Term", fixed)
 
 
 if __name__ == "__main__":

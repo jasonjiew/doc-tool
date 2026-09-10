@@ -932,7 +932,7 @@ class MainWindowInteractionTests(unittest.TestCase):
             self.assertEqual(window._result_state.status, "success")
             self.assertEqual(window._result_state.output_path, output)
             self.assertEqual(window._result_state.report_path, report)
-            self.assertIn("正式合并成功", window._result_state.title)
+            self.assertIn("正式出稿成功", window._result_state.title)
             window.close()
 
     def test_validation_success_result_exposes_report_only(self):
@@ -1162,6 +1162,119 @@ class MainWindowInteractionTests(unittest.TestCase):
         window.runner = SimpleNamespace(is_running=False, cancel=Mock())
         window.close()
 
+    def test_start_task_merge_and_diag_build_initializes_pending_steps(self):
+        """测试正式合并与诊断构建启动时正确初始化待处理步骤列表（防 STEP_STATUS_PENDING 未定义回归）。"""
+        from unittest.mock import Mock
+        from doc_tool.ui.main_window import MainWindow
+        from doc_tool.ui.task_bridge import TaskSpec
+        from doc_tool.application.pipeline import PIPELINE_STAGE_ORDER
+
+        window = MainWindow()
+        window.runner = Mock()
+        window.runner.start.return_value = True
+        window.runner.is_running = False
+
+        # 1. 验证正式合并
+        spec_merge = TaskSpec(name="merge", target=lambda: None)
+        window._start_task(spec_merge)
+        self.assertEqual(window._task_dock._step_list.count(), len(PIPELINE_STAGE_ORDER))
+        # 步骤应全部初始化（文字含待执行 glyph ○）
+        self.assertIn("○", window._task_dock._step_list.item(0).text())
+
+        # 2. 验证诊断构建
+        spec_diag = TaskSpec(name="diag_build", target=lambda: None)
+        window._start_task(spec_diag)
+        self.assertEqual(window._task_dock._step_list.count(), len(PIPELINE_STAGE_ORDER))
+        self.assertIn("○", window._task_dock._step_list.item(0).text())
+
+        window._poll_timer.stop()
+        window._elapsed_timer.stop()
+        window.runner.is_running = False
+        window.close()
+
+    def test_project_loading_overlay_no_nested_graphics_effect_warnings(self):
+        """测试项目加载遮罩层的生命周期正常切换与淡出结束，无 QPainter 或 nested effect 异常。"""
+        from PySide6.QtWidgets import QWidget
+        from doc_tool.ui.project_loading_overlay import ProjectLoadingOverlay
+
+        parent = QWidget()
+        parent.show()
+        overlay = ProjectLoadingOverlay(parent, dark=False)
+        overlay.start("TestProject", "正在准备工作区…")
+        self.assertFalse(overlay.isHidden())
+        self.assertFalse(overlay._opacity_effect.isEnabled())
+
+        # 阶段切换
+        overlay.show_stage("正在加载模型…")
+        self.assertEqual(overlay._stage_label.text(), "正在加载模型…")
+
+        # 结束淡出
+        done = []
+        overlay.finish(on_finished=lambda: done.append(True))
+        self.assertTrue(overlay._opacity_effect.isEnabled())
+        overlay._on_animation_finished()
+        self.assertTrue(overlay.isHidden())
+        self.assertFalse(overlay._opacity_effect.isEnabled())
+        self.assertEqual(done, [True])
+        parent.close()
+
+    def test_project_loading_overlay_interactive_steps_and_dismiss(self):
+        """测试加载遮罩分阶段进度胶囊、跳过/关闭按钮交互与 Esc 退出。"""
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtWidgets import QWidget
+        from doc_tool.ui.project_loading_overlay import ProjectLoadingOverlay
+
+        parent = QWidget()
+        parent.show()
+        overlay = ProjectLoadingOverlay(parent, dark=False)
+        overlay.start("TestProject", "正在解析配置…")
+
+        # 验证初始状态
+        self.assertEqual(overlay._current_step, 0)
+        self.assertEqual(overlay._progress_bar.value(), 15)
+        self.assertEqual(len(overlay._step_pills), 4)
+        self.assertIn("●", overlay._step_pills[0].text())
+
+        # 阶段推进：索引
+        overlay.show_stage("正在建立全文索引…")
+        self.assertEqual(overlay._current_step, 1)
+        self.assertEqual(overlay._progress_bar.value(), 55)
+        self.assertIn("✓", overlay._step_pills[0].text())
+        self.assertIn("●", overlay._step_pills[1].text())
+
+        # 阶段推进：工作区
+        overlay.show_stage("准备工作区视图…")
+        self.assertEqual(overlay._current_step, 2)
+        self.assertEqual(overlay._progress_bar.value(), 75)
+
+        # 阶段推进：恢复标签
+        overlay.show_stage("正在恢复标签页…")
+        self.assertEqual(overlay._current_step, 3)
+        self.assertEqual(overlay._progress_bar.value(), 90)
+
+        # 切换主题
+        overlay.set_dark(True)
+        overlay.set_dark(False)
+
+        # 交互测试：跳过等待按钮点击直接结束
+        self.assertFalse(overlay._opacity_effect.isEnabled())
+        overlay._skip_btn.click()
+        self.assertTrue(overlay._opacity_effect.isEnabled())
+        overlay._on_animation_finished()
+        self.assertTrue(overlay.isHidden())
+
+        # 重新启动测试 Esc 键退出
+        overlay.start("TestProject2", "正在解析配置…")
+        self.assertFalse(overlay.isHidden())
+        esc_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+        overlay.keyPressEvent(esc_event)
+        self.assertTrue(overlay._opacity_effect.isEnabled())
+        overlay._on_animation_finished()
+        self.assertTrue(overlay.isHidden())
+
+        parent.close()
+
     def test_search_panel_results_tree_is_layout_managed(self):
         """搜索面板结果树由唯一外层布局管理（回归：二次 QVBoxLayout 不可见）。"""
         from PySide6.QtWidgets import QVBoxLayout, QWidget
@@ -1242,8 +1355,15 @@ class MainWindowInteractionTests(unittest.TestCase):
             self.assertIn(expected, labels)
 
         # 关闭两个内容 Dock 后，Ctrl+F 必须重新显示底部工具面板。
-        win._content_workspace = SimpleNamespace(focus_search=Mock())
+        from PySide6.QtWidgets import QApplication
+
+        win._content_workspace = SimpleNamespace(
+            focus_search=Mock(), focus_in_editor_find=Mock()
+        )
         win._content_index_ready = True
+        app = QApplication.instance()
+        if app and app.focusWidget():
+            app.focusWidget().clearFocus()
         win._tree_dock.close()
         win._panels_dock.close()
         win._on_content_search()
@@ -1807,6 +1927,26 @@ class ChapterTreeInteractionTests(unittest.TestCase):
         finally:
             clipboard.setText = original_set_text
         self.assertEqual(written, ["[设备管理]({0})".format(self.rel)])
+        tree.close()
+
+    def test_directory_context_menu_on_flatten_single_type_root(self):
+        """测试单一类型项目中，顶层章节目录（parent_id 为 None）依然能正常展示右键菜单。"""
+        from doc_tool.application.content.tree import build_tree
+
+        # 仅包含 general 的文件列表：build_tree 会 flatten_single_type，第一层目录 parent_id 为 None
+        items = build_tree(["general/1 概述/1.1 背景.md"])
+        tree = self._make_tree(writable=True)
+        tree.set_items(items)
+
+        # 查找顶层目录节点
+        dir_node_id = "general/1 概述"
+        index = tree._model.index_for_id(dir_node_id)
+        self.assertTrue(index.isValid())
+        menu = tree._context_menu(index)
+        labels = [a.text() for a in menu.actions()]
+        self.assertIn("新增章节/文件…", labels)
+        self.assertIn("在文件管理器打开", labels)
+        self.assertIn("重新编号本目录（连续）…", labels)
         tree.close()
 
 
@@ -2383,6 +2523,40 @@ class EditorAuthoringWorkbenchTests(unittest.TestCase):
                 panel._on_preview_anchor_clicked(QUrl("https://example.com"))
                 locate.assert_not_called()
                 open_url.assert_called_once()
+        panel.close()
+
+    def test_preview_browser_scales_images_to_fit_viewport(self):
+        """预览面板中超出视口宽度的图表/图片自动等比缩放，防止溢出产生横向滚动条。"""
+        import base64
+        from PySide6.QtCore import QBuffer, QIODevice
+        from PySide6.QtGui import QImage
+
+        panel = self._panel()
+        panel.resize(400, 600)
+        panel.show()
+
+        img = QImage(1200, 800, QImage.Format.Format_ARGB32)
+        img.fill(0xFF00FF00)
+        buf = QBuffer()
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        img.save(buf, "PNG")
+        b64 = base64.b64encode(bytes(buf.data())).decode("ascii")
+
+        md_text = f"![大图](data:image/png;base64,{b64})\n"
+        panel._refresh_preview(md_text)
+
+        preview = panel._preview
+        self.assertLessEqual(preview.document().idealWidth(), preview.viewport().width() + 10)
+        self.assertEqual(preview.horizontalScrollBar().maximum(), 0)
+
+        panel.close()
+
+    def test_preview_browser_non_ascii_chinese_path_does_not_crash(self):
+        """测试加载包含中文或特殊字符深层目录的 Markdown 文件时，预览基准 URL 解析正常且不崩溃。"""
+        panel = self._panel()
+        chinese_rel = "content/design/第15章 数据存储/15.1 数据存储/15.1.2 数据归档.md"
+        panel.load(chinese_rel, "# 测试标题\n\n正文内容")
+        self.assertFalse(panel._preview_frame.isHidden())
         panel.close()
 
     def test_mermaid_dialog_valid_source_renders_preview(self):
@@ -3196,6 +3370,184 @@ class EditorWorkbenchPhase2Tests(unittest.TestCase):
         window.toggle_zen_mode()
         self.assertFalse(window._zen_mode)
         self.assertFalse(window._zen_mode_action.isChecked())
+
+    def test_mermaid_dialog_zoom_controls(self):
+        """测试 Mermaid 图形工作台缩放控制：放大、缩小、适应与 1:1 重置。"""
+        from doc_tool.ui.content.mermaid_dialog import MermaidDialog
+
+        dlg = MermaidDialog("flowchart TD\n  A --> B")
+        dlg.refresh_preview()
+        self.assertIsNotNone(dlg._current_pixmap)
+        self.assertTrue(dlg._fit_mode)
+
+        # 放大
+        dlg._zoom_in()
+        self.assertFalse(dlg._fit_mode)
+        self.assertGreater(dlg._zoom_factor, 1.0)
+        self.assertIn("%", dlg.zoom_label.text())
+
+        # 缩小
+        dlg._zoom_out()
+        self.assertLess(dlg._zoom_factor, 1.26)
+
+        # 重置 1:1
+        dlg._reset_zoom()
+        self.assertAlmostEqual(dlg._zoom_factor, 1.0)
+        self.assertEqual(dlg.zoom_label.text(), "100%")
+
+        # 适应窗口
+        dlg._fit_to_window()
+        self.assertTrue(dlg._fit_mode)
+        dlg.close()
+
+    def test_result_card_extended_action_callbacks(self):
+        """测试构建终态卡片支持定位文件、复制路径与另存为。"""
+        from doc_tool.ui.work_detail_pane import ResultCard
+        from doc_tool.ui.workbench_state import ResultState
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output.docx"
+            output.write_bytes(b"docx")
+
+            located = []
+            copied = []
+            exported = []
+
+            card = ResultCard(
+                on_locate_file=located.append,
+                on_copy_path=copied.append,
+                on_export_to=exported.append,
+            )
+            card.render(ResultState(status="success", output_path=output))
+
+            # 校验按钮绑定
+            btn_texts = [btn.text() for btn in card._action_buttons]
+            self.assertIn("定位文件", btn_texts)
+            self.assertIn("复制路径", btn_texts)
+            self.assertIn("另存为…", btn_texts)
+
+            locate_btn = next(b for b in card._action_buttons if b.text() == "定位文件")
+            locate_btn.click()
+            self.assertEqual(located, [str(output)])
+
+            copy_btn = next(b for b in card._action_buttons if b.text() == "复制路径")
+            copy_btn.click()
+            self.assertEqual(copied, [str(output)])
+
+            export_btn = next(b for b in card._action_buttons if b.text() == "另存为…")
+            export_btn.click()
+            self.assertEqual(exported, [str(output)])
+
+    def test_line_numbered_edit_replace_text_range(self):
+        """测试编辑器支持范围文本替换（如标题快速修复）。"""
+        from doc_tool.ui.content.editor_highlight import _LineNumberedEdit
+
+        edit = _LineNumberedEdit()
+        edit.setPlainText("#1.1 标题\n第二行")
+        # 替换第 0 到 4 字符为 '# 1.1'
+        edit._replace_text_range(0, 4, "# 1.1")
+        self.assertEqual(edit.toPlainText(), "# 1.1 标题\n第二行")
+
+    def test_lint_panel_initialization_and_quick_fix(self):
+        """测试 LintPanel 初始化无 _on_activate 缺失异常，并可执行一键修复。"""
+        from doc_tool.application.content.lint import ContentLinter, TermStore, LintIssue
+        from doc_tool.application.content.quality_rules import QualityRulesConfig
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.domain.content_index import ContentIndex, FileEntry
+        from doc_tool.ui.content.lint_panel import LintPanel, LintTreeItem
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_p = Path(tmp)
+            content_dir = tmp_p / "content"
+            content_dir.mkdir(parents=True)
+            state_dir = tmp_p / ".state"
+            state_dir.mkdir(parents=True)
+
+            md_file = content_dir / "1.1_test.md"
+            md_file.write_text("#1.1 标题\n正文", encoding="utf-8")
+
+            index = ContentIndex()
+            index.lines["1.1_test.md"] = ["#1.1 标题", "正文"]
+            index.files["1.1_test.md"] = FileEntry("1.1_test.md", "general", 2)
+
+            writer = ContentWriter(content_dir, state_dir)
+            terms = TermStore(state_dir)
+            linter = ContentLinter(index, QualityRulesConfig(state_dir, "general"))
+
+            opened = []
+            applied = []
+            panel = LintPanel(
+                linter,
+                terms,
+                on_open=lambda rel, line: opened.append((rel, line)),
+                writable=True,
+                writer=writer,
+                on_applied=lambda: applied.append(True),
+            )
+            # 验证 _on_activate 存在且可正常调用
+            self.assertTrue(hasattr(panel, "_on_activate"))
+            item = LintTreeItem(["1.1_test.md", "1", "标题格式", "警告", "测试说明"])
+            panel._on_activate(item)
+            self.assertEqual(opened, [("1.1_test.md", 1)])
+
+            # 验证一键修复
+            issue = LintIssue("heading_format", "1.1_test.md", 1, "标题 '#' 后面必须有空格：'#1.1 标题'", "heading_format")
+            panel._issues = [issue]
+            ok = panel.quick_fix_issue(issue)
+            self.assertTrue(ok)
+            fixed_text = md_file.read_text(encoding="utf-8")
+            self.assertIn("# 1.1 标题", fixed_text)
+            self.assertTrue(len(applied) > 0)
+
+            # 验证 quick_fix_all_in_file
+            md_file.write_text("#1.1 标题\n##1.1.1 子标题", encoding="utf-8")
+            i1 = LintIssue("heading_format", "1.1_test.md", 1, "标题 '#' 后面必须有空格：'#1.1 标题'", "heading_format")
+            i2 = LintIssue("heading_format", "1.1_test.md", 2, "标题 '#' 后面必须有空格：'##1.1.1 子标题'", "heading_format")
+            panel._issues = [i1, i2]
+            c_file = panel.quick_fix_all_in_file("1.1_test.md")
+            self.assertEqual(c_file, 2)
+            fixed_all = md_file.read_text(encoding="utf-8")
+            self.assertEqual(fixed_all, "# 1.1 标题\n## 1.1.1 子标题")
+
+            # 验证 quick_fix_all_in_project 跨文件批量修复
+            md_file2 = content_dir / "2.1_test.md"
+            md_file2.write_text("#2.1 第二章", encoding="utf-8")
+            md_file.write_text("#1.1 第一章", encoding="utf-8")
+            ip1 = LintIssue("heading_format", "1.1_test.md", 1, "标题 '#' 后面必须有空格：'#1.1 第一章'", "heading_format")
+            ip2 = LintIssue("heading_format", "2.1_test.md", 1, "标题 '#' 后面必须有空格：'#2.1 第二章'", "heading_format")
+            panel._issues = [ip1, ip2]
+            c_proj = panel.quick_fix_all_in_project()
+            self.assertEqual(c_proj, 2)
+            self.assertEqual(md_file.read_text(encoding="utf-8"), "# 1.1 第一章")
+            self.assertEqual(md_file2.read_text(encoding="utf-8"), "# 2.1 第二章")
+
+            # 验证 TreeItem 在 sortColumn 为 -1 时不报错
+            self.assertTrue(item < LintTreeItem(["2.1_test.md", "2", "说明", "警告", "说明"]))
+
+    def test_main_window_locate_file_windows_command(self):
+        """测试 MainWindow._locate_file 在 Windows 环境下构建正确的 explorer.exe /select 命令行。"""
+        import unittest.mock
+        from doc_tool.ui.main_window import MainWindow
+
+        with tempfile.TemporaryDirectory() as tmp:
+            test_file = Path(tmp) / "has space" / "test doc.docx"
+            test_file.parent.mkdir(parents=True)
+            test_file.write_bytes(b"docx")
+
+            commands = []
+            with unittest.mock.patch("subprocess.Popen", side_effect=lambda cmd: commands.append(cmd)):
+                with unittest.mock.patch("os.name", "nt"):
+                    window = MainWindow()
+                    window._locate_file(str(test_file))
+                    window.close()
+
+            self.assertEqual(len(commands), 1)
+            cmd_str = commands[0]
+            # 必须为完整字符串且 /select,"path" 格式，双引号不能包裹 /select 开关
+            self.assertIsInstance(cmd_str, str)
+            self.assertTrue(cmd_str.startswith('explorer.exe /select,"'))
+            self.assertTrue(cmd_str.endswith('"'))
+            self.assertIn(str(test_file.resolve()), cmd_str)
 
 
 if __name__ == "__main__":

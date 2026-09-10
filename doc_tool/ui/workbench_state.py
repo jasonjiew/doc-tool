@@ -153,7 +153,7 @@ def derive_workbench_state(
     if not writable:
         reasons.append("项目模式版本高于当前应用支持版本，仅可只读查看")
     if writable and word_available is False:
-        reasons.append("Microsoft Word 不可用；正式合并需要 Word，诊断构建仍可使用")
+        reasons.append("Microsoft Word 不可用；正式出稿需要 Word，快速构建仍可使用")
     if not output_exists:
         reasons.append("尚未生成输出目录")
     if not report_exists:
@@ -187,16 +187,16 @@ def derive_workbench_state(
         readiness = "任务运行中：{0}".format(task_label or "处理中")
         tone = "warning"
     elif not writable:
-        readiness = "只读项目：构建与校验不可用"
+        readiness = "只读项目：构建与检查不可用"
         tone = "warning"
     elif word_available is True:
-        readiness = "已具备正式合并条件"
+        readiness = "已具备正式出稿条件"
         tone = "success"
     elif word_available is False:
-        readiness = "可诊断构建；正式合并缺少 Microsoft Word"
+        readiness = "可快速构建；正式出稿缺少 Microsoft Word"
         tone = "warning"
     else:
-        readiness = "正式合并将在启动时检查 Microsoft Word"
+        readiness = "正式出稿将在启动时检查 Microsoft Word"
         tone = "neutral"
 
     # Four-view mapping: running drives the "running" view; a persistent result
@@ -266,15 +266,16 @@ def derive_step_list(
             )
         ]
 
-    # 全量管线步骤：未收到事件的阶段保持待处理（“未执行保持待处理”），
-    # 使总体进度 = 完成数/全管线步骤数，阶段顺序单一来自 stage_percent_table。
+    has_revision = any(ev[0] == "revision" for ev in events)
+    effective_order = [s for s in ordered if s != "revision" or has_revision]
+
     steps: Dict[str, StepItem] = {
         stage: StepItem(
             stage=stage,
             label=PIPELINE_STAGE_LABELS.get(stage, stage),
             status=STEP_STATUS_PENDING,
         )
-        for stage in ordered
+        for stage in effective_order
     }
     for ev in events:
         stage = ev[0]
@@ -309,7 +310,7 @@ def derive_step_list(
                 detail=detail,
             )
 
-    return [steps[stage] for stage in ordered]
+    return [steps[stage] for stage in effective_order]
 
 
 def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:

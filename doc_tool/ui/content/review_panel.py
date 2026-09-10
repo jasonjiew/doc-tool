@@ -268,7 +268,11 @@ class ExportReviewDraftDialog(QDialog):
 
         self._document_name = document_name
         self._document_version = document_version
-        self._changed_chapters = list(changed_chapters)
+        from doc_tool.domain.content_index import path_natural_sort_key
+        self._changed_chapters = sorted(
+            changed_chapters,
+            key=lambda item: path_natural_sort_key(item.get("rel_path", ""))
+        )
         self._chapter_checkboxes: List[QCheckBox] = []
 
         layout = QVBoxLayout(self)
@@ -307,10 +311,10 @@ class ExportReviewDraftDialog(QDialog):
         scroll_layout.setSpacing(6)
 
         status_map = {"added": "新增", "modified": "已修改", "deleted": "已删除", "normal": "正式"}
-        if not changed_chapters:
+        if not self._changed_chapters:
             scroll_layout.addWidget(QLabel("（当前未检测到章节，将生成空白评审模板）", scroll_content))
         else:
-            for item in changed_chapters:
+            for item in self._changed_chapters:
                 ch_no = item.get("chapter_no", "")
                 title = item.get("title", "")
                 st = status_map.get(item.get("status", ""), "正式")
@@ -1114,6 +1118,8 @@ class ReviewPanel(QWidget):
                     }
                 )
 
+        from doc_tool.domain.content_index import path_natural_sort_key
+        results.sort(key=lambda item: path_natural_sort_key(item.get("rel_path", "")))
         return results
 
     def _get_all_chapters(self) -> List[str]:

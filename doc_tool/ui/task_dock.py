@@ -42,6 +42,11 @@ class _IdleCard(QFrame):
         on_validate: Optional[Callable[[], None]] = None,
         on_diag_build: Optional[Callable[[], None]] = None,
         on_open_report: Optional[Callable[[], None]] = None,
+        on_open_output: Optional[Callable[[str], None]] = None,
+        on_open_directory: Optional[Callable[[str], None]] = None,
+        on_copy_path: Optional[Callable[[str], None]] = None,
+        on_export_to: Optional[Callable[[str], None]] = None,
+        on_locate_file: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -49,6 +54,11 @@ class _IdleCard(QFrame):
         self._on_validate = on_validate
         self._on_diag_build = on_diag_build
         self._on_open_report = on_open_report
+        self._on_open_output = on_open_output
+        self._on_open_directory = on_open_directory
+        self._on_copy_path = on_copy_path
+        self._on_export_to = on_export_to
+        self._on_locate_file = on_locate_file
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -83,8 +93,28 @@ class _IdleCard(QFrame):
         if output and Path(output).is_file():
             self._add_action(
                 "打开产物",
-                lambda _checked=False, p=str(output): self._open_output(p),
+                lambda _checked=False, p=str(output): (
+                    self._on_open_output(p) if self._on_open_output else self._open_output(p)
+                ),
             )
+            self._add_action(
+                "定位文件" if self._on_locate_file is not None else "打开所在目录",
+                lambda _checked=False, p=str(output): (
+                    self._on_locate_file(p)
+                    if self._on_locate_file is not None
+                    else (self._on_open_directory(str(Path(p).parent)) if self._on_open_directory else None)
+                ),
+            )
+            if self._on_copy_path is not None:
+                self._add_action(
+                    "复制路径",
+                    lambda _checked=False, p=str(output): self._on_copy_path(p),
+                )
+            if self._on_export_to is not None:
+                self._add_action(
+                    "另存为…",
+                    lambda _checked=False, p=str(output): self._on_export_to(p),
+                )
         report = result.report_path
         if report and Path(report).is_file():
             self._add_action("查看校验报告", lambda: self._open_report())
@@ -94,14 +124,14 @@ class _IdleCard(QFrame):
         self._title.setText("开始工作")
         self._title.setProperty("statusTone", "neutral")
         self._summary.setText(
-            "运行校验或诊断构建后，结果与后续操作会显示在这里。"
+            "运行项目检查或快速构建后，结果与后续操作会显示在这里。"
             if project_open
-            else "打开项目后即可执行校验、构建与合并。"
+            else "打开项目后即可执行检查、构建与出稿。"
         )
         self._clear_actions()
         if project_open:
-            self._add_action("校验", lambda: self._on_validate())
-            self._add_action("诊断构建", lambda: self._on_diag_build())
+            self._add_action("项目检查", lambda: self._on_validate())
+            self._add_action("快速构建", lambda: self._on_diag_build())
 
     def _clear_actions(self) -> None:
         while self._actions.count():
@@ -148,6 +178,9 @@ class TaskDock(QWidget):
         on_show_tech: Optional[Callable[[], None]] = None,
         on_copy_log: Optional[Callable[[], None]] = None,
         on_open_log_dir: Optional[Callable[[], None]] = None,
+        on_copy_path: Optional[Callable[[str], None]] = None,
+        on_export_to: Optional[Callable[[str], None]] = None,
+        on_locate_file: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -160,6 +193,9 @@ class TaskDock(QWidget):
         self._on_show_tech = on_show_tech
         self._on_copy_log = on_copy_log
         self._on_open_log_dir = on_open_log_dir
+        self._on_copy_path = on_copy_path
+        self._on_export_to = on_export_to
+        self._on_locate_file = on_locate_file
         self._dark = False
         self._has_result = False
 
@@ -186,6 +222,11 @@ class TaskDock(QWidget):
             on_validate=on_validate,
             on_diag_build=on_diag_build,
             on_open_report=on_open_report,
+            on_open_output=on_open_output,
+            on_open_directory=on_open_directory,
+            on_copy_path=on_copy_path,
+            on_export_to=on_export_to,
+            on_locate_file=on_locate_file,
         )
         self._stack.addWidget(self._idle_card)
 
@@ -239,6 +280,9 @@ class TaskDock(QWidget):
             on_open_directory=self._on_open_directory,
             on_open_report=self._on_open_report,
             on_show_tech=self._on_show_tech,
+            on_copy_path=self._on_copy_path,
+            on_export_to=self._on_export_to,
+            on_locate_file=self._on_locate_file,
             parent=page,
         )
         layout.addWidget(self._result_card)
@@ -283,7 +327,8 @@ class TaskDock(QWidget):
             if s.status
             in ("success", "skipped", "failed", "cancelled")
         )
-        self._step_footer.set_progress(done, len(steps))
+        running_weight = 0.45 if any(s.status == "running" for s in steps) else 0.0
+        self._step_footer.set_progress(done, len(steps), running_weight=running_weight)
         self._step_footer.set_elapsed(elapsed)
         self._cancel_btn.setEnabled(True)
         self._cancel_status.setText("")

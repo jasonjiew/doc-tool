@@ -141,13 +141,14 @@ class StepListFooter(QWidget):
         row.addWidget(self._elapsed_label)
         layout.addLayout(row)
 
-    def set_progress(self, done: int, total: int) -> None:
-        """总体完成度：完成（终态）步骤数 / 总步骤数。"""
+    def set_progress(self, done: int, total: int, running_weight: float = 0.0) -> None:
+        """总体完成度：完成步骤数 + 进行中步骤插值权重 / 总步骤数。"""
         if total <= 0:
             self._progress.setValue(0)
             self._summary_label.setText("—")
             return
-        percent = int(round(done * 100.0 / total))
+        effective = done + max(0.0, min(0.9, float(running_weight)))
+        percent = min(100, max(0, int(round(effective * 100.0 / total))))
         self._progress.setValue(percent)
         self._progress.setFormat("{0}%".format(percent))
         self._summary_label.setText("{0}/{1} 步骤".format(done, total))

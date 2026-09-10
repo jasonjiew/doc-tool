@@ -57,6 +57,7 @@ from doc_tool.ui.project_bar import ProjectBar
 from doc_tool.ui.empty_state import EmptyState
 from doc_tool.ui.styles import apply_theme, is_dark_theme
 from doc_tool.ui.task_dock import TaskDock
+from doc_tool.ui.operation_loading_overlay import run_async_operation
 from doc_tool.ui.task_bridge import (
     DEFAULT_TASK_TIMEOUT_SECONDS,
     ERR_WATCHDOG_TIMEOUT,
@@ -66,7 +67,12 @@ from doc_tool.ui.task_bridge import (
     TaskSpec,
 )
 from doc_tool.ui.workbench_state import (
+    STEP_STATUS_CANCELLED,
+    STEP_STATUS_FAILED,
+    STEP_STATUS_PENDING,
     STEP_STATUS_RUNNING,
+    STEP_STATUS_SKIPPED,
+    STEP_STATUS_SUCCESS,
     ResultState,
     StepItem,
     WorkView,
@@ -83,19 +89,19 @@ from doc_tool.ui.project_bar import DOC_TYPE_LABELS
 # 主窗口只负责展示语义；业务结果仍使用原有 bool / PipelineResult。
 TASK_UI = {
     "validate": {
-        "label": "校验",
+        "label": "项目检查",
         "stage_progress": False,
         "timeout": DEFAULT_TASK_TIMEOUT_SECONDS,
         "result_type": "validation",
     },
     "merge": {
-        "label": "正式合并",
+        "label": "正式出稿",
         "stage_progress": True,
         "timeout": DEFAULT_TASK_TIMEOUT_SECONDS,
         "result_type": "pipeline",
     },
     "diag_build": {
-        "label": "诊断构建",
+        "label": "快速构建",
         "stage_progress": True,
         "timeout": DEFAULT_TASK_TIMEOUT_SECONDS,
         "result_type": "pipeline",
@@ -197,6 +203,48 @@ class MainWindow(QMainWindow):
         self._branch_btn.clicked.connect(self._on_switch_branch_clicked)
         status_bar.addWidget(self._branch_btn)
 
+        # 构建成功产物动作胶囊条（默认隐藏，构建完成有产物时显示）
+        self._output_capsules_widget = QWidget(self)
+        capsule_layout = QHBoxLayout(self._output_capsules_widget)
+        capsule_layout.setContentsMargins(6, 0, 0, 0)
+        capsule_layout.setSpacing(4)
+
+        self._capsule_open_btn = QPushButton("📄 打开 Word", self._output_capsules_widget)
+        self._capsule_open_btn.setProperty("btnRole", "compact")
+        self._capsule_open_btn.setToolTip("用系统默认程序打开 Word 产物")
+        self._capsule_open_btn.clicked.connect(
+            lambda: self._current_output_path and self._on_open_result_output(self._current_output_path)
+        )
+        capsule_layout.addWidget(self._capsule_open_btn)
+
+        self._capsule_locate_btn = QPushButton("📁 定位文件", self._output_capsules_widget)
+        self._capsule_locate_btn.setProperty("btnRole", "compact")
+        self._capsule_locate_btn.setToolTip("在资源管理器中选中并高亮该产物")
+        self._capsule_locate_btn.clicked.connect(
+            lambda: self._current_output_path and self._locate_file(self._current_output_path)
+        )
+        capsule_layout.addWidget(self._capsule_locate_btn)
+
+        self._capsule_copy_btn = QPushButton("📋 复制路径", self._output_capsules_widget)
+        self._capsule_copy_btn.setProperty("btnRole", "compact")
+        self._capsule_copy_btn.setToolTip("复制生成文件的绝对路径到剪贴板")
+        self._capsule_copy_btn.clicked.connect(
+            lambda: self._current_output_path and self._copy_output_path(self._current_output_path)
+        )
+        capsule_layout.addWidget(self._capsule_copy_btn)
+
+        self._capsule_export_btn = QPushButton("📤 另存为…", self._output_capsules_widget)
+        self._capsule_export_btn.setProperty("btnRole", "compact")
+        self._capsule_export_btn.setToolTip("将文档另存/复制到外部交付目录")
+        self._capsule_export_btn.clicked.connect(
+            lambda: self._current_output_path and self._export_output_to_external(self._current_output_path)
+        )
+        capsule_layout.addWidget(self._capsule_export_btn)
+
+        self._current_output_path: Optional[str] = None
+        self._output_capsules_widget.setVisible(False)
+        status_bar.addWidget(self._output_capsules_widget)
+
         self._lock_label = QLabel("", self)
         self._lock_label.setObjectName("statusMuted")
         status_bar.addPermanentWidget(self._lock_label)
@@ -244,6 +292,9 @@ class MainWindow(QMainWindow):
             on_show_tech=self._show_result_technical_details,
             on_copy_log=self._copy_log,
             on_open_log_dir=self._on_open_logs,
+            on_copy_path=self._copy_output_path,
+            on_export_to=self._export_output_to_external,
+            on_locate_file=self._locate_file,
         )
         self._task_dock_widget.setWidget(self._task_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._task_dock_widget)
@@ -296,18 +347,18 @@ class MainWindow(QMainWindow):
 
         # 操作
         ops_menu = menubar.addMenu("操作")
-        self._validate_action = QAction("校验项目", self)
+        self._validate_action = QAction("项目检查", self)
         self._validate_action.setShortcut(QKeySequence("F5"))
         self._validate_action.triggered.connect(self._on_validate)
         ops_menu.addAction(self._validate_action)
         ops_menu.addSeparator()
-        self._merge_action = QAction("正式合并", self)
-        self._merge_action.triggered.connect(self._on_merge)
-        ops_menu.addAction(self._merge_action)
-        self._diag_action = QAction("诊断构建（无 Word）", self)
+        self._diag_action = QAction("快速构建（无 Word）", self)
         self._diag_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
         self._diag_action.triggered.connect(self._on_diag_build)
         ops_menu.addAction(self._diag_action)
+        self._merge_action = QAction("正式出稿", self)
+        self._merge_action.triggered.connect(self._on_merge)
+        ops_menu.addAction(self._merge_action)
         ops_menu.addSeparator()
         self._report_action = QAction("打开校验报告", self)
         self._report_action.triggered.connect(self._on_open_validation_report)
@@ -371,6 +422,13 @@ class MainWindow(QMainWindow):
         self._git_pop_stash_action = QAction("恢复暂存改动 (Stash Pop)", self)
         self._git_pop_stash_action.triggered.connect(self._on_git_pop_stash_menu_clicked)
         git_menu.addAction(self._git_pop_stash_action)
+
+        git_menu.addSeparator()
+
+        self._refresh_changes_action = QAction("刷新改动状态", self)
+        self._refresh_changes_action.setShortcut(QKeySequence("Ctrl+R"))
+        self._refresh_changes_action.triggered.connect(self._on_refresh_changes_menu_clicked)
+        git_menu.addAction(self._refresh_changes_action)
 
         # 视图：Dock 显隐开关、专注模式与全局命令面板
         self._view_menu = QMenu("视图", self)
@@ -593,7 +651,7 @@ class MainWindow(QMainWindow):
             )
             items.append(
                 PaletteItem(
-                    title="诊断构建（草稿）",
+                    title="快速构建（草稿）",
                     category="构建",
                     callback=self._on_diag_task,
                 )
@@ -658,6 +716,14 @@ class MainWindow(QMainWindow):
                     title="Git: 恢复暂存改动 (Stash Pop)",
                     category="Git",
                     callback=self._on_git_pop_stash_menu_clicked,
+                )
+            )
+            items.append(
+                PaletteItem(
+                    title="改动: 刷新改动列表与状态",
+                    category="改动",
+                    shortcut="Ctrl+R",
+                    callback=self._on_refresh_changes_menu_clicked,
                 )
             )
 
@@ -869,7 +935,6 @@ class MainWindow(QMainWindow):
             # 离开空状态后重新显示右侧任务/结果 Dock（空状态会隐藏它）。
             self._task_dock_widget.show()
             self._project_bar.render(self._project_summary, state)
-            self._update_git_branch_ui()
             # 右侧 Dock 内容由任务生命周期驱动，不在此覆盖 running/result
             if state.view == WorkView.IDLE and not self.runner.is_running:
                 self._task_dock.show_idle(
@@ -908,6 +973,8 @@ class MainWindow(QMainWindow):
         self._refactor_action.setEnabled(workspace_ready and writable)
         self._open_external_action.setEnabled(bool(self._content_workspace))
         self._save_all_action.setEnabled(workspace_ready and writable)
+        if hasattr(self, "_refresh_changes_action"):
+            self._refresh_changes_action.setEnabled(bool(self._content_workspace) and not running)
 
     def _switch_to_result_view(self) -> None:
         """任务终态：切到 result 视图（右侧 Dock 已由 on_task_done 渲染）。"""
@@ -1129,6 +1196,7 @@ class MainWindow(QMainWindow):
     def _on_content_index_ready(self) -> None:
         self._content_index_ready = True
         self._refresh_interaction_state()
+        self._update_git_branch_ui()
         if hasattr(self, "_loading_overlay"):
             self._loading_overlay.finish()
 
@@ -1313,6 +1381,119 @@ class MainWindow(QMainWindow):
 
     # --- 任务执行 ---
 
+    def _check_output_file_locked_and_prompt(self, target_output: Optional[Path]) -> bool:
+        """检查目标产物是否正被其他程序（如 Word）独占打开锁定；若是则弹窗提示用户关闭，返回 True 表示需要中止/无法继续。"""
+        if target_output is None or not target_output.is_file():
+            return False
+
+        def _is_locked(path: Path) -> bool:
+            try:
+                with open(path, "r+b"):
+                    pass
+                return False
+            except (PermissionError, OSError):
+                return True
+
+        if not _is_locked(target_output):
+            return False
+
+        # 文件被占用，循环提示用户关闭
+        while _is_locked(target_output):
+            reply = QMessageBox.warning(
+                self,
+                "目标文件正被占用",
+                "目标文档「{0}」当前正被 Microsoft Word 或其他程序打开，无法写入覆盖。\n\n"
+                "请先在 Word 中保存并关闭该文档，然后点击「重试」；或点击「取消」放弃本次构建。".format(
+                    target_output.name
+                ),
+                QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Retry,
+            )
+            if reply != QMessageBox.StandardButton.Retry:
+                return True
+
+        return False
+
+    def _run_source_content_check(self, summary, config: Optional[dict] = None) -> None:
+        """本地无 Word 产物时的源码与结构检查（不依赖 Word 产物，绝不阻断）。"""
+        from doc_tool.adapters.kernel import ensure_kernel_importable, config_from_project
+
+        def _do_check(manifest, paths):
+            ensure_kernel_importable()
+            from docx_common import validate_content_tree
+
+            cfg = config or config_from_project(manifest, paths)
+            tree_errors = []
+            try:
+                validate_content_tree(cfg)
+            except Exception as exc:  # noqa: BLE001
+                tree_errors.append(str(exc))
+
+            # 术语与质量规则检查
+            err_issues = []
+            warn_issues = []
+            try:
+                from doc_tool.application.content.index import ContentIndexService
+                from doc_tool.application.content.lint import ContentLinter, TermStore
+                from doc_tool.application.content.quality_rules import QualityRulesConfig
+
+                state_dir = paths.state_dir
+                content_root = paths.resolve(manifest.relative_content_root())
+                index = ContentIndexService(content_root).build()
+                q_config = QualityRulesConfig(state_dir, manifest.documentType, writable=False)
+                issues = ContentLinter(index, q_config).check_all(TermStore(state_dir).load())
+                err_issues = [iss for iss in issues if iss.severity == "error"]
+                warn_issues = [iss for iss in issues if iss.severity == "warning"]
+            except Exception:
+                pass
+
+            report_lines = [
+                "# {0} 源码与结构检查报告".format(manifest.documentName or manifest.documentType),
+                "",
+                "- 检查模式: **Markdown 源码与结构检查（本地无 Word 产物）**",
+                "- 项目路径: `{0}`".format(paths.root),
+                "",
+                "## 校验结果",
+            ]
+            if not tree_errors:
+                report_lines.append("- [PASS] 目录层次、编号连续性与资源引用完整")
+            else:
+                for err in tree_errors:
+                    report_lines.append("- [FAIL] 目录结构/资源引用错误: {0}".format(err))
+
+            if not err_issues:
+                report_lines.append("- [PASS] 质量规则检查通过（{0} 个提示）".format(len(warn_issues)))
+            else:
+                for iss in err_issues[:10]:
+                    rel = getattr(iss, "rel_path", getattr(iss, "file", ""))
+                    line = getattr(iss, "line_no", getattr(iss, "line", 0))
+                    report_lines.append("- [FAIL] [{0}] {1}:{2} {3}".format(iss.rule_id, rel, line, iss.message))
+
+            report_lines.extend(["", "## 关键指标", ""])
+            report_lines.append("- 结构错误: {0}".format(len(tree_errors)))
+            report_lines.append("- 质量错误: {0}".format(len(err_issues)))
+            report_lines.append("- 质量警告: {0}".format(len(warn_issues)))
+
+            passes = (1 if not tree_errors else 0) + (1 if not err_issues else 0)
+            fails = (len(tree_errors) if tree_errors else 0) + len(err_issues)
+            report_lines.extend(["", "## 总结", "", "- PASS: {0}".format(passes), "- FAIL: {0}".format(fails)])
+            report_lines.append("- 结论: **{0}**".format("通过" if fails == 0 else "失败"))
+
+            report_path = paths.logs_dir / "{0}-validation.md".format(manifest.documentType)
+            paths.logs_dir.mkdir(parents=True, exist_ok=True)
+            report_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+            return fails == 0
+
+        self._stage_progress_enabled = False
+        spec = TaskSpec(
+            name="validate",
+            target=_do_check,
+            args=(summary.manifest, summary.paths),
+            timeout_seconds=TASK_UI["validate"]["timeout"],
+        )
+        self._start_task(spec)
+        self._append_log("ℹ 提示：本地尚未生成 Word 产物，已自动执行【Markdown 源码与结构检查】。")
+
     def _on_validate(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
@@ -1333,52 +1514,87 @@ class MainWindow(QMainWindow):
             config = config_from_project(summary.manifest, summary.paths)
             target_output = Path(config["paths"]["output"])
         except Exception:
+            config = None
             target_output = None
 
-        if target_output is None or not target_output.exists():
-            display_name = target_output.name if target_output else "Word 产物"
-            self._show_error(
-                "Word 产物不存在",
-                "尚未生成 Word 产物（{0} 不存在）。".format(display_name),
-                "请先执行「操作 → 诊断构建（无 Word）」或「操作 → 正式合并」生成产物后再进行校验。",
+        # 查找目标 Word 产物或本地已有生成的产物
+        effective_output: Optional[Path] = None
+        using_fallback_output = False
+        if target_output is not None and target_output.exists():
+            effective_output = target_output
+        elif summary.paths.output_dir.is_dir():
+            # 查找同输出目录下的已有 docx 产物（排除临时文件与备份）
+            existing_docxs = sorted(
+                [p for p in summary.paths.output_dir.glob("*.docx") if not p.name.startswith(".")],
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
             )
+            if existing_docxs:
+                effective_output = existing_docxs[0]
+                using_fallback_output = True
+
+        # 如果存在可比对的 Word 产物（无论是精确版本还是本地已有产物）
+        if effective_output is not None and effective_output.is_file():
+            # 检查源 Markdown 是否在产物生成后被修改过
+            stale_notice = False
+            try:
+                content_root = summary.paths.resolve(summary.manifest.relative_content_root())
+                if content_root.is_dir():
+                    md_files = [p for p in content_root.glob("**/*.md") if p.is_file()]
+                    if md_files:
+                        latest_md_mtime = max(p.stat().st_mtime for p in md_files)
+                        output_mtime = effective_output.stat().st_mtime
+                        if latest_md_mtime > output_mtime:
+                            stale_notice = True
+            except Exception:
+                pass
+
+            self._stage_progress_enabled = TASK_UI["validate"]["stage_progress"]
+            # 若使用的是 fallback 已有产物，通过 output_override 传入
+            kwargs = {}
+            if using_fallback_output:
+                kwargs["output_override"] = str(effective_output)
+            spec = TaskSpec(
+                name="validate",
+                target=validate_with_project,
+                args=(summary.manifest, summary.paths),
+                kwargs=kwargs,
+                timeout_seconds=TASK_UI["validate"]["timeout"],
+            )
+            self._start_task(spec)
+            if using_fallback_output:
+                self._append_log(
+                    "ℹ 提示：未检测到与当前版本完全同名的产物（{0}），已自动选用本地最新已有产物「{1}」进行比对检查。".format(
+                        target_output.name if target_output else "指定版本",
+                        effective_output.name,
+                    )
+                )
+            if stale_notice:
+                self._append_log(
+                    "⚠ 提示：检测到源 Markdown 的修改时间晚于当前校验产物。当前校验基于磁盘已有产物；若需验证最新改动，请先执行「快速构建」或「正式出稿」。"
+                )
             return
 
-        # 检查源 Markdown 是否在产物生成后被修改过（消除用户关于“缓存”的误解）
-        stale_notice = False
-        try:
-            content_root = summary.paths.resolve(summary.manifest.relative_content_root())
-            if content_root.is_dir() and target_output.is_file():
-                md_files = [p for p in content_root.glob("**/*.md") if p.is_file()]
-                if md_files:
-                    latest_md_mtime = max(p.stat().st_mtime for p in md_files)
-                    output_mtime = target_output.stat().st_mtime
-                    if latest_md_mtime > output_mtime:
-                        stale_notice = True
-        except Exception:
-            pass
-
-        self._stage_progress_enabled = TASK_UI["validate"]["stage_progress"]
-        spec = TaskSpec(
-            name="validate",
-            target=validate_with_project,
-            args=(summary.manifest, summary.paths),
-            timeout_seconds=TASK_UI["validate"]["timeout"],
-        )
-        self._start_task(spec)
-        if stale_notice:
-            self._append_log(
-                "⚠ 提示：检测到源 Markdown 的修改时间晚于当前 Word 产物。当前校验基于磁盘已有产物；若需验证最新改动，请先执行「诊断构建」或「正式合并」。"
-            )
+        # 若本地完全未生成任何 Word 产物，执行纯 Markdown 源码与结构检查，不阻断用户！
+        self._run_source_content_check(summary, config)
 
     def _on_merge(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
         self._pending_publish_skip_note = None
         summary = self._project_summary
-        from doc_tool.adapters.kernel import ensure_kernel_importable
+        from doc_tool.adapters.kernel import config_from_project, ensure_kernel_importable
         from doc_tool.application.pipeline import run_pipeline
         from doc_tool.application.word_check import check_word_available
+
+        # 产物被占用探针（防止 Windows 下 Word 打开导致写入失败）
+        try:
+            cfg = config_from_project(summary.manifest, summary.paths)
+            target_output = Path(cfg["paths"]["output"])
+            if self._check_output_file_locked_and_prompt(target_output):
+                return
+        except Exception:
+            pass
 
         report = check_word_available(dispatch_check=False)
         self._word_available = bool(report.available)
@@ -1387,8 +1603,8 @@ class MainWindow(QMainWindow):
             reasons = "\n".join("  • {0}".format(r) for r in report.reasons) or "  • 未知原因"
             self._show_error(
                 "Microsoft Word 不可用",
-                "正式合并需要本机交互式会话中的 Microsoft Word。",
-                "请改用「操作 → 诊断构建（无 Word）」，或在安装 Microsoft Word 的电脑上执行正式合并。\n"
+                "正式出稿需要本机交互式会话中的 Microsoft Word。",
+                "请改用「操作 → 快速构建（无 Word）」，或在安装 Microsoft Word 的电脑上执行正式出稿。\n"
                 "原因：\n{0}".format(reasons),
             )
             return
@@ -1565,8 +1781,17 @@ class MainWindow(QMainWindow):
         if not self._project_summary or self.runner.is_running:
             return
         summary = self._project_summary
-        from doc_tool.adapters.kernel import ensure_kernel_importable
+        from doc_tool.adapters.kernel import config_from_project, ensure_kernel_importable
         from doc_tool.application.pipeline import run_pipeline
+
+        # 产物被占用探针（防止 Windows 下 Word 打开导致写入失败）
+        try:
+            cfg = config_from_project(summary.manifest, summary.paths)
+            target_output = Path(cfg["paths"]["output"])
+            if self._check_output_file_locked_and_prompt(target_output):
+                return
+        except Exception:
+            pass
 
         try:
             ensure_kernel_importable()
@@ -1611,6 +1836,7 @@ class MainWindow(QMainWindow):
         return self._progress_q
 
     def _start_task(self, spec: TaskSpec) -> None:
+        self._hide_output_capsules()
         self._current_task = spec.name
         self._task_started_at = monotonic()
         self._stage_events = []
@@ -1626,12 +1852,28 @@ class MainWindow(QMainWindow):
             summary="任务完成后将在这里保留结果和适用的后续操作。",
             project_root=getattr(self._project_summary, "project_root", None),
         )
+        initial_steps = []
+        if spec.name in ("merge", "diag_build"):
+            from doc_tool.application.pipeline import (
+                PIPELINE_STAGE_LABELS,
+                PIPELINE_STAGE_ORDER,
+            )
+            initial_steps = [
+                StepItem(
+                    stage=stage,
+                    label=PIPELINE_STAGE_LABELS.get(stage, stage),
+                    status=STEP_STATUS_PENDING,
+                )
+                for stage in PIPELINE_STAGE_ORDER
+            ]
         self._task_dock.show_running(
             self._task_label(spec.name),
-            steps=[],
+            steps=initial_steps,
             current_stage="",
             elapsed=0,
         )
+        if initial_steps:
+            self._task_dock._step_footer.set_progress(0, len(initial_steps))
         self._task_dock.clear_log()
         self._task_dock.set_cancel_waiting(False)
         self._status_label.setText("任务运行中")
@@ -1704,15 +1946,27 @@ class MainWindow(QMainWindow):
             self._stage_events, fallback_label=self._task_label(self._current_task)
         )
         if not steps and self.runner.is_running:
-            # 校验等不产生阶段事件的任务：以单步运行态展示，避免空步骤清单
-            # + “—”进度（与文档承诺的心跳单步一致）。
-            steps = [
-                StepItem(
-                    stage="",
-                    label=self._task_label(self._current_task),
-                    status=STEP_STATUS_RUNNING,
+            if self._current_task in ("merge", "diag_build"):
+                from doc_tool.application.pipeline import (
+                    PIPELINE_STAGE_LABELS,
+                    PIPELINE_STAGE_ORDER,
                 )
-            ]
+                steps = [
+                    StepItem(
+                        stage=stage,
+                        label=PIPELINE_STAGE_LABELS.get(stage, stage),
+                        status=STEP_STATUS_PENDING,
+                    )
+                    for stage in PIPELINE_STAGE_ORDER
+                ]
+            else:
+                steps = [
+                    StepItem(
+                        stage="",
+                        label=self._task_label(self._current_task),
+                        status=STEP_STATUS_RUNNING,
+                    )
+                ]
         current_stage = self._progress_recent_stage
         if current_stage not in {s.stage for s in steps}:
             current_stage = ""
@@ -1727,7 +1981,8 @@ class MainWindow(QMainWindow):
             for s in steps
             if s.status in ("success", "skipped", "failed", "cancelled")
         )
-        self._task_dock._step_footer.set_progress(done, len(steps))
+        running_weight = 0.45 if any(s.status == "running" for s in steps) else 0.0
+        self._task_dock._step_footer.set_progress(done, len(steps), running_weight=running_weight)
 
     def _update_elapsed(self) -> None:
         self._task_dock.set_elapsed(self._elapsed_seconds())
@@ -1856,16 +2111,17 @@ class MainWindow(QMainWindow):
 
             formal = bool(output_path and is_formal_success(str(output_path)))
             if output_path:
+                self._show_output_capsules(str(output_path))
                 if formal:
-                    title = "正式合并成功"
+                    title = "正式出稿成功"
                     summary = "Word 字段已刷新并完成正式输出：{0}".format(output_path)
-                    self._status_label.setText("正式合并成功（Word 已刷新，字段已校验）")
+                    self._status_label.setText("正式出稿成功（Word 已刷新，字段已校验）")
                     self._append_log("✓ 正式输出：{0}".format(output_path))
                 else:
-                    title = "诊断构建完成"
-                    summary = "已生成非正式诊断输出：{0}".format(output_path)
-                    self._status_label.setText("诊断构建完成（非正式，字段未实机刷新）")
-                    self._append_log("△ 诊断输出：{0}".format(output_path))
+                    title = "快速构建完成"
+                    summary = "已生成快速预览产物：{0}".format(output_path)
+                    self._status_label.setText("快速构建完成（非正式，字段未实机刷新）")
+                    self._append_log("△ 快速构建输出：{0}".format(output_path))
             else:
                 title = "任务成功完成"
                 summary = "任务已完成，但没有返回新的文档产物。"
@@ -1925,7 +2181,7 @@ class MainWindow(QMainWindow):
         report = read_validation_report_summary(report_path) if report_path else {}
         existing_report = report_path if report.get("exists") else None
         if report.get("exists"):
-            status = "校验通过" if passed else "校验未通过"
+            status = "项目检查通过" if passed else "项目检查未通过"
             summary = "{0}（PASS={1} FAIL={2}）".format(
                 status, report["passCount"], report["failCount"]
             )
@@ -1934,7 +2190,7 @@ class MainWindow(QMainWindow):
             for failure in report["failures"][:10]:
                 self._append_log("  ✗ {0}".format(failure))
         else:
-            status = "校验通过" if passed else "校验未通过"
+            status = "项目检查通过" if passed else "项目检查未通过"
             summary = status
             self._status_label.setText(status)
 
@@ -1942,7 +2198,7 @@ class MainWindow(QMainWindow):
             self._result_state = ResultState(
                 status="success",
                 task=self._current_task,
-                title="项目校验通过",
+                title="项目检查通过",
                 summary=summary,
                 report_path=existing_report,
                 log_path=self._current_log_path(),
@@ -1956,7 +2212,7 @@ class MainWindow(QMainWindow):
             self._result_state = ResultState(
                 status="failure",
                 task=self._current_task,
-                title="项目校验未通过",
+                title="项目检查未通过",
                 summary=reason,
                 advice=advice,
                 error_code=code,
@@ -2009,7 +2265,7 @@ class MainWindow(QMainWindow):
                 self._show_error(
                     "尚未生成输出",
                     "输出目录尚未生成：{0}".format(out),
-                    "请先执行「操作 → 诊断构建」或「正式合并」生成输出。",
+                    "请先执行「操作 → 快速构建」或「正式出稿」生成输出。",
                 )
                 return
             self._open_directory_or_warn(out, "输出目录")
@@ -2121,6 +2377,57 @@ class MainWindow(QMainWindow):
         if not self._open_directory(p):
             self._show_error("结果目录已不可用", "无法打开目录：{0}".format(p))
 
+    def _show_output_capsules(self, path: str) -> None:
+        self._current_output_path = path
+        if hasattr(self, "_output_capsules_widget"):
+            self._output_capsules_widget.setVisible(True)
+
+    def _hide_output_capsules(self) -> None:
+        self._current_output_path = None
+        if hasattr(self, "_output_capsules_widget"):
+            self._output_capsules_widget.setVisible(False)
+
+    def _locate_file(self, path: str) -> None:
+        p = Path(path)
+        if not p.is_file():
+            self._show_error("产物不存在", "无法定位文件，文件不存在：{0}".format(p))
+            return
+        try:
+            if os.name == "nt":
+                subprocess.Popen(f'explorer.exe /select,"{p.resolve()}"')
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(p)])
+            else:
+                self._open_directory(p.parent)
+        except Exception:
+            self._open_directory(p.parent)
+
+    def _copy_output_path(self, path: str) -> None:
+        p = str(Path(path).resolve())
+        QApplication.clipboard().setText(p)
+        self._status_label.setText("✓ 已复制产物路径：{0}".format(Path(path).name))
+
+    def _export_output_to_external(self, source_path: str) -> None:
+        src = Path(source_path)
+        if not src.is_file():
+            self._show_error("产物不存在", "无法导出，源文件不存在：{0}".format(src))
+            return
+        from PySide6.QtWidgets import QFileDialog
+        dest, _ = QFileDialog.getSaveFileName(
+            self,
+            "另存产物为…",
+            src.name,
+            "Word 文档 (*.docx);;全部文件 (*.*)",
+        )
+        if dest:
+            try:
+                import shutil
+                shutil.copy2(str(src), dest)
+                self._status_label.setText("✓ 已另存到：{0}".format(Path(dest).name))
+                self._append_log("✓ 产物已另存为：{0}".format(dest))
+            except Exception as exc:
+                self._show_error("另存失败", "无法另存文件：{0}".format(exc))
+
     def _show_result_technical_details(self) -> None:
         state = self._result_state
         details = [
@@ -2180,9 +2487,9 @@ class MainWindow(QMainWindow):
         labels = {
             "import": "导入",
             "build": "构建",
-            "validate": "校验",
-            "merge": "正式合并",
-            "diag_build": "诊断构建",
+            "validate": "项目检查",
+            "merge": "正式出稿",
+            "diag_build": "快速构建",
         }
         return labels.get(name, name)
 
@@ -2458,13 +2765,22 @@ class MainWindow(QMainWindow):
         if current_b:
             b_name = current_b.name
             u_count = current_b.uncommitted_count
+            ahead = current_b.ahead_count
+            behind = current_b.behind_count
+            badges = []
+            if ahead > 0:
+                badges.append(f"↑{ahead}")
+            if behind > 0:
+                badges.append(f"↓{behind}")
+            sync_str = (" " + "".join(badges)) if badges else ""
             badge = f" ({u_count})" if u_count > 0 else ""
+            btn_text = f"⎇ {b_name}{sync_str}{badge} ▾"
             if hasattr(self, "_branch_btn"):
-                self._branch_btn.setText(f"⎇ {b_name}{badge}")
-                self._branch_btn.setToolTip(f"当前 Git 分支：{b_name}（点击切换分支）")
+                self._branch_btn.setText(btn_text)
+                self._branch_btn.setToolTip(f"当前 Git 分支：{b_name}{sync_str}{badge}（点击切换分支）")
                 self._branch_btn.setVisible(True)
             if hasattr(self, "_project_bar"):
-                self._project_bar.set_branch(b_name, u_count)
+                self._project_bar.set_branch(b_name, u_count, ahead_count=ahead, behind_count=behind)
             self._set_git_menu_enabled(True)
         else:
             if hasattr(self, "_branch_btn"):
@@ -2525,65 +2841,110 @@ class MainWindow(QMainWindow):
         self._update_git_branch_ui()
 
     def _handle_popover_fetch(self, popover) -> None:
-        """从远端获取最新分支信息。"""
+        """从远端获取最新分支信息（异步执行，带平滑加载动画）。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
         popover.set_loading(True, "正在获取远端分支…")
-        QApplication.processEvents()
-        try:
-            ok, err = ws.fetch_branches()
-        finally:
+
+        def _do_fetch():
+            return ws.fetch_branches()
+
+        def _on_fetch_done(result):
             popover.set_loading(False)
-        if not ok:
-            QMessageBox.warning(self, "获取远端分支失败", f"拉取分支失败：\n\n{err}")
-        else:
-            ws._vcs.invalidate_cache()
-            branches, _ = ws.list_branches()
-            popover.set_branches(branches)
-            self._update_git_branch_ui()
+            ok, err = result
+            if not ok:
+                QMessageBox.warning(self, "获取远端分支失败", f"拉取分支失败：\n\n{err}")
+            else:
+                ws._vcs.invalidate_cache()
+                branches, _ = ws.list_branches()
+                popover.set_branches(branches)
+                self._update_git_branch_ui()
+                self._status_label.setText("✓ 已从远端同步最新分支列表")
+
+        run_async_operation(
+            self,
+            _do_fetch,
+            title="正在获取远端分支…",
+            description="正在执行 git fetch --prune 同步远端分支信息，请稍候…",
+            dark=self._dark,
+            on_success=_on_fetch_done,
+            on_error=lambda exc: (popover.set_loading(False), QMessageBox.warning(self, "获取远端分支失败", f"拉取分支异常：\n\n{exc}")),
+        )
 
     def _handle_popover_delete_branch(self, popover, branch_name: str) -> None:
-        """删除本地分支。"""
+        """删除本地分支（支持二次确认与强制删除）。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
-        ok, err = ws.delete_branch(branch_name, force=False)
-        if not ok:
-            # 可能是未合并分支，询问是否强制删除
-            ans = QMessageBox.question(
-                self,
-                "强制删除分支",
-                f"分支「{branch_name}」包含尚未合并的提交，普通删除失败：\n\n{err}\n\n是否强制删除此分支？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if ans == QMessageBox.StandardButton.Yes:
-                ok, err = ws.delete_branch(branch_name, force=True)
-                if not ok:
-                    QMessageBox.warning(self, "删除分支失败", f"强制删除失败：\n\n{err}")
-                    return
-            else:
-                return
 
-        ws._vcs.invalidate_cache()
-        branches, _ = ws.list_branches()
-        popover.set_branches(branches)
-        self._update_git_branch_ui()
+        def _execute_delete(force: bool):
+            def _do_del():
+                return ws.delete_branch(branch_name, force=force)
+
+            def _on_del_done(result):
+                ok, err = result
+                if not ok:
+                    if not force:
+                        ans = QMessageBox.question(
+                            self,
+                            "强制删除分支",
+                            f"分支「{branch_name}」包含尚未合并的提交，普通删除失败：\n\n{err}\n\n是否强制删除此分支？",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No,
+                        )
+                        if ans == QMessageBox.StandardButton.Yes:
+                            _execute_delete(force=True)
+                            return
+                    else:
+                        QMessageBox.warning(self, "删除分支失败", f"强制删除失败：\n\n{err}")
+                        return
+                else:
+                    ws._vcs.invalidate_cache()
+                    branches, _ = ws.list_branches()
+                    popover.set_branches(branches)
+                    self._update_git_branch_ui()
+                    self._status_label.setText(f"✓ 已删除本地分支：{branch_name}")
+
+            run_async_operation(
+                self,
+                _do_del,
+                title="正在删除分支…",
+                description=f"正在删除本地分支「{branch_name}」，请稍候…",
+                dark=self._dark,
+                on_success=_on_del_done,
+            )
+
+        _execute_delete(force=False)
 
     def _handle_popover_rename_branch(self, popover, old_name: str, new_name: str) -> None:
         """重命名本地分支。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
-        ok, err = ws.rename_branch(old_name, new_name)
-        if not ok:
-            QMessageBox.warning(self, "重命名分支失败", f"重命名失败：\n\n{err}")
-            return
-        ws._vcs.invalidate_cache()
-        branches, _ = ws.list_branches()
-        popover.set_branches(branches)
-        self._update_git_branch_ui()
+
+        def _do_rename():
+            return ws.rename_branch(old_name, new_name)
+
+        def _on_rename_done(result):
+            ok, err = result
+            if not ok:
+                QMessageBox.warning(self, "重命名分支失败", f"重命名失败：\n\n{err}")
+                return
+            ws._vcs.invalidate_cache()
+            branches, _ = ws.list_branches()
+            popover.set_branches(branches)
+            self._update_git_branch_ui()
+            self._status_label.setText(f"✓ 分支已重命名为：{new_name}")
+
+        run_async_operation(
+            self,
+            _do_rename,
+            title="正在重命名分支…",
+            description=f"正在将分支「{old_name}」重命名为「{new_name}」，请稍候…",
+            dark=self._dark,
+            on_success=_on_rename_done,
+        )
 
     def _on_create_branch_from(self, base_branch: str) -> None:
         """基于指定基准分支新建并切换分支。"""
@@ -2600,22 +2961,45 @@ class MainWindow(QMainWindow):
             return
 
         new_branch = dlg.branch_name
+        base = getattr(dlg, "base_branch", base_branch) or base_branch
         if not new_branch:
             return
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            ok, err = ws.switch_branch(new_branch, create=True, base_branch=base_branch)
-        finally:
-            QApplication.restoreOverrideCursor()
+        def _do_create_and_switch():
+            return ws._vcs.switch_branch(new_branch, create=True, base_branch=base)
 
-        if not ok:
-            QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
-        else:
+        def _on_create_done(result):
+            ok, err = result
+            if not ok:
+                QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
+                return
+
+            # 主线程重载文件与索引
+            if hasattr(ws, "tabs_host"):
+                for rel in ws.tabs_host.open_rel_paths():
+                    ws.tabs_host.reload_file(rel)
+            ws._rebuild_index()
+            ws._refresh_changes_panel()
+            if ws._on_branch_changed is not None:
+                ws._on_branch_changed(new_branch)
+            if ws._on_status is not None:
+                ws._on_status(f"已切换至分支: {new_branch}")
+
             self._update_git_branch_ui()
+            self._status_label.setText(f"✓ 已创建并切换至新分支：{new_branch}")
+            self._append_log(f"✓ 已基于「{base}」创建并切换至新分支「{new_branch}」")
+
+        run_async_operation(
+            self,
+            _do_create_and_switch,
+            title="正在创建并切换分支…",
+            description=f"正在基于「{base}」创建新分支「{new_branch}」并准备工作区…",
+            dark=self._dark,
+            on_success=_on_create_done,
+        )
 
     def _handle_branch_selected(self, target_branch: str) -> None:
-        """处理选中的目标分支切换。"""
+        """处理选中的目标分支切换（异步安全检出 + 优雅遮罩反馈）。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
@@ -2656,23 +3040,49 @@ class MainWindow(QMainWindow):
                 self._on_git_commit_menu_clicked()
                 return
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            ok, err = ws.switch_branch(target_branch)
-        finally:
-            QApplication.restoreOverrideCursor()
+        def _do_switch_vcs():
+            return ws._vcs.switch_branch(target_branch)
 
-        if not ok:
-            if did_stash:
-                try:
-                    ws.pop_stash()
-                except Exception:
-                    pass
-            QMessageBox.warning(self, "切换分支失败", f"无法切换到分支「{target_branch}」：\n\n{err}")
-        else:
+        def _on_switch_done(result):
+            ok, err = result
+            if not ok:
+                if did_stash:
+                    try:
+                        ws.pop_stash()
+                    except Exception:
+                        pass
+                QMessageBox.warning(self, "切换分支失败", f"无法切换到分支「{target_branch}」：\n\n{err}")
+                return
+
+            # 主线程重载文件与索引
+            if hasattr(ws, "tabs_host"):
+                for rel in ws.tabs_host.open_rel_paths():
+                    ws.tabs_host.reload_file(rel)
+            ws._rebuild_index()
+            ws._refresh_changes_panel()
+            if ws._on_branch_changed is not None:
+                ws._on_branch_changed(target_branch)
+            if ws._on_status is not None:
+                ws._on_status(f"已切换至分支: {target_branch}")
+
             self._update_git_branch_ui()
+            if did_stash:
+                self._status_label.setText(f"✓ 已切换至分支：{target_branch}（未提交改动已安全暂存入栈，可通过 菜单「版本控制」->「弹出暂存」恢复）")
+                self._append_log(f"✓ 已切换至分支「{target_branch}」，原分支未提交改动已保存在暂存区（Stash），随时可在顶部菜单「版本控制」->「弹出暂存」中恢复。")
+            else:
+                self._status_label.setText(f"✓ 已切换至分支：{target_branch}")
+                self._append_log(f"✓ 已切换至分支：{target_branch}")
 
-    def _on_new_branch_menu_clicked(self) -> None:
+        run_async_operation(
+            self,
+            _do_switch_vcs,
+            title="正在切换分支…",
+            description=f"正在检出分支「{target_branch}」并重载工作区，请稍候…",
+            dark=self._dark,
+            on_success=_on_switch_done,
+        )
+
+    def _on_new_branch_menu_clicked(self, initial_name: Any = "") -> None:
         """新建并切换分支对话框。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
@@ -2681,26 +3091,50 @@ class MainWindow(QMainWindow):
         branches, _ = ws.list_branches()
         existing = [b.name for b in branches]
 
+        name_str = initial_name if isinstance(initial_name, str) else ""
+
         from doc_tool.ui.content.branch_popover import NewBranchDialog
 
-        dlg = NewBranchDialog(cur_branch or "HEAD", existing, dark=self._dark, parent=self)
+        dlg = NewBranchDialog(cur_branch or "HEAD", existing, initial_name=name_str, dark=self._dark, parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         new_branch = dlg.branch_name
+        base_branch = getattr(dlg, "base_branch", cur_branch) or cur_branch
         if not new_branch:
             return
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            ok, err = ws.switch_branch(new_branch, create=True)
-        finally:
-            QApplication.restoreOverrideCursor()
+        def _do_create_and_switch():
+            return ws._vcs.switch_branch(new_branch, create=True, base_branch=base_branch)
 
-        if not ok:
-            QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
-        else:
+        def _on_create_done(result):
+            ok, err = result
+            if not ok:
+                QMessageBox.warning(self, "创建分支失败", f"创建并切换分支失败：\n\n{err}")
+                return
+
+            if hasattr(ws, "tabs_host"):
+                for rel in ws.tabs_host.open_rel_paths():
+                    ws.tabs_host.reload_file(rel)
+            ws._rebuild_index()
+            ws._refresh_changes_panel()
+            if ws._on_branch_changed is not None:
+                ws._on_branch_changed(new_branch)
+            if ws._on_status is not None:
+                ws._on_status(f"已切换至分支: {new_branch}")
+
             self._update_git_branch_ui()
+            self._status_label.setText(f"✓ 已创建并切换至新分支：{new_branch}")
+            self._append_log(f"✓ 已基于「{base_branch}」创建并切换至新分支「{new_branch}」")
+
+        run_async_operation(
+            self,
+            _do_create_and_switch,
+            title="正在创建新分支…",
+            description=f"正在基于「{base_branch}」创建分支「{new_branch}」并准备工作区…",
+            dark=self._dark,
+            on_success=_on_create_done,
+        )
 
     def _on_git_commit_menu_clicked(self) -> None:
         """菜单触发提交改动。"""
@@ -2710,7 +3144,7 @@ class MainWindow(QMainWindow):
         ws.trigger_commit()
 
     def _on_git_push_menu_clicked(self) -> None:
-        """菜单触发推送代码。"""
+        """菜单触发推送代码（异步推送 + 状态遮罩反馈）。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
@@ -2723,20 +3157,27 @@ class MainWindow(QMainWindow):
         )
         if ans != QMessageBox.StandardButton.Yes:
             return
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            res = ws._push_changes()
-        finally:
-            QApplication.restoreOverrideCursor()
 
-        if res.ok:
-            QMessageBox.information(self, "推送成功", res.summary or "已成功推送到远端仓库！")
-            self._update_git_branch_ui()
-        else:
-            QMessageBox.warning(self, "推送失败", f"推送代码到远端失败：\n\n{res.error}")
+        def _on_push_done(res):
+            if res.ok:
+                QMessageBox.information(self, "推送成功", res.summary or "已成功推送到远端仓库！")
+                self._update_git_branch_ui()
+                self._status_label.setText("✓ " + (res.summary or "已成功推送到远端仓库"))
+            else:
+                QMessageBox.warning(self, "推送失败", f"推送代码到远端失败：\n\n{res.error}")
+                self._status_label.setText(f"推送失败：{res.error}")
+
+        run_async_operation(
+            self,
+            ws._push_changes,
+            title="正在推送代码到远端…",
+            description="正在与远端仓库通信并推送本地提交，请稍候…",
+            dark=self._dark,
+            on_success=_on_push_done,
+        )
 
     def _on_git_pull_menu_clicked(self) -> None:
-        """菜单触发拉取更新。"""
+        """菜单触发拉取更新（异步拉取 + 状态遮罩反馈）。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
@@ -2747,49 +3188,113 @@ class MainWindow(QMainWindow):
         )
         if ans != QMessageBox.StandardButton.Yes:
             return
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            res = ws._pull_changes()
-        finally:
-            QApplication.restoreOverrideCursor()
 
-        if res.conflicts:
-            QMessageBox.warning(
-                self,
-                "拉取存在冲突",
-                f"以下 {len(res.conflicts)} 个文件有合并冲突，需要手工解决：\n\n"
-                + "\n".join(res.conflicts),
-            )
-        elif not res.ok:
-            QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{res.error}")
-        else:
-            QMessageBox.information(self, "拉取完成", res.summary or "已拉取最新更新！")
-            ws._after_restore()
-            self._update_git_branch_ui()
+        def _on_pull_done(res):
+            if res.conflicts:
+                QMessageBox.warning(
+                    self,
+                    "拉取存在冲突",
+                    f"以下 {len(res.conflicts)} 个文件有合并冲突，需要手工解决：\n\n"
+                    + "\n".join(res.conflicts),
+                )
+                self._status_label.setText(f"拉取完成但有 {len(res.conflicts)} 个冲突，需手工解决")
+            elif not res.ok:
+                QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{res.error}")
+                self._status_label.setText(f"拉取失败：{res.error}")
+            else:
+                QMessageBox.information(self, "拉取完成", res.summary or "已拉取最新更新！")
+                ws._after_restore()
+                self._update_git_branch_ui()
+                self._status_label.setText("✓ " + (res.summary or "已拉取最新更新"))
+
+        run_async_operation(
+            self,
+            ws._pull_changes,
+            title="正在拉取远端更新…",
+            description="正在执行 git pull 获取最新变更并合并，请稍候…",
+            dark=self._dark,
+            on_success=_on_pull_done,
+        )
 
     def _on_git_stash_menu_clicked(self) -> None:
         """菜单触发暂存工作区改动。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
-        ok, err = ws.stash_changes()
-        if ok:
-            QMessageBox.information(self, "暂存成功", "当前工作区的全部未提交改动已成功暂存 (git stash)。")
-            self._update_git_branch_ui()
-        else:
-            QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+
+        def _on_stash_done(result):
+            ok, err = result
+            if ok:
+                QMessageBox.information(self, "暂存成功", "当前工作区的全部未提交改动已成功暂存 (git stash)。")
+                self._update_git_branch_ui()
+                self._status_label.setText("✓ 未提交改动已安全暂存 (git stash)")
+            else:
+                QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+
+        def _do_stash():
+            return ws._vcs.stash()
+
+        def _on_stash_success(result):
+            ok, err = result
+            if ok:
+                if hasattr(ws, "tabs_host"):
+                    for rel in ws.tabs_host.open_rel_paths():
+                        ws.tabs_host.reload_file(rel)
+                ws._rebuild_index()
+                ws._refresh_changes_panel()
+            _on_stash_done(result)
+
+        run_async_operation(
+            self,
+            _do_stash,
+            title="正在暂存改动…",
+            description="正在将工作区未提交的文件改动暂存到栈区，请稍候…",
+            dark=self._dark,
+            on_success=_on_stash_success,
+        )
 
     def _on_git_pop_stash_menu_clicked(self) -> None:
         """菜单触发恢复暂存改动。"""
         ws = getattr(self, "_content_workspace", None)
         if ws is None:
             return
-        ok, err = ws.pop_stash()
-        if ok:
-            QMessageBox.information(self, "恢复暂存成功", "已成功恢复最近一次暂存的改动 (git stash pop)。")
-            self._update_git_branch_ui()
-        else:
-            QMessageBox.warning(self, "恢复暂存失败", f"恢复暂存改动失败：\n\n{err}")
+
+        def _on_pop_done(result):
+            ok, err = result
+            if ok:
+                QMessageBox.information(self, "恢复暂存成功", "已成功恢复最近一次暂存的改动 (git stash pop)。")
+                self._update_git_branch_ui()
+                self._status_label.setText("✓ 已恢复最近一次暂存的改动")
+            else:
+                QMessageBox.warning(self, "恢复暂存失败", f"恢复暂存改动失败：\n\n{err}")
+
+        def _do_pop():
+            return ws._vcs.pop_stash()
+
+        def _on_pop_success(result):
+            ok, err = result
+            if ok:
+                if hasattr(ws, "tabs_host"):
+                    for rel in ws.tabs_host.open_rel_paths():
+                        ws.tabs_host.reload_file(rel)
+                ws._rebuild_index()
+                ws._refresh_changes_panel()
+            _on_pop_done(result)
+
+        run_async_operation(
+            self,
+            _do_pop,
+            title="正在恢复暂存…",
+            description="正在弹出并应用最近一次暂存的改动，请稍候…",
+            dark=self._dark,
+            on_success=_on_pop_success,
+        )
+
+    def _on_refresh_changes_menu_clicked(self) -> None:
+        """菜单或全局快捷键触发刷新改动。"""
+        ws = getattr(self, "_content_workspace", None)
+        if ws is not None and hasattr(ws, "refresh_changes"):
+            ws.refresh_changes()
 
     def closeEvent(self, event) -> None:
         """任务运行中先请求安全取消，终态回调到达后再关闭窗口。
