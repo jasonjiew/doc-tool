@@ -86,12 +86,12 @@ _SEQ_KEYWORDS_RE = re.compile(
 )
 _NODE_RE = re.compile(
     r"(?P<id>\w[\w/.-]*)"
-    r"(?:\[\[(?P<sub>.*?)\]\]"
-    r"|\(\((?P<circle>.*?)\)\)"
-    r"|\[\((?P<cyl>.*?)\)\]"
-    r"|\[(?P<box>.*?)\]"
-    r"|\((?P<round>.*?)\)"
-    r"|\{(?P<diamond>.*?)\})?"
+    r"(?:(?:\*\*)?\[\[(?:\*\*)?(?P<sub>.*?)(?:\*\*)?\]\](?:\*\*)?"
+    r"|(?:\*\*)?\(\((?:\*\*)?(?P<circle>.*?)(?:\*\*)?\)\)(?:\*\*)?"
+    r"|(?:\*\*)?\[\((?:\*\*)?(?P<cyl>.*?)(?:\*\*)?\)\](?:\*\*)?"
+    r"|(?:\*\*)?\[(?:\*\*)?(?P<box>.*?)(?:\*\*)?\](?:\*\*)?"
+    r"|(?:\*\*)?\((?:\*\*)?(?P<round>.*?)(?:\*\*)?\)(?:\*\*)?"
+    r"|(?:\*\*)?\{(?:\*\*)?(?P<diamond>.*?)(?:\*\*)?\}(?:\*\*)?)?"
 )
 _EDGE_RE = re.compile(
     r"^(?P<left>.+?)\s*"
@@ -99,27 +99,61 @@ _EDGE_RE = re.compile(
     r"--\s*(?:\|(?P<label>.*?)\|\s*)?-*>"
     r"|--\s*(?P<txt>[^-|>][^|>]*?)\s*-->"
     r"|--\s*(?P<txt2>[^-|>][^|>]*?)\s*---"
+    r"|-\.\s*(?P<txt3>[^-|>][^|>]*?)\s*\.->"
+    r"|==\s*(?P<txt4>[^-|>][^|>]*?)\s*==>"
     r"|---|-.->|==>)"
     r"(?:\s*\|(?P<label2>.*?)\|)?\s*(?P<right>.+?)\s*;?$"
 )
-# 链式边拆解分隔符（A --> B --> C 按箭头切成节点序列）。
-_EDGE_SEP_RE = re.compile(r"(?:-->|---|-.->|==>)")
+_CHAIN_LINK_RE = re.compile(
+    r"\s*(?:"
+    r"(?:-->|---|-.->|==>)\s*\|(?P<label1>.*?)\|\s*"
+    r"|--\s*\|(?P<label2>.*?)\|\s*-*>?"
+    r"|--\s*(?P<label3>[^-|>][^|>]*?)\s*-->"
+    r"|--\s*(?P<label4>[^-|>][^|>]*?)\s*---"
+    r"|-\.\s*(?P<label5>[^-|>][^|>]*?)\s*\.->"
+    r"|==\s*(?P<label6>[^-|>][^|>]*?)\s*==>"
+    r"|-->|---|-.->|==>"
+    r")\s*"
+)
 
 
 def _split_chain_edges(line: str):
-    """把链式边行拆成 [(左节点, 右节点, 标签)] 边列表；非链式/含非法段返回 None。
+    """链式边切分 [(左节点, 右节点, 标签)] 列表。
 
-    只处理连续箭头的链式边（``A --> B --> C``）；含文本的边（``A -- text --> B``）
-    由 ``_EDGE_RE`` 的单边形态处理，此处返回 None 落入原有逻辑。
+    支持无标签链式连线：``A --> B --> C``，
+    以及带标签链式连线：``A -->|text| B --> C`` 或 ``A -- text --> B --> C``。
+    若不是有效的链式边（例如单条边或节点语法无效），返回 None 交给单条边逻辑处理。
     """
     line_clean = line.rstrip(";").strip()
-    parts = _EDGE_SEP_RE.split(line_clean)
-    if len(parts) < 2:
+    matches = list(_CHAIN_LINK_RE.finditer(line_clean))
+    if len(matches) < 2:
         return None
-    segs = [part.strip() for part in parts if part.strip()]
-    if len(segs) < 2 or any(_NODE_RE.fullmatch(seg) is None for seg in segs):
+    segs = []
+    labels = []
+    last_end = 0
+    for m in matches:
+        seg = line_clean[last_end:m.start()].strip()
+        if not seg:
+            return None
+        segs.append(seg)
+        lbl = (
+            m.group("label1")
+            or m.group("label2")
+            or m.group("label3")
+            or m.group("label4")
+            or m.group("label5")
+            or m.group("label6")
+            or ""
+        ).strip()
+        labels.append(lbl)
+        last_end = m.end()
+    final_seg = line_clean[last_end:].strip()
+    if not final_seg:
         return None
-    return [(segs[i], segs[i + 1], "") for i in range(len(segs) - 1)]
+    segs.append(final_seg)
+    if any(_NODE_RE.fullmatch(seg) is None for seg in segs):
+        return None
+    return [(segs[i], segs[i + 1], labels[i]) for i in range(len(segs) - 1)]
 _SEQ_MESSAGE_RE = re.compile(
     r"^\s*(\w[\w/.-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
     r"(\w[\w/.-]*)\s*:\s*(.+?)\s*$"
@@ -483,11 +517,11 @@ def validate(source: str, kind: Optional[str] = None) -> List[MermaidError]:
         elif actual == "sequenceDiagram":
             if _SEQ_MESSAGE_RE.match(line):
                 continue
-            if re.match(r"^(?:participant|actor)\s+\w[\w/.-]*(?:\s+as\s+.+)?$", line):
+            if re.match(r"^(?:participant|actor)\s+\w[\w/.-]*(?:\s+as\s+.+)?$", line, re.I):
                 continue
-            if re.match(r"^(?:activate|deactivate)\s+\w[\w/.-]*$", line):
+            if re.match(r"^(?:activate|deactivate)\s+\w[\w/.-]*$", line, re.I):
                 continue
-            if re.match(r"^(?:Note\s+(?:left of|right of|over)\s+.+:.+|alt\b.*|else\b.*|opt\b.*|loop\b.*|par\b.*|and\b.*|rect\b.*|end$|autonumber$)", line):
+            if re.match(r"^(?:Note\s+(?:left of|right of|over)\s+.+:.+|alt\b.*|else\b.*|opt\b.*|loop\b.*|par\b.*|and\b.*|rect\b.*|end$|autonumber$)", line, re.I):
                 continue
             errors.append(MermaidError(number, "无法识别的 sequenceDiagram 语句"))
         elif actual == "pie":
@@ -526,9 +560,14 @@ def _parse_node(text: str):
             label = value
             shape = name
             break
+    label = label.strip()
+    if label.startswith("**") and label.endswith("**") and len(label) >= 4:
+        label = label[2:-2].strip()
     if (label.startswith('"') and label.endswith('"')) or (label.startswith("'") and label.endswith("'")):
         if len(label) >= 2:
             label = label[1:-1]
+    if label.startswith("**") and label.endswith("**") and len(label) >= 4:
+        label = label[2:-2].strip()
     return match.group("id"), label, shape
 
 
@@ -536,10 +575,10 @@ _FONT_SIZE = 14
 _LABEL_FONT_SIZE = 12
 _NODE_PAD_X = 14
 _NODE_PAD_Y = 10
-_LINE_HEIGHT = 17
+_LINE_HEIGHT = 18
 _RANK_GAP = 80
 _NODE_GAP = 26
-_TEXT_MAX_WIDTH = 230
+_TEXT_MAX_WIDTH = 380
 
 
 def _text_width(text: str, size: int = _FONT_SIZE) -> float:
@@ -548,31 +587,55 @@ def _text_width(text: str, size: int = _FONT_SIZE) -> float:
 
 
 def _wrap_text(text: str, max_width: float, size: int = _FONT_SIZE) -> List[str]:
-    """按估算宽度折行，返回行列表。"""
-    lines: List[str] = []
-    current = ""
-    current_w = 0.0
-    for ch in text:
-        w = _text_width(ch, size)
-        if current and current_w + w > max_width:
-            lines.append(current)
-            current = ch
-            current_w = w
-        else:
-            current += ch
-            current_w += w
-    if current:
-        lines.append(current)
-    return lines or [""]
+    """按估算宽度折行，返回行列表。
+
+    支持 <br> / \\n 显式换行；优先在空白或英文/数字/标识符边界折行，
+    避免将 DeviceUploadProto oneof 这种单词在中间尴尬劈断。
+    """
+    raw_paragraphs = re.split(r"<br\s*/?>|\n", text, flags=re.IGNORECASE)
+    all_lines: List[str] = []
+
+    for raw in raw_paragraphs:
+        tokens = re.findall(r"\s+|[a-zA-Z0-9_\-\./:]+|[\u4e00-\u9fff]|.", raw)
+        if not tokens:
+            all_lines.append("")
+            continue
+        current = ""
+        current_w = 0.0
+        for token in tokens:
+            if not current and token.isspace():
+                continue
+            w = _text_width(token, size)
+            if current and current_w + w > max_width:
+                all_lines.append(current.rstrip())
+                current = token.lstrip()
+                current_w = _text_width(current, size)
+            elif not current and w > max_width:
+                for ch in token:
+                    cw = _text_width(ch, size)
+                    if current and current_w + cw > max_width:
+                        all_lines.append(current)
+                        current = ch
+                        current_w = cw
+                    else:
+                        current += ch
+                        current_w += cw
+            else:
+                current += token
+                current_w += w
+        if current:
+            all_lines.append(current.rstrip())
+
+    return all_lines or [""]
 
 
 def _node_size(label: str, shape: str) -> Tuple[float, float]:
     """根据文本内容与形状计算节点尺寸。"""
     target = min(_text_width(label), _TEXT_MAX_WIDTH)
     lines = _wrap_text(label, target)
-    text_w = max(_text_width(line) for line in lines)
+    text_w = max(_text_width(line) for line in lines) if lines else 100.0
     width = max(120.0, text_w + 2 * _NODE_PAD_X)
-    height = len(lines) * _LINE_HEIGHT + 2 * _NODE_PAD_Y
+    height = max(38.0, len(lines) * _LINE_HEIGHT + 2 * _NODE_PAD_Y)
     if shape == "diamond":
         width += 40
         height += 36
@@ -661,14 +724,14 @@ def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
             continue
         chain = _split_chain_edges(line)
         if chain is not None:
-            # 链式边（A --> B --> C）：拆成多条边渲染，优先于单边匹配。
-            for left_text, right_text, _label in chain:
+            # 链式边：A --> B --> C 或 A -->|label| B --> C
+            for left_text, right_text, label in chain:
                 left = _parse_node(left_text)
                 right = _parse_node(right_text)
                 if left and right:
                     _merge_node(nodes, left)
                     _merge_node(nodes, right)
-                    edges.append((left[0], right[0], ""))
+                    edges.append((left[0], right[0], label))
             continue
         edge = _EDGE_RE.match(line)
         if edge:
@@ -682,6 +745,8 @@ def _render_flowchart_svg(source: str) -> Tuple[bytes, int, int]:
                     or edge.group("label2")
                     or edge.group("txt")
                     or edge.group("txt2")
+                    or edge.group("txt3")
+                    or edge.group("txt4")
                     or ""
                 ).strip()
                 edges.append((left[0], right[0], label))
@@ -891,8 +956,8 @@ def _render_sequence_svg(source: str) -> Tuple[bytes, int, int]:
     return _svg_document(width, height, "".join(body)), width, height
 
 
-def svg_to_png(svg: bytes, width: int, height: int) -> bytes:
-    """用 PySide6.QtSvg 把 SVG 栅格化为 PNG。"""
+def svg_to_png(svg: bytes, width: int, height: int, scale: float = 3.0) -> bytes:
+    """用 PySide6.QtSvg 把 SVG 栅格化为高质量 PNG（默认 3x 超采样抗锯齿，写入物理 DPI）。"""
     from PySide6.QtCore import QByteArray, QBuffer, QIODevice
     from PySide6.QtGui import QGuiApplication, QImage, QPainter
     from PySide6.QtSvg import QSvgRenderer
@@ -907,14 +972,27 @@ def svg_to_png(svg: bytes, width: int, height: int) -> bytes:
 
         if threading.current_thread() is not threading.main_thread():
             raise RuntimeError("QtSvg PNG 栅格化首次调用必须在主线程执行")
-        _QT_APP_REF = QGuiApplication([])
+        try:
+            from PySide6.QtWidgets import QApplication
+            _QT_APP_REF = QApplication([])
+        except Exception:
+            _QT_APP_REF = QGuiApplication([])
 
     renderer = QSvgRenderer(QByteArray(svg))
     if not renderer.isValid():
         raise ValueError("SVG 渲染结果无效")
-    image = QImage(max(1, width), max(1, height), QImage.Format.Format_ARGB32)
+    target_w = max(1, int(round(width * scale)))
+    target_h = max(1, int(round(height * scale)))
+    image = QImage(target_w, target_h, QImage.Format.Format_ARGB32)
+    # 写入物理分辨率（DPI = 96 * scale），使 Word/看图软件按正确的物理尺寸展示高清图片，避免被模糊拉伸
+    dpi = 96.0 * scale
+    dpm = int(round(dpi / 0.0254))
+    image.setDotsPerMeterX(dpm)
+    image.setDotsPerMeterY(dpm)
     image.fill(0xFFFFFFFF)
     painter = QPainter(image)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
     renderer.render(painter)
     painter.end()
     buffer = QBuffer()
@@ -960,30 +1038,57 @@ def _clean_source_for_cli(source: str) -> str:
     cleaned = []
     for line in source.splitlines():
         s = line.strip()
-        if _HTML_COMMENT_RE.match(s):
+        if not s or _HTML_COMMENT_RE.match(s):
             continue
         cleaned.append(line)
     return "\n".join(cleaned)
 
 
-def _render_with_cli(source: str) -> Optional[RenderResult]:
+def _render_with_cli(source: str, want_png: bool = True) -> Optional[RenderResult]:
     executable = _find_mmdc()
     if not executable:
         return None
     with tempfile.TemporaryDirectory(prefix="doc-tool-mermaid-") as temp:
         input_path = Path(temp) / "diagram.mmd"
-        output_path = Path(temp) / "diagram.svg"
+        output_svg = Path(temp) / "diagram.svg"
+        output_png = Path(temp) / "diagram.png"
         input_path.write_text(_clean_source_for_cli(source), encoding="utf-8")
-        command = [executable, "-i", str(input_path), "-o", str(output_path), "-b", "white"]
+        base_cmd = [executable, "-i", str(input_path), "-b", "white"]
         puppeteer_config = _cli_puppeteer_config()
         if puppeteer_config:
-            command += ["-p", puppeteer_config]
+            base_cmd += ["-p", puppeteer_config]
         # Windows 上 npm 安装的 mmdc 是 .cmd 脚本，须经 cmd.exe 启动。
         if executable.lower().endswith((".cmd", ".bat")):
-            command = [os.environ.get("COMSPEC", "cmd.exe"), "/c"] + command
+            base_cmd = [os.environ.get("COMSPEC", "cmd.exe"), "/c"] + base_cmd
+
+        if not want_png:
+            # 极速矢量预览模式：Chromium 仅渲染纯 SVG，跳过昂贵的 3x PNG 渲染
+            svg_cmd = base_cmd + ["-o", str(output_svg)]
+            try:
+                completed_svg = subprocess.run(
+                    svg_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+            if completed_svg.returncode != 0 or not output_svg.exists():
+                err_text = completed_svg.stderr or completed_svg.stdout or ""
+                m = re.search(r"Parse error on line \d+:[\s\S]*?(?=\n\s*at\b|\Z)", err_text)
+                clean_err = m.group(0).strip() if m else (err_text.splitlines()[0] if err_text.strip() else "mermaid-cli 渲染失败")
+                return RenderResult(False, error=clean_err)
+            svg = output_svg.read_bytes()
+            size = re.search(rb'<svg[^>]*viewBox="[^"]*\s([\d.]+)\s([\d.]+)"', svg)
+            width, height = (int(float(size.group(1))), int(float(size.group(2)))) if size else (960, 540)
+            return RenderResult(True, svg, None, width, height, "mermaid-cli", None)
+
+        # 1. 优先直接由 Chromium 生成视网膜 3x 超清 PNG，确保 CSS/foreignObject 完美渲染且无单词截断
+        png_cmd = base_cmd + ["-o", str(output_png), "-s", "3"]
         try:
-            completed = subprocess.run(
-                command,
+            completed_png = subprocess.run(
+                png_cmd,
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -991,8 +1096,26 @@ def _render_with_cli(source: str) -> Optional[RenderResult]:
             )
         except (OSError, subprocess.SubprocessError):
             return None
-        if completed.returncode != 0 or not output_path.exists():
-            err_text = completed.stderr or completed.stdout or ""
+
+        completed_svg = None
+        err_png = completed_png.stderr or completed_png.stdout or ""
+        is_syntax_err = "Parse error" in err_png or "Syntax error" in err_png
+        if not is_syntax_err:
+            # 2. 同时生成 SVG 供矢量图预览
+            svg_cmd = base_cmd + ["-o", str(output_svg)]
+            try:
+                completed_svg = subprocess.run(
+                    svg_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                completed_svg = None
+
+        if (completed_png.returncode != 0 and (completed_svg is None or completed_svg.returncode != 0)) or (not output_png.exists() and not output_svg.exists()):
+            err_text = completed_png.stderr or completed_png.stdout or (completed_svg.stderr if completed_svg else "") or ""
             m = re.search(r"Parse error on line \d+:[\s\S]*?(?=\n\s*at\b|\Z)", err_text)
             if m:
                 clean_err = m.group(0).strip()
@@ -1004,39 +1127,59 @@ def _render_with_cli(source: str) -> Optional[RenderResult]:
                 ]
                 clean_err = lines_err[0] if lines_err else "mermaid-cli 渲染失败"
             return RenderResult(False, error=clean_err)
-        svg = output_path.read_bytes()
-        size = re.search(rb'<svg[^>]*viewBox="[^\"]*\s([\d.]+)\s([\d.]+)"', svg)
-        width, height = (int(float(size.group(1))), int(float(size.group(2)))) if size else (960, 540)
-        try:
-            png = svg_to_png(svg, width, height)
-        except (ImportError, ValueError, RuntimeError):
-            png = None
+
+        svg = output_svg.read_bytes() if output_svg.exists() else None
+        width, height = 960, 540
+        if svg:
+            size = re.search(rb'<svg[^>]*viewBox="[^"]*\s([\d.]+)\s([\d.]+)"', svg)
+            if size:
+                width, height = int(float(size.group(1))), int(float(size.group(2)))
+
+        png = None
+        if output_png.exists():
+            png = output_png.read_bytes()
+        elif svg:
+            try:
+                png = svg_to_png(svg, width, height)
+            except (ImportError, ValueError, RuntimeError):
+                png = None
+
         return RenderResult(True, svg, png, width, height, "mermaid-cli", None)
 
 
-def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True) -> RenderResult:
-    """渲染 Mermaid；CLI 可用时优先，否则使用内置子集渲染器。"""
+def render(
+    source: str,
+    kind: Optional[str] = None,
+    *,
+    use_cli: bool = True,
+    want_png: bool = True,
+) -> RenderResult:
+    """渲染 Mermaid：CLI 可用时优先，否则使用子集渲染器。
+    
+    ``want_png`` 为 False 时仅生成纯矢量 SVG，跳过昂贵的 CPU 软件光栅化，
+    专用于极速毫秒级预览；导出到 Word 等需要物理位图的场景传 True。
+    """
     actual = kind or detect_kind(source)
     errors = validate(source, actual)
     if errors:
         first = errors[0]
         return RenderResult(False, error="第 {0} 行：{1}".format(first.line, first.message))
 
-    cache_key = (source.strip(), actual, use_cli)
+    cache_key = (source.strip(), actual, use_cli, want_png)
     if cache_key in _RENDER_CACHE:
         return _RENDER_CACHE[cache_key]
 
-    # CLI 优先策略：若启用 CLI，走 CLI 官方渲染
+    # CLI 优先策略：有 CLI，走 CLI 官方渲染
     if use_cli:
-        cli_result = _render_with_cli(source)
+        cli_result = _render_with_cli(source, want_png=want_png)
         if cli_result is not None:
             if cli_result.ok:
                 if len(_RENDER_CACHE) >= _MAX_RENDER_CACHE:
                     _RENDER_CACHE.pop(next(iter(_RENDER_CACHE)))
                 _RENDER_CACHE[cache_key] = cli_result
                 return cli_result
-            # 若 CLI 执行失败且图类型属于内置支持的 flowchart/sequenceDiagram，
-            # 自动回退内置渲染器，避免因环境问题导致渲染完全不可用
+            # 若 CLI 执行失败但图表是支持的 flowchart/sequenceDiagram，
+            # 回退内置渲染器（避免环境问题导致渲染全挂）
             if actual not in ("flowchart", "sequenceDiagram"):
                 return cli_result
 
@@ -1046,7 +1189,16 @@ def render(source: str, kind: Optional[str] = None, *, use_cli: bool = True) -> 
         elif actual == "sequenceDiagram":
             svg, width, height = _render_sequence_svg(source)
         else:
-            return RenderResult(False, error="内置渲染器不支持此图类型「{0}」，需要启用 mermaid-cli 渲染".format(actual))
+            return RenderResult(False, error="内置渲染暂不支持此图表类型（{0}），需要启用 mermaid-cli 渲染".format(actual))
+
+        # 预览场景仅需轻量矢量 SVG（耗时 1~2ms），彻底跳过极其昂贵的 3x PNG 软件光栅化（1200ms+）
+        if not want_png:
+            result = RenderResult(True, svg, None, width, height, "builtin", None)
+            if len(_RENDER_CACHE) >= _MAX_RENDER_CACHE:
+                _RENDER_CACHE.pop(next(iter(_RENDER_CACHE)))
+            _RENDER_CACHE[cache_key] = result
+            return result
+
         try:
             png = svg_to_png(svg, width, height)
         except (ImportError, ValueError, RuntimeError) as exc:
@@ -1112,7 +1264,7 @@ def batch_convert(
         except Exception as exc:  # noqa: BLE001
             failures.append(BatchFailure(block.start_line, str(exc)))
             continue
-        newline = "\n" if lines and any(line.endswith("\n") for line in lines) else ""
+        newline = "\r\n" if "\r\n" in md_text else ("\n" if "\n" in md_text else "")
         replacements.append((block.start_line - 1, block.end_line, reference + newline))
     for start, end, reference in reversed(replacements):
         lines[start:end] = [reference]
