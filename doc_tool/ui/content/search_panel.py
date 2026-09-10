@@ -43,6 +43,33 @@ _TYPE_FILTERS = (
 _DEBOUNCE_MS = 350
 
 
+class SearchTreeItem(QTreeWidgetItem):
+    """支持路径自然编号排序与行号数值排序的结果项。"""
+
+    def __lt__(self, other: QTreeWidgetItem) -> bool:
+        tree = self.treeWidget()
+        col = tree.sortColumn() if tree else 0
+        if col < 0:
+            col = 0
+        if col == 1:
+            try:
+                return int(self.text(1)) < int(other.text(1))
+            except ValueError:
+                pass
+        elif col == 0:
+            from doc_tool.domain.content_index import path_natural_sort_key
+
+            k1 = path_natural_sort_key(self.text(0))
+            k2 = path_natural_sort_key(other.text(0))
+            if k1 != k2:
+                return k1 < k2
+            try:
+                return int(self.text(1)) < int(other.text(1))
+            except ValueError:
+                return self.text(1) < other.text(1)
+        return super().__lt__(other)
+
+
 class SearchPanel(QWidget):
     """全文搜索面板。
 
@@ -138,6 +165,8 @@ class SearchPanel(QWidget):
         self._tree.setColumnWidth(1, 48)
         self._tree.setRootIsDecorated(False)
         self._tree.setUniformRowHeights(True)
+        self._tree.setSortingEnabled(True)
+        self._tree.header().setSectionsClickable(True)
         self._tree.itemActivated.connect(self._on_activate)
         self._tree.itemClicked.connect(self._on_activate)
 
@@ -258,10 +287,11 @@ class SearchPanel(QWidget):
             preview = hit.text.strip()
             if len(preview) > 200:
                 preview = preview[:200] + "…"
-            item = QTreeWidgetItem(
+            item = SearchTreeItem(
                 [hit.rel_path, str(hit.line_no), preview]
             )
             self._tree.addTopLevelItem(item)
+        self._tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         if result.total == 0:
             summary = "无匹配内容" if result.query else "请输入关键字"
         elif result.truncated:

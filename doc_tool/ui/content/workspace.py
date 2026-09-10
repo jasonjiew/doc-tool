@@ -75,6 +75,7 @@ from doc_tool.ui.content.review_panel import ReviewPanel
 from doc_tool.ui.content.search_panel import SearchPanel
 from doc_tool.ui.content.tabs_host import TabsHost
 from doc_tool.ui.content.tree_panel import ChapterTree
+from doc_tool.ui.operation_loading_overlay import run_async_operation
 from doc_tool.ui.content.unsaved_prompt import confirm_unsaved_dialog
 
 
@@ -133,6 +134,7 @@ class ContentWorkspace(QWidget):
         on_stage: Optional[Callable[[str], None]] = None,
         unsaved_resolver: Optional[UnsavedResolver] = None,
         restore_drafts_choice=None,
+        change_detection_mode: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -147,6 +149,17 @@ class ContentWorkspace(QWidget):
         )
         self._change_source = "local"
         self._change_source_note = ""
+        if change_detection_mode is not None:
+            self._change_detection_mode = change_detection_mode
+        else:
+            mode_file = self._state_dir / "change_mode.txt"
+            if mode_file.exists():
+                try:
+                    self._change_detection_mode = mode_file.read_text(encoding="utf-8").strip() or "vcs"
+                except Exception:
+                    self._change_detection_mode = "vcs"
+            else:
+                self._change_detection_mode = "vcs"
         self._assets_root = Path(assets_root) if assets_root else None
         self._writable = writable
         self._on_status = on_status
@@ -247,7 +260,7 @@ class ContentWorkspace(QWidget):
         panels_layout.addWidget(self._panels)
         # 索引就绪前的占位
         self._placeholder_tabs: Dict[str, QWidget] = {}
-        for name in ("搜索", "替换", "重命名/重编号", "检查", "问题", "图片", "改动", "评审"):
+        for name in ("搜索", "替换", "重命名/重编号", "格式检查", "问题", "图片", "改动", "评审"):
             placeholder = QWidget(self.panels_host)
             self._panels.addTab(placeholder, name)
             self._placeholder_tabs[name] = placeholder
@@ -369,9 +382,11 @@ class ContentWorkspace(QWidget):
             on_open=self._open_and_locate,
             on_issues=self._on_lint_issues,
             writable=self._writable,
+            writer=self._writer,
+            on_applied=self._after_write,
         )
-        self._panels.addTab(lint, "检查")
-        self._remove_placeholder("检查")
+        self._panels.addTab(lint, "格式检查")
+        self._remove_placeholder("格式检查")
 
         issues = IssuesPanel(
             on_open=self.open_file,
@@ -408,6 +423,10 @@ class ContentWorkspace(QWidget):
             on_pull=self._pull_changes,
             on_push=self._push_changes,
             on_export_review=self._on_export_review_clicked,
+            on_detection_mode_changed=self.set_change_detection_mode,
+            initial_detection_mode=self._change_detection_mode,
+            on_set_baseline=self.set_current_as_baseline,
+            on_refresh=self.refresh_changes,
         )
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
@@ -569,7 +588,8 @@ class ContentWorkspace(QWidget):
 
     def _select_panel(self, name: str) -> None:
         for index in range(self._panels.count()):
-            if self._panels.tabText(index) == name:
+            tab_name = self._panels.tabText(index)
+            if tab_name == name or (name in ("检查", "格式检查") and tab_name in ("检查", "格式检查")):
                 self._panels.setCurrentIndex(index)
                 return
 
@@ -595,28 +615,64 @@ class ContentWorkspace(QWidget):
         """
         self._writer.manifest.load()
         report = self._vcs.detect()
-        if report.source in ("git", "svn"):
+        is_vcs = report.source in ("git", "svn")
+        self._vcs_managed = is_vcs
+        self._writer.set_backup_enabled(not self._vcs_managed)
+
+        if self._change_detection_mode == "local":
+            status = self._snapshot.diff(
+                self._content_root, self._index.all_files()
+            )
+            self._change_source = "local"
+            self._change_source_note = "本地记录模式"
+        elif is_vcs:
             status = self._vcs.status_map(
                 report, self._index.all_files()
             )
             self._change_source = report.source
             self._change_source_note = ""
-            self._vcs_managed = True
         else:
             status = self._snapshot.diff(
                 self._content_root, self._index.all_files()
             )
             self._change_source = "local"
-            # 为什么没用版本控制判断（未纳入 git / git 不可用…）：面板要说明。
             self._change_source_note = report.error or ""
-            self._vcs_managed = False
-        self._writer.set_backup_enabled(not self._vcs_managed)
         status = overlay_rename_status(status, self._writer.manifest.entries)
         # 资源不属于 content 快照，但软删除仍需出现在改动面板，供单项恢复。
         for entry in self._writer.manifest.entries:
             if entry.operation == OP_DELETE and entry.rel_path.startswith("assets/"):
                 status[entry.rel_path] = "deleted"
         return status
+
+    def set_change_detection_mode(self, mode: str) -> None:
+        """设置改动检测模式：'local'（本地记录改动点）或 'vcs'（按 Git/版本控制）。"""
+        if mode not in ("local", "vcs"):
+            mode = "local"
+        self._change_detection_mode = mode
+        try:
+            (self._state_dir / "change_mode.txt").write_text(mode, encoding="utf-8")
+        except Exception:
+            pass
+        panel = getattr(self, "_changes_panel", None)
+        if panel is not None:
+            panel.set_detection_mode(mode)
+        self._apply_status_map()
+        self._refresh_changes_panel()
+
+    def set_current_as_baseline(self) -> None:
+        """将当前工作区所有文件更新为 ContentSnapshot 的新基线，清空本地记录改动点。"""
+        if self._index is None:
+            return
+        self._snapshot.take(
+            self._content_root,
+            [rel for rel, _ in self._index_service.discover_files()],
+        )
+        self._snapshot.save()
+        self._writer.manifest.clear()
+        self._apply_status_map()
+        self._refresh_changes_panel()
+        if self._on_status is not None:
+            self._on_status("已将当前状态设为新基线")
 
     def _apply_status_map(self) -> None:
         """从内容快照对比当前真实变动并应用到章节树徽标与改动面板。"""
@@ -631,9 +687,29 @@ class ContentWorkspace(QWidget):
             except Exception:
                 pass
 
+    def refresh_changes(self) -> None:
+        """手动刷新改动面板与章节变动徽标。
+
+        使 VCS 缓存失效、重载改动清单、重扫内容索引以感知外部文件增删改、
+        重新比对状态并推送到改动面板与章节树。
+        """
+        self._vcs.invalidate_cache()
+        if self._index is not None:
+            try:
+                self._index_service.refresh(self._index)
+                items = build_tree(self._index.all_files())
+                self._tree.set_items(items)
+            except Exception:
+                pass
+        self._apply_status_map()
+        if self._on_status is not None:
+            self._on_status("已刷新改动列表")
+
     # --- 改动面板 ---
 
-    def _change_items(self, status: Dict[str, str]) -> List[ChangeItem]:
+    def _change_items(
+        self, status: Dict[str, str], source: Optional[str] = None
+    ) -> List[ChangeItem]:
         """快照状态 + 改动清单 rename/delete 映射 → 改动项列表。"""
         entries = self._writer.manifest.entries
         rename_map = {
@@ -646,8 +722,9 @@ class ContentWorkspace(QWidget):
             for e in entries
             if e.operation == OP_DELETE and e.trash_path
         }
+        src = source or self._change_source
         non_restorable = (
-            ["project.yml"] if self._change_source in ("git", "svn") else []
+            ["project.yml"] if src in ("git", "svn") else []
         )
         return build_change_items(
             status,
@@ -682,6 +759,9 @@ class ContentWorkspace(QWidget):
         """
         report = self._vcs.detect()
         if report.source not in ("git", "svn"):
+            return self._writer.rollback()
+        panel = getattr(self, "_changes_panel", None)
+        if panel is not None and panel.detection_mode() == "local":
             return self._writer.rollback()
         # 未跟踪文件不在此处删除：由下方按改动清单判定（只删本会话创建的）。
         failures = rollback_all(report, delete_untracked=False)
@@ -866,14 +946,26 @@ class ContentWorkspace(QWidget):
         return result
 
     def _refresh_changes_panel(self, status: Optional[Dict[str, str]] = None) -> None:
-        """刷新改动面板（status 缺省时重新推导）。"""
+        """刷新改动面板（根据面板当前选择的模式推送本地或版本控制改动点）。"""
         panel = getattr(self, "_changes_panel", None)
         if panel is None or self._index is None:
             return
-        if status is None:
-            status = self._status_map()
-        panel.set_source(self._change_source, self._change_source_note)
-        panel.set_items(self._change_items(status))
+        mode = panel.detection_mode() if hasattr(panel, "detection_mode") else self._change_detection_mode
+        if mode == "local":
+            local_status = self._snapshot.diff(
+                self._content_root, self._index.all_files()
+            )
+            local_status = overlay_rename_status(local_status, self._writer.manifest.entries)
+            for entry in self._writer.manifest.entries:
+                if entry.operation == OP_DELETE and entry.rel_path.startswith("assets/"):
+                    local_status[entry.rel_path] = "deleted"
+            panel.set_source("local", "本地记录模式")
+            panel.set_items(self._change_items(local_status, source="local"))
+        else:
+            if status is None:
+                status = self._status_map()
+            panel.set_source(self._change_source, self._change_source_note)
+            panel.set_items(self._change_items(status, source=self._change_source))
 
     def _after_restore(self, rel_path: Optional[str] = None) -> None:
         """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
@@ -903,8 +995,18 @@ class ContentWorkspace(QWidget):
         if not self._writable:
             return "项目为只读状态，无法撤销改动"
 
+        def _safe_after_restore() -> None:
+            # 仅在 Qt 主线程安全执行 UI 刷新与模型重建；若在后台工作线程中则由主线程回调负责
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() == app.thread():
+                self._after_restore(item.rel_path)
+
         report = self._vcs.detect()
-        if report.source in ("git", "svn"):
+        panel = getattr(self, "_changes_panel", None)
+        is_local = (panel is not None and panel.detection_mode() == "local")
+        if report.source in ("git", "svn") and not is_local:
             err = rollback_single_file(
                 report, item.rel_path, content_root=self._content_root
             )
@@ -920,7 +1022,7 @@ class ContentWorkspace(QWidget):
             except Exception:
                 pass
             self._vcs.invalidate_cache()
-            self._after_restore(item.rel_path)
+            _safe_after_restore()
             return None
 
         # 本地快照模式
@@ -934,7 +1036,7 @@ class ContentWorkspace(QWidget):
                     self._writer._rollback_entry(entry)
                     self._writer.manifest.drop(OP_RENAME, entry.rel_path)
                     break
-            self._after_restore(item.rel_path)
+            _safe_after_restore()
             return None
 
         baseline = None
@@ -961,11 +1063,11 @@ class ContentWorkspace(QWidget):
         if not result.written:
             return result.error or "未知原因"
 
-        self._after_restore(item.rel_path)
+        _safe_after_restore()
         return None
 
     def _on_tree_rollback_file(self, rel_path: str) -> None:
-        """从章节树右键菜单触发撤销单文件改动。"""
+        """从章节树右键菜单触发撤销单文件改动（支持全屏加载遮罩与平滑刷新）。"""
         if not self._writable:
             return
         status_map = self._status_map()
@@ -987,13 +1089,27 @@ class ContentWorkspace(QWidget):
                 baseline_rel_path=rel_path,
             )
 
-        err = self._rollback_single_change(target_item)
-        if err:
+        def _do_rollback_tree():
+            return self._rollback_single_change(target_item)
+
+        def _on_rollback_done(err):
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "撤销失败", f"撤销文件改动失败：{err}")
-        else:
-            if self._on_status is not None:
-                self._on_status(f"已撤销改动：{rel_path}")
+            if err:
+                QMessageBox.warning(self, "撤销失败", f"撤销文件改动失败：{err}")
+            else:
+                self._after_restore(rel_path)
+                if self._on_status is not None:
+                    self._on_status(f"已撤销改动：{rel_path}")
+
+        top = self.window() if hasattr(self, "window") and self.window() else self
+        run_async_operation(
+            top,
+            _do_rollback_tree,
+            title="正在撤销文件改动…",
+            description=f"正在将「{rel_path}」还原到基准状态并重建索引，请稍候…",
+            dark=getattr(self, "_dark", False),
+            on_success=_on_rollback_done,
+        )
 
     def reload_baseline(self) -> None:
         """重新从磁盘加载内容基线快照并刷新树状态与改动面板（例如在正式合并之后）。"""
@@ -1022,6 +1138,7 @@ class ContentWorkspace(QWidget):
             self._start_index_build()
             return
         try:
+            self._vcs.invalidate_cache()
             self._index_service.refresh(self._index)
             ReferenceScanner(self._index, assets_root=self._assets_root).scan_all()
             items = build_tree(self._index.all_files())
@@ -1044,7 +1161,9 @@ class ContentWorkspace(QWidget):
             return
         self._index.invalidate(rel_path)
         self._index_service.rebuild_file(self._index, rel_path)
-        self._tree.set_status(self._status_map())
+        status = self._status_map()
+        self._tree.set_status(status)
+        self._refresh_changes_panel(status)
 
     def _on_current_file_changed(self, rel_path: Optional[str]) -> None:
         if rel_path is not None and self._on_open_file is not None:
@@ -1670,15 +1789,42 @@ class ContentWorkspace(QWidget):
         只从磁盘正式内容恢复；草稿一律走 `_prompt_restore_drafts` 的显式
         确认，避免把已忽略/废弃的草稿静默载入为未保存状态。
         """
-        for rel in session.open_tabs:
-            if self.tabs_host.editor_for(rel) is not None:
-                continue  # 已打开
-            text = self._session_tab_text(rel)
-            if text is None:
-                continue  # 文件缺失/不可读：跳过该标签
-            self.tabs_host.open_file(rel, text)
+        if getattr(self, "_on_stage", None) is not None:
+            self._on_stage("正在恢复工作区标签…")
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.processEvents()
+
+        # 批量恢复标签时临时阻断 currentChanged 信号，避免多标签产生级联重绘与状态刷新风暴
+        tabs_widget = getattr(self.tabs_host, "_tabs", None)
+        if tabs_widget is not None:
+            tabs_widget.blockSignals(True)
+
+        try:
+            for rel in session.open_tabs:
+                if self.tabs_host.editor_for(rel) is not None:
+                    continue  # 已打开
+                text = self._session_tab_text(rel)
+                if text is None:
+                    continue  # 文件缺失/不可读：跳过该标签
+                is_active = (rel == session.current_file)
+                self.tabs_host.open_file(
+                    rel,
+                    text,
+                    activate=False,
+                    lazy_preview=not is_active,
+                )
+        finally:
+            if tabs_widget is not None:
+                tabs_widget.blockSignals(False)
+
+        # 仅在所有标签恢复后，一次性激活目标文件并通知外部
         if session.current_file and self.tabs_host.editor_for(session.current_file):
             self.tabs_host.activate(session.current_file)
+            self._on_current_file_changed(session.current_file)
+        elif self.tabs_host.current_rel_path():
+            self._on_current_file_changed(self.tabs_host.current_rel_path())
+
         for rel, enabled in session.preview_enabled.items():
             editor = self.tabs_host.editor_for(rel)
             if editor is not None:

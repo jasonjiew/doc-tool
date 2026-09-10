@@ -79,21 +79,24 @@ class ProjectBar(QWidget):
         self._readiness_label.setWordWrap(False)
         main.addWidget(self._readiness_label, 1)
 
-        # 高频入口（与菜单共享状态来源）
-        self._merge_btn = QPushButton("正式合并", self)
-        self._merge_btn.setProperty("btnRole", "primary")
-        self._merge_btn.clicked.connect(self._handle_merge)
-        main.addWidget(self._merge_btn)
+        # 高频入口（顺序：项目检查 -> 快速构建 -> 正式出稿，符合标准流水线认知）
+        self._validate_btn = QPushButton("项目检查", self)
+        self._validate_btn.setProperty("btnRole", "secondary")
+        self._validate_btn.setToolTip("检查文档结构、引用与格式；若已生成 Word 则一并校验一致性 (F5)")
+        self._validate_btn.clicked.connect(self._handle_validate)
+        main.addWidget(self._validate_btn)
 
-        self._diag_btn = QPushButton("诊断构建", self)
+        self._diag_btn = QPushButton("快速构建", self)
         self._diag_btn.setProperty("btnRole", "secondary")
+        self._diag_btn.setToolTip("快速生成 DOCX 预览（无需本机 Word，跳过目录域刷新） (Ctrl+Shift+B)")
         self._diag_btn.clicked.connect(self._handle_diag_build)
         main.addWidget(self._diag_btn)
 
-        self._validate_btn = QPushButton("校验", self)
-        self._validate_btn.setProperty("btnRole", "secondary")
-        self._validate_btn.clicked.connect(self._handle_validate)
-        main.addWidget(self._validate_btn)
+        self._merge_btn = QPushButton("正式出稿", self)
+        self._merge_btn.setProperty("btnRole", "primary")
+        self._merge_btn.setToolTip("完整生成、刷新目录域与页码并正式归档（需本机 Microsoft Word）")
+        self._merge_btn.clicked.connect(self._handle_merge)
+        main.addWidget(self._merge_btn)
 
         # 摘要折叠开关
         self._toggle_btn = QToolButton(self)
@@ -159,9 +162,21 @@ class ProjectBar(QWidget):
 
         # 高频入口可用性来自同一状态来源
         actions = state.actions
-        self._set_enabled(self._merge_btn, actions.get("merge", None))
-        self._set_enabled(self._diag_build_btn(), actions.get("diag_build", None))
-        self._set_enabled(self._validate_btn, actions.get("validate", None))
+        self._set_enabled(
+            self._validate_btn,
+            actions.get("validate", None),
+            "检查文档结构、引用与格式；若已生成 Word 则一并校验一致性 (F5)",
+        )
+        self._set_enabled(
+            self._diag_build_btn(),
+            actions.get("diag_build", None),
+            "快速生成 DOCX 预览（无需本机 Word，跳过目录域刷新） (Ctrl+Shift+B)",
+        )
+        self._set_enabled(
+            self._merge_btn,
+            actions.get("merge", None),
+            "完整生成、刷新目录域与页码并正式归档（需本机 Microsoft Word）",
+        )
 
         self._toggle_btn.setVisible(bool(document_name or project_root))
         # 摘要细节
@@ -187,15 +202,16 @@ class ProjectBar(QWidget):
         return self._diag_btn
 
     @staticmethod
-    def _set_enabled(button: QPushButton, action) -> None:
+    def _set_enabled(button: QPushButton, action, default_tooltip: str = "") -> None:
         if action is None:
             button.setEnabled(False)
+            button.setToolTip(default_tooltip)
             return
         button.setEnabled(bool(action.enabled))
         if not action.enabled and action.reason:
             button.setToolTip(action.reason)
         else:
-            button.setToolTip("")
+            button.setToolTip(default_tooltip)
 
     def toggle_summary(self) -> None:
         """折叠/展开摘要细节区。"""
@@ -221,13 +237,27 @@ class ProjectBar(QWidget):
         for label in getattr(self, "_detail_labels", []):
             label.setText("")
 
-    def set_branch(self, branch_name: str, uncommitted_count: int = 0) -> None:
+    def set_branch(
+        self,
+        branch_name: str,
+        uncommitted_count: int = 0,
+        *,
+        ahead_count: int = 0,
+        behind_count: int = 0,
+    ) -> None:
         """设置当前 Git 分支显示与改动角标。"""
         if not branch_name:
             self._branch_btn.setVisible(False)
             return
+        badges = []
+        if ahead_count > 0:
+            badges.append(f"↑{ahead_count}")
+        if behind_count > 0:
+            badges.append(f"↓{behind_count}")
+        sync_str = (" " + "".join(badges)) if badges else ""
         badge = f" ({uncommitted_count})" if uncommitted_count > 0 else ""
-        self._branch_btn.setText(f"⎇ {branch_name}{badge}")
+        self._branch_btn.setText(f"⎇ {branch_name}{sync_str}{badge} ▾")
+        self._branch_btn.setToolTip(f"当前 Git 分支：{branch_name}{sync_str}{badge}（点击切换分支）")
         self._branch_btn.setVisible(True)
 
     def branch_anchor(self) -> QWidget:

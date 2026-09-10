@@ -214,6 +214,9 @@ class ResultCard(QFrame):
         on_open_directory: Optional[Callable[[str], None]] = None,
         on_open_report: Optional[Callable[[], None]] = None,
         on_show_tech: Optional[Callable[[], None]] = None,
+        on_copy_path: Optional[Callable[[str], None]] = None,
+        on_export_to: Optional[Callable[[str], None]] = None,
+        on_locate_file: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -221,6 +224,9 @@ class ResultCard(QFrame):
         self._on_open_directory = on_open_directory
         self._on_open_report = on_open_report
         self._on_show_tech = on_show_tech
+        self._on_copy_path = on_copy_path
+        self._on_export_to = on_export_to
+        self._on_locate_file = on_locate_file
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(10, 10, 10, 10)
@@ -308,9 +314,23 @@ class ResultCard(QFrame):
                 lambda _checked=False, p=str(output): self._open_output(p),
             )
             self._add_action(
-                "打开所在目录",
-                lambda _checked=False, p=str(Path(output).parent): self._open_directory(p),
+                "定位文件" if self._on_locate_file is not None else "打开所在目录",
+                lambda _checked=False, p=str(output): (
+                    self._on_locate_file(p)
+                    if self._on_locate_file is not None
+                    else self._open_directory(str(Path(p).parent))
+                ),
             )
+            if self._on_copy_path is not None:
+                self._add_action(
+                    "复制路径",
+                    lambda _checked=False, p=str(output): self._on_copy_path(p),
+                )
+            if self._on_export_to is not None:
+                self._add_action(
+                    "另存为…",
+                    lambda _checked=False, p=str(output): self._on_export_to(p),
+                )
         report = result.report_path
         if report and Path(report).is_file():
             self._add_action("查看校验报告", lambda: self._open_report())

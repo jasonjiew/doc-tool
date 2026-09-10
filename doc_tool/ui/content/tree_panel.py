@@ -315,6 +315,14 @@ class ChapterTree(QWidget):
         collapse_btn.setProperty("btnRole", "compact")
         collapse_btn.clicked.connect(self.collapse_all)
         toolbar.addWidget(collapse_btn)
+
+        self._only_changed_btn = QPushButton("仅看改动", self)
+        self._only_changed_btn.setProperty("btnRole", "compact")
+        self._only_changed_btn.setCheckable(True)
+        self._only_changed_btn.setToolTip("仅展示有改动的章节与包含改动章节的父目录")
+        self._only_changed_btn.toggled.connect(self._on_only_changed_toggled)
+        toolbar.addWidget(self._only_changed_btn)
+
         toolbar.addStretch(1)
         self._clear_btn = QPushButton("清除标记", self)
         self._clear_btn.setProperty("btnRole", "compact")
@@ -349,6 +357,9 @@ class ChapterTree(QWidget):
         self._tree.selectionModel().currentChanged.connect(self._on_current_changed)
         self._tree.doubleClicked.connect(self._on_double_clicked)
 
+    def _on_only_changed_toggled(self, checked: bool) -> None:
+        self._apply_filter(self._filter_entry.text())
+
     # --- 数据 ---
 
     def set_items(self, items: List[TreeItem]) -> None:
@@ -357,8 +368,14 @@ class ChapterTree(QWidget):
         self._apply_filter(self._filter_entry.text())
 
     def _apply_filter(self, query: str) -> None:
-        """根据输入重建可见节点，并展开匹配结果的完整层级。"""
-        self._visible_items = filter_tree_items(self._items, query)
+        """根据输入与仅看改动状态重建可见节点，并展开匹配结果的完整层级。"""
+        only_changed = self._only_changed_btn.isChecked() if hasattr(self, "_only_changed_btn") else False
+        self._visible_items = filter_tree_items(
+            self._items,
+            query,
+            only_changed=only_changed,
+            status_map=self._status_map,
+        )
         self._model.set_items(self._visible_items, status=self._status_map)
         for item in self._visible_items:
             if not item.is_file:
@@ -578,8 +595,8 @@ class ChapterTree(QWidget):
                     and self._on_delete_file(rel_path)
                 )
                 menu.addAction(delete_action)
-        elif item.parent_id is not None:
-            # 目录节点（非类型根）→ 新增章节/文件 + 在文件管理器打开
+        elif not item.is_file:
+            # 目录节点（含扁平化顶层目录与类型根）→ 新增章节/文件 + 在文件管理器打开
             if self._writable:
                 renumber_action = QAction("重新编号本目录（连续）…", menu)
                 renumber_action.triggered.connect(

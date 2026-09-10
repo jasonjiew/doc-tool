@@ -45,6 +45,32 @@ _TYPE_FILTERS = (
 )
 
 
+class ReplaceTreeItem(QTreeWidgetItem):
+    """支持按自然路径与数值行号排序的替换树条目。"""
+
+    def __lt__(self, other: QTreeWidgetItem) -> bool:
+        tree = self.treeWidget()
+        col = tree.sortColumn() if tree is not None else 0
+        if col < 0:
+            col = 0
+        if col == 0:
+            from doc_tool.domain.content_index import path_natural_sort_key
+            k1 = path_natural_sort_key(self.text(0))
+            k2 = path_natural_sort_key(other.text(0))
+            if k1 != k2:
+                return k1 < k2
+            try:
+                return int(self.text(1)) < int(other.text(1))
+            except ValueError:
+                return self.text(1) < other.text(1)
+        if col == 1:
+            try:
+                return int(self.text(1)) < int(other.text(1))
+            except ValueError:
+                pass
+        return self.text(col) < other.text(col)
+
+
 class ReplacePanel(QWidget):
     """全局替换面板。
 
@@ -153,6 +179,8 @@ class ReplacePanel(QWidget):
         self._tree.setColumnWidth(1, 48)
         self._tree.setRootIsDecorated(False)
         self._tree.setUniformRowHeights(True)
+        self._tree.setSortingEnabled(True)
+        self._tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self._tree.currentItemChanged.connect(lambda _a, _b: self._update_diff())
 
         actions = QHBoxLayout()
@@ -384,11 +412,12 @@ class ReplacePanel(QWidget):
             preview_text = match.line_text.strip()
             if len(preview_text) > 160:
                 preview_text = preview_text[:160] + "…"
-            item = QTreeWidgetItem(
+            item = ReplaceTreeItem(
                 [match.rel_path, str(match.line_no), preview_text]
             )
             item.setData(0, Qt.ItemDataRole.UserRole, i)
             self._tree.addTopLevelItem(item)
+        self._tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self._update_diff()
         self._update_action_state()
 

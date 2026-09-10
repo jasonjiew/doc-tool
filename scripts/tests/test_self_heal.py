@@ -101,12 +101,14 @@ class EntryGuardTests(unittest.TestCase):
     """冻结入口守卫：1.4.2 期间曾因重写 app.py 丢失 __main__ 守卫导致 exe 静默退出。"""
 
     def test_app_py_invokes_main_under_main_guard(self):
-        src = open(os.path.join(REPO_ROOT, "doc_tool", "app.py"), encoding="utf-8").read()
+        with open(os.path.join(REPO_ROOT, "doc_tool", "app.py"), encoding="utf-8") as f:
+            src = f.read()
         self.assertIn('if __name__ == "__main__":', src)
         self.assertIn("sys.exit(main())", src)
 
     def test_frozen_branch_hooks_present(self):
-        src = open(os.path.join(REPO_ROOT, "doc_tool", "app.py"), encoding="utf-8").read()
+        with open(os.path.join(REPO_ROOT, "doc_tool", "app.py"), encoding="utf-8") as f:
+            src = f.read()
         self.assertIn("self_heal.handle_blocked_import", src)
         self.assertIn("self_heal.report_startup_failure", src)
 

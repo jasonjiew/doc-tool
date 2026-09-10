@@ -27,6 +27,8 @@ DEFAULT_TESTS = [
     "test_migration.py", "test_self_heal.py", "test_public_export.py",
     "test_review_docx.py", "test_table_format.py", "test_command_palette.py",
     "test_validate_adaptation.py", "test_branch_ui.py",
+    "test_action_positioning.py", "test_changes_refresh.py",
+    "test_diagram_viewer_interaction.py", "test_operation_loading_overlay.py",
 ]
 
 

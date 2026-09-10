@@ -21,7 +21,7 @@ _CONTEXT_TEXT = {
     "switch": "切换项目",
     "delete": "删除文件",
     "rename": "重命名文件",
-    "merge": "正式合并",
+    "merge": "正式出稿",
     "build": "生成文档",
 }
 
