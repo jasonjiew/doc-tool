@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
@@ -220,6 +221,7 @@ def _common_prefix_length(a: str, b: str) -> int:
     return length
 
 
+@functools.lru_cache(maxsize=1)
 def load_builtin_words() -> Set[str]:
     """从打包资源 ``resources/dict/en_words.txt`` 加载内置词典。
 

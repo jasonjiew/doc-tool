@@ -135,16 +135,23 @@ def build_tree(
     return items
 
 
-def filter_tree_items(items: List[TreeItem], query: str) -> List[TreeItem]:
+def filter_tree_items(
+    items: List[TreeItem],
+    query: str = "",
+    *,
+    only_changed: bool = False,
+    status_map: Optional[Dict[str, str]] = None,
+) -> List[TreeItem]:
     """筛选章节树，保留命中文件及其父级目录。
 
-    目录自身命中时保留其完整子树，便于按模块名（如 ``Accounts``）浏览；文件命中时
-    仅显示该文件和从文档类型到章节的祖先路径。
+    若 ``only_changed`` 为 True，则仅保留状态非 clean/normal 的改动条目（含其祖先目录）；
+    若 ``query`` 非空，则同时匹配文本或路径。
     """
     needle = query.strip().casefold()
-    if not needle:
+    if not needle and not only_changed:
         return list(items)
 
+    status_map = status_map or {}
     included: set = set()
     by_id = {item.node_id: item for item in items}
 
@@ -155,11 +162,32 @@ def filter_tree_items(items: List[TreeItem], query: str) -> List[TreeItem]:
             current = by_id.get(current.parent_id) if current.parent_id else None
 
     for item in items:
-        haystack = "{0}\n{1}".format(item.text, item.rel_path or item.node_id).casefold()
-        if needle not in haystack:
-            continue
+        # 1. 仅看改动检查
+        if only_changed:
+            if item.is_file:
+                st = status_map.get(item.rel_path, "")
+                if not st or st in ("clean", "normal"):
+                    continue
+            else:
+                if needle:
+                    haystack = "{0}\n{1}".format(item.text, item.rel_path or item.node_id).casefold()
+                    if needle in haystack:
+                        prefix = item.node_id + "/"
+                        for desc in items:
+                            if desc.is_file and desc.node_id.startswith(prefix):
+                                st = status_map.get(desc.rel_path, "")
+                                if st and st not in ("clean", "normal"):
+                                    include_with_ancestors(desc.node_id)
+                continue
+
+        # 2. 文本搜索过滤
+        if needle:
+            haystack = "{0}\n{1}".format(item.text, item.rel_path or item.node_id).casefold()
+            if needle not in haystack:
+                continue
+
         include_with_ancestors(item.node_id)
-        if not item.is_file:
+        if not item.is_file and not only_changed:
             prefix = item.node_id + "/"
             included.update(
                 descendant.node_id
@@ -404,6 +432,7 @@ def renumber_plan_after_delete(
         num = _numeric_prefix(Path(rest).stem)
         if (
             num is None
+            or len(num) != len(deleted_num)
             or num[: len(parent_segments)] != parent_segments
             or num[-1] <= deleted_last
         ):
@@ -416,7 +445,7 @@ def renumber_plan_after_delete(
         )
         # 保留原扩展名：.markdown 等合法后缀不得被静默改成 .md。
         renames.append((rel, prefix + new_stem + Path(rel).suffix))
-    renames.sort(key=lambda pair: _numeric_prefix(Path(pair[1]).stem))
+    renames.sort(key=lambda pair: _numeric_prefix(Path(pair[1]).stem) or ())
     return renames
 
 

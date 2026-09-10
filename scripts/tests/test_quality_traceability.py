@@ -155,6 +155,24 @@ class QualityRulesTests(unittest.TestCase):
             issues = ContentLinter(ContentIndexService(root).build(), config).check_all([])
             self.assertTrue(any(issue.rule_id == "field_completeness" for issue in issues))
 
+    def test_heading_format_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "content"
+            root.mkdir(parents=True)
+            (root / "1.1 格式.md").write_text(
+                "#1.1 无空格标题\n正文\n##\n```python\n#不是标题\n```\n",
+                encoding="utf-8",
+            )
+            config = QualityRulesConfig(Path(tmp) / ".state", "general")
+            config.save([QualityRule("heading_format", True, "warning")])
+            issues = [issue for issue in ContentLinter(ContentIndexService(root).build(), config).check_all([])
+                      if issue.rule_id == "heading_format"]
+            self.assertEqual(len(issues), 2)
+            self.assertIn("缺少空格", issues[0].message)
+            self.assertEqual(issues[0].line_no, 1)
+            self.assertIn("标题文本为空", issues[1].message)
+            self.assertEqual(issues[1].line_no, 3)
+
 
 class TraceabilityTests(unittest.TestCase):
     def test_parse_items_including_unnumbered_and_persist(self):
