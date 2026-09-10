@@ -2,12 +2,14 @@
 """Codex 风格分支切换悬浮卡片 (BranchPopover) 与分支管理对话框。
 
 对标 Codex / VS Code / JetBrains 分支选择器：
-- 顶部圆角搜索框与快捷刷新/获取远程分支按钮；
+- 宽幅现代卡片设计 (430px)，阴影与圆角层次；
+- 顶部宽幅搜索框与快捷刷新/拉取远程分支按钮；
 - 分类标签切换（全部 / 本地分支 / 远程分支），带实时计数；
-- 列表项展示分支图标、分支名、当前分支对勾 ✓ 标识、领先/落后提交数（↑ / ↓）与未提交改动子标题；
-- 支持右键分支条目进行切换、基于此新建、重命名与删除分支等操作；
-- 底部常驻「+ 新建并切换分支...」操作入口；
-- 点击外部区域自动关闭，支持智能贴靠在底部状态栏或顶部项目条上方/下方。
+- 当前激活分支智能置顶展示，带鲜明激活标识、超前/落后提交数与未提交改动子标题；
+- 分支列表项悬停浮现更多操作按钮 (⋮) 与快捷检出，支持右键快捷菜单；
+- 搜索即创建 (Search-to-Create)：搜索无匹配时回车或点击直接基于当前分支新建并切换；
+- 新建分支对话框支持规范化快捷前缀胶囊 (feature/、fix/、docs/ 等) 与基准分支灵活选择；
+- 智能贴靠在底部状态栏或顶部项目条上方/下方，自动边界防溢出。
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeyEvent, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QFrame,
     QGraphicsDropShadowEffect,
@@ -31,6 +34,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStyledItemDelegate,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -41,6 +45,8 @@ from doc_tool.ui.styles import SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, is_dark_th
 
 class BranchItemWidget(QWidget):
     """单个分支行渲染组件。"""
+
+    menu_requested = Signal(object, QPoint)
 
     def __init__(
         self,
@@ -54,7 +60,7 @@ class BranchItemWidget(QWidget):
         self._dark = dark
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setContentsMargins(10, 6, 8, 6)
         layout.setSpacing(8)
 
         # 1. 分支图标（本地分支 ⎇ / 远程分支 ☁）
@@ -116,7 +122,7 @@ class BranchItemWidget(QWidget):
             colors = SEMANTIC_COLORS_DARK if dark else SEMANTIC_COLORS
             sub_color = colors.get("warning", "#eab308")
         elif branch.is_remote:
-            sub_text = "远程分支"
+            sub_text = "远端分支 · 点击检出并跟踪"
         elif branch.upstream:
             sub_text = f"跟踪 {branch.upstream}"
 
@@ -130,22 +136,51 @@ class BranchItemWidget(QWidget):
 
         layout.addLayout(text_layout, 1)
 
-        # 3. 勾选图标 (当前激活分支)
+        # 3. 当前分支标识 / 悬停操作按钮
+        action_layout = QHBoxLayout()
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(4)
+
         if branch.is_current:
+            cur_tag = QLabel("当前", self)
+            cur_tag.setStyleSheet(
+                "background: rgba(59, 130, 246, 0.15); color: #3b82f6; "
+                "border-radius: 4px; padding: 1px 5px; font-size: 7.5pt; font-weight: 600;"
+            )
+            action_layout.addWidget(cur_tag)
+
             check_label = QLabel("✓", self)
             check_font = QFont(self.font())
-            check_font.setPointSize(11)
+            check_font.setPointSize(10)
             check_font.setBold(True)
             check_label.setFont(check_font)
             check_label.setStyleSheet("color: #3b82f6;")
-            layout.addWidget(check_label)
+            action_layout.addWidget(check_label)
+
+        self._more_btn = QToolButton(self)
+        self._more_btn.setText("⋮")
+        self._more_btn.setToolTip("分支操作选项")
+        self._more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._more_btn.setStyleSheet(
+            f"QToolButton {{ background: transparent; border: none; border-radius: 4px; "
+            f"font-size: 11pt; font-weight: bold; color: {'#94a3b8' if dark else '#64748b'}; padding: 0 4px; }} "
+            f"QToolButton:hover {{ background: {'#2a2b34' if dark else '#e2e8f0'}; color: #3b82f6; }}"
+        )
+        self._more_btn.clicked.connect(self._on_more_clicked)
+        action_layout.addWidget(self._more_btn)
+
+        layout.addLayout(action_layout)
+
+    def _on_more_clicked(self) -> None:
+        pos = self._more_btn.mapToGlobal(QPoint(0, self._more_btn.height()))
+        self.menu_requested.emit(self._branch, pos)
 
 
 class BranchPopover(QDialog):
     """Codex 风格分支选择器浮层。"""
 
     branch_selected = Signal(str)
-    create_branch_requested = Signal()
+    create_branch_requested = Signal(str)
     create_from_branch_requested = Signal(str)
     refresh_requested = Signal()
     fetch_requested = Signal()
@@ -166,8 +201,8 @@ class BranchPopover(QDialog):
         self._dark = dark
         self._active_tab = "all"  # "all", "local", "remote"
 
-        self.setFixedWidth(380)
-        self.setMaximumHeight(480)
+        self.setFixedWidth(430)
+        self.setMaximumHeight(520)
 
         # 外层阴影容器
         outer_layout = QVBoxLayout(self)
@@ -185,7 +220,7 @@ class BranchPopover(QDialog):
             f"}}"
         )
 
-        shadow = QGraphicsDropShadowEffect(self)
+        shadow = QGraphicsDropShadowEffect(self._container)
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 120 if dark else 50))
         shadow.setOffset(0, 6)
@@ -195,12 +230,12 @@ class BranchPopover(QDialog):
         layout.setContentsMargins(12, 12, 12, 8)
         layout.setSpacing(6)
 
-        # 1. 顶部操作条：搜索框 + 刷新按钮 + 拉取远端按钮
+        # 1. 顶部操作条：宽幅搜索框 + 图标化刷新/Fetch
         top_bar = QHBoxLayout()
         top_bar.setSpacing(6)
 
         self._search_input = QLineEdit(self)
-        self._search_input.setPlaceholderText("搜索分支 (Search branches)...")
+        self._search_input.setPlaceholderText("搜索分支或输入新分支名...")
         self._search_input.setClearButtonEnabled(True)
         input_bg = "#18181c" if dark else "#f8fafc"
         input_border = "#2e2f38" if dark else "#cbd5e1"
@@ -230,9 +265,10 @@ class BranchPopover(QDialog):
             f"QPushButton:hover {{ background: {btn_hover}; border-color: #3b82f6; color: #3b82f6; }}"
         )
 
-        self._refresh_btn = QPushButton("⟳ 刷新", self)
+        self._refresh_btn = QPushButton("⟳", self)
         self._refresh_btn.setToolTip("重新检查本地与跟踪分支 (Refresh)")
         self._refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._refresh_btn.setFixedSize(32, 30)
         self._refresh_btn.setStyleSheet(icon_btn_style)
         self._refresh_btn.clicked.connect(self._on_refresh_clicked)
         top_bar.addWidget(self._refresh_btn)
@@ -241,6 +277,7 @@ class BranchPopover(QDialog):
         self._fetch_btn = QPushButton("⬇ 远端", self)
         self._fetch_btn.setToolTip("从远程仓库获取最新分支列表 (git fetch --prune)")
         self._fetch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._fetch_btn.setFixedHeight(30)
         self._fetch_btn.setStyleSheet(icon_btn_style)
         self._fetch_btn.clicked.connect(self._on_fetch_clicked)
         top_bar.addWidget(self._fetch_btn)
@@ -381,23 +418,48 @@ class BranchPopover(QDialog):
         self._apply_filter()
 
     def _apply_filter(self) -> None:
-        keyword = self._search_input.text().strip().lower()
+        keyword = self._search_input.text().strip()
+        kw_lower = keyword.lower()
         filtered = []
         for b in self._branches:
             if self._active_tab == "local" and b.is_remote:
                 continue
             if self._active_tab == "remote" and not b.is_remote:
                 continue
-            if keyword and keyword not in b.name.lower():
+            if kw_lower and kw_lower not in b.name.lower():
                 continue
             filtered.append(b)
+
+        # 排序：当前激活分支置顶，其余按本地/远端及名称排列
+        def _sort_key(b: GitBranch):
+            return (
+                0 if b.is_current else 1,
+                1 if b.is_remote else 0,
+                b.name.lower(),
+            )
+
+        filtered.sort(key=_sort_key)
+
+        # 动态调整底部新建按钮文案与提示
+        exact_match = any(b.name.lower() == kw_lower for b in self._branches)
+        if keyword and not exact_match:
+            self._new_branch_btn.setText(f"✨ 创建并切换至「{keyword}」分支...")
+            self._new_branch_btn.setToolTip(f"直接基于当前分支创建「{keyword}」并切换")
+        else:
+            self._new_branch_btn.setText("+ 新建并切换分支...")
+            self._new_branch_btn.setToolTip("创建新分支并切换")
 
         self._populate_list(filtered)
 
     def _populate_list(self, branches: List[GitBranch]) -> None:
         self._list_widget.clear()
+        keyword = self._search_input.text().strip()
         if not branches:
             self._list_widget.setVisible(False)
+            if keyword:
+                self._empty_label.setText(f"未找到匹配分支\n回车或点击下方可直接创建「{keyword}」")
+            else:
+                self._empty_label.setText("暂无可用分支")
             self._empty_label.setVisible(True)
             return
 
@@ -408,6 +470,7 @@ class BranchPopover(QDialog):
             item = QListWidgetItem(self._list_widget)
             item.setData(Qt.ItemDataRole.UserRole, b)
             widget = BranchItemWidget(b, dark=self._dark)
+            widget.menu_requested.connect(self._show_context_menu_for_branch)
             item.setSizeHint(widget.sizeHint())
             self._list_widget.addItem(item)
             self._list_widget.setItemWidget(item, widget)
@@ -421,7 +484,8 @@ class BranchPopover(QDialog):
             self.accept()
 
     def _on_create_clicked(self) -> None:
-        self.create_branch_requested.emit()
+        keyword = self._search_input.text().strip()
+        self.create_branch_requested.emit(keyword or "")
         self.accept()
 
     def _on_refresh_clicked(self) -> None:
@@ -430,14 +494,7 @@ class BranchPopover(QDialog):
     def _on_fetch_clicked(self) -> None:
         self.fetch_requested.emit()
 
-    def _show_context_menu(self, pos: QPoint) -> None:
-        item = self._list_widget.itemAt(pos)
-        if not item:
-            return
-        branch: Optional[GitBranch] = item.data(Qt.ItemDataRole.UserRole)
-        if not branch:
-            return
-
+    def _show_context_menu_for_branch(self, branch: GitBranch, global_pos: QPoint) -> None:
         menu = QMenu(self)
         menu.setStyleSheet(
             f"QMenu {{ background: {'#1f2026' if self._dark else '#ffffff'}; "
@@ -447,7 +504,8 @@ class BranchPopover(QDialog):
         )
 
         if not branch.is_current:
-            act_checkout = menu.addAction("切换至此分支")
+            title = "检出为本地跟踪分支" if branch.is_remote else "切换至此分支"
+            act_checkout = menu.addAction(title)
             act_checkout.triggered.connect(lambda: (self.branch_selected.emit(branch.name), self.accept()))
 
         act_create_from = menu.addAction("基于此分支新建分支…")
@@ -465,7 +523,16 @@ class BranchPopover(QDialog):
         act_copy = menu.addAction("复制分支名称")
         act_copy.triggered.connect(lambda: QGuiApplication.clipboard().setText(branch.name))
 
-        menu.exec(self._list_widget.mapToGlobal(pos))
+        menu.exec(global_pos)
+
+    def _show_context_menu(self, pos: QPoint) -> None:
+        item = self._list_widget.itemAt(pos)
+        if not item:
+            return
+        branch: Optional[GitBranch] = item.data(Qt.ItemDataRole.UserRole)
+        if not branch:
+            return
+        self._show_context_menu_for_branch(branch, self._list_widget.mapToGlobal(pos))
 
     def _trigger_rename(self, old_name: str) -> None:
         existing = [b.name for b in self._branches]
@@ -499,17 +566,35 @@ class BranchPopover(QDialog):
                     self._list_widget.setCurrentRow(cur - 1)
                 return True
             elif key_event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                cur_item = self._list_widget.currentItem()
-                if cur_item:
-                    self._on_item_clicked(cur_item)
-                return True
+                if self._list_widget.count() > 0:
+                    cur_item = self._list_widget.currentItem() or self._list_widget.item(0)
+                    if cur_item:
+                        self._on_item_clicked(cur_item)
+                        return True
+                else:
+                    if self._search_input.text().strip():
+                        self._on_create_clicked()
+                        return True
         return super().eventFilter(obj, event)
+
+    def hideEvent(self, event) -> None:
+        if hasattr(self, "_container"):
+            eff = self._container.graphicsEffect()
+            if eff:
+                eff.setEnabled(False)
+        super().hideEvent(event)
 
     def show_anchored(self, anchor: Optional[QWidget] = None) -> None:
         """根据锚点控件位置智能弹出在上方（状态栏）或下方（顶部工具栏）。若无锚点则居中弹出。"""
+        if hasattr(self, "_container"):
+            eff = self._container.graphicsEffect()
+            if eff:
+                eff.setEnabled(True)
         self.adjustSize()
-        pop_w = self.width()
-        pop_h = min(self.sizeHint().height(), self.maximumHeight())
+        pop_w = 430
+        item_count = self._list_widget.count() if self._list_widget.isVisible() else 0
+        target_h = max(260, min(self.maximumHeight(), 160 + max(1, min(item_count, 8)) * 44))
+        self.resize(pop_w, target_h)
 
         scr = (anchor.screen() if anchor else None) or QApplication.primaryScreen()
         screen = scr.availableGeometry() if scr else QRect(0, 0, 1920, 1080)
@@ -525,14 +610,14 @@ class BranchPopover(QDialog):
 
             if top_left_global.y() > screen.center().y():
                 # 靠底端（状态栏）：弹出在按钮上方
-                y = top_left_global.y() - pop_h - 4
+                y = top_left_global.y() - target_h - 6
                 if y < screen.top() + 8:
                     y = screen.top() + 8
             else:
                 # 靠顶端（项目条）：弹出在按钮下方
-                y = top_left_global.y() + anchor.height() + 4
-                if y + pop_h > screen.bottom() - 8:
-                    y = screen.bottom() - pop_h - 8
+                y = top_left_global.y() + anchor.height() + 6
+                if y + target_h > screen.bottom() - 8:
+                    y = screen.bottom() - target_h - 8
         else:
             parent = self.parentWidget()
             if parent and parent.isVisible():
@@ -556,32 +641,84 @@ class NewBranchDialog(QDialog):
         current_branch: str,
         existing_branches: List[str],
         *,
+        initial_name: str = "",
         dark: bool = False,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("新建并切换分支")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(430)
         self._existing_branches = set(existing_branches)
+        self._current_branch = current_branch
         self.branch_name = ""
+        self.base_branch = current_branch
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(18, 18, 18, 16)
         layout.setSpacing(12)
 
-        safe_branch = html.escape(current_branch)
-        info_label = QLabel(f"基于分支 <b>{safe_branch}</b> 创建新分支：", self)
-        layout.addWidget(info_label)
+        # 1. 基准分支选择
+        base_layout = QHBoxLayout()
+        base_layout.setSpacing(8)
+        base_title = QLabel("基准分支:", self)
+        base_title.setStyleSheet("font-weight: 500;")
+        base_layout.addWidget(base_title)
+
+        self._base_combo = QComboBox(self)
+        unique_branches = []
+        if current_branch and current_branch != "HEAD":
+            unique_branches.append(current_branch)
+        for b in existing_branches:
+            if b and b not in unique_branches:
+                unique_branches.append(b)
+        if not unique_branches:
+            unique_branches.append(current_branch or "HEAD")
+        self._base_combo.addItems(unique_branches)
+        if current_branch in unique_branches:
+            self._base_combo.setCurrentText(current_branch)
+        base_layout.addWidget(self._base_combo, 1)
+        layout.addLayout(base_layout)
+
+        # 2. 分支名称输入
+        name_title = QLabel("新分支名称:", self)
+        name_title.setStyleSheet("font-weight: 500;")
+        layout.addWidget(name_title)
 
         self._input = QLineEdit(self)
         self._input.setPlaceholderText("例如: feature/new-module 或 fix/issue-123")
         self._input.textChanged.connect(self._validate_input)
         layout.addWidget(self._input)
 
+        # 3. 快捷前缀胶囊
+        prefix_layout = QHBoxLayout()
+        prefix_layout.setSpacing(6)
+        prefix_tip = QLabel("常用前缀:", self)
+        prefix_tip.setStyleSheet("color: #94a3b8; font-size: 8pt;")
+        prefix_layout.addWidget(prefix_tip)
+
+        prefixes = ["feature/", "fix/", "docs/", "refactor/", "release/"]
+        self._prefix_btns = []
+        for pfx in prefixes:
+            btn = QPushButton(pfx, self)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(
+                f"QPushButton {{ background: {'#2a2b34' if dark else '#f1f5f9'}; "
+                f"border: 1px solid {'#3a3b44' if dark else '#e2e8f0'}; border-radius: 4px; "
+                f"padding: 2px 7px; font-size: 8pt; color: {'#93c5fd' if dark else '#2563eb'}; font-weight: 500; }} "
+                f"QPushButton:hover {{ background: {'#3b82f6' if dark else '#dbeafe'}; color: {'#ffffff' if dark else '#1d4ed8'}; }}"
+            )
+            btn.clicked.connect(lambda _, p=pfx: self._apply_prefix(p))
+            prefix_layout.addWidget(btn)
+            self._prefix_btns.append(btn)
+        prefix_layout.addStretch(1)
+        layout.addLayout(prefix_layout)
+
+        # 4. 校验提示标签
         self._tip_label = QLabel("", self)
         self._tip_label.setStyleSheet("color: #ef4444; font-size: 8.5pt;")
         layout.addWidget(self._tip_label)
 
+        # 5. 底部按钮区
         btn_box = QHBoxLayout()
         btn_box.addStretch(1)
 
@@ -598,6 +735,25 @@ class NewBranchDialog(QDialog):
         btn_box.addWidget(self._create_btn)
 
         layout.addLayout(btn_box)
+
+        if initial_name:
+            self._input.setText(initial_name)
+            self._input.selectAll()
+
+    def _apply_prefix(self, prefix: str) -> None:
+        cur = self._input.text().strip()
+        common_prefixes = ["feature/", "fix/", "docs/", "refactor/", "release/", "hotfix/", "test/"]
+        replaced = False
+        for p in common_prefixes:
+            if cur.startswith(p):
+                cur = prefix + cur[len(p):]
+                replaced = True
+                break
+        if not replaced:
+            cur = prefix + cur.lstrip("/")
+        self._input.setText(cur)
+        self._input.setFocus()
+        self._input.setCursorPosition(len(cur))
 
     def _validate_input(self, text: str) -> None:
         name = text.strip()
@@ -622,6 +778,7 @@ class NewBranchDialog(QDialog):
 
     def _on_confirm(self) -> None:
         self.branch_name = self._input.text().strip()
+        self.base_branch = self._base_combo.currentText().strip() or self._current_branch
         self.accept()
 
 

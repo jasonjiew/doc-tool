@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -58,8 +58,14 @@ def build_change_items(
                 restorable=rel_path not in non_restorable,
             )
         )
+    from doc_tool.domain.content_index import path_natural_sort_key
+
     return sorted(
-        items, key=lambda item: (_STATUS_ORDER.get(item.status, 9), item.rel_path)
+        items,
+        key=lambda item: (
+            _STATUS_ORDER.get(item.status, 9),
+            path_natural_sort_key(item.rel_path),
+        ),
     )
 
 
@@ -76,3 +82,120 @@ def render_unified_diff(old_text: str, new_text: str) -> str:
         n=1,
     )
     return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class DiffSpan:
+    """行内字符级差异区间。"""
+
+    start: int
+    end: int
+    tag: str  # 'equal' | 'delete' | 'insert' | 'replace'
+
+
+def compute_word_diff_spans(
+    old_line: str, new_line: str
+) -> Tuple[List[DiffSpan], List[DiffSpan]]:
+    """对比两行文本的字符/单词级差异，返回 (old_spans, new_spans)。
+
+    仅保留非 equal 的变动区间供高亮加深底色使用。
+    """
+    matcher = difflib.SequenceMatcher(None, old_line, new_line, autojunk=False)
+    old_spans: List[DiffSpan] = []
+    new_spans: List[DiffSpan] = []
+    for tag, alo, ahi, blo, bhi in matcher.get_opcodes():
+        if tag in ("delete", "replace") and alo < ahi:
+            old_spans.append(DiffSpan(start=alo, end=ahi, tag=tag))
+        if tag in ("insert", "replace") and blo < bhi:
+            new_spans.append(DiffSpan(start=blo, end=bhi, tag=tag))
+    return old_spans, new_spans
+
+
+@dataclass(frozen=True)
+class SideBySideLine:
+    """分栏对比视图的单行对齐数据。"""
+
+    old_line_no: Optional[int]
+    old_text: str
+    new_line_no: Optional[int]
+    new_text: str
+    change_type: str  # 'equal' | 'delete' | 'insert' | 'replace'
+    old_spans: Tuple[DiffSpan, ...] = ()
+    new_spans: Tuple[DiffSpan, ...] = ()
+
+
+def render_side_by_side_diff(old_text: str, new_text: str) -> List[SideBySideLine]:
+    """生成左右两栏对齐的比对行数据（含字级别差异高亮区间）。"""
+    old_lines = old_text.splitlines()
+    new_lines = new_text.splitlines()
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
+    results: List[SideBySideLine] = []
+
+    for tag, alo, ahi, blo, bhi in matcher.get_opcodes():
+        if tag == "equal":
+            for i in range(ahi - alo):
+                results.append(
+                    SideBySideLine(
+                        old_line_no=alo + i + 1,
+                        old_text=old_lines[alo + i],
+                        new_line_no=blo + i + 1,
+                        new_text=new_lines[blo + i],
+                        change_type="equal",
+                    )
+                )
+        elif tag == "replace":
+            count = max(ahi - alo, bhi - blo)
+            for i in range(count):
+                o_idx = alo + i if i < (ahi - alo) else None
+                n_idx = blo + i if i < (bhi - blo) else None
+                o_text = old_lines[o_idx] if o_idx is not None else ""
+                n_text = new_lines[n_idx] if n_idx is not None else ""
+                o_spans: Tuple[DiffSpan, ...] = ()
+                n_spans: Tuple[DiffSpan, ...] = ()
+                if o_idx is not None and n_idx is not None:
+                    s_o, s_n = compute_word_diff_spans(o_text, n_text)
+                    o_spans, n_spans = tuple(s_o), tuple(s_n)
+                elif o_idx is not None:
+                    o_spans = (DiffSpan(start=0, end=len(o_text), tag="delete"),) if o_text else ()
+                elif n_idx is not None:
+                    n_spans = (DiffSpan(start=0, end=len(n_text), tag="insert"),) if n_text else ()
+
+                results.append(
+                    SideBySideLine(
+                        old_line_no=o_idx + 1 if o_idx is not None else None,
+                        old_text=o_text,
+                        new_line_no=n_idx + 1 if n_idx is not None else None,
+                        new_text=n_text,
+                        change_type="replace",
+                        old_spans=o_spans,
+                        new_spans=n_spans,
+                    )
+                )
+        elif tag == "delete":
+            for i in range(alo, ahi):
+                txt = old_lines[i]
+                results.append(
+                    SideBySideLine(
+                        old_line_no=i + 1,
+                        old_text=txt,
+                        new_line_no=None,
+                        new_text="",
+                        change_type="delete",
+                        old_spans=(DiffSpan(start=0, end=len(txt), tag="delete"),) if txt else (),
+                    )
+                )
+        elif tag == "insert":
+            for i in range(blo, bhi):
+                txt = new_lines[i]
+                results.append(
+                    SideBySideLine(
+                        old_line_no=None,
+                        old_text="",
+                        new_line_no=i + 1,
+                        new_text=txt,
+                        change_type="insert",
+                        new_spans=(DiffSpan(start=0, end=len(txt), tag="insert"),) if txt else (),
+                    )
+                )
+    return results
+
