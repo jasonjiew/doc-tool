@@ -91,13 +91,17 @@ class TabsHost(QWidget):
         rel_path: str,
         text: str,
         line_no: Optional[int] = None,
+        *,
+        activate: bool = True,
+        lazy_preview: bool = False,
     ) -> bool:
         """在标签页打开文件；已打开则切换到该标签。返回是否新开。"""
         existing = self._editors.get(rel_path)
         if existing is not None:
-            index = self._tabs.indexOf(existing)
-            if index >= 0:
-                self._tabs.setCurrentIndex(index)
+            if activate:
+                index = self._tabs.indexOf(existing)
+                if index >= 0:
+                    self._tabs.setCurrentIndex(index)
             if line_no is not None:
                 existing.highlight_line(line_no)
             return False
@@ -109,9 +113,10 @@ class TabsHost(QWidget):
             on_dirty_changed=lambda dirty: self._on_editor_dirty(editor, dirty),
             autosave=self._autosave,
         )
-        editor.load(rel_path, text)
+        editor.load(rel_path, text, lazy_preview=lazy_preview)
         self._tabs.addTab(editor, rel_path.rsplit("/", 1)[-1])
-        self._tabs.setCurrentWidget(editor)
+        if activate:
+            self._tabs.setCurrentWidget(editor)
         self._editors[rel_path] = editor
         if line_no is not None:
             editor.highlight_line(line_no)
@@ -389,6 +394,9 @@ class TabsHost(QWidget):
         editor.deleteLater()
 
     def _on_tab_changed(self, _index: int) -> None:
+        editor = self.current_editor()
+        if editor is not None and hasattr(editor, "ensure_preview_rendered"):
+            editor.ensure_preview_rendered()
         self.check_external_change_current()
         if self._on_current_changed is not None:
             self._on_current_changed(self.current_rel_path())

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown 实时预览</title>
+<script src="marked.min.js"></script>
+<script src="mermaid.min.js"></script>
+<style>
+:root {
+  --bg-color: #ffffff;
+  --text-color: #1f2328;
+  --border-color: #d0d7de;
+  --code-bg: #f6f8fa;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --muted-text: #64748b;
+  --link-color: #0969da;
+  --table-border: #d0d7de;
+  --table-th-bg: #f6f8fa;
+  --badge-bg: #f1f5f9;
+  --badge-text: #475569;
+}
+
+body.dark-theme {
+  --bg-color: #1e1f26;
+  --text-color: #e5e7eb;
+  --border-color: #374151;
+  --code-bg: #282a36;
+  --card-bg: #232530;
+  --card-border: #383a48;
+  --muted-text: #94a3b8;
+  --link-color: #58a6ff;
+  --table-border: #3b3d4a;
+  --table-th-bg: #282a36;
+  --badge-bg: #334155;
+  --badge-text: #cbd5e1;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  margin: 0;
+  padding: 16px 20px;
+  word-wrap: break-word;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* 标题样式：支持鼠标手势与悬浮微交互，点击直达对应编辑源码行 */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+h1:hover, h2:hover, h3:hover, h4:hover, h5:hover, h6:hover {
+  color: var(--link-color);
+}
+h1 { font-size: 1.8em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+h2 { font-size: 1.45em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1.1em; }
+
+p, blockquote, ul, ol, dl, table, pre {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
+hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 20px 0;
+  background-color: var(--border-color);
+  border: 0;
+}
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* 表格 */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  display: block;
+  overflow-x: auto;
+}
+table th, table td {
+  border: 1px solid var(--table-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+table th {
+  background-color: var(--table-th-bg);
+  font-weight: 600;
+}
+table tr:nth-child(2n) {
+  background-color: var(--code-bg);
+}
+
+/* GFM 任务列表复选框样式 */
+li.task-list-item {
+  list-style-type: none;
+}
+input[type="checkbox"] {
+  margin: 0 0.4em 0.2em -1.4em;
+  vertical-align: middle;
+}
+
+/* 引用块 */
+blockquote {
+  padding: 6px 14px;
+  color: var(--muted-text);
+  border-left: 4px solid var(--border-color);
+  background-color: var(--code-bg);
+  border-radius: 2px;
+}
+
+/* 代码块 */
+code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 88%;
+  background-color: var(--code-bg);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+pre {
+  padding: 14px;
+  overflow: auto;
+  font-size: 90%;
+  line-height: 1.45;
+  background-color: var(--code-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
+/* 图片样式 */
+img {
+  max-width: 100%;
+  box-sizing: content-box;
+  height: auto;
+}
+
+/* Mermaid 现代图表卡片 */
+.mermaid-card {
+  position: relative;
+  margin: 20px 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s ease;
+}
+.mermaid-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mermaid-card-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.mermaid-card-badge {
+  font-size: 12px;
+  color: var(--badge-text);
+  background: var(--badge-bg);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.mermaid-card-badge:hover {
+  background: var(--border-color);
+}
+
+.mermaid-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mermaid-btn {
+  background: var(--code-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.mermaid-btn:hover {
+  background: var(--border-color);
+}
+
+.mermaid-btn.active {
+  background: var(--link-color);
+  color: #ffffff;
+  border-color: var(--link-color);
+}
+
+.mermaid-viewport {
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  cursor: grab;
+}
+.mermaid-viewport.grabbing {
+  cursor: grabbing;
+}
+
+.mermaid-viewport svg {
+  max-width: 100%;
+  height: auto;
+  transform-origin: center center;
+  transition: transform 0.05s ease-out;
+}
+
+.mermaid-viewport.grabbing svg {
+  transition: none !important;
+}
+
+/* 提示卡片 */
+.mermaid-error-box {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #f43f5e;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 16px 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+body.dark-theme .mermaid-error-box {
+  background: #38151b;
+  color: #fda4af;
+  border-color: #881337;
+  border-left-color: #fb7185;
+}
+</style>
+</head>
+<body>
+<div id="content">正在载入预览...</div>
+
+<script>
+let isDarkTheme = false;
+let renderSequence = 0;
+let currentMarkdownText = '';
+let currentBaseUrl = '';
+
+function initMermaid(isDark) {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif',
+    flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+    sequence: { useMaxWidth: true, showSequenceNumbers: true },
+    gantt: { useMaxWidth: true }
+  });
+}
+
+// 初始默认配置
+initMermaid(false);
+
+/**
+ * 外部主更新入口：更新 Markdown 文本与状态
+ */
+window.updateMarkdown = function(mdText, dark, baseUrl) {
+  try {
+    if (dark !== undefined && dark !== isDarkTheme) {
+      isDarkTheme = dark;
+      if (dark) {
+        document.body.classList.add('dark-theme');
+      } else {
+        document.body.classList.remove('dark-theme');
+      }
+      initMermaid(dark);
+    }
+
+    if (mdText !== undefined) {
+      currentMarkdownText = mdText;
+    } else {
+      mdText = currentMarkdownText;
+    }
+
+    if (baseUrl !== undefined) {
+      currentBaseUrl = baseUrl;
+    } else {
+      baseUrl = currentBaseUrl;
+    }
+
+    const container = document.getElementById('content');
+    if (!mdText || !mdText.trim()) {
+      container.innerHTML = '<div style="color: var(--muted-text); padding: 40px 0; text-align: center;">文档内容为空</div>';
+      return;
+    }
+
+    // 1. 采用 marked 解析 Markdown（全兼容 GFM）
+    marked.setOptions({
+      gfm: true,
+      breaks: false
+    });
+    
+    const cleanedMd = mdText.replace(/<EMPTY_PAR\s*\/?>/gi, '');
+    const rawHtml = marked.parse(cleanedMd);
+    container.innerHTML = rawHtml;
+
+    // 安全重写图片路径，杜绝注入全局 <base> 标签以保护 SVG url(#id)
+    if (baseUrl) {
+      const normalizedBase = (baseUrl.endsWith('/') || baseUrl.endsWith('\\')) ? baseUrl : (baseUrl + '/');
+      const imgs = container.querySelectorAll('img');
+      imgs.forEach(img => {
+        const src = img.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('file://')) {
+          try {
+            const cleanSrc = src.replace(/\\/g, '/');
+            img.src = new URL(cleanSrc, normalizedBase).href;
+          } catch(e) {}
+        }
+      });
+    }
+
+    // 2. 识别并提取所有 Mermaid / mmd 代码块（不区分大小写，如 language-Mermaid / language-mmd）
+    const allCodes = container.querySelectorAll('pre > code');
+    const codeBlocks = Array.from(allCodes).filter(code => {
+      const cls = (code.className || '').toLowerCase();
+      return cls.includes('language-mermaid') || cls.includes('language-mmd');
+    });
+
+    let blockCounter = 0;
+    codeBlocks.forEach((code) => {
+      blockCounter++;
+      const pre = code.parentElement;
+      const blockIndex = blockCounter;
+      const sourceCode = code.textContent;
+
+      // 创建现代化图表卡片
+      const card = document.createElement('div');
+      card.className = 'mermaid-card';
+      card.id = `mermaid-card-${blockIndex}`;
+
+      // 工具栏与视口
+      card.innerHTML = `
+        <div class="mermaid-card-toolbar">
+          <span class="mermaid-card-badge" title="点击定位到左侧源码位置">📊 Mermaid 架构图</span>
+          <div class="mermaid-card-actions">
+            <button class="mermaid-btn btn-view" title="大图画廊查看 (也可双击图表)">🔍 大图查看</button>
+            <button class="mermaid-btn btn-reset" title="复位缩放与平移 (100%)">100%</button>
+            <button class="mermaid-btn btn-edit" title="在 Mermaid 图形工作台编辑">✏️ 工作台编辑</button>
+            <button class="mermaid-btn btn-copy" title="复制 Mermaid 源码">📋 复制源码</button>
+          </div>
+        </div>
+        <div class="mermaid-viewport" id="mermaid-viewport-${blockIndex}">
+          <div class="mermaid-raw" style="display:none;"></div>
+        </div>
+      `;
+
+      // 写入源码数据
+      const rawDiv = card.querySelector('.mermaid-raw');
+      rawDiv.textContent = sourceCode;
+
+      pre.parentNode.replaceChild(card, pre);
+
+      // 绑定卡片按钮与徽章事件
+      const btnView = card.querySelector('.btn-view');
+      const btnReset = card.querySelector('.btn-reset');
+      const btnEdit = card.querySelector('.btn-edit');
+      const btnCopy = card.querySelector('.btn-copy');
+      const badge = card.querySelector('.mermaid-card-badge');
+      const viewport = card.querySelector('.mermaid-viewport');
+
+      function sendMermaidView() {
+        const svgEl = card.querySelector('.mermaid-viewport svg');
+        const svgHtml = svgEl ? svgEl.outerHTML : '';
+        const data = JSON.stringify({ source: sourceCode, svg: svgHtml });
+        console.log('DOC_TOOL:mermaid-view:' + encodeURIComponent(data));
+      }
+
+      if (badge) {
+        badge.addEventListener('click', () => {
+          console.log('DOC_TOOL:mermaid-locate:' + encodeURIComponent(sourceCode));
+        });
+      }
+
+      if (btnView) {
+        btnView.addEventListener('click', sendMermaidView);
+      }
+
+      viewport.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        sendMermaidView();
+      });
+
+      btnEdit.addEventListener('click', () => {
+        console.log('DOC_TOOL:mermaid-edit:' + encodeURIComponent(sourceCode));
+      });
+
+      btnCopy.addEventListener('click', () => {
+        const copyOk = () => {
+          btnCopy.textContent = '已复制 ✓';
+          setTimeout(() => { btnCopy.textContent = '📋 复制源码'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(sourceCode).then(copyOk).catch(() => {
+            fallbackCopy();
+          });
+        } else {
+          fallbackCopy();
+        }
+        function fallbackCopy() {
+          const ta = document.createElement('textarea');
+          ta.value = sourceCode;
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch(e){}
+          document.body.removeChild(ta);
+          copyOk();
+        }
+      });
+
+      // 为每个视口配置平滑缩放平移 (Panzoom)
+      setupViewportPanzoom(viewport, btnReset);
+    });
+
+    // 3. 异步触发 Mermaid 原生渲染（带序列号防乱序冲突）
+    renderSequence++;
+    renderAllMermaidBlocks(renderSequence);
+  } catch (err) {
+    console.error('updateMarkdown error:', err);
+    const container = document.getElementById('content');
+    if (container) {
+      container.innerHTML = `<div class="mermaid-error-box">⚠️ 预览渲染异常：\n${err.message || err}</div>`;
+    }
+  }
+};
+
+/**
+ * 异步渲染所有 Mermaid 图表，附带当前渲染序列号
+ */
+async function renderAllMermaidBlocks(seq) {
+  const cards = document.querySelectorAll('.mermaid-card');
+  const batchPrefix = 'm-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1000).toString(36) + '-';
+  for (let i = 0; i < cards.length; i++) {
+    if (seq !== renderSequence) return;
+    const card = cards[i];
+    const rawDiv = card.querySelector('.mermaid-raw');
+    const viewport = card.querySelector('.mermaid-viewport');
+    if (!rawDiv || !viewport) continue;
+
+    const source = rawDiv.textContent.trim();
+    if (!source) {
+      viewport.innerHTML = '<div style="color: var(--muted-text); font-size: 12px; padding: 20px;">Mermaid 图表内容为空</div>';
+      continue;
+    }
+
+    const id = `${batchPrefix}${i + 1}`;
+    try {
+      const { svg } = await mermaid.render(id, source);
+      if (seq !== renderSequence) return;
+      viewport.innerHTML = svg;
+    } catch (err) {
+      if (seq !== renderSequence) return;
+      const tmp = document.getElementById('d' + id) || document.getElementById(id);
+      if (tmp && tmp.parentElement) {
+        tmp.parentElement.removeChild(tmp);
+      }
+      console.error('Mermaid render error:', err);
+      viewport.innerHTML = `<div class="mermaid-error-box">⚠️ Mermaid 语法提示：\n${err.message || err}</div>`;
+    }
+  }
+}
+
+/**
+ * 原生平滑缩放与平移（无内存泄露）
+ */
+function setupViewportPanzoom(viewport, btnReset) {
+  let scale = 1.0;
+  let translateX = 0;
+  let translateY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+
+  function updateTransform() {
+    const svg = viewport.querySelector('svg');
+    if (svg) {
+      svg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      if (btnReset) {
+        btnReset.textContent = Math.round(scale * 100) + '%';
+      }
+    }
+  }
+
+  function resetView() {
+    scale = 1.0;
+    translateX = 0;
+    translateY = 0;
+    updateTransform();
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', resetView);
+  }
+
+  viewport.addEventListener('wheel', (e) => {
+    // 仅当按住 Ctrl / Meta 键缩放图表，普通滚轮保持自然滚动页面
+    if (e.ctrlKey || e.metaKey || isDragging) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1.15 : 0.87;
+      const newScale = Math.min(Math.max(0.15, scale * delta), 6.0);
+      scale = newScale;
+      updateTransform();
+    }
+  }, { passive: false });
+
+  viewport.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // 左键拖拽
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+      viewport.classList.add('grabbing');
+
+      const onMouseMove = (ev) => {
+        if (!isDragging) return;
+        translateX = ev.clientX - startX;
+        translateY = ev.clientY - startY;
+        updateTransform();
+      };
+
+      const onMouseUp = () => {
+        if (isDragging) {
+          isDragging = false;
+          viewport.classList.remove('grabbing');
+        }
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    }
+  });
+}
+
+// 全局超链接、标题双向定位、锚点跳转与外部链接拦截
+document.addEventListener('click', function(e) {
+  // 1. 标题点击双向联动（跳到左侧编辑器对应行）
+  const heading = e.target.closest('h1, h2, h3, h4, h5, h6');
+  if (heading && !e.target.closest('a') && !e.target.closest('button')) {
+    const text = heading.textContent.trim();
+    if (text) {
+      console.log('DOC_TOOL:heading-click:' + encodeURIComponent(text));
+    }
+    return;
+  }
+
+  // 2. 超链接与行号锚点跳转
+  const link = e.target.closest('a');
+  if (link && link.href) {
+    const href = link.getAttribute('href') || '';
+    if (href.startsWith('#line-') || href.startsWith('line-')) {
+      e.preventDefault();
+      const lineNo = href.replace(/^#?line-/, '');
+      console.log('DOC_TOOL:anchor:' + lineNo);
+    } else if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) {
+      e.preventDefault();
+      console.log('DOC_TOOL:external:' + href);
+    } else if (href.startsWith('#')) {
+      e.preventDefault();
+      const targetId = decodeURIComponent(href.slice(1));
+      const el = document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
