@@ -457,6 +457,64 @@ class MarkdownStructureLintRuleTests(unittest.TestCase):
         self.assertTrue(findings[0].blocking)
 
 
+    def test_check_mermaid_structure_tolerates_bold_delimiters(self):
+        """Mermaid 节点若括号被 Markdown 加粗符号包裹时容错支持"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "```mermaid",
+            "flowchart TD",
+            '  ReturnResp --> EndStep2**(**"等待上传下一个日期的文件"**)**',
+            '  AckMQ --> End**(**"单日解析流程结束"**)**',
+            "```",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+    def test_check_mermaid_structure_supports_dotted_text_edge(self):
+        """Mermaid flowchart 支持虚线文字连线 A -. text .-> B"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "```mermaid",
+            "flowchart LR",
+            "  C1 -. TODO 单一URL .-> TEST[受控连通性测试客户端]",
+            "  TEST -. 无业务载荷探测 .-> TARGET[客户URL]",
+            "```",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+    def test_check_mermaid_structure_supports_case_insensitive_sequence_notes(self):
+        """Mermaid sequenceDiagram 支持小写 note over 语句"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "```mermaid",
+            "sequenceDiagram",
+            "  participant U as User",
+            "  participant DB as Database",
+            "  note over U, DB: 场景一：页面加载与多维组合查询",
+            "  U->>DB: Query",
+            "```",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+    def test_check_mermaid_structure_supports_chained_edges_with_labels(self):
+        """Mermaid flowchart 支持带标签的链式连线 A -->|label| B --> C"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "```mermaid",
+            "flowchart LR",
+            "  CacheRouter -->|查库| DbQueryEngine --> TblConfig",
+            "```",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

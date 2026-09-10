@@ -18,7 +18,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from doc_tool.domain.content_index import ContentIndex
 
@@ -84,11 +84,13 @@ class ContentLinter:
             "interface_table_structure": self.check_interface_table_structure,
             "markdown_structure": self.check_markdown_structure,
             "mermaid_syntax": self.check_mermaid_syntax,
+            "heading_format": lambda rule: self.check_heading_format(rule.severity),
         }
         for rule in self._rules().values():
             if rule.enabled and rule.rule_id in dispatch:
                 issues.extend(dispatch[rule.rule_id](rule))
-        issues.sort(key=lambda i: (i.rel_path, i.line_no))
+        from doc_tool.domain.content_index import path_natural_sort_key
+        issues.sort(key=lambda i: (path_natural_sort_key(i.rel_path), i.line_no))
         return issues
 
     def check_duplicate_titles(self, severity: str = "warning") -> List[LintIssue]:
@@ -369,6 +371,66 @@ class ContentLinter:
                         ))
         return issues
 
+    def check_heading_format(self, severity: str = "warning") -> List[LintIssue]:
+        """检查 Markdown 标题格式与基础语法（如 # 后缺少空格、空标题、未闭合代码块）。"""
+        issues: List[LintIssue] = []
+        for rel_path, lines in self._index.lines.items():
+            in_code_block = False
+            code_block_start = 0
+            for line_no, line in enumerate(lines, start=1):
+                stripped = line.strip()
+                if stripped.startswith("```"):
+                    if not in_code_block:
+                        in_code_block = True
+                        code_block_start = line_no
+                    else:
+                        in_code_block = False
+                    continue
+                if in_code_block:
+                    continue
+
+                # 检查只有 # 号没有标题文本
+                if re.match(r"^#{1,6}\s*$", stripped):
+                    issues.append(
+                        LintIssue(
+                            rule="heading_format",
+                            rel_path=rel_path,
+                            line_no=line_no,
+                            message="标题格式错误：标题文本为空。",
+                            rule_id="heading_format",
+                            severity=severity,
+                        )
+                    )
+                    continue
+
+                # 检查 # 后面缺少空格（例如 '#1.1' 或 '##功能说明'）
+                m = re.match(r"^(#{1,6})([^\s#].*)$", stripped)
+                if m:
+                    prefix = m.group(1)
+                    sample = stripped if len(stripped) <= 25 else stripped[:22] + "..."
+                    issues.append(
+                        LintIssue(
+                            rule="heading_format",
+                            rel_path=rel_path,
+                            line_no=line_no,
+                            message="标题格式错误：'{0}' 后面缺少空格（{1}），无法被识别为大纲标题。".format(prefix, sample),
+                            rule_id="heading_format",
+                            severity=severity,
+                        )
+                    )
+            if in_code_block:
+                issues.append(
+                    LintIssue(
+                        rule="heading_format",
+                        rel_path=rel_path,
+                        line_no=code_block_start,
+                        message="代码块未闭合：以 '```' 开头的代码块缺少配对的结束标记。",
+                        rule_id="heading_format",
+                        severity=severity,
+                    )
+                )
+        return issues
+
 
 class TermStore:
     """术语清单持久化（项目 .state/terms.json）。"""
@@ -432,3 +494,109 @@ class TermStore:
                     pass
             return "无法写入术语清单（{0}）".format(exc)
         return None
+
+
+def can_quick_fix(issue: LintIssue) -> bool:
+    """判断该检查问题是否支持一键自动修复。"""
+    if issue.rule_id == "heading_format":
+        if "缺少空格" in issue.message or "必须有空格" in issue.message or "代码块未闭合" in issue.message or "标题文本为空" in issue.message:
+            return True
+    elif issue.rule_id == "term_case":
+        return True
+    elif issue.rule_id == "markdown_structure":
+        if "缺少分隔行" in issue.message:
+            return True
+    return False
+
+
+def apply_quick_fix(content: str, issue: LintIssue) -> Tuple[str, bool, str]:
+    """对文件内容应用指定 LintIssue 的自动修复。
+
+    Returns:
+        (修复后的文本, 是否成功, 操作说明文本)
+    """
+    newline = "\r\n" if "\r\n" in content else "\n"
+    lines = content.splitlines()
+    line_idx = issue.line_no - 1  # 0-based
+
+    if issue.rule_id == "heading_format":
+        if "缺少空格" in issue.message or "必须有空格" in issue.message:
+            if 0 <= line_idx < len(lines):
+                orig = lines[line_idx]
+                m = re.match(r"^(\s*#{1,6})([^\s#].*)$", orig)
+                if m:
+                    lines[line_idx] = "{0} {1}".format(m.group(1), m.group(2))
+                    result = newline.join(lines)
+                    if content.endswith("\r\n"):
+                        result += "\r\n"
+                    elif content.endswith("\n"):
+                        result += "\n"
+                    return result, True, "已在第 {0} 行标题标记后添加空格".format(issue.line_no)
+        elif "代码块未闭合" in issue.message:
+            lines.append("```")
+            result = newline.join(lines) + newline
+            return result, True, "已在文档末尾补全闭合代码块 '```'"
+        elif "标题文本为空" in issue.message:
+            if 0 <= line_idx < len(lines):
+                del lines[line_idx]
+                result = newline.join(lines)
+                if content.endswith("\r\n"):
+                    result += "\r\n"
+                elif content.endswith("\n"):
+                    result += "\n"
+                return result, True, "已移除第 {0} 行的空标题".format(issue.line_no)
+
+    elif issue.rule_id == "term_case":
+        m = re.search(
+            r"(?:术语大小写不一致：\s*([^（]+?)\s*（应为\s*([^）]+)）|正文为\s*['\"]([^'\"]+)['\"]\s*，规范应为\s*['\"]([^'\"]+)['\"])",
+            issue.message,
+        )
+        if m and 0 <= line_idx < len(lines):
+            bad_term = m.group(1) or m.group(3)
+            good_term = m.group(2) or m.group(4)
+            orig = lines[line_idx]
+            if re.search(re.escape(bad_term), orig, flags=re.IGNORECASE):
+                lines[line_idx] = re.sub(re.escape(bad_term), lambda _: good_term, orig, flags=re.IGNORECASE)
+                result = newline.join(lines)
+                if content.endswith("\r\n"):
+                    result += "\r\n"
+                elif content.endswith("\n"):
+                    result += "\n"
+                return result, True, "已在第 {0} 行将 '{1}' 修正为 '{2}'".format(issue.line_no, bad_term, good_term)
+
+    elif issue.rule_id == "markdown_structure" and "缺少分隔行" in issue.message:
+        if 0 <= line_idx < len(lines):
+            header = lines[line_idx].strip()
+            from doc_tool.application.content.table_format import split_table_cells
+            cells = split_table_cells(header)
+            col_count = max(1, len(cells))
+            sep = "| " + " | ".join(["---"] * col_count) + " |"
+            lines.insert(line_idx + 1, sep)
+            result = newline.join(lines)
+            if content.endswith("\r\n"):
+                result += "\r\n"
+            elif content.endswith("\n"):
+                result += "\n"
+            return result, True, "已在第 {0} 行表头下方插入标准分隔行".format(issue.line_no)
+
+    return content, False, "该条目暂不支持自动修复"
+
+
+def apply_all_quick_fixes(content: str, issues: List[LintIssue]) -> Tuple[str, int]:
+    """批量应用所有支持自动修复的问题，按行号倒序应用以避免行号偏移。
+
+    Returns:
+        (修复后的文本, 成功修复的条目数)
+    """
+    fixable = [issue for issue in issues if can_quick_fix(issue)]
+    # 按行号倒序处理
+    fixable.sort(key=lambda i: i.line_no, reverse=True)
+    fixed_count = 0
+    current_content = content
+    for issue in fixable:
+        updated, success, _ = apply_quick_fix(current_content, issue)
+        if success:
+            current_content = updated
+            fixed_count += 1
+    return current_content, fixed_count
+

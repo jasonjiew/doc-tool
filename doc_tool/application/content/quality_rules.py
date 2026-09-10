@@ -50,6 +50,8 @@ def default_rules(document_type: str) -> List[QualityRule]:
         QualityRule("markdown_structure", True, "error"),
         # Mermaid 流程图与图表语法：错误语法阻断合并。
         QualityRule("mermaid_syntax", True, "error"),
+        # Markdown 标题格式：# 后面缺少空格导致无法被 Word 识别为标题。
+        QualityRule("heading_format", True, "warning"),
         QualityRule("sensitive_info", True, "warning", {"patterns": [
             {"name": "手机号", "regex": r"(?<!\d)1[3-9]\d{9}(?!\d)"},
             {"name": "身份证号", "regex": r"(?<!\d)\d{17}[0-9Xx](?!\d)"},

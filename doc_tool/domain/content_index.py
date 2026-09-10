@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -93,6 +94,26 @@ class HeadingEntry:
         return "{0}:{1}".format(self.level, _normalize_heading_text(self.text))
 
 
+
+def path_natural_sort_key(path_str: Optional[str] = ""):
+    """自然排序键：按路径层级分段，每段连续数字按整数数值比对，文本按小写比对。
+
+    使 1.2 排在 1.10 前面，第2章 排在 第10章 前面。
+    """
+    components = (path_str or "").replace("\\", "/").split("/")
+    result = []
+    for comp in components:
+        parts = re.split(r"(\d+)", comp)
+        comp_key = []
+        for part in parts:
+            if part.isdigit():
+                comp_key.append((0, int(part)))
+            elif part:
+                comp_key.append((1, part.lower()))
+        result.append(tuple(comp_key))
+    return tuple(result)
+
+
 def _normalize_heading_text(text: str) -> str:
     """标题文本规范化：去首尾空白、折叠内部空白，用于重复判定。"""
     return " ".join(text.split())
@@ -130,8 +151,8 @@ class ContentIndex:
         self.invalid_files.discard(rel_path)
 
     def all_files(self) -> List[str]:
-        """全部已索引文件的 rel_path（稳定排序）。"""
-        return sorted(self.files.keys())
+        """全部已索引文件的 rel_path（按章节编号与路径自然排序）。"""
+        return sorted(self.files.keys(), key=path_natural_sort_key)
 
     def find_file(self, rel_path: str) -> Optional[FileEntry]:
         """按 rel_path 查文件条目；不存在返回 None。"""
@@ -144,4 +165,4 @@ class ContentIndex:
             for rel_path, entry in self.files.items()
             if entry.name == name
         ]
-        return sorted(matches)
+        return sorted(matches, key=path_natural_sort_key)
