@@ -392,6 +392,33 @@ class ExpressionManager:
             override.set("ContentType", "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml")
             self.items["[Content_Types].xml"] = etree.tostring(content_types, xml_declaration=True, encoding="UTF-8")
 
+    def find_bookmark_for_section(self, token: str) -> Optional[str]:
+        """按章节编号（如 4.8.4、3.7.9）或小节标题文本查找对应的 Word 书签名称。"""
+        cleaned = token.strip()
+        if not cleaned:
+            return None
+        if cleaned in self.bookmarks:
+            return self.bookmarks[cleaned]
+        cleaned_no_space = cleaned.replace(" ", "")
+        for key, bookmark_name in self.bookmarks.items():
+            base = os.path.basename(key.split("#")[0])
+            stem = os.path.splitext(base)[0]
+            stem_no_space = stem.replace(" ", "")
+            if cleaned_no_space == stem_no_space or cleaned == stem:
+                return bookmark_name
+            m = re.match(r"^(\d+(?:\.\d+)*)", stem)
+            if m and (m.group(1) == cleaned or m.group(1) == cleaned_no_space):
+                return bookmark_name
+            m_chap = re.match(r"^(第\s*\d+\s*章)", stem)
+            if m_chap and m_chap.group(1).replace(" ", "") == cleaned_no_space:
+                return bookmark_name
+            if "#" in key:
+                heading = key.split("#", 1)[1].strip()
+                if cleaned == heading or cleaned_no_space == heading.replace(" ", ""):
+                    return bookmark_name
+        return None
+
+
 
 def _ensure_numbering_relationship(relationships) -> None:
     """确保 document.xml.rels 有指向 numbering.xml 的关系（幂等）。
@@ -908,6 +935,147 @@ def _replace_cell_with_field(cell, instruction: str, cached_value: str = "0") ->
         cell.remove(extra)
 
 
+def update_custom_properties(items: Dict[str, bytes], config: Dict) -> None:
+    """自动将文档编号、版本号、文档名称同步更新到 docProps/custom.xml 与 core.xml。
+
+    保证在 Word 中更新域（按 F9 或打开自动刷新）时，DOCPROPERTY 域从
+    custom.xml 重新计算的值始终与当前构建参数一致，绝不回退为模板老旧版本。
+    """
+    doc_no = str(config.get("documentNo", "")).strip()
+    doc_ver = str(config.get("documentVersion", "")).strip()
+    doc_name = str(config.get("documentName", "")).strip()
+
+    # 若 _revision_record.md 存在，尝试自动读取末行最新版本号作为真实版本
+    rev_path = config.get("paths", {}).get("revision_record")
+    if rev_path and os.path.isfile(rev_path):
+        try:
+            rev_rows = _parse_revision_markdown(rev_path)
+            if rev_rows and rev_rows[-1] and rev_rows[-1][0]:
+                latest_ver = str(rev_rows[-1][0]).strip()
+                if latest_ver.upper().startswith("V"):
+                    latest_ver = latest_ver[1:].strip()
+                if latest_ver:
+                    doc_ver = latest_ver
+                    config["documentVersion"] = latest_ver
+        except Exception:
+            pass
+
+    custom_props = {
+        "文档编号": doc_no,
+        "版本": doc_ver,
+        "文件名称": doc_name,
+    }
+
+    CUSTOM_NS = "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
+    VT_NS = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
+    FMTID = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}"
+
+    if "docProps/custom.xml" in items:
+        try:
+            root = _parse_xml_safe(items["docProps/custom.xml"], "docProps/custom.xml")
+        except Exception:
+            root = etree.Element("{{{0}}}Properties".format(CUSTOM_NS), nsmap={None: CUSTOM_NS, "vt": VT_NS})
+    else:
+        root = etree.Element("{{{0}}}Properties".format(CUSTOM_NS), nsmap={None: CUSTOM_NS, "vt": VT_NS})
+
+    existing_pids = []
+    prop_by_name = {}
+    for p in root.findall("{{{0}}}property".format(CUSTOM_NS)):
+        pid_str = p.get("pid")
+        if pid_str and pid_str.isdigit():
+            existing_pids.append(int(pid_str))
+        name = p.get("name")
+        if name:
+            prop_by_name[name] = p
+
+    next_pid = max(existing_pids or [1]) + 1
+
+    for name, value in custom_props.items():
+        if not value:
+            continue
+        if name in prop_by_name:
+            p = prop_by_name[name]
+            # 关键：清除原有的全部子节点（如 <vt:r8>、<vt:i4> 等），统一设为 Unicode 字符串 <vt:lpwstr>
+            for child in list(p):
+                p.remove(child)
+            lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
+            lpwstr.text = value
+        else:
+            p = etree.SubElement(root, "{{{0}}}property".format(CUSTOM_NS))
+            p.set("fmtid", FMTID)
+            p.set("pid", str(next_pid))
+            p.set("name", name)
+            next_pid += 1
+            lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
+            lpwstr.text = value
+
+    items["docProps/custom.xml"] = etree.tostring(
+        root, xml_declaration=True, encoding="UTF-8", standalone=True
+    )
+
+    # 确保 [Content_Types].xml 中声明了 docProps/custom.xml
+    if "[Content_Types].xml" in items:
+        try:
+            ct_root = _parse_xml_safe(items["[Content_Types].xml"], "[Content_Types].xml")
+            custom_ct = "application/vnd.openxmlformats-officedocument.custom-properties+xml"
+            has_override = False
+            for node in ct_root.findall(CT_NS + "Override"):
+                if (node.get("PartName") or "").lower() == "/docprops/custom.xml":
+                    has_override = True
+                    break
+            if not has_override:
+                node = etree.SubElement(ct_root, CT_NS + "Override")
+                node.set("PartName", "/docProps/custom.xml")
+                node.set("ContentType", custom_ct)
+                items["[Content_Types].xml"] = etree.tostring(
+                    ct_root, xml_declaration=True, encoding="UTF-8", standalone=True
+                )
+        except Exception:
+            pass
+
+    # 确保 _rels/.rels 中建立了 docProps/custom.xml 的关系
+    if "_rels/.rels" in items:
+        try:
+            rels_root = _parse_xml_safe(items["_rels/.rels"], "_rels/.rels")
+            CUSTOM_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties"
+            has_rel = False
+            rids = []
+            for node in rels_root.findall(RP_NS + "Relationship"):
+                target = (node.get("Target") or "").replace("\\", "/")
+                rel_type = node.get("Type") or ""
+                if target == "docProps/custom.xml" or rel_type == CUSTOM_REL_TYPE:
+                    has_rel = True
+                    break
+                rid = node.get("Id") or ""
+                if rid.startswith("rId") and rid[3:].isdigit():
+                    rids.append(int(rid[3:]))
+            if not has_rel:
+                next_rid = "rId{0}".format(max(rids or [0]) + 1)
+                node = etree.SubElement(rels_root, RP_NS + "Relationship")
+                node.set("Id", next_rid)
+                node.set("Type", CUSTOM_REL_TYPE)
+                node.set("Target", "docProps/custom.xml")
+                items["_rels/.rels"] = etree.tostring(
+                    rels_root, xml_declaration=True, encoding="UTF-8", standalone=True
+                )
+        except Exception:
+            pass
+
+    if "docProps/core.xml" in items:
+        try:
+            core_root = _parse_xml_safe(items["docProps/core.xml"], "docProps/core.xml")
+            DC_NS = "http://purl.org/dc/elements/1.1/"
+            for tag in ("{{{0}}}title".format(DC_NS), "{{{0}}}subject".format(DC_NS)):
+                node = core_root.find(tag)
+                if node is not None and doc_name:
+                    node.text = doc_name
+            items["docProps/core.xml"] = etree.tostring(
+                core_root, xml_declaration=True, encoding="UTF-8", standalone=True
+            )
+        except Exception:
+            pass
+
+
 def update_cover(root, config: Dict) -> None:
     expected = {
         "文件编号": ("text", str(config["documentNo"])),
@@ -915,9 +1083,6 @@ def update_cover(root, config: Dict) -> None:
         "页数": ("field", "NUMPAGES \\* MERGEFORMAT"),
     }
     found = set()
-    # Only the cover summary table contains all three labels.  Restricting the
-    # edit prevents similarly named cells in document-property tables from
-    # being overwritten.
     cover_tables = []
     for table in root.iter(qn("tbl")):
         labels = {_cell_text(cell).rstrip("：:").strip() for cell in table.iter(qn("tc"))}
@@ -942,15 +1107,48 @@ def update_cover(root, config: Dict) -> None:
     if missing:
         raise AutomationError("模板封面缺少字段: {0}".format(", ".join(missing)))
 
-
+    # 同步更新封面段落中的 DOCPROPERTY 域缓存文本
+    doc_no = str(config.get("documentNo", ""))
+    doc_ver = str(config.get("documentVersion", ""))
+    doc_name = str(config.get("documentName", ""))
+    flat_runs = [(run, run.getparent()) for run in root.iter(qn("r"))]
+    fld_stack = []
+    for r_node, _ in flat_runs:
+        fld_char = r_node.find(qn("fldChar"))
+        fld_type = fld_char.get(qn("fldCharType")) if fld_char is not None else None
+        if fld_type == "begin":
+            fld_stack.append({"separate": False, "instr": []})
+        elif fld_type == "separate":
+            if fld_stack:
+                fld_stack[-1]["separate"] = True
+        elif fld_type == "end":
+            if fld_stack:
+                fld_stack.pop()
+        elif fld_stack and not fld_stack[-1]["separate"]:
+            for t in r_node.iter(qn("instrText")):
+                fld_stack[-1]["instr"].append(t.text or "")
+        elif fld_stack and fld_stack[-1]["separate"]:
+            full_instr = "".join(fld_stack[-1]["instr"]).upper()
+            if "DOCPROPERTY" in full_instr:
+                for t in r_node.iter(qn("t")):
+                    if "版本" in full_instr or "VERSION" in full_instr:
+                        if doc_ver:
+                            t.text = doc_ver
+                    elif "文件编号" in full_instr or "文档编号" in full_instr or "DOCNO" in full_instr:
+                        if doc_no:
+                            t.text = doc_no
+                    elif "文件名称" in full_instr or "文档名称" in full_instr:
+                        if doc_name:
+                            t.text = doc_name
 
 
 def update_headers(items, config):
     """Automatically update document number and version in page headers."""
     doc_no = str(config.get("documentNo", ""))
     doc_ver = str(config.get("documentVersion", ""))
+    doc_name = str(config.get("documentName", ""))
     doc_no_pattern = re.compile(r"^[a-zA-Z0-9_-]+-\d+-\d+-\d+$")
-    ver_pattern = re.compile(r"^\d+\.\d+$")
+    ver_pattern = re.compile(r"^\d+\.\d+(\.\d+)?$")
     header_names = sorted(
         name for name in items
         if name.startswith("word/header") and name.endswith(".xml")
@@ -960,6 +1158,42 @@ def update_headers(items, config):
     for hdr_name in header_names:
         hdr_root = _parse_xml_safe(items[hdr_name], hdr_name)
         modified = False
+
+        # 1. 扫描更新 DOCPROPERTY 域缓存值
+        flat_runs = [(run, run.getparent()) for run in hdr_root.iter(qn("r"))]
+        fld_stack = []
+        for r_node, _ in flat_runs:
+            fld_char = r_node.find(qn("fldChar"))
+            fld_type = fld_char.get(qn("fldCharType")) if fld_char is not None else None
+            if fld_type == "begin":
+                fld_stack.append({"separate": False, "instr": []})
+            elif fld_type == "separate":
+                if fld_stack:
+                    fld_stack[-1]["separate"] = True
+            elif fld_type == "end":
+                if fld_stack:
+                    fld_stack.pop()
+            elif fld_stack and not fld_stack[-1]["separate"]:
+                for t in r_node.iter(qn("instrText")):
+                    fld_stack[-1]["instr"].append(t.text or "")
+            elif fld_stack and fld_stack[-1]["separate"]:
+                full_instr = "".join(fld_stack[-1]["instr"]).upper()
+                if "DOCPROPERTY" in full_instr:
+                    for t in r_node.iter(qn("t")):
+                        if "版本" in full_instr or "VERSION" in full_instr:
+                            if doc_ver and t.text != doc_ver:
+                                t.text = doc_ver
+                                modified = True
+                        elif "文件编号" in full_instr or "文档编号" in full_instr or "DOCNO" in full_instr:
+                            if doc_no and t.text != doc_no:
+                                t.text = doc_no
+                                modified = True
+                        elif "文件名称" in full_instr or "文档名称" in full_instr or "TITLE" in full_instr:
+                            if doc_name and t.text != doc_name:
+                                t.text = doc_name
+                                modified = True
+
+        # 2. 扫描普通文本节点
         for t_node in hdr_root.iter(qn("t")):
             if t_node.text is None:
                 continue
@@ -1012,17 +1246,10 @@ def _parse_revision_markdown(file_path):
         return []
     rows = parse_markdown_table(table_lines)
     data_rows = rows[1:] if len(rows) > 1 else []
-    # parse_markdown_table 已跳过分隔行（|---|），rows[0] 是表头、rows[1:] 是
-    # 数据行；按 rows[2:] 会丢掉第一条数据（如 V1.0）。
     return data_rows
 
 
 def _make_revision_cell(cell_index, text):
-    """无原型可用时的兜底单元格（模板修订表只有表头、没有数据行）。
-
-    正常情况走 ``_clone_revision_row``：模板数据行的排版由模板自己决定，
-    这里的宽度/对齐只是最后兜底，不足以还原真实模板（无边框、dxa 宽度）。
-    """
     cell = etree.Element(qn("tc"))
     tc_pr = etree.SubElement(cell, qn("tcPr"))
     tc_w = etree.SubElement(tc_pr, qn("tcW"))
@@ -1033,9 +1260,7 @@ def _make_revision_cell(cell_index, text):
     etree.SubElement(tc_pr, qn("vAlign")).set(qn("val"), "center")
     paragraph = etree.SubElement(cell, qn("p"))
     ppr = etree.SubElement(paragraph, qn("pPr"))
-    # w:jc 是 w:pPr 的子元素，不是属性；写成属性 Word 直接忽略（原实现如此，
-    # 所以兜底行连居中都没生效）。
-    etree.SubElement(ppr, qn("jc")).set(qn("val"), "center")
+    etree.SubElement(ppr, qn("jc")).set(qn("val"), "left" if cell_index == 1 else "center")
     run = etree.SubElement(paragraph, qn("r"))
     t_node = etree.SubElement(run, qn("t"))
     t_node.text = text
@@ -1044,12 +1269,6 @@ def _make_revision_cell(cell_index, text):
 
 
 def _set_revision_cell_text(cell, text) -> None:
-    """把单元格正文整体换成 ``text``，保留段落属性与首个 run 的字符格式。
-
-    只留第一个 ``w:p``、只保留它的 ``w:pPr``，再按原首个 run 的 ``w:rPr``
-    重建文本；``\\n``（Markdown 里的 ``<br>``）转成 ``w:br`` 而不是塞进
-    ``w:t``——``w:t`` 里的换行 Word 不认，会挤成一行。
-    """
     paragraphs = cell.findall(qn("p"))
     if paragraphs:
         paragraph = paragraphs[0]
@@ -1069,7 +1288,7 @@ def _set_revision_cell_text(cell, text) -> None:
     run = etree.SubElement(paragraph, qn("r"))
     if run_properties is not None:
         run.append(run_properties)
-    for index, line in enumerate(str(text).split("\n")):
+    for index, line in enumerate(str(text).splitlines() or [""]):
         if index:
             etree.SubElement(run, qn("br"))
         t_node = etree.SubElement(run, qn("t"))
@@ -1077,16 +1296,173 @@ def _set_revision_cell_text(cell, text) -> None:
         t_node.set(XML_NS + "space", "preserve")
 
 
-def _clone_revision_row(prototype, values):
+def _set_revision_summary_cell(cell, text, expressions=None) -> None:
+    """写入修订摘要单元格，为识别到的章节标题或编号添加内部超链接，并保留换行与样式。"""
+    paragraphs = cell.findall(qn("p"))
+    if paragraphs:
+        paragraph = paragraphs[0]
+        for extra in paragraphs[1:]:
+            cell.remove(extra)
+    else:
+        paragraph = etree.SubElement(cell, qn("p"))
+    run_properties = None
+    first_run = paragraph.find(qn("r"))
+    if first_run is not None:
+        existing = first_run.find(qn("rPr"))
+        if existing is not None:
+            run_properties = copy.deepcopy(existing)
+    for node in list(paragraph):
+        if node.tag != qn("pPr"):
+            paragraph.remove(node)
+
+    def append_plain(parent, plain_text):
+        if not plain_text:
+            return
+        r = etree.SubElement(parent, qn("r"))
+        if run_properties is not None:
+            r.append(copy.deepcopy(run_properties))
+        t = etree.SubElement(r, qn("t"))
+        t.text = plain_text
+        t.set(XML_NS + "space", "preserve")
+
+    def append_link(parent, link_text, bookmark):
+        hl = etree.SubElement(parent, qn("hyperlink"))
+        hl.set(qn("anchor"), bookmark)
+        r = etree.SubElement(hl, qn("r"))
+        rpr = etree.SubElement(r, qn("rPr"))
+        if run_properties is not None:
+            for child in run_properties:
+                if child.tag not in (qn("u"), qn("color")):
+                    rpr.append(copy.deepcopy(child))
+        etree.SubElement(rpr, qn("color")).set(qn("val"), "0563C1")
+        etree.SubElement(rpr, qn("u")).set(qn("val"), "single")
+        t = etree.SubElement(r, qn("t"))
+        t.text = link_text
+        t.set(XML_NS + "space", "preserve")
+
+    lines = str(text).splitlines()
+    for line_idx, line in enumerate(lines):
+        if line_idx > 0:
+            br_run = etree.SubElement(paragraph, qn("r"))
+            etree.SubElement(br_run, qn("br"))
+        if not line:
+            continue
+        if expressions is None:
+            append_plain(paragraph, line)
+            continue
+
+        if "->" in line:
+            parts = re.split(r"(->)", line)
+            for part in parts:
+                if part == "->":
+                    append_plain(paragraph, "->")
+                    continue
+                lead_space = part[:len(part) - len(part.lstrip())]
+                trail_space = part[len(part.rstrip()):]
+                part_strip = part.strip()
+                if not part_strip:
+                    if part:
+                        append_plain(paragraph, part)
+                    continue
+
+                # 1. 优先尝试直接全词匹配书签
+                bm = expressions.find_bookmark_for_section(part_strip)
+                if bm:
+                    if lead_space:
+                        append_plain(paragraph, lead_space)
+                    append_link(paragraph, part_strip, bm)
+                    if trail_space:
+                        append_plain(paragraph, trail_space)
+                    continue
+
+                # 2. 若带有括号/冒号等补充描述（如 "4.8.4 APP 用户管理（Tab 复合标签页展现: 合并智护士..."）
+                # 剥离出核心编号与标题，让超链接精准加在小节上，后面的补充说明作为普通正文追加
+                m_sub = re.match(r"^(\d+(?:\.\d+)+(?:\s+[^（\(\n:：，,\[【]+)?)(.*)$", part_strip)
+                if m_sub:
+                    core_title_raw, extra_note = m_sub.groups()
+                    core_title = core_title_raw.rstrip()
+                    trail_core = core_title_raw[len(core_title):]
+                    core_strip = core_title.strip()
+                    bm_core = expressions.find_bookmark_for_section(core_strip)
+                    if not bm_core:
+                        m_num = re.match(r"^(\d+(?:\.\d+)+)", core_strip)
+                        if m_num:
+                            bm_core = expressions.find_bookmark_for_section(m_num.group(1))
+                    if bm_core:
+                        if lead_space:
+                            append_plain(paragraph, lead_space)
+                        append_link(paragraph, core_title, bm_core)
+                        if trail_core or extra_note:
+                            append_plain(paragraph, trail_core + (extra_note or ""))
+                        if trail_space:
+                            append_plain(paragraph, trail_space)
+                        continue
+
+                # 3. 兜底尝试正则匹配其中的章节号如 "4.8.4"
+                m_num = re.search(r"(\d+(?:\.\d+)+)", part_strip)
+                if m_num:
+                    bm_num = expressions.find_bookmark_for_section(m_num.group(1))
+                    if bm_num:
+                        n_start = m_num.start(1)
+                        n_end = m_num.end(1)
+                        pre = part_strip[:n_start]
+                        num_str = part_strip[n_start:n_end]
+                        post = part_strip[n_end:]
+                        if lead_space or pre:
+                            append_plain(paragraph, lead_space + pre)
+                        append_link(paragraph, num_str, bm_num)
+                        if post or trail_space:
+                            append_plain(paragraph, post + trail_space)
+                        continue
+
+                append_plain(paragraph, part)
+        else:
+            m_sec = re.match(r"^(\s*)(\d+(?:\.\d+)+(?:\s+[^（\(\n:：，,\[【]+)?)(.*)$", line)
+            if m_sec:
+                lead_space, sec_raw, rest = m_sec.groups()
+                sec_text = sec_raw.rstrip()
+                trail_sec = sec_raw[len(sec_text):]
+                sec_strip = sec_text.strip()
+                bm = expressions.find_bookmark_for_section(sec_strip)
+                if not bm:
+                    m_num = re.match(r"^(\d+(?:\.\d+)+)", sec_strip)
+                    if m_num:
+                        bm = expressions.find_bookmark_for_section(m_num.group(1))
+                if bm:
+                    if lead_space:
+                        append_plain(paragraph, lead_space)
+                    append_link(paragraph, sec_text, bm)
+                    if trail_sec or rest:
+                        append_plain(paragraph, trail_sec + (rest or ""))
+                    continue
+            bm = expressions.find_bookmark_for_section(line.strip())
+            if bm:
+                lead_space = line[:len(line) - len(line.lstrip())]
+                trail_space = line[len(line.rstrip()):]
+                if lead_space:
+                    append_plain(paragraph, lead_space)
+                append_link(paragraph, line.strip(), bm)
+                if trail_space:
+                    append_plain(paragraph, trail_space)
+            else:
+                append_plain(paragraph, line)
+
+
+def _clone_revision_row(prototype, values, expressions=None):
     """按模板数据行原型克隆一行并只替换文本；原型不可用时退回自建单元格。
 
-    模板数据行携带 ``w:trPr``（``gridBefore`` 让数据行整体右移一个网格列、
-    ``trHeight``、``cantSplit``）、``pct`` 宽度和逐单元格 ``tcBorders``。自建
-    单元格拿不到这些，产出的行会没有边框、宽度单位变 dxa、比表头少一个网格
-    列——正是修订表排版错位的成因，因此有原型时一律克隆。
+    对长修订摘要移除 w:cantSplit，允许长内容跨页自然拆分，杜绝边框穿透页脚。
     """
     if prototype is not None:
         row = copy.deepcopy(prototype)
+        summary_text = str(values[1]) if len(values) > 1 else ""
+        is_long = len(summary_text.splitlines()) >= 3 or len(summary_text) > 150
+        tr_pr = row.find(qn("trPr"))
+        if tr_pr is not None and is_long:
+            for cant_split in tr_pr.findall(qn("cantSplit")):
+                tr_pr.remove(cant_split)
+            for tr_h in tr_pr.findall(qn("trHeight")):
+                tr_h.set(qn("hRule"), "atLeast")
         cells = row.findall(qn("tc"))
         if len(cells) == len(values):
             # w14:paraId/textId 是段落唯一标识，克隆后必须去掉，避免整表重复 ID。
@@ -1094,27 +1470,35 @@ def _clone_revision_row(prototype, values):
                 for name in list(node.attrib):
                     if name.rpartition("}")[2] in ("paraId", "textId"):
                         del node.attrib[name]
-            for cell, text in zip(cells, values):
-                _set_revision_cell_text(cell, text)
+            for idx, (cell, text) in enumerate(zip(cells, values)):
+                tc_pr = cell.find(qn("tcPr"))
+                if tc_pr is not None:
+                    tc_borders = tc_pr.find(qn("tcBorders"))
+                    if tc_borders is not None and tc_borders.find(qn("bottom")) is None:
+                        etree.SubElement(tc_borders, qn("bottom"), {
+                            qn("val"): "single",
+                            qn("sz"): "4",
+                            qn("space"): "0",
+                            qn("color"): "auto",
+                        })
+                if idx == 1 and expressions is not None:
+                    _set_revision_summary_cell(cell, text, expressions)
+                else:
+                    _set_revision_cell_text(cell, text)
             return row
     row = etree.Element(qn("tr"))
     for index, text in enumerate(values):
-        row.append(_make_revision_cell(index, text))
+        if index == 1 and expressions is not None:
+            cell = _make_revision_cell(index, "")
+            _set_revision_summary_cell(cell, text, expressions)
+            row.append(cell)
+        else:
+            row.append(_make_revision_cell(index, text))
     return row
 
 
-def update_revision_record(document_root, config):
-    """用 ``_revision_record.md`` 的数据行替换模板修订记录表，返回写入行数。
-
-    必须直接改调用方传入的 ``document_root``（与 ``update_cover`` 一致）：
-    ``build()`` 末尾会把它统一序列化进 ``items["word/document.xml"]``，
-    若这里自行解析 ``items`` 再写回，改动会被那次序列化整份覆盖——修订记录
-    一直没能进正式产物就是这个原因。
-
-    重建行的排版取自模板数据行原型（详见 ``_clone_revision_row``）：第 i 条
-    Markdown 数据行用模板第 i 条数据行的排版，超出部分沿用最后一条，这样
-    模板原有行保持原样、新增行与最后一行同款。
-    """
+def update_revision_record(document_root, config, expressions=None):
+    """用 ``_revision_record.md`` 的数据行替换模板修订记录表，返回写入行数。"""
     rev_path = config.get("paths", {}).get("revision_record")
     if not rev_path or not os.path.isfile(rev_path):
         return 0
@@ -1131,7 +1515,14 @@ def update_revision_record(document_root, config):
     if len(rows) < 2:
         return 0
     header_rows = rows[:2]
-    # 先留下排版原型，再删旧数据行——顺序反了就没原型可克隆了。
+    # 确保表头具有 tblHeader，以便跨页时自动重复表头
+    for hr in header_rows:
+        tr_pr = hr.find(qn("trPr"))
+        if tr_pr is None:
+            tr_pr = etree.SubElement(hr, qn("trPr"))
+        if tr_pr.find(qn("tblHeader")) is None:
+            etree.SubElement(tr_pr, qn("tblHeader"))
+
     prototypes = [copy.deepcopy(row) for row in rows[2:]]
     for row in rows[2:]:
         tbl.remove(row)
@@ -1141,10 +1532,11 @@ def update_revision_record(document_root, config):
         prototype = None
         if prototypes:
             prototype = prototypes[min(index, len(prototypes) - 1)]
-        row = _clone_revision_row(prototype, values)
+        row = _clone_revision_row(prototype, values, expressions=expressions)
         insert_after.addnext(row)
         insert_after = row
     return len(data_rows)
+
 
 
 def set_update_fields(items: Dict[str, bytes], document_root) -> None:
@@ -1446,6 +1838,7 @@ def build(
         raise AutomationError("模板正文末尾缺少 w:sectPr")
     # 需求/详细设计预设启用封面字段同步；通用大文档不得
     # 假设存在“文件编号/版本号/页数”表格，原封面随模板保留。
+    update_custom_properties(items, config)
     if doc_type in ("requirement", "design"):
         update_cover(document_root, config)
         update_headers(items, config)
@@ -1522,7 +1915,7 @@ def build(
             doc_type, hyperlink_fields
         ))
 
-    revision_rows = update_revision_record(document_root, config)
+    revision_rows = update_revision_record(document_root, config, expressions)
     if revision_rows:
         print("[{0}] 修订记录: 写入 {1} 行".format(doc_type, revision_rows))
     set_update_fields(items, document_root)
