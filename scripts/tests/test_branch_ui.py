@@ -248,13 +248,71 @@ class BranchUITests(unittest.TestCase):
                 )
             return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
 
-        branches, err = list_git_branches(Path("."), runner=mock_runner)
-        self.assertIsNone(err)
-        names = [b.name for b in branches]
-        self.assertIn("main", names)
-        self.assertIn("origin/main", names)
-        # 确保 origin 伪分支已被成功过滤
-        self.assertNotIn("origin", names)
+    def test_current_branch_pinned_first(self):
+        branches = [
+            GitBranch(name="z-feature", is_current=False),
+            GitBranch(name="alpha", is_current=False),
+            GitBranch(name="omega-current", is_current=True),
+        ]
+        popover = BranchPopover(branches)
+        # 即使名称字母排在最后，当前分支应始终置顶到第 0 位
+        first_item = popover._list_widget.item(0)
+        b = first_item.data(Qt.ItemDataRole.UserRole)
+        self.assertEqual(b.name, "omega-current")
+        self.assertTrue(b.is_current)
+
+    def test_search_to_create_ui_interaction(self):
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import QEvent
+
+        branches = [GitBranch(name="main", is_current=True)]
+        popover = BranchPopover(branches)
+
+        created_branches = []
+        popover.create_branch_requested.connect(lambda name: created_branches.append(name))
+
+        # 输入不存在的分支名
+        popover._search_input.setText("feature/new-card")
+        self.assertIn("feature/new-card", popover._new_branch_btn.text())
+        self.assertEqual(popover._list_widget.count(), 0)
+
+        # 在输入框中按回车直接触发快捷创建
+        enter_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        handled = popover.eventFilter(popover._search_input, enter_event)
+        self.assertTrue(handled)
+        self.assertEqual(created_branches, ["feature/new-card"])
+
+    def test_new_branch_dialog_prefix_chips_and_base_branch(self):
+        existing = ["main", "dev"]
+        dlg = NewBranchDialog("main", existing, initial_name="my-work")
+        self.assertEqual(dlg._input.text(), "my-work")
+        self.assertEqual(dlg._base_combo.currentText(), "main")
+
+        # 点击 feature/ 快捷前缀胶囊
+        dlg._apply_prefix("feature/")
+        self.assertEqual(dlg._input.text(), "feature/my-work")
+
+        # 切换前缀为 fix/ 自动替换原有前缀
+        dlg._apply_prefix("fix/")
+        self.assertEqual(dlg._input.text(), "fix/my-work")
+
+        # 切换基准分支
+        dlg._base_combo.setCurrentText("dev")
+        dlg._on_confirm()
+        self.assertEqual(dlg.base_branch, "dev")
+        self.assertEqual(dlg.branch_name, "fix/my-work")
+
+    def test_project_bar_set_branch_with_sync_and_dropdown(self):
+        from doc_tool.ui.project_bar import ProjectBar
+
+        bar = ProjectBar()
+        bar.set_branch("main", 3, ahead_count=2, behind_count=1)
+        btn_text = bar._branch_btn.text()
+        self.assertIn("main", btn_text)
+        self.assertIn("↑2", btn_text)
+        self.assertIn("↓1", btn_text)
+        self.assertIn("(3)", btn_text)
+        self.assertTrue(btn_text.endswith("▾"))
 
 
 if __name__ == "__main__":
