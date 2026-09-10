@@ -541,9 +541,43 @@ _HEADER_VERSION_RE = re.compile(r"^\d+\.\d+$")
 
 
 def _normalize_header_fields(root, config: Dict) -> None:
-    """把页眉文本节点中的文档编号/版本号替换为清单配置值（与构建侧一致）。"""
+    """把页眉文本节点与 DOCPROPERTY 域中的文档编号/版本号/文件名称替换为清单配置值（与构建侧一致）。"""
     doc_no = str(config.get("documentNo", ""))
     doc_ver = str(config.get("documentVersion", ""))
+    doc_name = str(config.get("documentName", ""))
+
+    # 1. 扫描更新 DOCPROPERTY 域缓存值
+    flat_runs = [(run, run.getparent()) for run in root.iter(qn("r"))]
+    fld_stack = []
+    for r_node, _ in flat_runs:
+        fld_char = r_node.find(qn("fldChar"))
+        fld_type = fld_char.get(qn("fldCharType")) if fld_char is not None else None
+        if fld_type == "begin":
+            fld_stack.append({"separate": False, "instr": []})
+        elif fld_type == "separate":
+            if fld_stack:
+                fld_stack[-1]["separate"] = True
+        elif fld_type == "end":
+            if fld_stack:
+                fld_stack.pop()
+        elif fld_stack and not fld_stack[-1]["separate"]:
+            for t in r_node.iter(qn("instrText")):
+                fld_stack[-1]["instr"].append(t.text or "")
+        elif fld_stack and fld_stack[-1]["separate"]:
+            full_instr = "".join(fld_stack[-1]["instr"]).upper()
+            if "DOCPROPERTY" in full_instr:
+                for t in r_node.iter(qn("t")):
+                    if "版本" in full_instr or "VERSION" in full_instr:
+                        if doc_ver:
+                            t.text = doc_ver
+                    elif "文件编号" in full_instr or "文档编号" in full_instr or "DOCNO" in full_instr:
+                        if doc_no:
+                            t.text = doc_no
+                    elif "文件名称" in full_instr or "文档名称" in full_instr or "TITLE" in full_instr:
+                        if doc_name:
+                            t.text = doc_name
+
+    # 2. 扫描普通文本节点
     for t_node in root.iter(qn("t")):
         if t_node.text is None:
             continue
