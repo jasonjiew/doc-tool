@@ -89,6 +89,8 @@ all_datas = (
         # doc_tool/resources/ 下的默认配置与图标
         (str(REPO_ROOT / "doc_tool" / "resources" / "default_project.yml"),
          "doc_tool/resources"),
+        (str(REPO_ROOT / "doc_tool" / "resources" / "web_preview"),
+         "doc_tool/resources/web_preview"),
     ]
 )
 

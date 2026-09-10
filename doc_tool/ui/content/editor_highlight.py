@@ -209,11 +209,43 @@ class DiffHighlighter(QSyntaxHighlighter):
             fmt.setForeground(QColor("#86efac" if self._dark else "#166534"))
             fmt.setBackground(QColor("#14532d" if self._dark else "#dcfce7"))
             self.setFormat(0, len(text), fmt)
+
+            # 字级别差异高亮（Intra-line / Word Diff）
+            block = self.currentBlock()
+            prev_block = block.previous()
+            if prev_block.isValid() and prev_block.text().startswith("-") and not prev_block.text().startswith("---"):
+                old_line = prev_block.text()[1:]
+                new_line = text[1:]
+                from doc_tool.application.content.changes import compute_word_diff_spans
+
+                _, new_spans = compute_word_diff_spans(old_line, new_line)
+                for span in new_spans:
+                    w_fmt = QTextCharFormat(fmt)
+                    w_fmt.setFontWeight(QFont.Weight.Bold)
+                    w_fmt.setBackground(QColor("#15803d" if self._dark else "#86efac"))
+                    w_fmt.setForeground(QColor("#f0fdf4" if self._dark else "#14532d"))
+                    self.setFormat(span.start + 1, span.end - span.start, w_fmt)
         elif text.startswith("-"):
             fmt = QTextCharFormat()
             fmt.setForeground(QColor("#fca5a5" if self._dark else "#991b1b"))
             fmt.setBackground(QColor("#450a0a" if self._dark else "#fee2e2"))
             self.setFormat(0, len(text), fmt)
+
+            # 字级别差异高亮（Intra-line / Word Diff）
+            block = self.currentBlock()
+            next_block = block.next()
+            if next_block.isValid() and next_block.text().startswith("+") and not next_block.text().startswith("+++"):
+                old_line = text[1:]
+                new_line = next_block.text()[1:]
+                from doc_tool.application.content.changes import compute_word_diff_spans
+
+                old_spans, _ = compute_word_diff_spans(old_line, new_line)
+                for span in old_spans:
+                    w_fmt = QTextCharFormat(fmt)
+                    w_fmt.setFontWeight(QFont.Weight.Bold)
+                    w_fmt.setBackground(QColor("#991b1b" if self._dark else "#fca5a5"))
+                    w_fmt.setForeground(QColor("#fef2f2" if self._dark else "#7f1d1d"))
+                    self.setFormat(span.start + 1, span.end - span.start, w_fmt)
         elif text.startswith("@@"):
             fmt = QTextCharFormat()
             fmt.setFontWeight(QFont.Weight.Bold)
@@ -297,12 +329,6 @@ class _LineNumberedEdit(QPlainTextEdit):
                 return None
         return None
 
-    def _replace_text_range(self, start: int, end: int, text: str) -> None:
-        cursor = self.textCursor()
-        cursor.setPosition(start)
-        cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
-        cursor.insertText(text)
-        self.setTextCursor(cursor)
 
     def contextMenuEvent(self, event) -> None:
         menu = self.createStandardContextMenu()
@@ -332,10 +358,57 @@ class _LineNumberedEdit(QPlainTextEdit):
                 )
         from doc_tool.application.content.table_format import is_table_row
         cursor_at_pos = self.cursorForPosition(event.pos())
-        if is_table_row(cursor_at_pos.block().text()) and not self.isReadOnly():
-            table_action = menu.addAction("美化当前表格 (Ctrl+Alt+T)")
-            table_action.triggered.connect(lambda _=False: self.formatTableRequested.emit())
+        if not self.isReadOnly():
+            line_text = cursor_at_pos.block().text()
+            # 1. 标题缺少空格快速修复 (#1.1 标题 -> # 1.1 标题)
+            m_heading = re.match(r"^(\s*#{1,6})([^\s#].*)$", line_text)
+            if m_heading:
+                menu.addSeparator()
+                fixed_heading = "{0} {1}".format(m_heading.group(1), m_heading.group(2))
+                fix_h_act = menu.addAction("⚡ 快速修复标题格式（补全空格为 '{0}'）".format(fixed_heading.strip()))
+                b_pos = cursor_at_pos.block().position()
+                b_len = len(cursor_at_pos.block().text())
+                fix_h_act.triggered.connect(
+                    lambda _=False, bp=b_pos, bl=b_len, fh=fixed_heading: (
+                        self._replace_text_range(bp, bp + bl, fh)
+                    )
+                )
+
+            # 2. 表格操作
+            if is_table_row(line_text):
+                table_action = menu.addAction("美化当前表格 (Ctrl+Alt+T)")
+                table_action.triggered.connect(lambda _=False: self.formatTableRequested.emit())
+            else:
+                ins_tbl_act = menu.addAction("插入标准 Markdown 表格 (3×3)")
+                table_tmpl = "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n"
+                ins_tbl_act.triggered.connect(
+                    lambda _=False, p=cursor_at_pos.position(), t=table_tmpl: (
+                        self._insert_table_at(p, t)
+                    )
+                )
         menu.exec(event.globalPos())
+
+    def _insert_table_at(self, position: int, text: str) -> None:
+        c = self.textCursor()
+        c.setPosition(position)
+        line_text = c.block().text()
+        pos_in_block = c.positionInBlock()
+        prefix = ""
+        suffix = ""
+        if line_text.strip():
+            if pos_in_block > 0:
+                prefix = "\n\n"
+            else:
+                suffix = "\n"
+        c.insertText(prefix + text + suffix)
+        self.setTextCursor(c)
+
+    def _replace_text_range(self, start: int, end: int, text: str) -> None:
+        c = self.textCursor()
+        c.setPosition(start)
+        c.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+        c.insertText(text)
+        self.setTextCursor(c)
 
     # --- 代码片段占位符跳转 ---
 

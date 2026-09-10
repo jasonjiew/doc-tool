@@ -132,6 +132,14 @@ hr {
     border-top: 1px solid #e2e8f0;
     margin: 16px 0;
 }
+img {
+    max-width: 100%;
+    height: auto;
+}
+.mermaid-diagram-card {
+    text-align: center;
+    margin: 14px 0 10px 0;
+}
 """
 
 _CSS_DARK = """
@@ -209,6 +217,14 @@ hr {
     border: none;
     border-top: 1px solid #3a3b44;
     margin: 16px 0;
+}
+img {
+    max-width: 100%;
+    height: auto;
+}
+.mermaid-diagram-card {
+    text-align: center;
+    margin: 14px 0 10px 0;
 }
 """
 
@@ -565,19 +581,33 @@ def render_markdown_html(
         if code_language == "mermaid":
             from doc_tool.application.content.mermaid import render
 
-            result = render(source, use_cli=use_cli)
-            if result.ok and result.png:
-                encoded = base64.b64encode(result.png).decode("ascii")
+            result = render(source, use_cli=use_cli, want_png=False)
+            if result.ok and (result.svg or result.png):
+                if result.svg:
+                    encoded = base64.b64encode(result.svg).decode("ascii")
+                    mime = "image/svg+xml"
+                else:
+                    encoded = base64.b64encode(result.png).decode("ascii")
+                    mime = "image/png"
+                size_attrs = ""
+                if result.width:
+                    size_attrs += ' width="{0}"'.format(result.width)
+                if result.height:
+                    size_attrs += ' height="{0}"'.format(result.height)
+                badge_bg = "#334155" if dark else "#f1f5f9"
+                badge_color = "#94a3b8" if dark else "#64748b"
                 parts.append(
-                    '<p><a name="line-{0}" href="#line-{0}">'
-                    '<img src="data:image/png;base64,{1}" alt="Mermaid 图"/></a></p>'.format(
-                        code_start_line, encoded
-                    )
-                )
-            elif result.svg and result.png is None:
-                parts.append(
-                    '<pre><a name="line-{0}"></a>{1}</pre>'.format(
-                        code_start_line, html.escape(source)
+                    '<div class="mermaid-diagram-card">'
+                    '<p align="center"><a name="line-{0}" href="#line-{0}">'
+                    '<img{2} src="data:{3};base64,{1}" alt="Mermaid 图" title="双击放大并自由缩放平移 · 右键在工作台编辑"/>'
+                    '</a></p>'
+                    '<div align="center" style="margin-top: 2px; margin-bottom: 6px;">'
+                    '<span style="font-size: 8.5pt; color: {5}; background-color: {4}; padding: 2px 8px; border-radius: 4px;">'
+                    '📊 Mermaid 图表 · 双击放大 / 右键编辑'
+                    '</span>'
+                    '</div>'
+                    '</div>'.format(
+                        code_start_line, encoded, size_attrs, mime, badge_bg, badge_color
                     )
                 )
             else:
