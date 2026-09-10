@@ -184,7 +184,32 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 本版变更（2.3.2）
+## 本版变更（2.4.0）
+
+- **Mermaid 极速矢量预览与沉浸式大图查看器（Lightbox）**：
+  - 引入 `want_png=False` 纯矢量 SVG 极速预览模式，跳过 CPU/Chromium 3x PNG 光栅化，实现毫秒级预览响应；
+  - 增强图表语法兼容：支持 sequenceDiagram 小写 `note over`、虚线文字连线（`-. text .->`）与链式标签连线；
+  - 新增 `DiagramViewer` 架构图/大图沉浸式交互查看器（Lightbox），支持平移抓手、滚轮缩放、双击还原及跳转至 Markdown 源码行；
+  - Mermaid 编辑器对话框增加画布缩放、窗口自适应与 1:1 显示控制。
+- **现代 Web 预览与编辑器双向联动**：
+  - 新增基于 QWebEngineView + marked.js + mermaid.min.js 的现代前端预览引擎，原生支持全量官方 Mermaid 语法与主线程零卡顿；
+  - 编辑器支持延迟预览（`lazy_preview`）与按需渲染（`ensure_preview_rendered`），大幅优化多文件同时打开速度；
+  - 实现精准双向定位：预览标题反向定位编辑器源码行并高亮闪烁（`jump_to_heading`），Mermaid 图表反向定位源码。
+- **异步操作加载遮罩（OperationLoadingOverlay & AsyncOperationWorker）**：
+  - 为版本控制（Git/SVN）等耗时操作提供 60 FPS 渐变加载旋转指示器与模态防连击，杜绝主线程冻结；
+  - 重构 `ProjectLoadingOverlay` 项目加载遮罩：增加步进药丸胶囊指示、进度条、平滑淡出动画及 Esc/跳过等待支持。
+- **版本控制与改动比对体验**：
+  - 改动面板支持统一差异（Unified diff）与分栏比对（Side-by-side diff）双视图切换；
+  - 支持行内词级/字符级差异高亮；
+  - 新建分支对话框支持选择基准分支与常用前缀胶囊（feature/, fix/, docs/ 等）。
+- **文档质检与一键自动修复**：
+  - 引入 `path_natural_sort_key` 自然排序键（1.2 排在 1.10 前，第2章在第10章前）；
+  - 新增 `heading_format` 规则并支持标题空格、空标题、未闭合代码块一键自动修复。
+- **Word 内核排版优化**：
+  - 修订记录行支持超长摘要自然跨页拆分与自动重复表头，章节名自动映射内部超链接；
+  - 评审导出 DOCX 补齐中文字体（微软雅黑、Consolas、Times New Roman）与标准边距。
+
+## 历史更新（2.3.2）
 
 - **修复独立校验模式错配（操作 → 校验项目 / F5）**：
   - **产物刷新状态自适应**：自动探测当前 Word 产物状态（优先读取 `.state.json`，缺失时自动探测 `word/settings.xml` 内 `updateFields` 消费状态）；
@@ -229,7 +254,7 @@ def main():
 ## 构建来源
 
 - 标签：{TAG_NAME}
-- 提交：44034f9（main）
+- 提交：6398d6c（main）
 - 构建环境：Windows 11 / Python 3.13 / PyInstaller 6.22.1 / Inno Setup 6
 
 ## 已知限制
