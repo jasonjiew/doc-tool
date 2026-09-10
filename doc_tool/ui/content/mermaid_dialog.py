@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from typing import List
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QPixmap, QTextCharFormat, QTextCursor
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QColor, QKeySequence, QPixmap, QShortcut, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTextEdit,
     QVBoxLayout,
@@ -40,14 +41,17 @@ _MERMAID_TEMPLATES = {
 
 
 class MermaidDialog(QDialog):
-    """源码编辑、按行错误定位、去抖实时预览和导出动作选择。"""
+    """源码编辑、按行错误定位、去抖实时预览、缩放查看与导出动作选择。"""
 
     def __init__(self, source: str = "flowchart TD\n  A[开始] --> B[结束]", *, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Mermaid 图形工作台")
-        self.resize(960, 640)
+        self.resize(1000, 660)
         self.action = ""
         self.render_result = None
+        self._current_pixmap: QPixmap | None = None
+        self._zoom_factor: float = 1.0
+        self._fit_mode: bool = True
 
         outer = QVBoxLayout(self)
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
@@ -79,15 +83,58 @@ class MermaidDialog(QDialog):
         right = QWidget(splitter)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(QLabel("实时效果预览", right))
-        self.preview = QLabel("正在渲染…", right)
+
+        preview_header = QHBoxLayout()
+        preview_header.addWidget(QLabel("实时效果预览", right))
+        preview_header.addStretch()
+
+        self.zoom_out_btn = QPushButton("-", right)
+        self.zoom_out_btn.setToolTip("缩小 (Ctrl+滚轮向下)")
+        self.zoom_out_btn.setFixedWidth(28)
+        self.zoom_out_btn.clicked.connect(self._zoom_out)
+
+        self.zoom_label = QLabel("100%", right)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.zoom_label.setFixedWidth(48)
+
+        self.zoom_in_btn = QPushButton("+", right)
+        self.zoom_in_btn.setToolTip("放大 (Ctrl+滚轮向上)")
+        self.zoom_in_btn.setFixedWidth(28)
+        self.zoom_in_btn.clicked.connect(self._zoom_in)
+
+        self.fit_btn = QPushButton("适应窗口", right)
+        self.fit_btn.setToolTip("按窗口自适应缩放")
+        self.fit_btn.clicked.connect(self._fit_to_window)
+
+        self.reset_btn = QPushButton("1:1", right)
+        self.reset_btn.setToolTip("恢复原始 1:1 像素大小")
+        self.reset_btn.clicked.connect(self._reset_zoom)
+
+        preview_header.addWidget(self.zoom_out_btn)
+        preview_header.addWidget(self.zoom_label)
+        preview_header.addWidget(self.zoom_in_btn)
+        preview_header.addWidget(self.fit_btn)
+        preview_header.addWidget(self.reset_btn)
+        right_layout.addLayout(preview_header)
+
+        self.scroll_area = QScrollArea(right)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.scroll_area.setStyleSheet("QScrollArea { background: #f8fafc; border: 1px solid #d7dee8; }")
+
+        self.preview = QLabel("正在渲染…", self.scroll_area)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setWordWrap(True)
         self.preview.setMinimumSize(360, 320)
         self.preview.setStyleSheet("QLabel { background: white; border: 1px solid #d7dee8; }")
-        right_layout.addWidget(self.preview, 1)
+        self.scroll_area.setWidget(self.preview)
+
+        self.scroll_area.viewport().installEventFilter(self)
+        self.preview.installEventFilter(self)
+
+        right_layout.addWidget(self.scroll_area, 1)
         splitter.addWidget(right)
-        splitter.setSizes([480, 480])
+        splitter.setSizes([480, 520])
         outer.addWidget(splitter, 1)
 
         actions = QHBoxLayout()
@@ -96,8 +143,16 @@ class MermaidDialog(QDialog):
         actions.addWidget(self.status, 1)
         insert_btn = QPushButton("插入 Word", self)
         insert_btn.setProperty("btnRole", "primary")
+        insert_btn.setToolTip("生成高清图片并插入 Word 引用标记 (Ctrl+Enter)")
         insert_btn.clicked.connect(lambda: self._finish("insert"))
         actions.addWidget(insert_btn)
+        QShortcut(QKeySequence("Ctrl+Return"), self, lambda: self._finish("insert"))
+        QShortcut(QKeySequence("Ctrl+Enter"), self, lambda: self._finish("insert"))
+        QShortcut(QKeySequence("Ctrl+="), self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl++"), self, self._zoom_in)
+        QShortcut(QKeySequence("Ctrl+-"), self, self._zoom_out)
+        QShortcut(QKeySequence("Ctrl+0"), self, self._fit_to_window)
+        QShortcut(QKeySequence("Ctrl+1"), self, self._reset_zoom)
         replace_btn = QPushButton("转换并替换源码", self)
         replace_btn.setProperty("btnRole", "secondary")
         replace_btn.clicked.connect(lambda: self._finish("replace"))
@@ -155,7 +210,10 @@ class MermaidDialog(QDialog):
 
         if issues:
             self.render_result = None
+            self._current_pixmap = None
             self.preview.setPixmap(QPixmap())
+            self.preview.setMinimumSize(0, 0)
+            self.preview.setMaximumSize(16777215, 16777215)
             self.preview.setStyleSheet(
                 "QLabel { background: #fff5f5; color: #c92a2a; border: 1px solid #ffc9c9; padding: 16px; font-size: 10pt; }"
             )
@@ -164,6 +222,7 @@ class MermaidDialog(QDialog):
                 + "\n".join(item.text() for item in [self.errors.item(i) for i in range(self.errors.count())])
             )
             self.status.setText("⚠ 发现 {0} 个语法问题（双击列表可定位到行）".format(len(issues)))
+            self.zoom_label.setText("100%")
             return
 
         actual = detect_kind(source)
@@ -174,8 +233,11 @@ class MermaidDialog(QDialog):
             result = render(source, use_cli=True)
 
         self.render_result = result
-        if not result.ok or not result.png:
+        if not result.ok or (not result.png and not result.svg):
+            self._current_pixmap = None
             self.preview.setPixmap(QPixmap())
+            self.preview.setMinimumSize(0, 0)
+            self.preview.setMaximumSize(16777215, 16777215)
             if "需要启用 mermaid-cli" in (result.error or "") or "未安装" in (result.error or ""):
                 self.preview.setStyleSheet(
                     "QLabel { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 16px; font-size: 10pt; }"
@@ -192,20 +254,104 @@ class MermaidDialog(QDialog):
                 )
                 self.preview.setText("渲染失败：{0}".format(result.error or "未知原因"))
                 self.status.setText(result.error or "渲染失败")
+            self.zoom_label.setText("100%")
             return
 
         pixmap = QPixmap()
-        pixmap.loadFromData(result.png, "PNG")
+        if result.png:
+            pixmap.loadFromData(result.png, "PNG")
+        elif result.svg:
+            pixmap.loadFromData(result.svg, "SVG")
+        self._current_pixmap = pixmap
         self.preview.setStyleSheet("QLabel { background: white; border: 1px solid #d7dee8; }")
         self.preview.setText("")
-        self.preview.setPixmap(
-            pixmap.scaled(
-                self.preview.size(),
+        self._update_pixmap_display()
+        self.status.setText("✅ 渲染成功 · {0} · {1} · {2}×{3}".format(actual, result.backend, result.width, result.height))
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched in (self.scroll_area.viewport(), self.preview):
+            if event.type() == QEvent.Type.Wheel:
+                if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                    num_degrees = event.angleDelta().y()
+                    if num_degrees > 0:
+                        self._zoom_in()
+                    elif num_degrees < 0:
+                        self._zoom_out()
+                    return True
+            elif event.type() == QEvent.Type.MouseButtonDblClick:
+                if self._fit_mode or abs(self._zoom_factor - 1.0) > 0.05:
+                    self._reset_zoom()
+                else:
+                    self._fit_to_window()
+                return True
+        return super().eventFilter(watched, event)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._fit_mode and self._current_pixmap and not self._current_pixmap.isNull():
+            self._update_pixmap_display()
+
+    def _zoom_in(self) -> None:
+        if not self._current_pixmap or self._current_pixmap.isNull():
+            return
+        self._fit_mode = False
+        self._zoom_factor = min(5.0, round(self._zoom_factor * 1.25, 2))
+        self._update_pixmap_display()
+
+    def _zoom_out(self) -> None:
+        if not self._current_pixmap or self._current_pixmap.isNull():
+            return
+        self._fit_mode = False
+        self._zoom_factor = max(0.2, round(self._zoom_factor * 0.8, 2))
+        self._update_pixmap_display()
+
+    def _fit_to_window(self) -> None:
+        if not self._current_pixmap or self._current_pixmap.isNull():
+            return
+        self._fit_mode = True
+        self._update_pixmap_display()
+
+    def _reset_zoom(self) -> None:
+        if not self._current_pixmap or self._current_pixmap.isNull():
+            return
+        self._fit_mode = False
+        self._zoom_factor = 1.0
+        self._update_pixmap_display()
+
+    def _update_pixmap_display(self) -> None:
+        if not self._current_pixmap or self._current_pixmap.isNull():
+            return
+        if self._fit_mode:
+            avail_w = max(100, self.scroll_area.viewport().width() - 24)
+            avail_h = max(100, self.scroll_area.viewport().height() - 24)
+            scale_w = avail_w / self._current_pixmap.width() if self._current_pixmap.width() > 0 else 1.0
+            scale_h = avail_h / self._current_pixmap.height() if self._current_pixmap.height() > 0 else 1.0
+            scale = min(1.0, scale_w, scale_h)
+            target_w = max(10, int(self._current_pixmap.width() * scale))
+            target_h = max(10, int(self._current_pixmap.height() * scale))
+            scaled = self._current_pixmap.scaled(
+                target_w,
+                target_h,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-        )
-        self.status.setText("✅ 渲染成功 · {0} · {1} · {2}×{3}".format(actual, result.backend, result.width, result.height))
+            self.preview.setPixmap(scaled)
+            self.preview.setFixedSize(scaled.size())
+            if self._current_pixmap.width() > 0:
+                pct = int((scaled.width() / self._current_pixmap.width()) * 100)
+                self.zoom_label.setText(f"{pct}%")
+        else:
+            target_w = max(20, int(self._current_pixmap.width() * self._zoom_factor))
+            target_h = max(20, int(self._current_pixmap.height() * self._zoom_factor))
+            scaled = self._current_pixmap.scaled(
+                target_w,
+                target_h,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.preview.setPixmap(scaled)
+            self.preview.setFixedSize(scaled.size())
+            self.zoom_label.setText(f"{int(self._zoom_factor * 100)}%")
 
     def _locate_error(self, item) -> None:
         line = int(item.data(Qt.ItemDataRole.UserRole) or 1)
