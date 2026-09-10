@@ -28,6 +28,7 @@ from doc_tool.domain.ooxml import OOXMLSecurityError, parse_xml_safe, read_docx_
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+RP_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 CT_NS = "{http://schemas.openxmlformats.org/package/2006/content-types}"
 XML_NS = "{http://www.w3.org/XML/1998/namespace}"
 
@@ -411,7 +412,7 @@ def _create_cell(
     valign: str = "center",
     font_size: int = 18,  # 9pt
 ) -> etree._Element:
-    """构建单元格。"""
+    """构建单元格（带内边距与规范段落间距）。"""
     tc = etree.Element(qn("tc"))
     tc_pr = etree.SubElement(tc, qn("tcPr"))
     tc_w = etree.SubElement(tc_pr, qn("tcW"))
@@ -425,12 +426,21 @@ def _create_cell(
     if valign:
         etree.SubElement(tc_pr, qn("vAlign")).set(qn("val"), valign)
 
+    tc_mar = etree.SubElement(tc_pr, qn("tcMar"))
+    for edge, val in (("top", "100"), ("bottom", "100"), ("left", "140"), ("right", "140")):
+        m = etree.SubElement(tc_mar, qn(edge))
+        m.set(qn("w"), val)
+        m.set(qn("type"), "dxa")
+
     p = _create_paragraph(
         text,
         align=align,
         bold=bold,
         color=text_color,
         font_size=font_size,
+        spacing_before=0,
+        spacing_after=0,
+        line_spacing=240,
     )
     tc.append(p)
     return tc
@@ -600,6 +610,8 @@ def build_review_draft_docx(
         etree.SubElement(tbl_pr, qn("tblW")).set(qn("w"), "8600")
         etree.SubElement(tbl_pr, qn("tblW")).set(qn("type"), "dxa")
         row = etree.SubElement(summary_tbl, qn("tr"))
+        tr_pr = etree.SubElement(row, qn("trPr"))
+        etree.SubElement(tr_pr, qn("cantSplit"))
         summary_text = (
             f"【改动摘要】状态: {status_labels.get(status, status)}   |   "
             f"变动: {diff_summary or '内容已更新'}   |   "
@@ -646,10 +658,184 @@ def build_review_draft_docx(
 
     body.append(sect_pr_copy)
 
+    # 同步页眉与文档属性
+    _sync_review_draft_headers_and_props(items, document_name, document_version)
+
     # 序列化写回 ZIP
     items["word/document.xml"] = etree.tostring(doc_tree, encoding="utf-8", xml_declaration=True)
     _write_docx_zip(items, output_path)
     return output_path
+
+
+def _sync_review_draft_headers_and_props(
+    items: Dict[str, bytes], document_name: str, document_version: str
+) -> None:
+    """同步评审稿中的 docProps/custom.xml 与页眉，保证 Word 刷新域或打印时版本与名称正确。"""
+    CUSTOM_NS = "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
+    VT_NS = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
+    FMTID = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}"
+
+    doc_ver = str(document_version or "").strip()
+    if doc_ver.upper().startswith("V"):
+        doc_ver = doc_ver[1:].strip()
+    doc_name = str(document_name or "").strip()
+
+    # 1. 更新 custom.xml
+    if "docProps/custom.xml" in items:
+        try:
+            root = parse_xml_safe(items["docProps/custom.xml"], "docProps/custom.xml")
+        except Exception:
+            root = etree.Element("{{{0}}}Properties".format(CUSTOM_NS), nsmap={None: CUSTOM_NS, "vt": VT_NS})
+    else:
+        root = etree.Element("{{{0}}}Properties".format(CUSTOM_NS), nsmap={None: CUSTOM_NS, "vt": VT_NS})
+
+    existing_pids = []
+    prop_by_name = {}
+    for p in root.findall("{{{0}}}property".format(CUSTOM_NS)):
+        pid_str = p.get("pid")
+        if pid_str and pid_str.isdigit():
+            existing_pids.append(int(pid_str))
+        name = p.get("name")
+        if name:
+            prop_by_name[name] = p
+
+    next_pid = max(existing_pids or [1]) + 1
+    for name, value in [("版本", doc_ver), ("文件名称", doc_name)]:
+        if not value:
+            continue
+        if name in prop_by_name:
+            p = prop_by_name[name]
+            for child in list(p):
+                p.remove(child)
+            lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
+            lpwstr.text = value
+        else:
+            p = etree.SubElement(root, "{{{0}}}property".format(CUSTOM_NS))
+            p.set("fmtid", FMTID)
+            p.set("pid", str(next_pid))
+            p.set("name", name)
+            next_pid += 1
+            lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
+            lpwstr.text = value
+
+    items["docProps/custom.xml"] = etree.tostring(
+        root, xml_declaration=True, encoding="UTF-8", standalone=True
+    )
+
+    # 确保 [Content_Types].xml 中声明了 docProps/custom.xml
+    if "[Content_Types].xml" in items:
+        try:
+            ct_root = parse_xml_safe(items["[Content_Types].xml"], "[Content_Types].xml")
+            custom_ct = "application/vnd.openxmlformats-officedocument.custom-properties+xml"
+            has_override = False
+            for node in ct_root.findall(CT_NS + "Override"):
+                if (node.get("PartName") or "").lower() == "/docprops/custom.xml":
+                    has_override = True
+                    break
+            if not has_override:
+                node = etree.SubElement(ct_root, CT_NS + "Override")
+                node.set("PartName", "/docProps/custom.xml")
+                node.set("ContentType", custom_ct)
+                items["[Content_Types].xml"] = etree.tostring(
+                    ct_root, xml_declaration=True, encoding="UTF-8", standalone=True
+                )
+        except Exception:
+            pass
+
+    # 确保 _rels/.rels 中建立了 docProps/custom.xml 的关系
+    if "_rels/.rels" in items:
+        try:
+            rels_root = parse_xml_safe(items["_rels/.rels"], "_rels/.rels")
+            CUSTOM_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties"
+            has_rel = False
+            rids = []
+            for node in rels_root.findall(RP_NS + "Relationship"):
+                target = (node.get("Target") or "").replace("\\", "/")
+                rel_type = node.get("Type") or ""
+                if target == "docProps/custom.xml" or rel_type == CUSTOM_REL_TYPE:
+                    has_rel = True
+                    break
+                rid = node.get("Id") or ""
+                if rid.startswith("rId") and rid[3:].isdigit():
+                    rids.append(int(rid[3:]))
+            if not has_rel:
+                next_rid = "rId{0}".format(max(rids or [0]) + 1)
+                node = etree.SubElement(rels_root, RP_NS + "Relationship")
+                node.set("Id", next_rid)
+                node.set("Type", CUSTOM_REL_TYPE)
+                node.set("Target", "docProps/custom.xml")
+                items["_rels/.rels"] = etree.tostring(
+                    rels_root, xml_declaration=True, encoding="UTF-8", standalone=True
+                )
+        except Exception:
+            pass
+
+    # 2. 更新 core.xml
+    if "docProps/core.xml" in items and doc_name:
+        try:
+            core_root = parse_xml_safe(items["docProps/core.xml"], "docProps/core.xml")
+            DC_NS = "http://purl.org/dc/elements/1.1/"
+            for tag in ("{{{0}}}title".format(DC_NS), "{{{0}}}subject".format(DC_NS)):
+                node = core_root.find(tag)
+                if node is not None:
+                    node.text = doc_name
+            items["docProps/core.xml"] = etree.tostring(
+                core_root, xml_declaration=True, encoding="UTF-8", standalone=True
+            )
+        except Exception:
+            pass
+
+    # 3. 更新页眉
+    header_names = sorted(
+        name for name in items
+        if name.startswith("word/header") and name.endswith(".xml")
+    )
+    ver_pattern = re.compile(r"^\d+\.\d+(\.\d+)?$")
+    for hdr_name in header_names:
+        try:
+            hdr_root = parse_xml_safe(items[hdr_name], hdr_name)
+        except Exception:
+            continue
+        modified = False
+        flat_runs = [(run, run.getparent()) for run in hdr_root.iter(qn("r"))]
+        fld_stack = []
+        for r_node, _ in flat_runs:
+            fld_char = r_node.find(qn("fldChar"))
+            fld_type = fld_char.get(qn("fldCharType")) if fld_char is not None else None
+            if fld_type == "begin":
+                fld_stack.append({"separate": False, "instr": []})
+            elif fld_type == "separate":
+                if fld_stack:
+                    fld_stack[-1]["separate"] = True
+            elif fld_type == "end":
+                if fld_stack:
+                    fld_stack.pop()
+            elif fld_stack and not fld_stack[-1]["separate"]:
+                for t in r_node.iter(qn("instrText")):
+                    fld_stack[-1]["instr"].append(t.text or "")
+            elif fld_stack and fld_stack[-1]["separate"]:
+                full_instr = "".join(fld_stack[-1]["instr"]).upper()
+                if "DOCPROPERTY" in full_instr:
+                    for t in r_node.iter(qn("t")):
+                        if "版本" in full_instr or "VERSION" in full_instr:
+                            if doc_ver and t.text != doc_ver:
+                                t.text = doc_ver
+                                modified = True
+                        elif "文件名称" in full_instr or "文档名称" in full_instr or "TITLE" in full_instr:
+                            if doc_name and t.text != doc_name:
+                                t.text = doc_name
+                                modified = True
+        for t_node in hdr_root.iter(qn("t")):
+            if t_node.text is None:
+                continue
+            text = t_node.text.strip()
+            if ver_pattern.match(text) and doc_ver:
+                t_node.text = doc_ver
+                modified = True
+        if modified:
+            items[hdr_name] = etree.tostring(
+                hdr_root, xml_declaration=True, encoding="UTF-8", standalone=True
+            )
 
 
 def _parse_md_table_rows(lines: List[str]) -> List[List[str]]:
@@ -663,7 +849,7 @@ def _parse_md_table_rows(lines: List[str]) -> List[List[str]]:
             content = content[:-1]
         cells = [c.strip() for c in content.split("|")]
         # 过滤分隔行形如 :--- 或 :---: 或 ---
-        if cells and all(re.match(r"^:?-+:?$", c) for c in cells if c):
+        if cells and any(c for c in cells) and all(re.match(r"^:?-+:?$", c) for c in cells if c):
             continue
         rows.append(cells)
     if not rows:
@@ -1550,13 +1736,15 @@ def generate_evidence_for_comment(
 # =========================================================================
 
 def _create_blank_package() -> Dict[str, bytes]:
-    """内存中生成最小合法 DOCX 包。"""
+    """内存中生成包含基础中文字体与样式定义的标准 DOCX 包。"""
     content_types = (
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n'
         b'  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n'
         b'  <Default Extension="xml" ContentType="application/xml"/>\n'
         b'  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n'
+        b'  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>\n'
+        b'  <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>\n'
         b'</Types>'
     )
     rels = (
@@ -1567,15 +1755,69 @@ def _create_blank_package() -> Dict[str, bytes]:
     )
     doc_rels = (
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+        b'  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>\n'
+        b'  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>\n'
+        b'</Relationships>'
+    )
+    styles_xml = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        b'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n'
+        b'  <w:docDefaults>\n'
+        b'    <w:rPrDefault>\n'
+        b'      <w:rPr>\n'
+        b'        <w:rFonts w:ascii="Microsoft YaHei" w:eastAsia="Microsoft YaHei" w:hAnsi="Microsoft YaHei" w:cs="Microsoft YaHei"/>\n'
+        b'        <w:sz w:val="21"/>\n'
+        b'        <w:szCs w:val="21"/>\n'
+        b'        <w:lang w:val="en-US" w:eastAsia="zh-CN" w:bidi="ar-SA"/>\n'
+        b'      </w:rPr>\n'
+        b'    </w:rPrDefault>\n'
+        b'    <w:pPrDefault>\n'
+        b'      <w:pPr>\n'
+        b'        <w:spacing w:after="80" w:line="240" w:lineRule="auto"/>\n'
+        b'      </w:pPr>\n'
+        b'    </w:pPrDefault>\n'
+        b'  </w:docDefaults>\n'
+        b'  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">\n'
+        b'    <w:name w:val="Normal"/>\n'
+        b'    <w:qFormat/>\n'
+        b'  </w:style>\n'
+        b'  <w:style w:type="table" w:default="1" w:styleId="TableNormal">\n'
+        b'    <w:name w:val="Normal Table"/>\n'
+        b'    <w:tblPr>\n'
+        b'      <w:tblInd w:w="0" w:type="dxa"/>\n'
+        b'      <w:tblCellMar>\n'
+        b'        <w:top w:w="100" w:type="dxa"/>\n'
+        b'        <w:left w:w="140" w:type="dxa"/>\n'
+        b'        <w:bottom w:w="100" w:type="dxa"/>\n'
+        b'        <w:right w:w="140" w:type="dxa"/>\n'
+        b'      </w:tblCellMar>\n'
+        b'    </w:tblPr>\n'
+        b'  </w:style>\n'
+        b'</w:styles>'
+    )
+    font_table_xml = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        b'<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n'
+        b'  <w:font w:name="Microsoft YaHei">\n'
+        b'    <w:altName w:val="\xe5\xbe\xae\xe8\xbd\xaf\xe9\x9b\x85\xe9\xbb\x91"/>\n'
+        b'    <w:charset w:val="86"/>\n'
+        b'  </w:font>\n'
+        b'  <w:font w:name="Consolas">\n'
+        b'    <w:charset w:val="0"/>\n'
+        b'  </w:font>\n'
+        b'  <w:font w:name="Times New Roman">\n'
+        b'    <w:charset w:val="0"/>\n'
+        b'  </w:font>\n'
+        b'</w:fonts>'
     )
     document_xml = (
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n'
         b'  <w:body>\n'
         b'    <w:sectPr>\n'
-        b'      <w:pgSz w:w="11906" w:h="16838"/>\n'
-        b'      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>\n'
+        b'      <w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>\n'
+        b'      <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>\n'
         b'    </w:sectPr>\n'
         b'  </w:body>\n'
         b'</w:document>'
@@ -1584,6 +1826,8 @@ def _create_blank_package() -> Dict[str, bytes]:
         "[Content_Types].xml": content_types,
         "_rels/.rels": rels,
         "word/_rels/document.xml.rels": doc_rels,
+        "word/styles.xml": styles_xml,
+        "word/fontTable.xml": font_table_xml,
         "word/document.xml": document_xml,
     }
 
