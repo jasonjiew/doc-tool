@@ -13,10 +13,8 @@ GUI 线程不阻塞：所有长操作（导入、构建、校验、合并）在�
 
 from __future__ import annotations
 
-import os
 import queue
 import threading
-import traceback
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -217,6 +215,19 @@ class TaskRunner:
                 from doc_tool.domain.version import APP_VERSION
 
                 kwargs["app_version"] = APP_VERSION
+            if "on_event" in sig.parameters and "on_event" not in kwargs:
+                def _push_event(ev):
+                    self._event_queue.put(
+                        TaskEvent(
+                            kind="stage",
+                            stage=getattr(ev, "stage", str(ev)),
+                            status=getattr(ev, "status", ""),
+                            detail=getattr(ev, "detail", ""),
+                            metrics=getattr(ev, "metrics", {}),
+                            run_id=run_id,
+                        )
+                    )
+                kwargs["on_event"] = _push_event
 
             result = spec.target(*spec.args, **kwargs)
             self._results[run_id] = result
