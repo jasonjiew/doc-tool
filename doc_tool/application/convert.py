@@ -394,6 +394,139 @@ class ConvertBatchResult:
         }
 
 
+def available_targets_for(source: PathLike) -> List[Tuple[str, str]]:
+    suffix = Path(source).suffix.lower()
+    rows = _ROWS_BY_SUFFIX.get(suffix, ())
+    targets: List[Tuple[str, str]] = []
+    seen = set()
+    for row in rows:
+        if suffix == ".doc" and row.target_format != TARGET_PDF:
+            continue
+        if row.target_format not in seen:
+            seen.add(row.target_format)
+            label = TARGET_LABELS.get(row.target_format, row.target_format.upper())
+            targets.append((row.target_format, label))
+    return targets
+
+
+def default_target_for(source: PathLike) -> str:
+    suffix = Path(source).suffix.lower()
+    rows = _ROWS_BY_SUFFIX.get(suffix, ())
+    for row in rows:
+        if row.is_default:
+            return row.target_format
+    return TARGET_DOCX if suffix == ".pdf" else TARGET_PDF
+
+
+def format_file_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+
+def validate_source_signature(path: PathLike) -> Tuple[bool, str]:
+    """校验源文件特征头与声明的扩展名是否一致，防范伪装或严重损坏的文件。
+
+    返回 (is_valid, error_message)。
+    """
+    path = Path(path)
+    if not path.is_file():
+        return False, f"源文件不存在或不是文件：{path}"
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        return False, f"无法读取源文件信息（{exc}）：{path.name}"
+    if size == 0:
+        return False, f"源文件为空文件（0 字节），无内容可转换：{path.name}"
+
+    suffix = path.suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        return False, f"不支持的文件扩展名：{suffix or '无扩展名'}"
+
+    try:
+        with open(str(path), "rb") as f:
+            header = f.read(1024)
+    except OSError as exc:
+        return False, f"无法读取文件头部特征（{exc}）：{path.name}"
+
+    # 1. 拦截伪装成文档的 Windows PE 可执行程序 (MZ)
+    if header.startswith(b"MZ"):
+        return False, f"检测到可执行程序二进制特征（MZ），拒绝转换伪装程序：{path.name}"
+
+    # 2. Office OpenXML 格式 (.docx, .xlsx, .odt) 必须为 ZIP 容器且以 PK 开头
+    if suffix in (".docx", ".xlsx", ".odt"):
+        if header.startswith((b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"BM")):
+            return False, f"文件扩展名为 {suffix}，但实际为图片文件（伪装扩展名）：{path.name}"
+        if size < 22 or not header.startswith(b"PK"):
+            return False, f"文件扩展名为 {suffix}，但缺少合法的 ZIP 压缩包头部标识（PK）：{path.name}"
+
+    # 3. PDF 格式在其前 1024 字节内必须包含 %PDF-
+    elif suffix == ".pdf":
+        if header.startswith((b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"BM")):
+            return False, f"文件扩展名为 .pdf，但实际为图片文件（伪装扩展名）：{path.name}"
+        if size < 20 or b"%PDF-" not in header:
+            return False, f"文件扩展名为 .pdf，但未检测到合法的 PDF 文件头标识（%PDF-）：{path.name}"
+
+    # 4. RTF 格式
+    elif suffix == ".rtf":
+        if size < 10 or not header.lstrip().startswith(b"{\\rtf"):
+            return False, f"文件扩展名为 .rtf，但缺少 RTF 格式头部标识（{{\\rtf）：{path.name}"
+
+    # 5. Word 97-2003 复合文档 (.doc)
+    elif suffix == ".doc":
+        if size < 512 or not header.startswith(b"\xd0\xcf\x11\xe0"):
+            return False, f"文件扩展名为 .doc，但缺少复合二进制文档（OLE2）头部标识：{path.name}"
+
+    # 6. 纯文本与表格源不得为 ELF/Mach-O 二进制，非 UTF-16 时不得包含 NUL 二进制字符
+    elif suffix in (".txt", ".md", ".markdown", ".csv", ".html", ".htm"):
+        if header.startswith((b"\x7fELF", b"\xfe\xed\xfa\xce", b"\xfe\xed\xfa\xcf", b"\xce\xfa\xed\xfe", b"\xcf\xfa\xed\xfe")):
+            return False, f"文件扩展名为纯文本/数据格式，但检测到二进制程序文件头，拒绝转换：{path.name}"
+        if not header.startswith((b"\xff\xfe", b"\xfe\xff")) and b"\x00" in header[:512]:
+            return False, f"纯文本/数据文件检测到二进制空字符（NUL），可能是二进制文件伪装或已损坏：{path.name}"
+
+    return True, ""
+
+def error_resolution_guide(error_code: Optional[str], detail: str = "") -> Tuple[str, str]:
+    guides = {
+        "E6001": ("格式或方向不支持", "支持格式：Word (.docx/.doc)、PDF、Markdown、Excel (.xlsx)、CSV、HTML、TXT、RTF、ODT，源文件须非空且未伪装。"),
+        "E6002": ("目标文件已存在", "请勾选「覆盖同名文件」或更换输出目录。"),
+        "E6003": ("Word 转换失败", "请确认文档能在 Word 中正常打开、未被加密或锁定，且没有被其他程序占用。"),
+        "E6004": ("转换超时", "请在高级选项「单文件超时」中调大超时秒数（如 300 或 600 秒）后重试。"),
+        "E6005": ("产物文件未找到", "请检查磁盘写入权限及可用空间，确认未被安全软件拦截。"),
+        "E6006": ("表格文件异常", "请使用 Excel 打开并另存为标准 .xlsx 或 .csv 后重试。"),
+        "E6007": ("字符编码无法识别", "请用文本编辑器打开并另存为 UTF-8 编码后重试。"),
+        "E6008": ("页范围参数错误", "请按「起始页-结束页」（如 1-5）或单页（如 3）填写。"),
+        "E3001": ("未检测到 Microsoft Word", "Word 互转与组合方向需要本机安装并激活 Microsoft Word，或选用纯 Python 离线格式。"),
+        "E1001": ("DOCX 文档格式损坏", "请确认文件扩展名为 .docx 且未被加密或损坏。"),
+        "E7001": ("PDF 文档格式损坏", "请确认文件扩展名为 .pdf 且能正常打开；损坏文件请先修复后重试。"),
+        "E5003": ("任务已取消", "转换任务已被用户主动中止。"),
+    }
+    if error_code and error_code in guides:
+        return guides[error_code]
+    det_lower = (detail or "").lower()
+    if any(k in det_lower for k in ("0x800706be", "rpc", "1722")):
+        return ("Word COM 服务崩溃", "系统 COM 服务无响应或异常，请在任务管理器关闭 WINWORD.EXE 进程后重试。")
+    if any(k in det_lower for k in ("permission", "denied", "拒绝访问", "1005")):
+        return ("文件访问受限", "请确认文件未被其他程序独占打开，且当前用户具备该目录写入权限。")
+    if any(k in det_lower for k in ("utf-8", "codec", "decode", "gbk")):
+        return ("编码解析异常", "源文本包含无法识别的特殊编码，请另存为标准 UTF-8 编码后再转换。")
+    if any(k in det_lower for k in ("timeout", "timed out", "超时")):
+        return ("处理超时", "文档处理耗时超过预设阈值，请拆分大文件或在高级选项中增加超时时间。")
+    if any(k in det_lower for k in ("disk", "space", "空间")):
+        return ("存储空间不足", "目标驱动器可用磁盘空间不足，请清理空间后重试。")
+    if any(k in det_lower for k in ("busy", "occupied", "lock", "占用")):
+        return ("文件占用锁定", "源文件正在被其他编辑器或 Office 占用，请关闭相关程序后重试。")
+    if any(k in det_lower for k in ("path too long", "206", "超长", "filename too long")):
+        return ("路径或文件名超长", "Windows 限制路径长度不能超过 260 个字符，请缩短输出目录或文件名称后重试。")
+    return (detail or "转换异常", "请检查源文件是否损坏或被占用后重试。")
+
+
 def detect_kind(source: PathLike, target_format: Optional[str] = None) -> str:
     """按扩展名（必要时加转出格式）判定转换方向。
 
@@ -470,6 +603,7 @@ def build_plan(
     output_dir: Optional[PathLike] = None,
     overwrite: bool = False,
     target_format: Optional[str] = None,
+    validate_signature: bool = False,
 ) -> ConversionPlan:
     """构造单个文件的转换计划，顺带做输入输出可用性预检。"""
     source = Path(source)
@@ -479,6 +613,27 @@ def build_plan(
             suggested_action="源文件不存在或不是文件：{0}".format(source),
             details={"source": source.name},
         )
+    if validate_signature:
+        is_valid, err_msg = validate_source_signature(source)
+        if not is_valid:
+            raise UnsupportedConversionError(
+                suggested_action=err_msg,
+                details={"source": source.name},
+            )
+    if output_dir:
+        out_p = Path(output_dir)
+        if out_p.is_file():
+            raise UnsupportedConversionError(
+                suggested_action="指定的输出目录是一个已有文件，无法作为输出文件夹：{0}".format(out_p),
+                details={"target": str(out_p)},
+            )
+        try:
+            out_p.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise UnsupportedConversionError(
+                suggested_action="无法创建或访问输出目录：{0}".format(exc),
+                details={"target": str(out_p)},
+            )
     target = target_for(source, kind, output_dir)
     if target.exists() and not overwrite:
         raise ConversionTargetExistsError(details={"target": str(target)})
@@ -937,12 +1092,29 @@ def convert_paths(
         kind = ""
         target = Path("")
         try:
-            kind = detect_kind(path, target_format)
+            if isinstance(target_format, dict):
+                try:
+                    resolved_path = path.resolve()
+                except (OSError, RuntimeError):
+                    resolved_path = path
+                item_tf = (
+                    target_format.get(path)
+                    or target_format.get(str(path))
+                    or target_format.get(resolved_path)
+                    or target_format.get(str(resolved_path))
+                )
+            else:
+                item_tf = target_format
+            kind = detect_kind(path, item_tf)
             target = target_for(path, kind, output_dir)
-            plan = build_plan(path, output_dir, overwrite, target_format)
+            plan = build_plan(path, output_dir, overwrite, item_tf)
             # 同批次里两个源不能落到同一个输出：a.doc 与 a.docx 都指向 a.pdf 时，
             # 后一个会静默覆盖前一个的产物。
-            owner = claimed.get(plan.target.resolve())
+            try:
+                resolved_target = plan.target.resolve()
+            except (OSError, RuntimeError):
+                resolved_target = plan.target
+            owner = claimed.get(resolved_target)
             if owner is not None:
                 raise ConversionTargetExistsError(
                     suggested_action="与同批次的 {0} 输出同名，请去掉其中一个或分开转换。".format(
