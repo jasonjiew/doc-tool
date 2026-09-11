@@ -13,8 +13,8 @@ import urllib.request
 
 GITLAB_BASE = os.getenv("GITLAB_BASE", "http://192.168.0.242:8899")
 PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
-VERSION = "2.4.0"
-TAG_NAME = "v2.4.0"
+VERSION = "2.5.0"
+TAG_NAME = "v2.5.0"
 PACKAGE_NAME = "DocTool"
 
 
@@ -124,6 +124,10 @@ def create_or_update_release(token: str, description: str, links: list[dict]) ->
 def main():
     token = get_token()
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from doc_tool.domain.version import get_commit_id
+    commit_sha = get_commit_id()[:7]
     out_dir = os.path.join(repo_root, "packaging", "Output")
 
     files_to_upload = [
@@ -184,7 +188,30 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 本版变更（2.4.0）
+## 本版变更（2.5.0）
+
+- **Word 导入向导大纲树实时预览与格式安全拦截**：
+  - 样式映射步骤引入实时大纲树预览（`generate_preview_heading_tree` / `HeadingPreviewWidget`），支持各级标题层级即时诊断、空标题与跳级拦截；
+  - 样式普查展示正文样例文本（`sample_text`），直观区分标题与正文样式；
+  - 严密拦截伪装成 `.docx` 的旧版 Word 97-2003 二进制 `.doc` 文件（前8字节魔数精准识别），提供友好修复引导；
+  - 首次导入支持阶段事件（`ImportStageEvent`）回调，向导平滑呈现解包、解析、清洗、骨架生成实时进度。
+- **离线 PDF 工具箱新增页面重排与高级参数配置**：
+  - 扩展至 15 项常用离线 PDF 工具，新增「页面重排（reorder）」工具：支持倒序反转（`reverse`）、奇偶分组（`odd-even` / `even-odd`）、自定义序列与连续范围；
+  - 深度补齐高级配置：图片转 PDF 页面尺寸/边距/方向、压缩级别与图像重采样质量、水印旋转/透明度/精确坐标定位等；
+  - CLI 命令行同步支持页面重排与高级参数。
+- **文档互转界面交互升级与文件签名安全防呆**：
+  - 互转对话框重构为交互式表格清单，支持多文件拖放与列表管理、每项独立选择目标格式与全局批量覆盖；
+  - 文件签名防呆拦截：基于文件头特征严格拦截伪装成文档的 Windows PE 可执行文件（MZ 特征）、假扩展名及 0 字节空文件；
+  - 转换完成后支持一键定位并打开产物目录。
+- **首页任务页体验升级与 Docs-as-Code 流水线引导**：
+  - 新增 Docs-as-Code 3 步流水线引导条（导入拆解 → 协同撰写 → 规范出稿）与全局命令面板（Ctrl+K）快捷入口；
+  - 最近项目列表支持实时关键字过滤、在文件资源管理器中定位、复制绝对路径、快速移除与失效项目标记；
+  - 文档互转与 PDF 工具箱卡片增加功能直达胶囊（Pill），项目条增加保存并关闭项目（Ctrl+Shift+W）安全返回主页；
+  - 页面支持响应式滚动排版，完美适配小屏幕与副屏显示。
+- **命令面板条目委托修复**：
+  - 修复 `PaletteItemDelegate` 状态标志属性访问偶发异常，保障多分辨率与高 DPI 下平滑渲染。
+
+## 历史更新（2.4.0）
 
 - **Mermaid 极速矢量预览与沉浸式大图查看器（Lightbox）**：
   - 引入 `want_png=False` 纯矢量 SVG 极速预览模式，跳过 CPU/Chromium 3x PNG 光栅化，实现毫秒级预览响应；
@@ -254,7 +281,7 @@ def main():
 ## 构建来源
 
 - 标签：{TAG_NAME}
-- 提交：6398d6c（main）
+- 提交：{commit_sha}（main）
 - 构建环境：Windows 11 / Python 3.13 / PyInstaller 6.22.1 / Inno Setup 6
 
 ## 已知限制
