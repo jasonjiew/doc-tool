@@ -250,9 +250,27 @@ def add_recent_project(project_root: str, manifest: ProjectManifest) -> None:
 
 def remove_recent_project(project_root: str) -> None:
     """从最近项目列表移除一条。"""
-    root = str(Path(project_root).resolve())
+    try:
+        resolved_root = str(Path(project_root).resolve())
+    except Exception:
+        resolved_root = None
+    target_norm = os.path.normcase(os.path.normpath(project_root))
     entries = load_recent_projects()
-    entries = [e for e in entries if e.path != root]
+
+    def _matches(e: RecentEntry) -> bool:
+        if e.path == project_root:
+            return True
+        if os.path.normcase(os.path.normpath(e.path)) == target_norm:
+            return True
+        if resolved_root is not None:
+            try:
+                if str(Path(e.path).resolve()) == resolved_root:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    entries = [e for e in entries if not _matches(e)]
     _save_recent_projects(entries)
 
 

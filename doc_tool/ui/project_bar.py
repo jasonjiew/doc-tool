@@ -37,6 +37,7 @@ class ProjectBar(QWidget):
         on_diag_build: Optional[Callable[[], None]] = None,
         on_validate: Optional[Callable[[], None]] = None,
         on_switch_branch: Optional[Callable[[], None]] = None,
+        on_close_project: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -44,6 +45,7 @@ class ProjectBar(QWidget):
         self._on_diag_build = on_diag_build
         self._on_validate = on_validate
         self._on_switch_branch = on_switch_branch
+        self._on_close_project = on_close_project
         self._summary_collapsed = False
 
         layout = QVBoxLayout(self)
@@ -105,6 +107,14 @@ class ProjectBar(QWidget):
         self._toggle_btn.clicked.connect(self.toggle_summary)
         self._toggle_btn.setVisible(False)
         main.addWidget(self._toggle_btn)
+
+        # 关闭项目入口
+        self._close_btn = QPushButton("关闭项目", self)
+        self._close_btn.setProperty("btnRole", "secondary")
+        self._close_btn.setToolTip("保存并关闭当前项目，返回主页 (Ctrl+Shift+W)")
+        self._close_btn.clicked.connect(self._handle_close_project)
+        self._close_btn.setVisible(False)
+        main.addWidget(self._close_btn)
 
         layout.addLayout(main)
 
@@ -179,6 +189,14 @@ class ProjectBar(QWidget):
         )
 
         self._toggle_btn.setVisible(bool(document_name or project_root))
+        self._close_btn.setVisible(bool(document_name or project_root))
+        from doc_tool.ui.workbench_state import WorkView
+        is_running = (getattr(state, "view", None) == WorkView.RUNNING or getattr(state, "running", False))
+        self._close_btn.setEnabled(not is_running)
+        if is_running:
+            self._close_btn.setToolTip("任务正在执行中，请等待完成或取消后再关闭项目")
+        else:
+            self._close_btn.setToolTip("保存并关闭当前项目，返回主页 (Ctrl+Shift+W)")
         # 摘要细节
         values = {
             "document_no": "文档编号：{0}".format(document_no or "—"),
@@ -234,6 +252,7 @@ class ProjectBar(QWidget):
         self._diag_btn.setEnabled(False)
         self._validate_btn.setEnabled(False)
         self._toggle_btn.setVisible(False)
+        self._close_btn.setVisible(False)
         for label in getattr(self, "_detail_labels", []):
             label.setText("")
 
@@ -281,3 +300,8 @@ class ProjectBar(QWidget):
     def _handle_switch_branch(self) -> None:
         if self._on_switch_branch is not None:
             self._on_switch_branch()
+
+
+    def _handle_close_project(self) -> None:
+        if self._on_close_project is not None:
+            self._on_close_project()

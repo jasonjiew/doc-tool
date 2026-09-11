@@ -255,11 +255,13 @@ class MainWindow(QMainWindow):
             on_new_project=self._on_new_project,
             on_open_project=self._on_open_project,
             on_open_recent=self._on_open_recent,
+            on_remove_recent=self._on_remove_recent,
             on_convert=self._on_convert_documents,
             on_pdf_toolbox=self._on_pdf_toolbox,
             on_drop_files=self._on_convert_documents,
             on_show_help=self._on_open_help,
             on_about=self._on_about,
+            on_command_palette=self.open_command_palette,
         )
         self._stack.addWidget(self._empty_state)
 
@@ -272,6 +274,7 @@ class MainWindow(QMainWindow):
             on_diag_build=self._on_diag_build,
             on_validate=self._on_validate,
             on_switch_branch=self._on_switch_branch_clicked,
+            on_close_project=self.close_project,
         )
         ide_layout.addWidget(self._project_bar)
         self._ide_center_host = QWidget(self._ide_page)
@@ -340,6 +343,10 @@ class MainWindow(QMainWindow):
         self._save_all_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
         self._save_all_action.triggered.connect(self._on_save_all)
         file_menu.addAction(self._save_all_action)
+        self._close_action = QAction("关闭项目", self)
+        self._close_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
+        self._close_action.triggered.connect(self.close_project)
+        file_menu.addAction(self._close_action)
         file_menu.addSeparator()
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.close)
@@ -956,6 +963,8 @@ class MainWindow(QMainWindow):
         self._logs_action.setEnabled(state.actions["logs"].enabled)
         self._settings_action.setEnabled(bool(self._project_summary) and not running)
         self._reimport_action.setEnabled(bool(self._project_summary) and not running)
+        if hasattr(self, "_close_action"):
+            self._close_action.setEnabled(bool(self._project_summary) and not running)
 
         self._refresh_content_menu_state(running)
         if hasattr(self, "_empty_state"):
@@ -2312,7 +2321,11 @@ class MainWindow(QMainWindow):
             detail += "\n{0} 个冲突章节默认保留本地内容。".format(len(result.conflicts))
         QMessageBox.information(self, "重新导入完成", detail)
 
-    def _on_convert_documents(self, paths: Optional[List[Path]] = None) -> None:
+    def _on_convert_documents(
+        self,
+        paths_or_target: Optional[object] = None,
+        target_format: Optional[str] = None,
+    ) -> None:
         """文档互转：处理任意文件（Word/PDF/Markdown），无需打开项目。
 
         工具菜单、首页互转卡与首页拖放共用此入口；拖放路径（文件夹由
@@ -2320,19 +2333,102 @@ class MainWindow(QMainWindow):
         """
         from doc_tool.ui.convert_dialog import ConvertDialog
 
-        dialog = ConvertDialog(parent=self, busy_check=lambda: self.runner.is_running)
-        if paths:
-            dialog._ingest_paths(list(paths))
-        dialog.exec()
+        paths = None
+        target = target_format
+        if isinstance(paths_or_target, str):
+            target = paths_or_target
+        elif isinstance(paths_or_target, (list, tuple, set)):
+            paths = list(paths_or_target)
+        elif isinstance(paths_or_target, Path):
+            paths = [paths_or_target]
 
-    def _on_pdf_toolbox(self, paths: Optional[List[Path]] = None) -> None:
+        dialog = ConvertDialog(parent=self, busy_check=lambda: self.runner.is_running)
+        try:
+            if target and hasattr(dialog, "_format_combo"):
+                idx = dialog._format_combo.findData(target)
+                if idx >= 0:
+                    dialog._format_combo.setCurrentIndex(idx)
+            if paths:
+                dialog._ingest_paths(list(paths))
+            dialog.exec()
+        finally:
+            if hasattr(dialog, "deleteLater"):
+                dialog.deleteLater()
+
+    def _on_pdf_toolbox(
+        self,
+        paths_or_tool_id: Optional[object] = None,
+        tool_id: Optional[str] = None,
+    ) -> None:
         """PDF 工具箱：页面组织、转换、编辑与安全优化（无需打开项目）。"""
         from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
 
+        paths = None
+        target_tool = tool_id
+        if isinstance(paths_or_tool_id, str):
+            target_tool = paths_or_tool_id
+        elif isinstance(paths_or_tool_id, (list, tuple, set)):
+            paths = list(paths_or_tool_id)
+        elif isinstance(paths_or_tool_id, Path):
+            paths = [paths_or_tool_id]
+
         dialog = PdfToolboxDialog(parent=self, busy_check=lambda: self.runner.is_running)
-        if paths:
-            dialog._ingest_paths(list(paths))
-        dialog.exec()
+        try:
+            if target_tool and hasattr(dialog, "select_tool"):
+                dialog.select_tool(target_tool)
+            if paths:
+                dialog._ingest_paths(list(paths))
+            dialog.exec()
+        finally:
+            if hasattr(dialog, "deleteLater"):
+                dialog.deleteLater()
+
+    def _on_remove_recent(self, path: str) -> None:
+        """从最近项目列表中移除条目并刷新界面。"""
+        from doc_tool.application.project_service import remove_recent_project
+
+        remove_recent_project(path)
+        self._refresh_recent_projects()
+
+    @property
+    def project(self):
+        """兼容属性：返回当前打开的项目摘要（若无则为 None）。"""
+        return self._project_summary
+
+    @project.setter
+    def project(self, val) -> None:
+        self._project_summary = val
+
+    def close_project(self) -> bool:
+        """关闭当前项目，保存必要状态后返回首页任务页。"""
+        if self.project is None:
+            return True
+        if bool(self.runner.is_running):
+            QMessageBox.warning(
+                self,
+                "任务执行中",
+                "当前有任务正在执行中，请等待任务完成或先取消任务后再关闭项目。",
+            )
+            return False
+        if not self._confirm_switch_project():
+            return False
+        self._persist_workspace_session()
+        self._remove_content_docks()
+        if self._content_workspace is not None:
+            try:
+                self._content_workspace.shutdown()
+            except Exception:
+                pass
+            try:
+                self._content_workspace.deleteLater()
+            except Exception:
+                pass
+            self._content_workspace = None
+        self.project = None
+        self._project_summary = None
+        self._refresh_interaction_state()
+        self._refresh_recent_projects()
+        return True
 
     def _on_open_help(self) -> None:
         """打开《使用说明》帮助文档（系统默认程序）；缺失时给出可见提示。"""
