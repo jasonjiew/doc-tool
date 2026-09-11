@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
@@ -60,7 +61,7 @@ class PaletteItemDelegate(QStyledItemDelegate):
             painter.restore()
             return
 
-        is_selected = bool(option.state & QStyledItemDelegate.StateFlag.State_Selected)
+        is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
 
         # 背景底色
         if is_selected:
