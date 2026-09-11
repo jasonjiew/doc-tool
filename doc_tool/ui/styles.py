@@ -246,13 +246,127 @@ QLabel[strong="true"] {{ font-weight: 600; }}
 
 /* --- 首页任务页（项目 + 工具双栏） --- */
 /* 页面自绘 window 底色：裸 QWidget 顶层不画 QSS 背景（embedded/截图态也正确）。 */
-QWidget#homeRoot {{ background: {window}; }}
+QWidget#homeRoot, QWidget#homeContent, QScrollArea#homeScrollArea {{ background: {window}; border: none; }}
 QLabel#homeSubtitle {{ {font_body} color: {text_muted}; }}
 QLabel#homeSubheading {{ {font_body_bold} color: {text}; }}
 QLabel#homeMuted {{ {font_small} color: {text_muted}; }}
 QLabel#homeAccent {{ {font_small} color: {accent}; }}
 QLabel[pill="true"] {{ {font_small} background: {panel_alt}; border: 1px solid {border}; border-radius: 10px; padding: 2px 9px; }}
+QLabel[pill="true"]:hover {{ border-color: {accent}; color: {accent}; }}
 QLabel[pill="true"][pillTone="muted"] {{ color: {text_muted}; }}
+QLabel[pill="true"][pillTone="warning"] {{ color: {warning}; border-color: {warning}; }}
+QFrame[card="true"]:focus {{ border-color: {accent}; outline: none; }}
+QLabel[pill="true"]:focus {{ border-color: {accent}; color: {accent}; outline: none; }}
+QFrame[pipelineStep="true"] {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 4px;
+}}
+QFrame[pipelineStep="true"]:hover {{
+    background: {panel_alt};
+    border-color: {border};
+}}
+QFrame[pipelineStep="true"]:focus {{
+    border-color: {accent};
+    outline: none;
+}}
+
+
+/* --- 流程横幅 (Docs-as-Code Pipeline) --- */
+QFrame#pipelineBanner {{
+    background: {panel};
+    border: 1px solid {border};
+    border-radius: 8px;
+    padding: 6px 12px;
+}}
+QLabel#pipelineStepNum {{
+    font-size: 8.5pt;
+    font-weight: bold;
+    color: {accent};
+    background: {accent_soft};
+    border-radius: 9px;
+    padding: 1px 7px;
+}}
+QLabel#pipelineStepTitle {{
+    font-size: 9pt;
+    font-weight: 600;
+    color: {text};
+}}
+QLabel#pipelineStepDesc {{
+    font-size: 8.5pt;
+    color: {text_muted};
+}}
+QLabel#pipelineArrow {{
+    color: {text_muted};
+    font-size: 10pt;
+    font-weight: bold;
+    padding: 0 4px;
+}}
+QPushButton#pipelineCmdBtn {{
+    background: {panel_alt};
+    border: 1px solid {border};
+    border-radius: 11px;
+    padding: 2px 10px;
+    font-size: 8.5pt;
+    color: {text};
+}}
+QPushButton#pipelineCmdBtn:hover {{
+    background: {selection_bg};
+    border-color: {accent};
+    color: {accent};
+}}
+
+/* --- 最近项目操作与搜索 --- */
+QLineEdit#recentSearchInput {{
+    background: {input_bg};
+    border: 1px solid {border};
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 8.5pt;
+    color: {text};
+}}
+QLineEdit#recentSearchInput:focus {{
+    border-color: {accent};
+}}
+QPushButton[recentAction="true"],
+QPushButton[recentAction="remove"] {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 8.5pt;
+    color: {text_muted};
+}}
+QPushButton[recentAction="true"]:hover {{
+    background: {panel_alt};
+    border-color: {border};
+    color: {text};
+}}
+QPushButton[recentAction="remove"]:hover {{
+    background: {panel_alt};
+    border-color: {failure};
+    color: {failure};
+}}
+QPushButton[recentAction="true"]:pressed,
+QPushButton[recentAction="remove"]:pressed {{
+    background: {border};
+}}
+QPushButton[recentAction="true"]:focus,
+QPushButton[recentAction="remove"]:focus {{
+    border-color: {accent};
+    outline: none;
+}}
+QFrame#recentEmptyBox {{
+    background: {panel_alt};
+    border: 1px dashed {border};
+    border-radius: 8px;
+    padding: 14px 18px;
+}}
+QScrollArea#homeScrollArea {{
+    background: transparent;
+    border: none;
+}}
 
 /* 图标徽标容器 */
 QLabel#homeBrandIcon {{ {font_small} font-weight: bold; background: {accent}; color: {text_on_accent}; border-radius: 6px; padding: 3px 8px; }}
