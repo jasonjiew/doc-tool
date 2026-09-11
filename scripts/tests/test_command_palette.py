@@ -3,9 +3,9 @@
 
 import unittest
 
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent, QRect, Qt
+from PySide6.QtGui import QKeyEvent, QPainter, QPixmap
+from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionViewItem
 
 from doc_tool.ui.command_palette import CommandPaletteDialog, PaletteItem
 
@@ -73,6 +73,29 @@ class CommandPaletteTests(unittest.TestCase):
         dlg._trigger_current()
         self.assertEqual(activated_items, ["1.2 架构"])
 
+
+    def test_palette_delegate_paint_without_error(self):
+        """测试条目委托绘制过程正常，不发生 StateFlag AttributeError 异常。"""
+        items = [
+            PaletteItem(title="打开项目", category="文件", shortcut="Ctrl+O"),
+            PaletteItem(title="导出文档", category="构建", shortcut="Ctrl+E"),
+        ]
+        for dark in (False, True):
+            dlg = CommandPaletteDialog(items, mode="command", dark=dark)
+            dlg.show()
+            pixmap = QPixmap(dlg.size())
+            dlg.render(pixmap)
+            delegate = dlg._list_widget.itemDelegate()
+            option = QStyleOptionViewItem()
+            option.rect = QRect(0, 0, 300, 38)
+            painter = QPainter(pixmap)
+            index = dlg._list_widget.model().index(0, 0)
+            option.state = QStyle.StateFlag.State_Selected | QStyle.StateFlag.State_Enabled
+            delegate.paint(painter, option, index)
+            option.state = QStyle.StateFlag.State_Enabled
+            delegate.paint(painter, option, index)
+            painter.end()
+            dlg.close()
 
 if __name__ == "__main__":
     unittest.main()
