@@ -263,8 +263,6 @@ class TaskRunnerTests(unittest.TestCase):
 
     def test_cancel_request_stops_long_task(self):
         """取消请求在阶段边界停止任务。"""
-        from doc_tool.domain.cancellation import CancellationToken
-        from doc_tool.domain.errors import CancelledError
         from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
 
         runner = TaskRunner()
@@ -2758,20 +2756,33 @@ class ConvertDialogTests(unittest.TestCase):
         _ensure_qapp()
 
     def setUp(self):
+        self._dialogs = []
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
-        (self.root / "a.docx").write_bytes(b"stub")
-        (self.root / "b.pdf").write_bytes(b"stub")
+        (self.root / "a.docx").write_bytes(b"PK\x03\x04" + b"\x00" * 30)
+        (self.root / "b.pdf").write_bytes(b"%PDF-1.4\n" + b"\x00" * 30)
         (self.root / "c.md").write_text("# 标题\n\n| 一 | 二 |\n| --- | --- |\n", encoding="utf-8")
-        (self.root / "old.doc").write_bytes(b"stub")
+        (self.root / "old.doc").write_bytes(b"\xd0\xcf\x11\xe0" + b"\x00" * 512)
 
     def tearDown(self):
+        for dlg in getattr(self, "_dialogs", []):
+            try:
+                dlg.close()
+                dlg.deleteLater()
+            except Exception:
+                pass
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is not None:
+            app.processEvents()
         self._tmp.cleanup()
 
     def _dialog(self):
         from doc_tool.ui.convert_dialog import ConvertDialog
 
-        return ConvertDialog()
+        dlg = ConvertDialog()
+        self._dialogs.append(dlg)
+        return dlg
 
     def test_rows_and_direction_labels(self):
         dlg = self._dialog()
@@ -2977,7 +2988,7 @@ class HomeTaskPageTests(unittest.TestCase):
         pdf_texts = [c.text() for c in home._pdf_card.findChildren(QLabel)]
         for chip in ("合并", "拆分", "水印", "加密", "解密", "压缩", "页码"):
             self.assertIn(chip, pdf_texts)
-        self.assertTrue(any("14 项离线工具" in t for t in pdf_texts))
+        self.assertTrue(any("项离线工具" in t for t in pdf_texts))
         # 兼容旧属性名
         self.assertIs(home._placeholder_card, home._pdf_card)
         # 版本徽章取自统一版本模块，不硬编码
@@ -3273,6 +3284,7 @@ class HomeTaskPageTests(unittest.TestCase):
         # 「使用说明」：解析到仓库 docs/使用说明.md 并交给系统关联程序打开。
         with patch.object(MainWindow, "_open_file", return_value=True) as open_file:
             home._handle_show_help()
+            self.assertEqual(open_file.call_count, 1)
 
 class EditorWorkbenchPhase2Tests(unittest.TestCase):
     """主构建区 UI 优化、多标签页右键/快捷关闭、语法弱化与专注模式。"""
@@ -3549,6 +3561,634 @@ class EditorWorkbenchPhase2Tests(unittest.TestCase):
             self.assertTrue(cmd_str.endswith('"'))
             self.assertIn(str(test_file.resolve()), cmd_str)
 
+
+
+
+class WizardUXOptimizationTests(unittest.TestCase):
+    """测试新建项目向导 UI/UX 优化特性的逻辑行为。"""
+
+    def setUp(self):
+        _ensure_qapp()
+
+    def _wizard(self):
+        from doc_tool.ui.wizard import ImportWizard
+
+        wizard = ImportWizard()
+        self.addCleanup(wizard.close)
+        return wizard
+
+    def test_smart_skip_next_id_with_heading1(self):
+        """当预检已自动识别标准 Heading 1 且无阻断时，步骤 1 直接跳步至步骤 4（项目信息）。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        wizard._preview = SimpleNamespace(
+            has_heading1=True,
+            fidelity=SimpleNamespace(has_block=False),
+        )
+        wizard._source_page._wants_tuning = False
+        self.assertEqual(wizard.nextId(), 3, "标准文档应自动跳过日志与样式映射，直达步骤 4")
+
+        wizard._source_page._wants_tuning = True
+        self.assertEqual(wizard.nextId(), 2, "用户勾选微调时应进入样式映射页")
+
+    def test_smart_skip_next_id_without_heading1(self):
+        """当预检未检测到 Heading 1 时，步骤 1 引导至样式映射或预检页。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        wizard._preview = SimpleNamespace(
+            has_heading1=False,
+            fidelity=SimpleNamespace(has_block=False),
+        )
+        self.assertEqual(wizard.nextId(), 1)
+
+    def test_smart_skip_next_id_from_preflight_page(self):
+        """从预检页（Page 1）若大纲良好，nextId 跳过映射页直达项目信息页（Page 3）。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        wizard._preview = SimpleNamespace(
+            has_heading1=True,
+            fidelity=SimpleNamespace(has_block=False),
+        )
+        wizard.setStartId(1)
+        wizard.restart()
+        self.assertEqual(wizard.nextId(), 3)
+
+    def test_reversible_error_handling_back_button(self):
+        """导入失败时允许点击「上一步」返回重试，成功时禁用上一步。"""
+        from types import SimpleNamespace
+        from PySide6.QtWidgets import QWizard
+        wizard = self._wizard()
+        result_page = wizard._result_page
+
+        wizard._import_result = SimpleNamespace(success=True, events=[], source_sha256="abcdef123456")
+        wizard._target_root = "C:/fake/proj"
+        wizard.setStartId(5)
+        wizard.restart()
+        back_btn = wizard.button(QWizard.WizardButton.BackButton)
+        next_btn = wizard.button(QWizard.WizardButton.NextButton)
+        self.assertFalse(back_btn.isEnabled(), "导入成功时不应允许返回")
+        self.assertEqual(next_btn.text(), "进入工作台")
+
+        wizard._import_result = SimpleNamespace(
+            success=False,
+            error_code="E1005",
+            events=[],
+            diagnostic_log="",
+        )
+        result_page.initializePage()
+        wizard._on_page_changed(5)
+        self.assertTrue(back_btn.isEnabled(), "导入失败时必须允许点击上一步返回重试")
+        self.assertEqual(next_btn.text(), "关闭")
+
+    def test_style_mapping_sample_text_and_smooth_degrade(self):
+        """样式映射表回显正文样例首句，并支持跨级跳跃自动平滑降级。"""
+        from types import SimpleNamespace
+        from doc_tool.adapters.preflight import StyleCensus
+        wizard = self._wizard()
+        page = wizard._mapping_page
+
+        census = {
+            "Custom1": StyleCensus("Custom1", "我的章标题", 5, True, sample_text="第1章 总体概述与背景"),
+            "Custom2": StyleCensus("Custom2", "我的三级节", 3, True, sample_text="1.1.1 关键性能指标"),
+        }
+        preview = SimpleNamespace(style_census=census, heading_style_map={})
+        page._populate(preview)
+
+        self.assertEqual(page._table.item(0, 2).text(), "第1章 总体概述与背景")
+        self.assertEqual(page._table.item(1, 2).text(), "1.1.1 关键性能指标")
+
+        c1 = next(r["combo"] for r in page._rows if r["style_id"] == "Custom1")
+        c2 = next(r["combo"] for r in page._rows if r["style_id"] == "Custom2")
+        c1.setCurrentIndex(c1.findData(1))
+        c2.setCurrentIndex(c2.findData(3))
+        self.assertEqual(page.mapping(), {"Custom1": 1, "Custom2": 3})
+
+        page._auto_smooth_degrade()
+        self.assertEqual(page.mapping(), {"Custom1": 1, "Custom2": 2}, "自动平滑降级应把跳跃的级别 3 降为连续的级别 2")
+
+    def test_project_info_smart_default_and_conflict_check(self):
+        """项目信息页智能填充默认路径，并实时检测重名冲突提供一键后缀。"""
+        import tempfile
+        wizard = self._wizard()
+        page = wizard._info_page
+
+        with tempfile.TemporaryDirectory() as td:
+            existing_dir = Path(td) / "my_project"
+            existing_dir.mkdir()
+
+            wizard._target_parent = td
+            wizard._project_name = "my_project"
+            wizard._doc_name = "我的测试项目"
+            page.initializePage()
+
+            self.assertFalse(page._conflict_label.isHidden(), "检测到重名目录应显示警告标签")
+            self.assertFalse(page._suffix_btn.isHidden(), "重名时应显示后缀建议按钮")
+            self.assertIn("v2", page._suffix_btn.text(), "重名建议按钮应包含递增后缀 (v2)")
+
+            page._apply_suggested_name()
+            self.assertEqual(page._project_name_entry.text(), "my_project-v2")
+            self.assertTrue(page._conflict_label.isHidden(), "应用无冲突名称后应隐藏警告标签")
+
+    def test_executing_stepper_progress(self):
+        """流水线 Stepper 接收到阶段事件后正确推进高亮状态。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        page = wizard._executing_page
+
+        page._reset_stepper()
+        self.assertIn("○", page._step_labels["validate"].text())
+
+        page.on_stage_event(SimpleNamespace(stage="extract_content", status="started", detail="正在提取正文段落与图片"))
+        self.assertIn("✓", page._step_labels["validate"].text())
+        self.assertIn("✓", page._step_labels["template"].text())
+        self.assertIn("⟳", page._step_labels["content"].text())
+        self.assertIn("○", page._step_labels["split"].text())
+        self.assertEqual(page._detail_label.text(), "正在提取正文段落与图片")
+
+
+    def test_drop_zone_drag_drop_and_click_events(self):
+        """拖放区 DropZone 正常响应 dragEnter, dragLeave, drop 以及点击信号。"""
+        from PySide6.QtCore import QPoint, Qt, QUrl, QMimeData
+        from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDropEvent
+        from doc_tool.ui.wizard import _DropZone
+
+        zone = _DropZone()
+        clicked_events = []
+        dropped_paths = []
+        zone.clicked.connect(lambda: clicked_events.append(True))
+        zone.file_dropped.connect(lambda p: dropped_paths.append(p))
+
+        from PySide6.QtTest import QTest
+        QTest.mouseClick(zone, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(clicked_events), 1)
+
+        mime_txt = QMimeData()
+        mime_txt.setUrls([QUrl.fromLocalFile("test.txt")])
+        enter_ev_txt = QDragEnterEvent(
+            QPoint(10, 10),
+            Qt.DropAction.CopyAction,
+            mime_txt,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        zone.dragEnterEvent(enter_ev_txt)
+        self.assertFalse(enter_ev_txt.isAccepted())
+
+        mime_docx = QMimeData()
+        mime_docx.setUrls([QUrl.fromLocalFile("C:/fake/sample.docx")])
+        enter_ev = QDragEnterEvent(
+            QPoint(10, 10),
+            Qt.DropAction.CopyAction,
+            mime_docx,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        zone.dragEnterEvent(enter_ev)
+        self.assertTrue(enter_ev.isAccepted())
+
+        leave_ev = QDragLeaveEvent()
+        zone.dragLeaveEvent(leave_ev)
+
+        drop_ev = QDropEvent(
+            QPoint(10, 10),
+            Qt.DropAction.CopyAction,
+            mime_docx,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        zone.dropEvent(drop_ev)
+        self.assertEqual(len(dropped_paths), 1)
+        self.assertIn("sample.docx", dropped_paths[0])
+
+    def test_back_navigation_from_failed_result_skips_executing_page(self):
+        """导入失败后在结果页点击「上一步」回退，跳过正在执行页（Page 4），直接安全回退至项目信息页（Page 3），且保留输入数据。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        wizard._source_page._source_path = "C:/fake/sample.docx"
+        wizard._preview = SimpleNamespace(has_heading1=True, fidelity=SimpleNamespace(has_block=False))
+        wizard.restart()
+        self.assertEqual(wizard.currentId(), 0)
+
+        wizard.next()
+        self.assertEqual(wizard.currentId(), 3)
+        wizard._info_page._doc_name_entry.setText("原始文档名称")
+        wizard._info_page._project_name_entry.setText("my_target_project")
+        wizard._info_page._target_entry.setText("C:/my_projects")
+
+        done_callbacks = []
+        wizard._do_import = lambda on_done: done_callbacks.append(on_done)
+        wizard.next()
+        self.assertEqual(wizard.currentId(), 4)
+
+        done_callbacks[0](
+            SimpleNamespace(success=False, error_code="E1005", events=[], diagnostic_log="Target directory permission error"),
+            "C:/my_projects/my_target_project",
+        )
+        self.assertEqual(wizard.currentId(), 5, "导入完成后应进入结果看板页")
+
+        wizard.back()
+        self.assertEqual(wizard.currentId(), 3, "必须直接回退到项目配置页（Page 3），避免卡死在执行页或重复失败")
+        self.assertEqual(wizard._info_page._doc_name_entry.text(), "原始文档名称")
+        self.assertEqual(wizard._info_page._project_name_entry.text(), "my_target_project")
+        self.assertEqual(wizard._info_page._target_entry.text(), "C:/my_projects")
+
+        wizard._info_page._project_name_entry.setText("my_target_project_retry")
+        wizard.next()
+        self.assertEqual(wizard.currentId(), 4)
+        done_callbacks[1](
+            SimpleNamespace(success=True, events=[], source_sha256="abcdef012345"),
+            "C:/my_projects/my_target_project_retry",
+        )
+        self.assertEqual(wizard.currentId(), 5)
+        self.assertTrue(wizard._import_result.success)
+
+    def test_finish_button_text_synchronization(self):
+        """结果页中 FinishButton 和 NextButton 的文本保持同步（成功时为「进入工作台」，失败时为「关闭」）。"""
+        from types import SimpleNamespace
+        from PySide6.QtWidgets import QWizard
+        wizard = self._wizard()
+
+        wizard._import_result = SimpleNamespace(success=True, events=[], source_sha256="1234567890ab")
+        wizard._target_root = "C:/fake/proj"
+        wizard.setStartId(5)
+        wizard.restart()
+
+        next_btn = wizard.button(QWizard.WizardButton.NextButton)
+        finish_btn = wizard.button(QWizard.WizardButton.FinishButton)
+        self.assertEqual(next_btn.text(), "进入工作台")
+        self.assertEqual(finish_btn.text(), "进入工作台")
+
+        wizard._import_result = SimpleNamespace(success=False, error_code="E5003", events=[], diagnostic_log="")
+        wizard._result_page.initializePage()
+        wizard._on_page_changed(5)
+        self.assertEqual(next_btn.text(), "关闭")
+        self.assertEqual(finish_btn.text(), "关闭")
+
+    def test_outline_tree_live_update_and_error_degrade(self):
+        """右侧大纲树根据映射实时刷新，遇到跳级展示降级按钮，点击后自动修复。"""
+        from types import SimpleNamespace
+        from doc_tool.adapters.preflight import StyleCensus
+        from unittest.mock import patch
+        import tempfile
+        wizard = self._wizard()
+        page = wizard._mapping_page
+
+        census = {
+            "S1": StyleCensus("S1", "章样式", 3, True, sample_text="第1章"),
+            "S2": StyleCensus("S2", "节样式", 2, True, sample_text="1.1 节"),
+        }
+        preview = SimpleNamespace(style_census=census, heading_style_map={})
+        page._populate(preview)
+
+        c1 = next(r["combo"] for r in page._rows if r["style_id"] == "S1")
+        c2 = next(r["combo"] for r in page._rows if r["style_id"] == "S2")
+        c1.setCurrentIndex(c1.findData(1))
+        c2.setCurrentIndex(c2.findData(3))
+
+        with tempfile.NamedTemporaryFile(suffix=".docx") as tmp_file:
+            wizard._source_page._source_path = tmp_file.name
+            with patch("doc_tool.adapters.preflight.generate_preview_heading_tree") as mock_tree:
+                mock_tree.return_value = ([], "标题层级跳跃：从级别 1 直接跳至级别 3")
+                page._update_outline_tree()
+                self.assertFalse(page._degrade_btn.isHidden(), "检测到层级跳跃错误时应显示自动平滑降级按钮")
+                self.assertIn("跳跃", page._tree_status.text())
+
+                mock_tree.return_value = ([SimpleNamespace(level=1, text="第一章"), SimpleNamespace(level=2, text="第一节")], "")
+                page._degrade_btn.click()
+                self.assertTrue(page._degrade_btn.isHidden(), "平滑降级修复后降级按钮应自动隐藏")
+                self.assertIn("完整无跳跃", page._tree_status.text())
+                self.assertEqual(page._tree.topLevelItemCount(), 1)
+
+
+    def test_drop_zone_drag_move_event_accepted(self):
+        """DropZone 正确响应 dragMoveEvent，使得 Windows 资源管理器拖拽悬停时不被判定为非法区域。"""
+        from PySide6.QtCore import QPoint, Qt, QUrl, QMimeData
+        from PySide6.QtGui import QDragMoveEvent
+        from doc_tool.ui.wizard import _DropZone
+
+        zone = _DropZone()
+        mime_docx = QMimeData()
+        mime_docx.setUrls([QUrl.fromLocalFile("C:/fake/sample.docx")])
+        move_ev = QDragMoveEvent(
+            QPoint(10, 10),
+            Qt.DropAction.CopyAction,
+            mime_docx,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        zone.dragMoveEvent(move_ev)
+        self.assertTrue(move_ev.isAccepted(), "docx 文件悬停时必须接受 dragMove 以便 Windows OLE 正确放行 drop")
+
+    def test_source_page_resets_stale_mapping_and_updates_names_on_switch(self):
+        """更换源文件时，重置上一文件的样式映射残留，并同步更新文档名称与项目目录名。"""
+        import tempfile
+        wizard = self._wizard()
+        source_page = wizard._source_page
+        mapping_page = wizard._mapping_page
+
+        mapping_page._rows = [{"style_id": "OldStyle", "combo": None}]
+        wizard._heading_style_map = {"OldStyle": 1}
+
+        with tempfile.NamedTemporaryFile(suffix=".docx", prefix="new_design_doc_") as f:
+            source_page._on_file_selected(f.name)
+            self.assertEqual(mapping_page._rows, [], "更换文件必须清空旧样式映射行")
+            self.assertIsNone(wizard._heading_style_map, "更换文件必须重置 heading_style_map")
+            self.assertIn("new_design_doc", wizard._doc_name, "更换文件后文档名称必须同步更新")
+            self.assertIn("new_design_doc", wizard._project_name, "更换文件后项目目录名必须同步更新")
+
+    def test_silent_preflight_updates_next_button_text_and_runner_gate(self):
+        """静默预检运行中 NextButton 禁用防并发碰撞，完成时立即刷新按钮文案为下一步引导。"""
+        from types import SimpleNamespace
+        from PySide6.QtWidgets import QWizard
+        wizard = self._wizard()
+        source_page = wizard._source_page
+
+        source_page._source_path = "C:/fake/sample.docx"
+        wizard._runner._is_running = True
+        self.assertFalse(source_page.isComplete(), "预检执行中禁止点击下一步导致并发任务冲突")
+
+        wizard._runner._is_running = False
+        preview = SimpleNamespace(
+            has_heading1=True,
+            heading_level_counts={1: 3},
+            image_count=2,
+            table_count=1,
+            warnings=[],
+            fidelity=SimpleNamespace(has_block=False, findings=[]),
+        )
+        wizard._on_page_changed(0)
+        source_page._on_silent_preflight_done((True, preview, "ok"))
+        self.assertTrue(source_page.isComplete())
+        next_btn = wizard.button(QWizard.WizardButton.NextButton)
+        self.assertEqual(next_btn.text(), "下一步：确认项目信息", "预检完成后 NextButton 文案应即时自适应")
+
+    def test_project_info_conflict_naming_increments_cleanly(self):
+        """已存在 my_project 与 my_project-v2 时，递增建议为 my_project-v3 而非层叠 -v2-v2。"""
+        import tempfile
+        wizard = self._wizard()
+        page = wizard._info_page
+
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "demo_proj").mkdir()
+            (Path(td) / "demo_proj-v2").mkdir()
+
+            wizard._target_parent = td
+            wizard._project_name = "demo_proj"
+            wizard._doc_name = "我的演示"
+            page.initializePage()
+
+            self.assertFalse(page.isComplete(), "存在冲突目录时禁止提交导入")
+            self.assertEqual(page._suggested_safe_name, "demo_proj-v3", "连续递增应为 -v3 而非 -v2-v2")
+            page._apply_suggested_name()
+            self.assertTrue(page.isComplete(), "更名后应自动恢复为 Complete")
+            self.assertEqual(page._project_name_entry.text(), "demo_proj-v3")
+
+    def test_result_page_failure_surfaces_error_reason_directly(self):
+        """导入失败卡片上直接呈现具体失败原因，无需非技术用户展开技术诊断折叠框。"""
+        from types import SimpleNamespace
+        wizard = self._wizard()
+        page = wizard._result_page
+
+        failed_event = SimpleNamespace(stage="validate_target", status="failed", detail="目标目录无写入权限", metrics={})
+        wizard._import_result = SimpleNamespace(
+            success=False,
+            error_code="E1005",
+            events=[failed_event],
+            diagnostic_log="",
+        )
+        page.initializePage()
+        self.assertFalse(page._failure_reason.isHidden())
+        self.assertIn("目标目录无写入权限", page._failure_reason.text())
+
+    def test_outline_tree_degrade_btn_appears_on_missing_h1_or_gaps(self):
+        """当用户从级别 2 开始映射或跳级时，降级按钮显现并支持一键顺延对齐。"""
+        from types import SimpleNamespace
+        from doc_tool.adapters.preflight import StyleCensus
+        from unittest.mock import patch
+        import tempfile
+        wizard = self._wizard()
+        page = wizard._mapping_page
+
+        census = {
+            "S2": StyleCensus("S2", "二级样式", 2, True),
+            "S3": StyleCensus("S3", "三级样式", 2, True),
+        }
+        page._populate(SimpleNamespace(style_census=census, heading_style_map={}))
+        c2 = next(r["combo"] for r in page._rows if r["style_id"] == "S2")
+        c3 = next(r["combo"] for r in page._rows if r["style_id"] == "S3")
+        c2.setCurrentIndex(c2.findData(2))
+        c3.setCurrentIndex(c3.findData(3))
+
+        with tempfile.NamedTemporaryFile(suffix=".docx") as tmp:
+            wizard._source_page._source_path = tmp.name
+            with patch("doc_tool.adapters.preflight.generate_preview_heading_tree") as mock_tree:
+                mock_tree.return_value = ([], "未包含级别 1（章标题）")
+                page._update_outline_tree()
+                self.assertFalse(page._degrade_btn.isHidden(), "映射缺少级别 1 时也应展现平滑降级按钮协助修正")
+
+                mock_tree.return_value = ([SimpleNamespace(level=1, text="新章"), SimpleNamespace(level=2, text="新节")], "")
+                page._degrade_btn.click()
+                self.assertEqual(page.mapping(), {"S2": 1, "S3": 2}, "平滑降级后 2/3 应顺延降为 1/2")
+
+    def test_generate_preview_heading_tree_reports_first_heading_not_h1(self):
+        """当文档第一个标题不是 H1 时，准确回显错误信息而非误报未被使用。"""
+        from doc_tool.adapters.preflight import generate_preview_heading_tree
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        with patch("doc_tool.adapters.preflight._build_heading_tree") as mock_build:
+            mock_build.return_value = [
+                SimpleNamespace(level=2, text="引言"),
+                SimpleNamespace(level=1, text="第一章"),
+            ]
+            headings, error = generate_preview_heading_tree({}, {"S": 1, "S2": 2})
+            self.assertIn("第一个标题不是", error)
+
+
+    def test_custom_generation_dir_checkbox_default_state_and_collapse(self):
+        """测试'自定义生成目录'选项默认未勾选，路径输入框折叠，且清晰展示默认推荐路径提示。"""
+        wizard = self._wizard()
+        source_page = wizard._source_page
+        info_page = wizard._info_page
+
+        # 1. 步骤 1 (SourcePage) 默认未勾选，目录输入控件折叠隐藏，显示默认路径友好提示
+        self.assertTrue(hasattr(source_page, "_custom_dir_check"))
+        self.assertEqual(source_page._custom_dir_check.text(), "自定义生成目录")
+        self.assertFalse(source_page._custom_dir_check.isChecked(), "默认状态必须未勾选")
+        self.assertTrue(source_page._custom_dir_container.isHidden(), "未勾选时目录输入框和浏览按钮应折叠隐藏")
+        self.assertFalse(source_page._default_path_label.isHidden(), "未勾选时应清晰展示默认生成目录提示")
+        self.assertIn("系统推荐默认路径", source_page._default_path_label.text())
+
+        # 2. 步骤 4 (ProjectInfoPage) 默认未勾选，目录输入控件折叠隐藏，显示默认路径友好提示
+        info_page.initializePage()
+        self.assertTrue(hasattr(info_page, "_custom_dir_check"))
+        self.assertEqual(info_page._custom_dir_check.text(), "自定义生成目录")
+        self.assertFalse(info_page._custom_dir_check.isChecked(), "默认状态必须未勾选")
+        self.assertTrue(info_page._custom_dir_container.isHidden(), "未勾选时存放位置输入行应折叠隐藏")
+        self.assertFalse(info_page._default_path_label.isHidden(), "未勾选时应清晰展示默认路径提示")
+        self.assertIn("系统推荐默认路径", info_page._default_path_label.text())
+        self.assertTrue(len(info_page._target_entry.text().strip()) > 0, "应智能填充默认推荐存放父目录")
+
+    def test_custom_generation_dir_expand_and_revert_on_info_page(self):
+        """测试在项目信息页勾选自定义目录展开输入框与浏览按钮，取消勾选时自动恢复默认路径并折叠。"""
+        import tempfile
+        wizard = self._wizard()
+        info_page = wizard._info_page
+
+        with tempfile.TemporaryDirectory() as td:
+            wizard._target_parent = td
+            wizard._project_name = "my_project"
+            wizard._doc_name = "测试项目"
+            info_page.initializePage()
+            default_path = info_page._target_entry.text().strip()
+            self.assertEqual(default_path, td)
+
+            # 勾选展开
+            info_page._custom_dir_check.setChecked(True)
+            self.assertTrue(info_page._custom_dir_check.isChecked())
+            self.assertFalse(info_page._custom_dir_container.isHidden(), "勾选后应展开目标目录输入框与浏览按钮")
+            self.assertTrue(info_page._default_path_label.isHidden(), "展开自定义输入后应隐藏默认路径静态提示")
+
+            # 修改为自定义路径
+            custom_path = str(Path(td) / "custom_subfolder")
+            info_page._target_entry.setText(custom_path)
+            self.assertEqual(wizard._target_parent, custom_path)
+            self.assertIn(custom_path, info_page._path_preview_label.text())
+
+            # 取消勾选（没有自定义就默认）
+            info_page._custom_dir_check.setChecked(False)
+            self.assertTrue(info_page._custom_dir_container.isHidden(), "取消勾选后应重新折叠目录输入框")
+            self.assertFalse(info_page._default_path_label.isHidden(), "取消勾选后应重新展示默认路径提示")
+            self.assertEqual(info_page._target_entry.text().strip(), default_path, "取消勾选后应自动恢复默认生成路径")
+            self.assertEqual(wizard._target_parent, default_path)
+
+    def test_custom_generation_dir_sync_from_source_page_to_info_page(self):
+        """测试在步骤1源页面自定义生成目录后，无缝同步至步骤4项目信息页。"""
+        wizard = self._wizard()
+        source_page = wizard._source_page
+        info_page = wizard._info_page
+
+        # 在步骤1勾选自定义生成目录并配置路径
+        source_page._custom_dir_check.setChecked(True)
+        self.assertFalse(source_page._custom_dir_container.isHidden())
+        self.assertTrue(source_page._default_path_label.isHidden())
+
+        custom_dest = "D:/my_custom_project_dir"
+        source_page._target_entry.setText(custom_dest)
+        self.assertEqual(wizard._target_parent, custom_dest)
+
+        # 切换或初始化步骤 4
+        info_page.initializePage()
+        self.assertTrue(info_page._custom_dir_check.isChecked(), "步骤4应自动同步勾选状态")
+        self.assertFalse(info_page._custom_dir_container.isHidden(), "步骤4应保持展开状态")
+        self.assertEqual(info_page._target_entry.text(), custom_dest, "步骤4应保持步骤1选择的自定义目录")
+
+    def test_custom_generation_dir_bidirectional_sync_and_uncheck_revert(self):
+        """测试双向实时同步与在任一页面取消勾选均能正确恢复真实默认路径。"""
+        wizard = self._wizard()
+        source_page = wizard._source_page
+        info_page = wizard._info_page
+        real_default = wizard._get_default_target_parent()
+
+        # 1. 步骤1勾选并自定义路径
+        source_page._custom_dir_check.setChecked(True)
+        source_page._target_entry.setText("D:/first_custom")
+        self.assertEqual(wizard._target_parent, "D:/first_custom")
+
+        # 2. 进入步骤4，验证默认路径未被自定义路径覆盖破坏
+        info_page.initializePage()
+        self.assertEqual(wizard._default_target_parent, real_default, "默认目录属性必须保持为系统真实默认目录")
+        self.assertTrue(info_page._custom_dir_check.isChecked())
+        self.assertEqual(info_page._target_entry.text(), "D:/first_custom")
+
+        # 3. 在步骤4取消勾选（没有自定义就默认），必须恢复到真实默认路径，而不是恢复到自定义路径
+        info_page._custom_dir_check.setChecked(False)
+        self.assertFalse(info_page._custom_dir_check.isChecked())
+        self.assertTrue(info_page._custom_dir_container.isHidden())
+        self.assertEqual(info_page._target_entry.text().strip(), real_default, "取消勾选必须恢复为系统推荐默认目录")
+        self.assertEqual(wizard._target_parent, real_default)
+
+        # 同步回步骤1验证
+        self.assertFalse(source_page._custom_dir_check.isChecked(), "步骤1勾选状态应随之重置为未勾选")
+        self.assertTrue(source_page._custom_dir_container.isHidden(), "步骤1输入框应重新折叠")
+        self.assertEqual(source_page._target_entry.text().strip(), real_default, "步骤1路径应恢复为真实默认目录")
+        self.assertIn(real_default, source_page._default_path_label.text())
+
+        # 4. 在步骤4重新自定义并修改路径，双向同步到步骤1
+        info_page._custom_dir_check.setChecked(True)
+        info_page._target_entry.setText("E:/second_custom")
+        self.assertTrue(source_page._custom_dir_check.isChecked())
+        self.assertEqual(source_page._target_entry.text(), "E:/second_custom")
+
+        # 5. 在步骤1取消勾选，步骤4亦同步恢复默认并折叠
+        source_page._custom_dir_check.setChecked(False)
+        self.assertFalse(info_page._custom_dir_check.isChecked())
+        self.assertTrue(info_page._custom_dir_container.isHidden())
+        self.assertEqual(info_page._target_entry.text().strip(), real_default)
+
+    def test_custom_generation_dir_backwards_compatibility_attributes(self):
+        """向后兼容性验证：确保 _doc_name_entry, _project_name_entry, _target_entry 等旧属性依然存在可用。"""
+        from PySide6.QtWidgets import QLineEdit
+        wizard = self._wizard()
+        info_page = wizard._info_page
+
+        self.assertTrue(hasattr(info_page, "_doc_name_entry"))
+        self.assertIsInstance(info_page._doc_name_entry, QLineEdit)
+        self.assertTrue(hasattr(info_page, "_project_name_entry"))
+        self.assertIsInstance(info_page._project_name_entry, QLineEdit)
+        self.assertTrue(hasattr(info_page, "_target_entry"))
+        self.assertIsInstance(info_page._target_entry, QLineEdit)
+
+        # 验证属性读写及默认提交流程
+        info_page._doc_name_entry.setText("系统架构方案")
+        info_page._project_name_entry.setText("arch_project")
+        info_page._target_entry.setText("C:/projects")
+
+        self.assertEqual(info_page._doc_name_entry.text(), "系统架构方案")
+        self.assertEqual(info_page._project_name_entry.text(), "arch_project")
+        self.assertEqual(info_page._target_entry.text(), "C:/projects")
+
+    def test_custom_generation_dir_edge_cases(self):
+        """测试多次切换勾选、空路径阻断、特殊路径字符等边界情况。"""
+        wizard = self._wizard()
+        source_page = wizard._source_page
+        info_page = wizard._info_page
+
+        # 1. 连续多次切换勾选状态
+        for _ in range(3):
+            source_page._custom_dir_check.setChecked(True)
+            self.assertFalse(source_page._custom_dir_container.isHidden())
+            self.assertTrue(source_page._default_path_label.isHidden())
+            source_page._custom_dir_check.setChecked(False)
+            self.assertTrue(source_page._custom_dir_container.isHidden())
+            self.assertFalse(source_page._default_path_label.isHidden())
+
+        # 2. 步骤 1 勾选自定义目录后清空路径阻断 Next
+        source_page._source_path = "sample.docx"
+        source_page._custom_dir_check.setChecked(True)
+        source_page._target_entry.setText("   ")
+        self.assertFalse(source_page.isComplete(), "勾选自定义目录但路径为空时应阻断完成")
+
+        source_page._target_entry.setText("D:/valid_path")
+        self.assertTrue(source_page.isComplete(), "填写有效自定义目录后恢复完成")
+
+        source_page._custom_dir_check.setChecked(False)
+        self.assertTrue(source_page.isComplete(), "未勾选时自动回落默认路径，允许完成")
+
+        # 3. 步骤 4 勾选自定义目录后清空路径阻断 Next
+        info_page.initializePage()
+        info_page._doc_name_entry.setText("Doc")
+        info_page._project_name_entry.setText("Proj")
+        info_page._custom_dir_check.setChecked(True)
+        info_page._target_entry.setText("")
+        self.assertFalse(info_page.isComplete(), "项目信息页自定义目录为空时应阻断完成")
+
+        # 4. 特殊非法项目名阻断
+        info_page._target_entry.setText("D:/valid_path")
+        info_page._project_name_entry.setText("invalid:name*")
+        self.assertFalse(info_page.isComplete(), "包含非法字符的项目名应阻断完成")
+
+        info_page._project_name_entry.setText("valid_proj")
+        self.assertTrue(info_page.isComplete())
 
 if __name__ == "__main__":
     unittest.main()

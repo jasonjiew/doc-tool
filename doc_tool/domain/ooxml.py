@@ -16,7 +16,6 @@ XML 部件，消除各链路独立的包读取/解析实现，保证安全参数
 
 from __future__ import annotations
 
-import os
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -202,6 +201,13 @@ def read_docx_package(path: Union[str, Path]) -> DocxPackage:
             h = test_f.read(16)
         handle = zipfile.ZipFile(str(file_path), "r")
     except (zipfile.BadZipFile, OSError) as exc:
+        if h.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            raise OOXMLSecurityError(
+                "文件实际为旧版 Word 97-2003 二进制格式（.doc），仅文件扩展名被修改为了 .docx（路径={0}）".format(file_path),
+                part_name="",
+                reason="doc_as_docx",
+                cause=exc,
+            ) from exc
         raise OOXMLSecurityError(
             "文件不是有效的 ZIP 包或不存在（路径={0}，前16字节={1!r}）：{2}".format(file_path, h, exc),
             part_name="",

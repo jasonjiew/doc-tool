@@ -32,10 +32,9 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional
 
 from doc_tool.adapters.importer import (
-    ExtractionResult,
     TemplateMeta,
     extract_content,
     generate_template,
@@ -127,6 +126,7 @@ class ImportResult:
 def import_first_time(
     request: ImportRequest,
     cancel_token: Optional[CancellationToken] = None,
+    on_event: Optional[Callable[[ImportStageEvent], None]] = None,
 ) -> ImportResult:
     """执行事务化首次导入，返回结构化结果（不向调用方抛出异常）。
 
@@ -134,6 +134,7 @@ def import_first_time(
     正式项目永不被修改。
     """
     result = ImportResult(success=False)
+    result._on_event = on_event
     source_path = Path(request.source_docx)
     target = Path(request.target_project_root).resolve()
     staging: Optional[Path] = None
@@ -346,6 +347,12 @@ def _record(
     if error_code:
         event.metrics["errorCode"] = error_code
     result.events.append(event)
+    cb = getattr(result, "_on_event", None)
+    if cb is not None:
+        try:
+            cb(event)
+        except Exception:
+            pass
 
 
 def _current_stage(result: ImportResult) -> str:

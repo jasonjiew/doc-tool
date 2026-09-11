@@ -17,12 +17,11 @@
 
 from __future__ import annotations
 
-import os
 import posixpath
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from lxml import etree
 
@@ -93,6 +92,7 @@ class StyleCensus:
     name: str
     usage_count: int
     suspected_heading: bool
+    sample_text: str = ""
 
 
 @dataclass
@@ -278,6 +278,18 @@ def _map_security_error(exc: OOXMLSecurityError) -> DocToolError:
             suggested_action="文件可能在传输中损坏，请重新获取原始 DOCX。",
             details={"badEntry": exc.part_name},
         )
+    if exc.reason == "doc_as_docx":
+        return InvalidDocxError(
+            "文件实际为旧版 Word 97-2003 二进制格式（.doc），仅文件扩展名被修改为了 .docx",
+            suggested_action="请在 Word 或 WPS 中打开该文件，通过【另存为】将保存类型选择为【Word 文档 (*.docx)】后重新导入。",
+            details={"magic": "d0cf11e0", "originalFormat": "doc"},
+        )
+    if exc.reason == "zip":
+        return InvalidDocxError(
+            "文件不是有效的 DOCX 压缩包（可能损坏或格式不符）：{0}".format(exc),
+            suggested_action="请确认文件是标准 Word .docx 格式并在 Word 中尝试重新另存。",
+            details={"error": str(exc)},
+        )
     if exc.reason == "missing":
         return InvalidDocxError(
             "缺少核心部件：{0}".format(exc.part_name),
@@ -462,6 +474,7 @@ def census_paragraph_styles(parts: Dict[str, bytes]) -> Dict[str, StyleCensus]:
 
     document_xml = parts.get("word/document.xml", b"")
     usage: Dict[str, int] = {}
+    sample_texts: Dict[str, str] = {}
     if document_xml:
         root = parse_xml_safe(document_xml, "word/document.xml")
         for paragraph in root.iter(_qn("p")):
@@ -474,6 +487,10 @@ def census_paragraph_styles(parts: Dict[str, bytes]) -> Dict[str, StyleCensus]:
             style_id = pStyle.get(_qn("val"))
             if style_id:
                 usage[style_id] = usage.get(style_id, 0) + 1
+                if style_id not in sample_texts:
+                    p_text = _para_text(paragraph).strip()
+                    if p_text:
+                        sample_texts[style_id] = p_text[:40]
 
     census: Dict[str, StyleCensus] = {}
     for style_id, name in style_names.items():
@@ -482,6 +499,7 @@ def census_paragraph_styles(parts: Dict[str, bytes]) -> Dict[str, StyleCensus]:
             name=name,
             usage_count=usage.get(style_id, 0),
             suspected_heading=_looks_like_heading(name),
+            sample_text=sample_texts.get(style_id, ""),
         )
     return census
 
@@ -652,3 +670,32 @@ def _count_tables(parts: Dict[str, bytes]) -> int:
         if etree.QName(elem).localname == "tbl":
             count += 1
     return count
+
+
+def generate_preview_heading_tree(
+    path_or_parts: Union[str, Path, Dict[str, bytes]],
+    heading_style_map: Dict[str, int],
+) -> Tuple[List[HeadingInfo], str]:
+    if not heading_style_map or 1 not in heading_style_map.values():
+        return [], "未包含级别 1（章标题）"
+    try:
+        if isinstance(path_or_parts, (str, Path)):
+            with read_docx_package(path_or_parts) as package:
+                parts = package.read_xml_parts()
+        else:
+            parts = path_or_parts
+    except Exception as exc:
+        return [], f"读取文档失败: {exc}"
+
+    headings = _build_heading_tree(parts, heading_style_map)
+    error = ""
+    try:
+        _validate_heading_hierarchy(headings)
+    except HeadingHierarchyError as exc:
+        error = exc.user_message
+    except MissingHeading1Error as exc:
+        if not headings:
+            error = "映射到级别 1 的样式在正文中未被使用"
+        else:
+            error = getattr(exc, "user_message", None) or "第一个标题不是级别 1（章标题）"
+    return headings, error
