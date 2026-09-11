@@ -526,6 +526,8 @@ class PdfToolboxTests(unittest.TestCase):
             self.assertEqual(len(dialog._sources), 0)
         finally:
             dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
 
 
     def test_19_edge_cases_and_clean_handles(self) -> None:
@@ -572,6 +574,573 @@ class PdfToolboxTests(unittest.TestCase):
             options={"password": "  pw_with_spaces  "},
         )
         self.assertTrue(res_dec_ok.success)
+
+
+
+    def test_20_reorder(self) -> None:
+        """测试页面重排功能：reverse 与自定义顺序。"""
+        from doc_tool.application.pdf_tools import TOOL_REORDER
+
+        src = _create_sample_pdf(self.temp_path / "reorder_src.pdf", page_count=3)
+
+        # 1. 倒序反转全部页面
+        res_rev = run_pdf_tool(
+            TOOL_REORDER,
+            [src],
+            output_dir=self.temp_path,
+            options={"order": "reverse"},
+        )
+        self.assertTrue(res_rev.success)
+        out_pdf = res_rev.records[0].outputs[0]
+        reader = pypdf.PdfReader(str(out_pdf))
+        self.assertEqual(len(reader.pages), 3)
+        self.assertIn("第 3 页", reader.pages[0].extract_text())
+        self.assertIn("第 1 页", reader.pages[2].extract_text())
+
+        # 2. 自定义顺序 "2, 1" (截取前2页并颠倒)
+        res_custom = run_pdf_tool(
+            TOOL_REORDER,
+            [src],
+            output_dir=self.temp_path,
+            options={"order": "2, 1"},
+            overwrite=True,
+        )
+        self.assertTrue(res_custom.success)
+        out_custom = res_custom.records[0].outputs[0]
+        reader_c = pypdf.PdfReader(str(out_custom))
+        self.assertEqual(len(reader_c.pages), 2)
+        self.assertIn("第 2 页", reader_c.pages[0].extract_text())
+        self.assertIn("第 1 页", reader_c.pages[1].extract_text())
+
+        # 3. 越界异常校验
+        res_bad = run_pdf_tool(
+            TOOL_REORDER,
+            [src],
+            output_dir=self.temp_path,
+            options={"order": "1, 99"},
+        )
+        self.assertFalse(res_bad.success)
+        self.assertEqual(res_bad.error_code, "E7002")
+
+    def test_21_compress_levels(self) -> None:
+        """测试压缩等级选择（standard / lossless / aggressive）。"""
+        src = _create_sample_pdf(self.temp_path / "comp_lvl_src.pdf", page_count=2)
+        for lvl in ("lossless", "standard", "aggressive"):
+            res = run_pdf_tool(
+                TOOL_COMPRESS,
+                [src],
+                output_dir=self.temp_path / f"out_{lvl}",
+                options={"level": lvl},
+            )
+            self.assertTrue(res.success)
+            self.assertTrue(res.records[0].outputs[0].is_file())
+            self.assertIn("KB", res.records[0].detail)
+
+    def test_22_watermark_image_and_positions(self) -> None:
+        """测试图片水印与不同定位模式。"""
+        src = _create_sample_pdf(self.temp_path / "wm_pos_src.pdf", page_count=1)
+        # 创建一张临时测试印章图片
+        from PIL import Image
+        stamp_img = self.temp_path / "stamp.png"
+        img = Image.new("RGBA", (100, 100), (255, 0, 0, 180))
+        img.save(stamp_img)
+
+        # 图片水印测试
+        res_img = run_pdf_tool(
+            TOOL_WATERMARK,
+            [src],
+            output_dir=self.temp_path,
+            options={
+                "watermark_type": "image",
+                "image_path": str(stamp_img),
+                "mode": "top-right",
+                "opacity": 50,
+                "scale": 25,
+            },
+        )
+        self.assertTrue(res_img.success)
+        self.assertTrue(res_img.records[0].outputs[0].is_file())
+
+        # 多方位文字水印测试
+        for mode in ("top-left", "bottom-right", "tiled"):
+            res_mode = run_pdf_tool(
+                TOOL_WATERMARK,
+                [src],
+                output_dir=self.temp_path / f"out_{mode}",
+                options={"text": "TEST_POS", "mode": mode},
+            )
+            self.assertTrue(res_mode.success)
+
+    def test_23_images_to_pdf_layout(self) -> None:
+        """测试图片转 PDF 版面尺寸、方向与边距。"""
+        from PIL import Image
+        img_p1 = self.temp_path / "p1.jpg"
+        img_p2 = self.temp_path / "p2.png"
+        Image.new("RGB", (200, 300), (100, 150, 200)).save(img_p1)
+        Image.new("RGB", (400, 200), (200, 100, 150)).save(img_p2)
+
+        res = run_pdf_tool(
+            TOOL_IMAGES_TO_PDF,
+            [img_p1, img_p2],
+            output_dir=self.temp_path,
+            options={
+                "page_size": "a4",
+                "orientation": "portrait",
+                "margin": 18,
+            },
+        )
+        self.assertTrue(res.success)
+        out_pdf = res.records[0].outputs[0]
+        reader = pypdf.PdfReader(str(out_pdf))
+        self.assertEqual(len(reader.pages), 2)
+
+    def test_24_helpers_and_password_strength(self) -> None:
+        """测试 get_pdf_info 与 evaluate_password_strength 辅助能力。"""
+        from doc_tool.application.pdf_tools import (
+            evaluate_password_strength,
+            get_pdf_info,
+        )
+
+        src = _create_sample_pdf(self.temp_path / "info_src.pdf", page_count=2)
+        info = get_pdf_info(src)
+        self.assertTrue(info["exists"])
+        self.assertEqual(info["type"], "pdf")
+        self.assertEqual(info["page_count"], 2)
+        self.assertFalse(info["is_encrypted"])
+
+        # 密码强度评估
+        eval_weak = evaluate_password_strength("12345")
+        self.assertEqual(eval_weak["score"], 1)
+
+        eval_mid = evaluate_password_strength("abc12345")
+        self.assertGreaterEqual(eval_mid["score"], 2)
+
+        eval_strong = evaluate_password_strength("Abc@2026!Strong")
+        self.assertGreaterEqual(eval_strong["score"], 3)
+
+
+
+    def test_25_dialog_portal_and_filtering(self) -> None:
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            self.assertEqual(len(dialog._cards_list), len(pt.TOOL_SPECS) + 1)
+            dialog._portal_search.setText(pt.TOOL_WATERMARK)
+            dialog._filter_portal_cards()
+            wm_cards = [c for c in dialog._cards_list if not c.isHidden()]
+            self.assertGreaterEqual(len(wm_cards), 1)
+            self.assertEqual(wm_cards[0]._tool_id, pt.TOOL_WATERMARK)
+
+            dialog._portal_search.setText('')
+            dialog._filter_portal_cards()
+
+            dialog.select_tool(pt.TOOL_WATERMARK)
+            self.assertEqual(dialog._current_tool_id(), pt.TOOL_WATERMARK)
+            self.assertEqual(dialog._view_stack.currentIndex(), 1)
+
+            dialog._show_portal_view()
+            self.assertEqual(dialog._view_stack.currentIndex(), 0)
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_26_dialog_options_collection_validation(self) -> None:
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+        from doc_tool.domain.errors import PdfInputError
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            dialog.select_tool(pt.TOOL_ENCRYPT)
+            dialog._enc_user_pw.setText('pass123')
+            dialog._enc_confirm_pw.setText('pass456')
+            with self.assertRaises(PdfInputError):
+                dialog._collect_options(pt.TOOL_ENCRYPT)
+
+            dialog._enc_confirm_pw.setText('pass123')
+            opts_enc = dialog._collect_options(pt.TOOL_ENCRYPT)
+            self.assertEqual(opts_enc['user_password'], 'pass123')
+
+            dialog.select_tool(pt.TOOL_EXTRACT)
+            dialog._extract_pages.setText('')
+            with self.assertRaises(PdfInputError):
+                dialog._collect_options(pt.TOOL_EXTRACT)
+
+            dialog._extract_pages.setText('1-3')
+            opts_ext = dialog._collect_options(pt.TOOL_EXTRACT)
+            self.assertEqual(opts_ext['pages'], '1-3')
+
+            dialog.select_tool(pt.TOOL_WATERMARK)
+            dialog._wm_type.setCurrentIndex(1)
+            dialog._wm_img_path.setText('')
+            with self.assertRaises(PdfInputError):
+                dialog._collect_options(pt.TOOL_WATERMARK)
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_27_edge_cases_and_error_handling(self) -> None:
+        import doc_tool.application.pdf_tools as pt
+
+        src = _create_sample_pdf(self.temp_path / 'edge_src.pdf', page_count=2)
+
+        res_split_bad = run_pdf_tool(
+            pt.TOOL_SPLIT,
+            [src],
+            output_dir=self.temp_path / 'bad_split',
+            options={'mode': 'invalid_mode'},
+        )
+        self.assertFalse(res_split_bad.success)
+
+        res_merge_one = run_pdf_tool(
+            pt.TOOL_MERGE,
+            [src],
+            output_dir=self.temp_path / 'bad_merge',
+        )
+        self.assertFalse(res_merge_one.success)
+        self.assertEqual(res_merge_one.error_code, 'E7008')
+
+        res_dec_unenc = run_pdf_tool(
+            pt.TOOL_DECRYPT,
+            [src],
+            output_dir=self.temp_path / 'dec_unenc',
+            options={'password': ''},
+        )
+        self.assertTrue(res_dec_unenc.success)
+        self.assertTrue(bool(res_dec_unenc.records[0].note))
+
+
+    def test_28_cli_mode_and_scale_quality_args(self) -> None:
+        """测试 CLI 参数解析支持扩展水印位置、缩放比例与质量。"""
+        import argparse
+        from doc_tool.application.pdf_tools import (
+            TOOL_TO_IMAGES,
+            TOOL_WATERMARK,
+            add_pdf_tool_arguments,
+            pdf_options_from_args,
+        )
+
+        parser = argparse.ArgumentParser()
+        add_pdf_tool_arguments(parser)
+
+        for mode in ("top-left", "top-right", "bottom-left", "bottom-right", "tiled", "center"):
+            args = parser.parse_args([TOOL_WATERMARK, "dummy.pdf", "--mode", mode, "--scale", "45", "--quality", "85"])
+            opts = pdf_options_from_args(args)
+            self.assertEqual(opts["mode"], mode)
+            self.assertEqual(opts["scale"], 45.0)
+            self.assertEqual(opts["quality"], 85)
+
+    def test_29_tool_to_images_quality_support(self) -> None:
+        """测试 PDF 转图片质量设置真实生效。"""
+        from doc_tool.application.pdf_tools import TOOL_TO_IMAGES
+        src = _create_sample_pdf(self.temp_path / "img_q_src.pdf", page_count=1)
+
+        res_q30 = run_pdf_tool(
+            TOOL_TO_IMAGES,
+            [src],
+            output_dir=self.temp_path / "out_q30",
+            options={"image_format": "jpg", "quality": 30, "dpi": 150},
+        )
+        self.assertTrue(res_q30.success)
+        self.assertIn("质量: 30", res_q30.records[0].detail)
+        f_q30 = res_q30.records[0].outputs[0]
+
+        res_q95 = run_pdf_tool(
+            TOOL_TO_IMAGES,
+            [src],
+            output_dir=self.temp_path / "out_q95",
+            options={"image_format": "jpg", "quality": 95, "dpi": 150},
+        )
+        self.assertTrue(res_q95.success)
+        self.assertIn("质量: 95", res_q95.records[0].detail)
+        f_q95 = res_q95.records[0].outputs[0]
+
+        self.assertLess(f_q30.stat().st_size, f_q95.stat().st_size)
+
+    def test_30_aggressive_compress_image_reduction(self) -> None:
+        """测试强力压缩对高分辨率图片流的下采样与重压缩降容。"""
+        from PIL import Image
+        from doc_tool.application.pdf_tools import TOOL_COMPRESS
+        import io
+
+        im = Image.new("RGB", (2000, 2000), (180, 120, 60))
+        pdf_path = self.temp_path / "img_heavy.pdf"
+        im.save(pdf_path, format="PDF")
+
+        res_lossless = run_pdf_tool(
+            TOOL_COMPRESS,
+            [pdf_path],
+            output_dir=self.temp_path / "out_lossless",
+            options={"level": "lossless"},
+        )
+        self.assertTrue(res_lossless.success)
+        size_lossless = res_lossless.records[0].outputs[0].stat().st_size
+
+        res_aggr = run_pdf_tool(
+            TOOL_COMPRESS,
+            [pdf_path],
+            output_dir=self.temp_path / "out_aggr",
+            options={"level": "aggressive"},
+        )
+        self.assertTrue(res_aggr.success)
+        size_aggr = res_aggr.records[0].outputs[0].stat().st_size
+
+        self.assertLess(size_aggr, size_lossless)
+
+    def test_31_get_pdf_info_dimensions_and_metadata(self) -> None:
+        """测试 get_pdf_info 提取尺寸、主题、关键字及异常防护。"""
+        from doc_tool.application.pdf_tools import get_pdf_info
+        p = self.temp_path / "meta_dim.pdf"
+        writer = pypdf.PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.add_metadata({
+            "/Title": "测试报告",
+            "/Author": "测试作者",
+            "/Subject": "质量检验",
+            "/Keywords": "PDF, 压缩, 测试",
+        })
+        with open(p, "wb") as f:
+            writer.write(f)
+
+        info = get_pdf_info(p)
+        self.assertTrue(info["exists"])
+        self.assertEqual(info["title"], "测试报告")
+        self.assertEqual(info["author"], "测试作者")
+        self.assertEqual(info["subject"], "质量检验")
+        self.assertEqual(info["keywords"], "PDF, 压缩, 测试")
+        self.assertIn("595 × 842", info["dimensions"])
+
+        # 空损坏文件防护
+        p_corrupt = self.temp_path / "corrupt_empty.pdf"
+        p_corrupt.write_bytes(b"")
+        info_c = get_pdf_info(p_corrupt)
+        self.assertIn("error", info_c)
+
+    def test_32_dialog_password_confirmation_enforced(self) -> None:
+        """测试加密密码确认强制校验及拆分范围必填校验。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+        from doc_tool.domain.errors import PdfInputError
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            dialog.select_tool(pt.TOOL_ENCRYPT)
+            dialog._enc_user_pw.setText("mysecret")
+            dialog._enc_confirm_pw.setText("")
+            with self.assertRaises(PdfInputError):
+                dialog._collect_options(pt.TOOL_ENCRYPT)
+
+            dialog._enc_confirm_pw.setText("mysecret")
+            opts = dialog._collect_options(pt.TOOL_ENCRYPT)
+            self.assertEqual(opts["user_password"], "mysecret")
+
+            # 拆分模式范围必填
+            dialog.select_tool(pt.TOOL_SPLIT)
+            dialog._split_mode.setCurrentIndex(2)  # range 模式
+            dialog._split_ranges.setText("")
+            with self.assertRaises(PdfInputError):
+                dialog._collect_options(pt.TOOL_SPLIT)
+
+            dialog._split_ranges.setText("1-3")
+            opts_split = dialog._collect_options(pt.TOOL_SPLIT)
+            self.assertEqual(opts_split["ranges"], "1-3")
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_33_dialog_format_incompatibility_and_retry_batch(self) -> None:
+        """测试文件格式不兼容提示与整批工具重试逻辑。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+        from PIL import Image
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            pdf_file = _create_sample_pdf(self.temp_path / "compat.pdf")
+            img_file = self.temp_path / "compat.png"
+            Image.new("RGB", (50, 50)).save(img_file)
+
+            dialog.select_tool(pt.TOOL_MERGE)
+            dialog._sources = [pdf_file, img_file]
+            dialog._refresh_table()
+
+            # 第二行格式不符
+            item_stat_img = dialog._table.item(1, 4)
+            self.assertIsNotNone(item_stat_img)
+            self.assertEqual(item_stat_img.text(), "格式不符")
+
+            # 重试合并调用全量 sources
+            called_with = []
+            dialog._start_processing = lambda targets: called_with.append(targets)
+            dialog._on_retry_single(pdf_file)
+            self.assertEqual(called_with[0], dialog._sources)
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_34_portal_compact_reflow_and_responsive_columns(self) -> None:
+        """测试首页卡片紧凑重排、无结果提示与响应式列计算。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            dialog.resize(600, 600)
+            self.assertEqual(dialog._get_responsive_col_count(), 1)
+            dialog.resize(900, 600)
+            self.assertEqual(dialog._get_responsive_col_count(), 2)
+            dialog.resize(1200, 600)
+            self.assertEqual(dialog._get_responsive_col_count(), 3)
+
+            # 搜索无结果时触发空状态提示
+            dialog._portal_search.setText("non_existing_keyword_xyz")
+            dialog._filter_portal_cards()
+            self.assertFalse(dialog._no_results_lbl.isHidden())
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_35_keyboard_events_and_accessibility(self) -> None:
+        """测试键盘操作（Esc 返回导航大厅）与无障碍语义标记。"""
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import QEvent, Qt
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            self.assertTrue(bool(dialog._table.accessibleName()))
+            self.assertTrue(bool(dialog._cards_list[0].accessibleName()))
+
+            # 进入工作区后按 Escape 键平滑返回首页
+            dialog.select_tool(pt.TOOL_MERGE)
+            self.assertEqual(dialog._view_stack.currentIndex(), 1)
+
+            key_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+            dialog.keyPressEvent(key_event)
+            self.assertEqual(dialog._view_stack.currentIndex(), 0)
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+    def test_36_table_selection_preview_and_metadata_autofill(self) -> None:
+        """测试选中表格行展示元信息摘要并自动填充元数据编辑表单。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            pdf_path = self.temp_path / "autofill.pdf"
+            w = pypdf.PdfWriter()
+            w.add_blank_page(width=200, height=300)
+            w.add_metadata({
+                "/Title": "自动填充标题",
+                "/Author": "自动填充作者",
+                "/Subject": "自动填充主题",
+                "/Keywords": "关键词A, 关键词B",
+            })
+            with open(pdf_path, "wb") as f:
+                w.write(f)
+
+            dialog.select_tool(pt.TOOL_METADATA)
+            dialog._sources = [pdf_path]
+            dialog._refresh_table()
+
+            dialog._table.selectRow(0)
+            dialog._on_table_selection_changed()
+
+            self.assertIn("自动填充标题", dialog._preview_banner.text())
+            self.assertEqual(dialog._meta_title.text(), "自动填充标题")
+            self.assertEqual(dialog._meta_author.text(), "自动填充作者")
+            self.assertEqual(dialog._meta_subject.text(), "自动填充主题")
+            self.assertEqual(dialog._meta_keywords.text(), "关键词A, 关键词B")
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+
+
+    def test_37_reorder_edge_cases_and_out_of_bounds(self) -> None:
+        """测试页面重排边界条件：倒序合法范围、越界范围与含0异常。"""
+        import doc_tool.application.pdf_tools as pt
+        from doc_tool.domain.errors import PdfPageSelectionError
+
+        pdf_path = self.temp_path / "three_pages.pdf"
+        writer = pypdf.PdfWriter()
+        for _ in range(3):
+            writer.add_blank_page(width=100, height=100)
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+
+        # 合法倒序 3-1
+        res = pt.run_pdf_tool(
+            pt.TOOL_REORDER,
+            [pdf_path],
+            output_dir=self.temp_path / "out_reorder",
+            options={"order": "3-1"},
+        )
+        self.assertTrue(res.success)
+        out_pdf = res.records[0].outputs[0]
+        r = pypdf.PdfReader(str(out_pdf))
+        self.assertEqual(len(r.pages), 3)
+
+        # 倒序越界 10-1（总共 3 页）
+        with self.assertRaises(PdfPageSelectionError):
+            pt._tool_reorder(pdf_path, None, True, {"order": "10-1"})
+
+        # 包含 0 异常 3-0
+        with self.assertRaises(PdfPageSelectionError):
+            pt._tool_reorder(pdf_path, None, True, {"order": "3-0"})
+
+    def test_38_dialog_row_actions_deleted_on_clear_and_reject_gating(self) -> None:
+        """测试 PdfToolboxDialog 的行级操作组件生命周期追踪与清空安全释放。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.ui.pdf_toolbox_dialog import PdfToolboxDialog
+        import doc_tool.application.pdf_tools as pt
+
+        app = QApplication.instance() or QApplication([])
+        dialog = PdfToolboxDialog()
+        try:
+            p1 = _create_sample_pdf(self.temp_path / "del_1.pdf", 1)
+            p2 = _create_sample_pdf(self.temp_path / "del_2.pdf", 1)
+            dialog.select_tool(pt.TOOL_MERGE)
+            dialog._ingest_paths([p1, p2])
+            self.assertEqual(len(dialog._row_actions), 2)
+
+            # 清空表格应清空行级组件字典并释放
+            dialog._on_clear()
+            self.assertEqual(len(dialog._row_actions), 0)
+            self.assertEqual(dialog._table.rowCount(), 0)
+
+            # 再次加入并测试未运行状态下直接正常 reject
+            dialog._ingest_paths([p1])
+            self.assertEqual(len(dialog._row_actions), 1)
+            dialog.reject()
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
 
 
 if __name__ == "__main__":

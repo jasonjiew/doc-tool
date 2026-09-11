@@ -58,6 +58,7 @@ TOOL_METADATA = "metadata"
 TOOL_ENCRYPT = "encrypt"
 TOOL_DECRYPT = "decrypt"
 TOOL_COMPRESS = "compress"
+TOOL_REORDER = "reorder"
 
 CATEGORY_PAGES = "页面组织"
 CATEGORY_CONVERT = "转换"
@@ -128,6 +129,15 @@ TOOL_SPECS: Tuple[PdfToolSpec, ...] = (
         plural=False,
         description="将 PDF 页面按顺时针或逆时针旋转 90°、180° 或 270°。",
         hint="选择旋转角度及要旋转的页面范围（留空表示全部页面）。",
+    ),
+    PdfToolSpec(
+        id=TOOL_REORDER,
+        label="页面重排",
+        category=CATEGORY_PAGES,
+        accepts=PDF_SUFFIXES,
+        plural=False,
+        description="按指定顺序重新编排 PDF 页面，支持倒序反转、奇偶分组与自定义序列。",
+        hint="输入目标页码序列（如 3,1,2,4 或 reverse 倒序全部页面）。",
     ),
     PdfToolSpec(
         id=TOOL_TO_IMAGES,
@@ -727,7 +737,7 @@ def _tool_merge(
     out_dir = output_dir or sources[0].parent
     custom_name = options.get("output_name")
     if custom_name and custom_name.strip():
-        name = custom_name.strip()
+        name = Path(custom_name.strip()).name
         if not name.lower().endswith(".pdf"):
             name += ".pdf"
     else:
@@ -975,6 +985,102 @@ def _tool_rotate(
             pass
 
 
+def _tool_reorder(
+    source: Path,
+    output_dir: Optional[Path],
+    overwrite: bool,
+    options: Dict[str, Any],
+) -> PdfToolOutcome:
+    """按指定序列重新编排 PDF 页面顺序。"""
+    import pypdf
+
+    reader = _open_reader(source, options.get("password", ""))
+    try:
+        total_pages = len(reader.pages)
+        if total_pages == 0:
+            raise PdfFileError(suggested_action="该 PDF 没有页面可重排。")
+
+        order_raw = str(options.get("order", "")).strip()
+        if not order_raw:
+            raise PdfInputError(
+                suggested_action="请指定重排页码序列（如 3,1,2,4 或 reverse 倒序全部页面）。"
+            )
+
+        order_lower = order_raw.lower()
+        if order_lower == "reverse":
+            page_sequence = list(range(total_pages, 0, -1))
+        elif order_lower in ("odd-even", "odd_even"):
+            page_sequence = [p for p in range(1, total_pages + 1) if p % 2 != 0] + [
+                p for p in range(1, total_pages + 1) if p % 2 == 0
+            ]
+        elif order_lower in ("even-odd", "even_odd"):
+            page_sequence = [p for p in range(1, total_pages + 1) if p % 2 == 0] + [
+                p for p in range(1, total_pages + 1) if p % 2 != 0
+            ]
+        else:
+            tokens = re.split(r"[,，;；\s]+", order_raw)
+            page_sequence = []
+            for tok in tokens:
+                if not tok:
+                    continue
+                if "-" in tok:
+                    parts = tok.split("-", 1)
+                    try:
+                        s_page, e_page = int(parts[0]), int(parts[1])
+                    except ValueError:
+                        raise PdfPageSelectionError(
+                            suggested_action=f"无法解析页码范围「{tok}」。"
+                        )
+                    if s_page < 1 or s_page > total_pages or e_page < 1 or e_page > total_pages:
+                        raise PdfPageSelectionError(
+                            suggested_action=f"页码范围「{tok}」超出总页数（共 {total_pages} 页）。"
+                        )
+                    step = 1 if s_page <= e_page else -1
+                    for p in range(s_page, e_page + step, step):
+                        page_sequence.append(p)
+                else:
+                    try:
+                        p = int(tok)
+                    except ValueError:
+                        raise PdfPageSelectionError(
+                            suggested_action=f"无法解析页码「{tok}」。"
+                        )
+                    if p < 1 or p > total_pages:
+                        raise PdfPageSelectionError(
+                            suggested_action=f"页码「{p}」超出总页数（共 {total_pages} 页）。"
+                        )
+                    page_sequence.append(p)
+
+        if not page_sequence:
+            raise PdfInputError(suggested_action="重排页码序列不能为空。")
+
+        out_dir = output_dir or source.parent
+        target = out_dir / f"{source.stem}_重排.pdf"
+        _check_target_conflict([target], overwrite)
+
+        writer = pypdf.PdfWriter()
+        for p_num in page_sequence:
+            writer.add_page(reader.pages[p_num - 1])
+
+        _safe_write_pdf(writer, target)
+
+        seq_disp = ", ".join(map(str, page_sequence[:8]))
+        if len(page_sequence) > 8:
+            seq_disp += f"... (共 {len(page_sequence)} 页)"
+
+        return PdfToolOutcome(
+            ok=True,
+            outputs=[target],
+            detail=f"已按新顺序 [{seq_disp}] 重排完成",
+        )
+    finally:
+        try:
+            reader.close()
+        except Exception:
+            pass
+
+
+
 def _tool_to_images(
     source: Path,
     output_dir: Optional[Path],
@@ -1070,8 +1176,10 @@ def _tool_to_images(
             p.drawImage(0, 0, rendered_img)
             p.end()
 
+            quality = int(options.get("quality", 90))
+            quality = max(1, min(100, quality))
             if save_format == "JPG":
-                flattened.save(str(target_path), "JPG", quality=90)
+                flattened.save(str(target_path), "JPG", quality=quality)
             else:
                 flattened.save(str(target_path), "PNG")
             generated.append(target_path)
@@ -1079,7 +1187,12 @@ def _tool_to_images(
         if not generated:
             raise PdfRenderError(suggested_action="全部页面渲染失败，无法导出图片。")
 
-        detail = "已成功渲染并导出 {0} 张图片（DPI: {1}）".format(len(generated), dpi)
+        quality = int(options.get("quality", 90))
+        quality = max(1, min(100, quality))
+        detail = "已成功渲染并导出 {0} 张图片（DPI: {1}，格式: {2}".format(len(generated), dpi, save_format)
+        if save_format == "JPG":
+            detail += "，质量: {0}".format(quality)
+        detail += "）" 
         if skipped > 0:
             detail += "，{0} 页渲染失败已跳过".format(skipped)
 
@@ -1106,7 +1219,7 @@ def _tool_images_to_pdf(
     overwrite: bool,
     options: Dict[str, Any],
 ) -> PdfToolOutcome:
-    """将多张图片合成一个 PDF 文档。"""
+    """将多张图片合成一个 PDF 文档，支持页面尺寸、方向与边距。"""
     from PIL import Image, ImageOps
 
     if not sources:
@@ -1115,69 +1228,106 @@ def _tool_images_to_pdf(
     out_dir = output_dir or sources[0].parent
     custom_name = options.get("output_name")
     if custom_name and custom_name.strip():
-        name = custom_name.strip()
+        name = Path(custom_name.strip()).name
         if not name.lower().endswith(".pdf"):
             name += ".pdf"
     else:
-        name = "{0}_图片.pdf".format(sources[0].stem)
+        name = f"{sources[0].stem}_图片.pdf"
     target = out_dir / name
 
     _check_target_conflict([target], overwrite)
 
-    a4_mode = bool(options.get("a4", False))
+    # 选项解析：向下兼容 a4 布尔值
+    page_size_opt = str(options.get("page_size", "")).lower()
+    if not page_size_opt:
+        page_size_opt = "a4" if bool(options.get("a4", False)) else "original"
+
+    orientation_opt = str(options.get("orientation", "auto")).lower()
+    margin_pt = int(options.get("margin", 0))
+
+    PAGE_DIMS_150DPI = {
+        "a4": (1240, 1754),
+        "a3": (1754, 2480),
+        "letter": (1275, 1650),
+    }
+    margin_px = int(round(margin_pt * (150.0 / 72.0)))
+
     processed_images: List[Image.Image] = []
-
-    for src in sources:
-        try:
-            with Image.open(src) as raw_im:
-                im = ImageOps.exif_transpose(raw_im)
-                if im.mode in ("RGBA", "LA") or (
-                    im.mode == "P" and "transparency" in im.info
-                ):
-                    im_rgba = im.convert("RGBA")
-                    bg = Image.new("RGB", im_rgba.size, (255, 255, 255))
-                    bg.paste(im_rgba, mask=im_rgba.split()[3])
-                    rgb_im = bg
-                elif im.mode != "RGB":
-                    rgb_im = im.convert("RGB")
-                else:
-                    rgb_im = im.copy()
-
-                if a4_mode:
-                    # A4 标准尺寸（150 DPI）：1240 x 1754 像素
-                    a4_w, a4_h = 1240, 1754
-                    canvas = Image.new("RGB", (a4_w, a4_h), (255, 255, 255))
-                    im_ratio = rgb_im.width / float(rgb_im.height)
-                    canvas_ratio = a4_w / float(a4_h)
-                    if im_ratio > canvas_ratio:
-                        nw = a4_w
-                        nh = int(round(a4_w / im_ratio))
-                    else:
-                        nh = a4_h
-                        nw = int(round(a4_h * im_ratio))
-                    resized = rgb_im.resize(
-                        (max(1, nw), max(1, nh)), Image.Resampling.LANCZOS
-                    )
-                    ox = (a4_w - nw) // 2
-                    oy = (a4_h - nh) // 2
-                    canvas.paste(resized, (ox, oy))
-                    processed_images.append(canvas)
-                else:
-                    processed_images.append(rgb_im)
-        except Exception as exc:
-            raise PdfImageError(
-                suggested_action="读取图片「{0}」失败，请确认格式是否支持且文件未损坏。".format(
-                    src.name
-                ),
-                details={"source": str(src), "error": str(exc)},
-            )
-
-    resolution = 150.0 if a4_mode else 72.0
-    first = processed_images[0]
-    rest = processed_images[1:]
-    target.parent.mkdir(parents=True, exist_ok=True)
-
     try:
+        for src in sources:
+            try:
+                with Image.open(src) as raw_im:
+                    im = ImageOps.exif_transpose(raw_im)
+                    if im.mode in ("RGBA", "LA") or (
+                        im.mode == "P" and "transparency" in im.info
+                    ):
+                        im_rgba = im.convert("RGBA")
+                        bg = Image.new("RGB", im_rgba.size, (255, 255, 255))
+                        bg.paste(im_rgba, mask=im_rgba.split()[3])
+                        rgb_im = bg
+                    elif im.mode != "RGB":
+                        rgb_im = im.convert("RGB")
+                    else:
+                        rgb_im = im.copy()
+
+                    if page_size_opt in PAGE_DIMS_150DPI:
+                        base_w, base_h = PAGE_DIMS_150DPI[page_size_opt]
+                        im_w, im_h = rgb_im.width, rgb_im.height
+
+                        if orientation_opt == "landscape":
+                            pw, ph = max(base_w, base_h), min(base_w, base_h)
+                        elif orientation_opt == "portrait":
+                            pw, ph = min(base_w, base_h), max(base_w, base_h)
+                        else:  # auto
+                            if im_w > im_h:
+                                pw, ph = max(base_w, base_h), min(base_w, base_h)
+                            else:
+                                pw, ph = min(base_w, base_h), max(base_w, base_h)
+
+                        avail_w = max(10, pw - 2 * margin_px)
+                        avail_h = max(10, ph - 2 * margin_px)
+
+                        canvas = Image.new("RGB", (pw, ph), (255, 255, 255))
+                        im_ratio = im_w / float(im_h)
+                        avail_ratio = avail_w / float(avail_h)
+
+                        if im_ratio > avail_ratio:
+                            nw = avail_w
+                            nh = int(round(avail_w / im_ratio))
+                        else:
+                            nh = avail_h
+                            nw = int(round(avail_h * im_ratio))
+
+                        resized = rgb_im.resize(
+                            (max(1, nw), max(1, nh)), Image.Resampling.LANCZOS
+                        )
+                        ox = margin_px + (avail_w - nw) // 2
+                        oy = margin_px + (avail_h - nh) // 2
+                        canvas.paste(resized, (ox, oy))
+                        processed_images.append(canvas)
+                    else:
+                        if margin_px > 0:
+                            orig_w, orig_h = rgb_im.width, rgb_im.height
+                            canvas = Image.new(
+                                "RGB",
+                                (orig_w + 2 * margin_px, orig_h + 2 * margin_px),
+                                (255, 255, 255),
+                            )
+                            canvas.paste(rgb_im, (margin_px, margin_px))
+                            processed_images.append(canvas)
+                        else:
+                            processed_images.append(rgb_im)
+            except Exception as exc:
+                raise PdfImageError(
+                    suggested_action=f"读取图片「{src.name}」失败，请确认格式是否支持且文件未损坏。",
+                    details={"source": str(src), "error": str(exc)},
+                )
+
+        resolution = 150.0 if page_size_opt != "original" else 72.0
+        first = processed_images[0]
+        rest = processed_images[1:]
+        target.parent.mkdir(parents=True, exist_ok=True)
+
         try:
             first.save(
                 str(target),
@@ -1192,9 +1342,9 @@ def _tool_images_to_pdf(
                 details={"target": str(target), "error": str(exc)},
             )
 
-        detail = "已将 {0} 张图片合并为 PDF".format(len(sources))
-        if a4_mode:
-            detail += "（A4 居中适应版面）"
+        detail = f"已将 {len(sources)} 张图片合并为 PDF"
+        if page_size_opt != "original":
+            detail += f"（{page_size_opt.upper()} 版面，边距 {margin_pt}pt）"
 
         return PdfToolOutcome(ok=True, outputs=[target], detail=detail)
     finally:
@@ -1256,24 +1406,42 @@ def _tool_watermark(
     overwrite: bool,
     options: Dict[str, Any],
 ) -> PdfToolOutcome:
-    """添加全页平铺或居中文本水印。"""
+    """添加全页平铺、居中或多方位水印（支持文字水印与图片水印）。"""
     import pypdf
     from PySide6.QtCore import QPointF, QRectF, Qt
-    from PySide6.QtGui import QColor, QFontMetricsF
+    from PySide6.QtGui import QColor, QFontMetricsF, QImage
 
+    wm_type = str(options.get("watermark_type", "text")).lower()
     wm_text = str(options.get("text", "")).strip()
-    if not wm_text:
-        raise PdfInputError(
-            suggested_action="请填写水印文字内容，水印文字不能为空。"
-        )
+    image_path_str = str(options.get("image_path", "")).strip()
+
+    q_img: Optional[QImage] = None
+    if wm_type == "image":
+        if not image_path_str or not Path(image_path_str).is_file():
+            raise PdfInputError(
+                suggested_action="请选择有效的水印图片文件（PNG、JPG 或 BMP 等格式）。"
+            )
+        q_img = QImage(image_path_str)
+        if q_img.isNull():
+            raise PdfInputError(
+                suggested_action=f"无法解析水印图片文件「{Path(image_path_str).name}」，请检查文件格式。"
+            )
+    else:
+        if not wm_text:
+            raise PdfInputError(
+                suggested_action="请填写水印文字内容，水印文字不能为空。"
+            )
 
     font_size = float(options.get("font_size", 48.0))
     if font_size <= 0:
         font_size = 48.0
     opacity = int(options.get("opacity", 30))
+    opacity = max(1, min(100, opacity))
     angle = float(options.get("angle", 45.0))
     mode = str(options.get("mode", "center")).lower()
     color_hex = str(options.get("color", "#ff0000"))
+    scale_pct = float(options.get("scale", 30))
+    scale_pct = max(5.0, min(100.0, scale_pct))
 
     reader = _open_reader(source, options.get("password", ""))
     total_pages = len(reader.pages)
@@ -1287,7 +1455,7 @@ def _tool_watermark(
     target_indices = set(selected if selected is not None else range(total_pages))
 
     out_dir = output_dir or source.parent
-    target = out_dir / "{0}_水印.pdf".format(source.stem)
+    target = out_dir / f"{source.stem}_水印.pdf"
     _check_target_conflict([target], overwrite)
 
     pages_meta: List[Tuple[float, float, int]] = []
@@ -1303,12 +1471,25 @@ def _tool_watermark(
     def _draw_wm(painter: Any, idx: int, lw: float, lh: float) -> None:
         if idx not in target_indices:
             return
-        painter.setFont(font)
-        painter.setPen(sim_color)
-        fm = QFontMetricsF(font)
-        text_w = fm.horizontalAdvance(wm_text)
-        text_h = fm.height()
 
+        if wm_type == "image" and q_img is not None:
+            painter.setOpacity(opacity / 100.0)
+            target_side = min(lw, lh) * (scale_pct / 100.0)
+            img_ratio = q_img.width() / float(q_img.height()) if q_img.height() > 0 else 1.0
+            if img_ratio >= 1.0:
+                item_w = target_side
+                item_h = target_side / img_ratio
+            else:
+                item_h = target_side
+                item_w = target_side * img_ratio
+        else:
+            painter.setFont(font)
+            painter.setPen(sim_color)
+            fm = QFontMetricsF(font)
+            item_w = fm.horizontalAdvance(wm_text)
+            item_h = fm.height()
+
+        margin = 36.0
         if mode == "tiled":
             cols, rows = 3, 4
             cell_w = lw / cols
@@ -1320,60 +1501,89 @@ def _tool_watermark(
                     painter.save()
                     painter.translate(cx, cy)
                     painter.rotate(-angle)
-                    painter.drawText(
-                        QRectF(-text_w / 2.0, -text_h / 2.0, text_w, text_h),
-                        Qt.AlignmentFlag.AlignCenter,
-                        wm_text,
-                    )
+                    if wm_type == "image" and q_img is not None:
+                        painter.drawImage(
+                            QRectF(-item_w / 2.0, -item_h / 2.0, item_w, item_h),
+                            q_img,
+                        )
+                    else:
+                        painter.drawText(
+                            QRectF(-item_w / 2.0, -item_h / 2.0, item_w, item_h),
+                            Qt.AlignmentFlag.AlignCenter,
+                            wm_text,
+                        )
                     painter.restore()
         else:
+            if mode == "top-left":
+                cx = margin + item_w / 2.0
+                cy = margin + item_h / 2.0
+            elif mode == "top-right":
+                cx = lw - margin - item_w / 2.0
+                cy = margin + item_h / 2.0
+            elif mode == "bottom-left":
+                cx = margin + item_w / 2.0
+                cy = lh - margin - item_h / 2.0
+            elif mode == "bottom-right":
+                cx = lw - margin - item_w / 2.0
+                cy = lh - margin - item_h / 2.0
+            else:  # center
+                cx = lw / 2.0
+                cy = lh / 2.0
+
             painter.save()
-            painter.translate(lw / 2.0, lh / 2.0)
+            painter.translate(cx, cy)
             painter.rotate(-angle)
-            painter.drawText(
-                QRectF(-text_w / 2.0, -text_h / 2.0, text_w, text_h),
-                Qt.AlignmentFlag.AlignCenter,
-                wm_text,
-            )
-            painter.restore()
-
-    overlay_bytes = _create_overlay_pdf_bytes(pages_meta, _draw_wm)
-    overlay_reader = pypdf.PdfReader(io.BytesIO(overlay_bytes))
-
-    writer = pypdf.PdfWriter()
-    for i, orig_page in enumerate(reader.pages):
-        if i in target_indices:
-            over_page = overlay_reader.pages[i]
-            mb_left = float(orig_page.mediabox.left)
-            mb_bottom = float(orig_page.mediabox.bottom)
-            if mb_left != 0 or mb_bottom != 0:
-                orig_page.merge_transformed_page(
-                    over_page,
-                    pypdf.Transformation().translate(mb_left, mb_bottom),
-                    over=True,
+            if wm_type == "image" and q_img is not None:
+                painter.drawImage(
+                    QRectF(-item_w / 2.0, -item_h / 2.0, item_w, item_h),
+                    q_img,
                 )
             else:
-                orig_page.merge_page(over_page, over=True)
-        writer.add_page(orig_page)
+                painter.drawText(
+                    QRectF(-item_w / 2.0, -item_h / 2.0, item_w, item_h),
+                    Qt.AlignmentFlag.AlignCenter,
+                    wm_text,
+                )
+            painter.restore()
 
     try:
-        _safe_write_pdf(writer, target)
+        overlay_bytes = _create_overlay_pdf_bytes(pages_meta, _draw_wm)
+        overlay_reader = pypdf.PdfReader(io.BytesIO(overlay_bytes))
 
+        writer = pypdf.PdfWriter()
+        for i, orig_page in enumerate(reader.pages):
+            if i in target_indices:
+                over_page = overlay_reader.pages[i]
+                mb_left = float(orig_page.mediabox.left)
+                mb_bottom = float(orig_page.mediabox.bottom)
+                if mb_left != 0 or mb_bottom != 0:
+                    orig_page.merge_transformed_page(
+                        over_page,
+                        pypdf.Transformation().translate(mb_left, mb_bottom),
+                        over=True,
+                    )
+                else:
+                    orig_page.merge_page(over_page, over=True)
+            writer.add_page(orig_page)
+
+        _safe_write_pdf(writer, target)
+        wm_desc = f"图片水印「{Path(image_path_str).name}」" if wm_type == "image" else f"文字水印「{wm_text}」"
         return PdfToolOutcome(
             ok=True,
             outputs=[target],
-            detail="已为 {0} 个页面添加文字水印「{1}」".format(len(target_indices), wm_text),
-            note="水印透明度以颜色向白色减淡模拟呈现",
+            detail=f"已为 {len(target_indices)} 个页面添加{wm_desc}",
+            note="水印已融合至页面覆盖层",
         )
     finally:
         try:
             reader.close()
         except Exception:
             pass
-        try:
-            overlay_reader.close()
-        except Exception:
-            pass
+        if 'overlay_reader' in locals() and overlay_reader is not None:
+            try:
+                overlay_reader.close()
+            except Exception:
+                pass
 
 
 def _tool_page_numbers(
@@ -1688,38 +1898,74 @@ def _tool_compress(
     overwrite: bool,
     options: Dict[str, Any],
 ) -> PdfToolOutcome:
-    """无损优化 PDF 体积。"""
+    """多等级优化 PDF 体积，输出前后大小对比分析。"""
     import pypdf
 
     reader = _open_reader(source, options.get("password", ""))
     before_size = source.stat().st_size
 
     out_dir = output_dir or source.parent
-    target = out_dir / "{0}_压缩.pdf".format(source.stem)
+    target = out_dir / f"{source.stem}_压缩.pdf"
     _check_target_conflict([target], overwrite)
 
-    writer = pypdf.PdfWriter(clone_from=reader)
-    writer.compress_identical_objects(
-        remove_identicals=True, remove_orphans=True
-    )
-
-    for page in writer.pages:
-        page.compress_content_streams()
-
-    strip_meta = bool(options.get("strip_metadata", True))
-    if strip_meta:
-        # 清理 Producer 和 Creator 冗余项，保留业务属性
-        orig_meta = dict(writer.metadata or {})
-        cleaned_meta = {
-            k: v
-            for k, v in orig_meta.items()
-            if k not in ("/Producer", "/Creator")
-        }
-        writer.metadata = None
-        if cleaned_meta:
-            writer.add_metadata(cleaned_meta)
+    level = str(options.get("level", "standard")).lower()
 
     try:
+        writer = pypdf.PdfWriter(clone_from=reader)
+        writer.compress_identical_objects(
+            remove_identicals=True, remove_orphans=True
+        )
+
+        # 针对图片流进行分级重压缩优化
+        if level in ("aggressive", "standard"):
+            from PIL import Image
+
+            max_dim_limit = 1600 if level == "aggressive" else 2400
+            recompress_q = 65 if level == "aggressive" else 85
+            try:
+                for page in writer.pages:
+                    for img_obj in page.images:
+                        try:
+                            pil_im = img_obj.image
+                            w_orig, h_orig = pil_im.size
+                            max_side = max(w_orig, h_orig)
+                            if max_side > max_dim_limit:
+                                ratio = float(max_dim_limit) / max_side
+                                new_w = max(1, int(round(w_orig * ratio)))
+                                new_h = max(1, int(round(h_orig * ratio)))
+                                pil_im = pil_im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                            if pil_im.mode in ("RGBA", "LA", "P"):
+                                bg_im = Image.new("RGB", pil_im.size, (255, 255, 255))
+                                if pil_im.mode == "P":
+                                    pil_im = pil_im.convert("RGBA")
+                                if "A" in pil_im.mode:
+                                    bg_im.paste(pil_im, mask=pil_im.split()[-1])
+                                else:
+                                    bg_im.paste(pil_im)
+                                pil_im = bg_im
+                            elif pil_im.mode not in ("RGB", "L"):
+                                pil_im = pil_im.convert("RGB")
+                            img_obj.replace(pil_im, quality=recompress_q)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        for page in writer.pages:
+            page.compress_content_streams()
+
+        strip_meta = bool(options.get("strip_metadata", level != "lossless"))
+        if strip_meta:
+            orig_meta = dict(writer.metadata or {})
+            cleaned_meta = {
+                k: v
+                for k, v in orig_meta.items()
+                if k not in ("/Producer", "/Creator")
+            }
+            writer.metadata = None
+            if cleaned_meta:
+                writer.add_metadata(cleaned_meta)
+
         _safe_write_pdf(writer, target)
         after_size = target.stat().st_size
 
@@ -1730,10 +1976,10 @@ def _tool_compress(
             (saved_bytes / float(before_size)) * 100.0 if before_size > 0 else 0.0
         )
 
-        detail = "{0:.1f} KB → {1:.1f} KB".format(before_kb, after_kb)
+        detail = f"{before_kb:.1f} KB → {after_kb:.1f} KB"
         note_msg = ""
         if saved_bytes > 0:
-            detail += "（减少 {0:.1f}%）".format(saved_pct)
+            detail += f"（减少 {saved_pct:.1f}%，节省 {saved_bytes / 1024.0:.1f} KB）"
         else:
             detail += "（体积无显著变化）"
             note_msg = "该文件结构已高度优化，无损压缩收益有限"
@@ -1746,6 +1992,139 @@ def _tool_compress(
             reader.close()
         except Exception:
             pass
+
+
+
+def get_pdf_info(path: Union[str, Path], password: str = "") -> Dict[str, Any]:
+    """快速读取 PDF 或图片文件的基础元信息（页数/尺寸/加密状态/大小）。"""
+    p = Path(path)
+    if not p.is_file():
+        return {"exists": False, "size_bytes": 0, "page_count": 0, "is_encrypted": False}
+
+    size_bytes = p.stat().st_size
+    suffix = p.suffix.lower()
+
+    if suffix == ".pdf":
+        reader = None
+        try:
+            import pypdf
+
+            reader = pypdf.PdfReader(str(p))
+            is_encrypted = bool(reader.is_encrypted)
+            if is_encrypted and password:
+                try:
+                    reader.decrypt(password)
+                except Exception:
+                    pass
+            page_count = len(reader.pages) if not reader.is_encrypted else 0
+            title = ""
+            author = ""
+            subject = ""
+            keywords = ""
+            dimensions = "--"
+            if not reader.is_encrypted:
+                if reader.metadata:
+                    title = str(reader.metadata.get("/Title") or "")
+                    author = str(reader.metadata.get("/Author") or "")
+                    subject = str(reader.metadata.get("/Subject") or "")
+                    keywords = str(reader.metadata.get("/Keywords") or "")
+                if page_count > 0:
+                    try:
+                        p0 = reader.pages[0]
+                        w_pt = float(p0.mediabox.width)
+                        h_pt = float(p0.mediabox.height)
+                        dimensions = f"{w_pt:.0f} × {h_pt:.0f} pt"
+                    except Exception:
+                        pass
+            return {
+                "exists": True,
+                "type": "pdf",
+                "size_bytes": size_bytes,
+                "page_count": page_count,
+                "is_encrypted": is_encrypted,
+                "title": title,
+                "author": author,
+                "subject": subject,
+                "keywords": keywords,
+                "dimensions": dimensions,
+            }
+        except Exception as e:
+            return {
+                "exists": True,
+                "type": "pdf",
+                "size_bytes": size_bytes,
+                "page_count": 0,
+                "is_encrypted": False,
+                "dimensions": "--",
+                "error": str(e),
+            }
+        finally:
+            if reader is not None:
+                try:
+                    reader.close()
+                except Exception:
+                    pass
+    elif suffix in IMAGE_SUFFIXES:
+        try:
+            from PIL import Image
+
+            with Image.open(p) as img:
+                w, h = img.size
+                return {
+                    "exists": True,
+                    "type": "image",
+                    "size_bytes": size_bytes,
+                    "page_count": 1,
+                    "dimensions": f"{w} × {h}",
+                    "is_encrypted": False,
+                }
+        except Exception:
+            return {
+                "exists": True,
+                "type": "image",
+                "size_bytes": size_bytes,
+                "page_count": 1,
+                "dimensions": "--",
+                "is_encrypted": False,
+            }
+    else:
+        return {
+            "exists": True,
+            "type": "other",
+            "size_bytes": size_bytes,
+            "page_count": 0,
+            "is_encrypted": False,
+        }
+
+
+def evaluate_password_strength(password: str) -> Dict[str, Any]:
+    """评估密码强度，返回评分 (0-4)、文字标签、推荐颜色与提示。"""
+    if not password:
+        return {"score": 0, "label": "未输入", "color": "#9ca3af", "hint": "请输入密码"}
+    length = len(password)
+    has_digit = bool(re.search(r"\d", password))
+    has_lower = bool(re.search(r"[a-z]", password))
+    has_upper = bool(re.search(r"[A-Z]", password))
+    has_special = bool(re.search(r"[^a-zA-Z0-9]", password))
+
+    score = 0
+    if length >= 6:
+        score += 1
+    if length >= 8 and (has_digit and (has_lower or has_upper)):
+        score += 1
+    if length >= 10 and has_digit and has_lower and has_upper:
+        score += 1
+    if length >= 12 and has_special and (has_lower or has_upper) and has_digit:
+        score += 1
+
+    if score <= 1:
+        return {"score": 1, "label": "弱", "color": "#dc2626", "hint": "建议 8 位以上，包含大小写字母与数字"}
+    elif score == 2:
+        return {"score": 2, "label": "中等", "color": "#f59e0b", "hint": "密码安全度尚可，可增加特殊字符提升强度"}
+    elif score == 3:
+        return {"score": 3, "label": "强", "color": "#2563eb", "hint": "密码强度高，抗破解能力好"}
+    else:
+        return {"score": 4, "label": "极强", "color": "#16a34a", "hint": "高安全性密码，防护严密"}
 
 
 # --- 批量与调度层 ---
@@ -1915,6 +2294,8 @@ def run_pdf_tool(
                 outcome = _tool_delete(src, out_dir, overwrite, opts)
             elif tool_id == TOOL_ROTATE:
                 outcome = _tool_rotate(src, out_dir, overwrite, opts)
+            elif tool_id == TOOL_REORDER:
+                outcome = _tool_reorder(src, out_dir, overwrite, opts)
             elif tool_id == TOOL_TO_IMAGES:
                 outcome = _tool_to_images(src, out_dir, overwrite, opts)
             elif tool_id == TOOL_TO_TEXT:
@@ -2013,15 +2394,71 @@ def add_pdf_tool_arguments(parser: Any) -> None:
 
     # 选项参数
     parser.add_argument(
+        "--order",
+        default="",
+        help="页面重排序列（如 3,1,2,4 或 reverse）",
+    )
+    parser.add_argument(
+        "--level",
+        choices=["standard", "lossless", "aggressive"],
+        default="standard",
+        help="PDF 压缩等级（standard/lossless/aggressive）",
+    )
+    parser.add_argument(
+        "--watermark-type",
+        choices=["text", "image"],
+        default="text",
+        help="水印类型（text/image）",
+    )
+    parser.add_argument(
+        "--image-path",
+        default="",
+        help="图片水印路径",
+    )
+    parser.add_argument(
+        "--page-size",
+        choices=["original", "a4", "a3", "letter"],
+        default="original",
+        help="图片转 PDF 页面尺寸",
+    )
+    parser.add_argument(
+        "--orientation",
+        choices=["auto", "portrait", "landscape"],
+        default="auto",
+        help="图片转 PDF 页面方向",
+    )
+    parser.add_argument(
         "--pages",
         default="",
         help="页码选择（如 1-5,8 或 all）",
     )
     parser.add_argument(
         "--mode",
-        choices=["each", "every-n", "range", "center", "tiled"],
+        choices=[
+            "each",
+            "every-n",
+            "range",
+            "center",
+            "tiled",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+        ],
         default="",
-        help="拆分模式（each/every-n/range）或水印排版（center/tiled）",
+        help="拆分模式（each/every-n/range）或水印排版（center/tiled/top-left/top-right/bottom-left/bottom-right）",
+    )
+    parser.add_argument(
+        "--scale",
+        type=float,
+        default=30.0,
+        help="图片水印缩放比例（百分比 5~100，默认 30）",
+    )
+    parser.add_argument(
+        "--quality",
+        type=int,
+        default=90,
+        help="PDF 转图片保存质量（1~100，默认 90）",
     )
     parser.add_argument(
         "--every",
@@ -2191,6 +2628,22 @@ def add_pdf_tool_arguments(parser: Any) -> None:
 def pdf_options_from_args(args: Any) -> Dict[str, Any]:
     """从 CLI 解析出的 Namespace 转换为服务层可接受的 options 字典。"""
     opts: Dict[str, Any] = {}
+    if getattr(args, "order", None):
+        opts["order"] = args.order
+    if getattr(args, "level", None):
+        opts["level"] = args.level
+    if getattr(args, "watermark_type", None):
+        opts["watermark_type"] = args.watermark_type
+    if getattr(args, "image_path", None):
+        opts["image_path"] = args.image_path
+    if getattr(args, "page_size", None):
+        opts["page_size"] = args.page_size
+    if getattr(args, "orientation", None):
+        opts["orientation"] = args.orientation
+    if getattr(args, "scale", None) is not None:
+        opts["scale"] = args.scale
+    if getattr(args, "quality", None) is not None:
+        opts["quality"] = args.quality
     if getattr(args, "pages", None):
         opts["pages"] = args.pages
     if getattr(args, "mode", None):
