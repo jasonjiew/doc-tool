@@ -101,10 +101,23 @@ class ProjectLock:
         locked_at = _parse_iso_time(self.start_time)
         if locked_at is None:
             return True
-        return created <= locked_at
+        # start_time is recorded with 1-second precision and is captured
+        # before the lock file is written, while _pid_start_time is exact.
+        # A live holder can therefore look like it was created slightly
+        # AFTER its own lock timestamp (slow interpreter start, coarse
+        # clock). Only treat a clearly later creation time as PID reuse,
+        # otherwise two processes would both consider the lock stale and
+        # both acquire it, breaking mutual exclusion.
+        return (created - locked_at) <= _PID_REUSE_TOLERANCE_SECONDS
 
 
 _CACHED_HOST: Optional[str] = None
+
+# Tolerance (seconds) for PID-reuse detection. The lock timestamp has
+# only 1-second precision and is taken before the lock file is written,
+# so a live holder can look slightly newer than its own lock record.
+
+_PID_REUSE_TOLERANCE_SECONDS = 5.0
 
 
 def _current_host() -> str:
