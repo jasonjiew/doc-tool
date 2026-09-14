@@ -82,10 +82,24 @@ class ProjectPathsTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_standard_paths_under_root(self):
-        self.assertEqual(self.paths.source_docx, self.root / "original" / "source.docx")
-        self.assertEqual(self.paths.template_docx, self.root / "template" / "template.docx")
-        self.assertEqual(self.paths.content_dir("requirement"), self.root / "content" / "requirement")
-        self.assertEqual(self.paths.tables_dir("design"), self.root / "assets" / "design" / "tables")
+        # Windows 短路径（8.3，如 RUNNER~1）与长路径指向同一目录，
+        # 归一化后再比较，避免把等价路径误判为不一致。
+        self.assertEqual(
+            os.path.realpath(self.paths.source_docx),
+            os.path.realpath(self.root / "original" / "source.docx"),
+        )
+        self.assertEqual(
+            os.path.realpath(self.paths.template_docx),
+            os.path.realpath(self.root / "template" / "template.docx"),
+        )
+        self.assertEqual(
+            os.path.realpath(self.paths.content_dir("requirement")),
+            os.path.realpath(self.root / "content" / "requirement"),
+        )
+        self.assertEqual(
+            os.path.realpath(self.paths.tables_dir("design")),
+            os.path.realpath(self.root / "assets" / "design" / "tables"),
+        )
 
     def test_resolve_relative_path(self):
         resolved = self.paths.resolve("content/requirement/第3章.md")

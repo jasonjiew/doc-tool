@@ -206,7 +206,12 @@ class SchemaCompatibilityGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="doc-proj-") as tmp:
             paths = ProjectPaths(tmp)
             # 项目路径都在用户选择的 tmp 下，不在安装目录
-            self.assertTrue(str(paths.root).startswith(tmp))
+            # 短路径（8.3）与长路径指向同一目录，归一化后再做前缀判断。
+            self.assertTrue(
+                os.path.realpath(str(paths.root)).startswith(
+                    os.path.realpath(tmp)
+                )
+            )
 
 
 if __name__ == "__main__":

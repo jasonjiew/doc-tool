@@ -308,9 +308,11 @@ class LegacyProjectConsistencyTests(unittest.TestCase):
         project_config = config_from_project(manifest, paths)
 
         for key in ("template", "content_root", "asset_root", "table_root"):
+            # 两个入口可能一个产出短路径、一个产出长路径（Windows 8.3），
+            # 归一化后比较，避免把等价路径误判为不一致。
             self.assertEqual(
-                os.path.normpath(legacy_config["paths"][key]),
-                os.path.normpath(project_config["paths"][key]),
+                os.path.realpath(legacy_config["paths"][key]),
+                os.path.realpath(project_config["paths"][key]),
                 "路径 {0} 不一致".format(key),
             )
         self.assertEqual(

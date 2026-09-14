@@ -128,7 +128,10 @@ class GitRepoRootTests(unittest.TestCase):
             (repo / ".git").mkdir(parents=True)
             deep = repo / "a" / "b" / "c"
             deep.mkdir(parents=True)
-            self.assertEqual(find_git_repo_root(deep), repo)
+            self.assertEqual(
+                os.path.realpath(find_git_repo_root(deep)),
+                os.path.realpath(repo),
+            )
             outside = Path(tmp) / "elsewhere"
             outside.mkdir()
             self.assertIsNone(find_git_repo_root(outside))
@@ -139,7 +142,10 @@ class GitRepoRootTests(unittest.TestCase):
             (wc / ".svn").mkdir(parents=True)
             deep = wc / "x" / "y"
             deep.mkdir(parents=True)
-            self.assertEqual(find_svn_wc_root(deep), wc)
+            self.assertEqual(
+                os.path.realpath(find_svn_wc_root(deep)),
+                os.path.realpath(wc),
+            )
             outside = Path(tmp) / "no"
             outside.mkdir()
             self.assertIsNone(find_svn_wc_root(outside))
@@ -569,8 +575,17 @@ class SvnDetectionTests(unittest.TestCase):
         return xml.encode("utf-8")
 
     def _runner_for(self, entries_by_wc: dict):
+        # cwd 可能以 Windows 短路径（8.3）形式传入，与构造夹具时的长路径
+        # 字符串不同；按 realpath 归一化后再查表，避免误判为无变更。
+        normalized = {
+            os.path.realpath(str(key)): value
+            for key, value in entries_by_wc.items()
+        }
+
         def runner(args, cwd):
-            xml = entries_by_wc.get(cwd, self._svn_xml([]))
+            xml = normalized.get(
+                os.path.realpath(str(cwd)), self._svn_xml([])
+            )
             return subprocess.CompletedProcess(
                 args, returncode=0, stdout=xml, stderr=b""
             )
