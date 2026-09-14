@@ -53,6 +53,14 @@ pywin32_hiddenimports = collect_submodules("win32com") + collect_submodules("pyt
 # QtWidgets 收集所需 DLL 与 plugins（platforms/styles/imageformats），
 # 未使用的 Addons 模块自然不打包。下方 excludes 再显式排除以双保险。
 
+# openpyxl / python-docx：均为函数内部延迟导入（table_convert / text_convert），
+# PyInstaller 静态分析看不到，必须显式收集，否则漏打包导致
+# XLSX 互转与 DOCX 转纯文本在净机器上 ImportError。
+openpyxl_hiddenimports = collect_submodules("openpyxl")
+openpyxl_datas = collect_data_files("openpyxl")
+docx_hiddenimports = collect_submodules("docx")
+docx_datas = collect_data_files("docx")
+
 # yaml（PyYAML）：纯 Python，自动收集
 
 # --- 收集本应用资源 ---
@@ -83,6 +91,8 @@ icon_datas = [(icon_file, "doc_tool/resources")] if os.path.isfile(icon_file) el
 all_datas = (
     lxml_datas
     + pywin32_datas
+    + openpyxl_datas
+    + docx_datas
     + script_datas
     + license_datas
     + icon_datas
@@ -101,6 +111,8 @@ all_hiddenimports = (
     lxml_hiddenimports
     + pillow_hiddenimports
     + pywin32_hiddenimports
+    + openpyxl_hiddenimports
+    + docx_hiddenimports
     + [
         "yaml",
         "docx_common",
