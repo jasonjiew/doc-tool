@@ -296,7 +296,25 @@ def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
     return 0 if result.success else 1
 
 
+def _force_utf8_stdio() -> None:
+    """Force UTF-8 on stdout/stderr.
+
+    Help text and diagnostics contain CJK characters. On a non-UTF-8
+    console (frozen exe on an English-locale Windows) printing them
+    raises UnicodeEncodeError and the CLI exits with code 1.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _force_utf8_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     legacy = _legacy(args, parser)
