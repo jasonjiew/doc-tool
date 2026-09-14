@@ -1133,7 +1133,7 @@ class MermaidServiceTests(unittest.TestCase):
         )
         items = {"docProps/custom.xml": custom_xml}
         config = {
-            "documentNo": "KF-2090-1-006",
+            "documentNo": "DOC-0000-0-000",
             "documentVersion": "2.6.0",
             "documentName": "\xe5\xba\xb7\xe5\xb0\x9a\xe5\x81\xa5\xe5\xba\xb7\xe4\xba\x91",
         }
@@ -1157,7 +1157,7 @@ class MermaidServiceTests(unittest.TestCase):
             ),
         }
         config = {
-            "documentNo": "KF-2090-1-006",
+            "documentNo": "DOC-0000-0-000",
             "documentVersion": "2.6.0",
             "documentName": "测试文档",
         }

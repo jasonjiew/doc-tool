@@ -1,0 +1,418 @@
+name: Build & Release
+
+# Windows 构建与发布流水线（GitHub Actions 版，与 .gitlab-ci.yml 同源同门禁）
+#
+# 门禁来源（与 GitLab CI 保持一致，避免两套流水线漂移）：
+#   - 版本一致性：tag / doc_tool.domain.APP_VERSION / installer.iss / build.ps1
+#   - 工作树干净：禁止把本地未提交修改标记为正式发布
+#   - 单元测试与覆盖率下限（COVERAGE_MIN）
+#   - 依赖漏洞审计（pip-audit）与 SBOM（CycloneDX + SPDX）
+#   - 净化公开源码导出 + 生产文档泄漏扫描（scan_leaks --strict）
+#   - 公共正式发布授权门禁（release_gate --public）
+#
+# 触发约定：
+#   - push main        → 校验 + 测试 + 构建（不发布）
+#   - push tag v*.*.*  → 全流程，并发布 GitHub Release 资产
+#   - 手动 dispatch     → 同上，可勾选只跑校验与测试
+#
+# 二进制一律走 Release 资产，不入库（packaging/Output 与 dist 已在 .gitignore 中）。
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      skip_package:
+        description: '只跑校验与测试，跳过构建/打包/发布'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_VERSION: '2.5.0'
+  COVERAGE_MIN: '60'
+  PYTHONUTF8: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------- 阶段 1：版本一致性校验 ----------
+  validate:
+    name: Validate version & tree
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: 校验 tag 与各版本来源一致
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tagVersion = '${{ github.ref_name }}'.TrimStart('v')
+          $appVersion = python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)"
+          $installerVersion = (Select-String -Path 'packaging\installer.iss' -Pattern '#define\s+MyAppVersion\s+"([^"]+)"').Matches[0].Groups[1].Value
+          $buildVersion = (Select-String -Path 'packaging\build.ps1' -Pattern '\$Version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          Write-Host "tag=$tagVersion app=$appVersion installer=$installerVersion build=$buildVersion"
+          if ($tagVersion -ne $appVersion -or $tagVersion -ne $installerVersion -or $tagVersion -ne $buildVersion) {
+            throw "版本不一致: tag=$tagVersion app=$appVersion installer=$installerVersion build=$buildVersion"
+          }
+          if ($tagVersion -ne $env:APP_VERSION) {
+            throw "workflow APP_VERSION=$env:APP_VERSION 与 tag=$tagVersion 不一致，请同步本文件 env.APP_VERSION"
+          }
+          Write-Host "版本一致: $tagVersion"
+
+      - name: 校验工作树干净（正式发布门禁）
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $dirty = git status --porcelain --untracked-files=all
+          if ($dirty) {
+            $dirty | Write-Host
+            throw '工作树存在未提交或未跟踪文件，禁止正式发布'
+          }
+          python -c "from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
+
+  # ---------- 阶段 2：测试与合规产物 ----------
+  test:
+    name: Tests, audit & SBOM
+    runs-on: windows-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: 安装依赖
+        shell: pwsh
+        run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
+
+      - name: 单元测试与覆盖率（下限 ${{ env.COVERAGE_MIN }}%）
+        shell: pwsh
+        run: python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN
+
+      - name: 依赖漏洞审计
+        if: always()
+        shell: pwsh
+        run: |
+          python -m pip install pip-audit==2.9.0 --no-cache-dir
+          python packaging/audit_dependencies.py --requirements requirements.txt --output dependency-audit.json
+          python packaging/audit_dependencies.py --requirements requirements-build.txt --output dependency-audit-build.json
+
+      - name: 生成 SBOM（CycloneDX + SPDX）并校验格式
+        if: always()
+        shell: pwsh
+        run: |
+          python packaging/generate_sbom.py --requirements requirements.txt --requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+          python -c "import json; c=json.load(open('sbom.cdx.json', encoding='utf-8')); s=json.load(open('sbom.spdx.json', encoding='utf-8')); assert c['bomFormat']=='CycloneDX' and c['specVersion']=='1.5'; assert s['spdxVersion']=='SPDX-2.3'; print('SBOM 格式校验通过')"
+
+      - name: 净化公开源码导出与扫描
+        if: always()
+        shell: pwsh
+        run: python packaging/export_public_source.py --output "$env:RUNNER_TEMP\doc-public-export-${{ github.run_id }}" --scan
+
+      - name: 上传测试与合规产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            test-results.xml
+            coverage.xml
+            coverage.json
+            dependency-audit.json
+            dependency-audit-build.json
+            sbom.cdx.json
+            sbom.spdx.json
+
+  # ---------- 阶段 3：PyInstaller 构建 ----------
+  build:
+    name: Build onedir (PyInstaller)
+    runs-on: windows-latest
+    needs: test
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: 安装依赖
+        shell: pwsh
+        run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
+
+      - name: PyInstaller 构建
+        shell: pwsh
+        run: pyinstaller packaging/doc_tool.spec --noconfirm --clean
+
+      - name: 冻结应用冒烟测试
+        shell: pwsh
+        run: python scripts\tests\test_frozen_smoke.py
+
+      - name: 上传 dist 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-onedir
+          path: dist/DocTool/
+          retention-days: 7
+
+  # ---------- 阶段 4：打包安装器与便携包 ----------
+  package:
+    name: Package installer & portable
+    runs-on: windows-latest
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: 安装依赖
+        shell: pwsh
+        run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
+
+      - name: 下载 dist 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-onedir
+          path: dist/DocTool/
+
+      - name: 重装 SBOM 生成工具依赖
+        shell: pwsh
+        run: python -m pip install pip-audit==2.9.0 --no-cache-dir
+
+      - name: 生产文档泄漏与允许清单扫描（strict）
+        shell: pwsh
+        run: |
+          python packaging/scan_leaks.py --strict
+          if ($LASTEXITCODE -ne 0) { throw '生产文档泄漏/允许清单扫描失败' }
+
+      - name: 公共正式发布授权门禁
+        shell: pwsh
+        run: |
+          python packaging/release_gate.py --public
+          if ($LASTEXITCODE -ne 0) { throw '公共发布授权门禁未通过，仅允许内部测试产物' }
+
+      - name: 生成 SBOM 供发布使用
+        shell: pwsh
+        run: python packaging/generate_sbom.py --requirements requirements.txt --requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+
+      - name: 安装 Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          if (!(Test-Path $iscc)) { throw 'Inno Setup 未安装' }
+          Write-Host "ISCC: $iscc"
+          "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 代码签名配置检查
+        shell: pwsh
+        run: |
+          # 需要仓库 Secrets：CODE_SIGNING_PFX_BASE64 与 CODE_SIGNING_PASSWORD。
+          # 未配置时保持内部测试产物语义（与 GitLab CI 行为一致）。
+          $hasPfx = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PASSWORD)
+          if ($hasPfx -xor $hasPassword) { throw '代码签名配置不完整：证书与密码必须同时配置' }
+          if ($hasPfx) {
+            $pfxPath = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGNING_PFX_BASE64))
+            "CODE_SIGNING_PFX_PATH=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "SIGNING_ENABLED=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host '代码签名已配置，将签名应用与安装器'
+          } else {
+            "SIGNING_ENABLED=false" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Warning '未配置代码签名证书，产出仅限受控试点'
+          }
+        env:
+          CODE_SIGNING_PFX_BASE64: ${{ secrets.CODE_SIGNING_PFX_BASE64 }}
+          CODE_SIGNING_PASSWORD: ${{ secrets.CODE_SIGNING_PASSWORD }}
+
+      - name: 应用 exe 代码签名（可选）
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signtool) { throw '已配置代码签名，但 signtool.exe 不可用' }
+          $appExe = 'dist\DocTool\DocTool.exe'
+          & $signtool sign /fd SHA256 /f $env:CODE_SIGNING_PFX_PATH /p $env:CODE_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $appExe
+          if ($LASTEXITCODE -ne 0) { throw '应用程序代码签名失败' }
+          & $signtool verify /pa /all $appExe
+          if ($LASTEXITCODE -ne 0) { throw '应用程序签名验证失败' }
+        env:
+          CODE_SIGNING_PASSWORD: ${{ secrets.CODE_SIGNING_PASSWORD }}
+
+      - name: 暂存 dist 启动/诊断脚本
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging\stage_dist.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'dist 暂存失败' }
+
+      - name: 编译安装器（Inno Setup）
+        shell: pwsh
+        run: |
+          Push-Location packaging
+          try {
+            & $env:ISCC_PATH installer.iss
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup 编译失败' }
+          } finally { Pop-Location }
+
+      - name: 生成便携包
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging\make_portable.ps1 -Version $env:APP_VERSION
+          if ($LASTEXITCODE -ne 0) { throw '便携包生成失败' }
+          $portable = "packaging\Output\DocTool-$env:APP_VERSION-portable.zip"
+          if (!(Test-Path "$portable.sha256")) { throw "便携包校验值文件缺失: $portable.sha256" }
+
+      - name: 安装级冒烟测试
+        shell: pwsh
+        run: |
+          $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\tests\test_installer_smoke.ps1 -InstallerPath $exe
+          if ($LASTEXITCODE -ne 0) { throw '安装级冒烟测试失败' }
+
+      - name: 安装器代码签名（可选）
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
+          & $signtool sign /fd SHA256 /f $env:CODE_SIGNING_PFX_PATH /p $env:CODE_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+          if ($LASTEXITCODE -ne 0) { throw '安装器代码签名失败' }
+          & $signtool verify /pa /all $exe
+          if ($LASTEXITCODE -ne 0) { throw '安装器签名验证失败' }
+        env:
+          CODE_SIGNING_PASSWORD: ${{ secrets.CODE_SIGNING_PASSWORD }}
+
+      - name: 生成校验值与 SBOM 文本
+        shell: pwsh
+        run: |
+          # 哈希必须在所有签名完成之后生成，否则发布的校验值会失效。
+          $exe = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "$hash  DocTool-Setup-$env:APP_VERSION.exe" | Out-File "$exe.sha256" -Encoding ascii -NoNewline
+
+          $sbom = "packaging\Output\DocTool-$env:APP_VERSION-sbom.txt"
+          "Doc Tool $env:APP_VERSION 依赖清单（SBOM）" | Out-File $sbom -Encoding utf8
+          "生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File $sbom -Append -Encoding utf8
+          "PyYAML 6.0.3 (MIT), lxml 6.1.1 (BSD), Pillow 12.3.0 (MIT-CMU), pywin32 312 (PSF), Python 3.13 (PSF)" | Out-File $sbom -Append -Encoding utf8
+          Copy-Item sbom.cdx.json "packaging\Output\DocTool-$env:APP_VERSION.cdx.json"
+          Copy-Item sbom.spdx.json "packaging\Output\DocTool-$env:APP_VERSION.spdx.json"
+
+          Get-ChildItem packaging\Output | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 生成发布说明
+        shell: pwsh
+        run: |
+          $setup = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
+          $sbom  = "packaging\Output\DocTool-$env:APP_VERSION-sbom.txt"
+          python packaging/generate_release_notes.py --output packaging\Output\release-notes.md --setup-exe $setup --sbom $sbom
+
+          $portable = "packaging\Output\DocTool-$env:APP_VERSION-portable.zip"
+          $portableHash = (Get-FileHash $portable -Algorithm SHA256).Hash
+          "" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
+          "## 便携包校验" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
+          "- 便携包 SHA-256: $portableHash" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
+
+      - name: 上传发布资产
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: packaging/Output/*
+          retention-days: 90
+
+  # ---------- 阶段 5：发布 GitHub Release ----------
+  release:
+    name: Publish GitHub Release
+    runs-on: windows-latest
+    needs: package
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    permissions:
+      contents: write
+    steps:
+      - name: 下载发布资产
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: assets
+
+      - name: 校验资产完整性
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = '${{ env.APP_VERSION }}'
+          $required = @(
+            "DocTool-Setup-$v.exe",
+            "DocTool-Setup-$v.exe.sha256",
+            "DocTool-$v-portable.zip",
+            "DocTool-$v-portable.zip.sha256",
+            "DocTool-$v-sbom.txt",
+            "DocTool-$v.cdx.json",
+            "DocTool-$v.spdx.json",
+            "release-notes.md"
+          )
+          $missing = @()
+          foreach ($r in $required) { if (!(Test-Path (Join-Path assets $r))) { $missing += $r } }
+          if ($missing.Count -gt 0) { throw "发布资产缺失: $($missing -join ', ')" }
+
+          # 校验 sha256 记录与真实文件一致
+          foreach ($pair in @(
+            @{ Bin = "DocTool-Setup-$v.exe"; Sum = "DocTool-Setup-$v.exe.sha256" },
+            @{ Bin = "DocTool-$v-portable.zip"; Sum = "DocTool-$v-portable.zip.sha256" }
+          )) {
+            $actual = (Get-FileHash (Join-Path assets $pair.Bin) -Algorithm SHA256).Hash.ToLower()
+            $recorded = (Get-Content (Join-Path assets $pair.Sum) -Raw).Trim().Split()[0].ToLower()
+            if ($actual -ne $recorded) { throw "$($pair.Bin) 校验值不一致: actual=$actual recorded=$recorded" }
+            Write-Host "校验通过: $($pair.Bin)"
+          }
+          Get-ChildItem assets | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Doc Tool ${{ github.ref_name }}
+          body_path: assets/release-notes.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            assets/DocTool-Setup-${{ env.APP_VERSION }}.exe
+            assets/DocTool-Setup-${{ env.APP_VERSION }}.exe.sha256
+            assets/DocTool-${{ env.APP_VERSION }}-portable.zip
+            assets/DocTool-${{ env.APP_VERSION }}-portable.zip.sha256
+            assets/DocTool-${{ env.APP_VERSION }}-sbom.txt
+            assets/DocTool-${{ env.APP_VERSION }}.cdx.json
+            assets/DocTool-${{ env.APP_VERSION }}.spdx.json
