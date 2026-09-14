@@ -243,7 +243,29 @@ class LegacyProjectConsistencyTests(unittest.TestCase):
         project_output = build_with_project(manifest, paths)
 
         # 比较字节哈希
-        self.assertEqual(_sha256(legacy_output), _sha256(project_output))
+        legacy_hash = _sha256(legacy_output)
+        project_hash = _sha256(project_output)
+        if legacy_hash != project_hash:
+            # 失败时打印具体差异的 zip 条目，
+            # 便于区分环境差异与真实不一致。
+            import zipfile
+            with zipfile.ZipFile(legacy_output) as za, zipfile.ZipFile(
+                project_output
+            ) as zb:
+                names_a = {i.filename: i.CRC for i in za.infolist()}
+                names_b = {i.filename: i.CRC for i in zb.infolist()}
+                only_a = sorted(set(names_a) - set(names_b))
+                only_b = sorted(set(names_b) - set(names_a))
+                differing = sorted(
+                    k for k in set(names_a) & set(names_b)
+                    if names_a[k] != names_b[k]
+                )
+            print('legacy_only   =', only_a[:20])
+            print('project_only  =', only_b[:20])
+            print('crc_differs   =', differing[:20])
+            print('legacy_path   =', legacy_output)
+            print('project_path  =', project_output)
+        self.assertEqual(legacy_hash, project_hash)
 
     def test_corrupt_template_raises_automation_error(self) -> None:
         """模板不是合法 DOCX 时映射为 AutomationError（统一入口中性异常）。

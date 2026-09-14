@@ -122,7 +122,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          python packaging/generate_sbom.py --requirements requirements.txt "--requirements-build.txt" --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+          python packaging/generate_sbom.py --requirements requirements.txt requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
           python -c "import json; c=json.load(open('sbom.cdx.json', encoding='utf-8')); s=json.load(open('sbom.spdx.json', encoding='utf-8')); assert c['bomFormat']=='CycloneDX' and c['specVersion']=='1.5'; assert s['spdxVersion']=='SPDX-2.3'; print('SBOM 格式校验通过')"
 
       - name: 净化公开源码导出与扫描
@@ -225,7 +225,7 @@ jobs:
 
       - name: 生成 SBOM 供发布使用
         shell: pwsh
-        run: python packaging/generate_sbom.py --requirements requirements.txt --requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+        run: python packaging/generate_sbom.py --requirements requirements.txt requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
 
       - name: 安装 Inno Setup 6
         shell: pwsh

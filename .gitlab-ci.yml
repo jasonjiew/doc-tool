@@ -99,7 +99,7 @@ generate-sbom:
   tags:
     - windows
   script:
-    - python packaging/generate_sbom.py --requirements requirements.txt --requirements requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
+    - python packaging/generate_sbom.py --requirements requirements.txt requirements-build.txt --cyclonedx sbom.cdx.json --spdx sbom.spdx.json
     - python -c "import json; c=json.load(open('sbom.cdx.json', encoding='utf-8')); s=json.load(open('sbom.spdx.json', encoding='utf-8')); assert c['bomFormat']=='CycloneDX' and c['specVersion']=='1.5'; assert s['spdxVersion']=='SPDX-2.3'"
   artifacts:
     paths:

@@ -63,7 +63,11 @@ def generate(requirements, cyclone_path, spdx_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--requirements", action="append", required=True)
+    # nargs="+" takes every requirements file after one flag. Repeating
+    # --requirements is unsafe: Windows PowerShell splits
+    # "--requirements-build.txt" at the dash, and argparse then fails with
+    # "unrecognized arguments".
+    parser.add_argument("--requirements", nargs="+", required=True)
     parser.add_argument("--cyclonedx", required=True)
     parser.add_argument("--spdx", required=True)
     args = parser.parse_args()

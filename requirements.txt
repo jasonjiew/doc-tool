@@ -22,6 +22,9 @@ PySide6==6.8.3
 # Excel/XLSX 读写：XLSX ↔ CSV/HTML/PDF 互转（table_convert 静态导入，必须声明）
 openpyxl==3.1.5
 
+# DOCX to plain text extraction (text_convert imports docx)
+python-docx==1.2.0
+
 # Review PDF export and verification.
 reportlab==4.4.3
 pypdf==6.0.0
