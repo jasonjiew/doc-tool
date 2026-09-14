@@ -225,7 +225,10 @@ class LegacyProjectConsistencyTests(unittest.TestCase):
     """任务 2.5：新旧入口产出一致。"""
 
     def setUp(self) -> None:
-        self._tmp = tempfile.mkdtemp(prefix="doc-project-build-")
+        # realpath: tempfile may hand back a 8.3 short path (RUNNER~1).
+        # Both build entry points must see one canonical path form,
+        # otherwise the output path lands in word/document.xml differently.
+        self._tmp = os.path.realpath(tempfile.mkdtemp(prefix="doc-project-build-"))
         self.project_root = _setup_project(self._tmp)
 
     def tearDown(self) -> None:
@@ -350,7 +353,7 @@ class SpecialPathRegressionTests(unittest.TestCase):
     def test_build_with_chinese_space_bracket_ampersand_path(self) -> None:
         """在含中文、空格、括号、& 的项目路径下构建成功。"""
         special_name = "测试 项目(1.0) & 验证"
-        tmp = tempfile.mkdtemp(prefix="doc-special-path-")
+        tmp = os.path.realpath(tempfile.mkdtemp(prefix="doc-special-path-"))
         try:
             project_root = os.path.join(tmp, special_name)
             _setup_project(project_root)
