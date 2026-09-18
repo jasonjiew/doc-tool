@@ -21,6 +21,7 @@ import posixpath
 import re
 import sys
 import tempfile
+import urllib.parse
 import zipfile
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -1347,6 +1348,76 @@ def _set_revision_summary_cell(cell, text, expressions=None) -> None:
             etree.SubElement(br_run, qn("br"))
         if not line:
             continue
+
+        # 0. 优先解析 Markdown 显式超链接 [文本](目标路径)
+        md_link_re = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+        if md_link_re.search(line):
+            pos = 0
+            for match in md_link_re.finditer(line):
+                start, end = match.span()
+                if start > pos:
+                    append_plain(paragraph, line[pos:start])
+                label, target = match.groups()
+                bm = None
+                if expressions is not None:
+                    # 1. 优先按目标路径与锚点精确反查 Word 书签
+                    unquoted_target = urllib.parse.unquote(target).replace("\\", "/")
+                    path_part, _, frag_part = unquoted_target.partition("#")
+                    target_clean = path_part.rstrip("/")
+                    target_stem = os.path.splitext(os.path.basename(target_clean))[0] if target_clean else ""
+
+                    if hasattr(expressions, "bookmarks"):
+                        # 1a. 优先全路径精确匹配（含 #frag 锚点）
+                        for b_key, b_name in expressions.bookmarks.items():
+                            b_norm = b_key.replace("\\", "/").rstrip("/")
+                            if b_norm == unquoted_target or b_norm.endswith("/" + unquoted_target):
+                                bm = b_name
+                                break
+                        # 1b. 锚点对应书签查找
+                        if not bm and frag_part and hasattr(expressions, "find_bookmark_for_section"):
+                            bm = expressions.find_bookmark_for_section(frag_part)
+                        # 1c. 降级为目标文件路径匹配
+                        if not bm and target_clean:
+                            for b_key, b_name in expressions.bookmarks.items():
+                                b_norm = b_key.replace("\\", "/").rstrip("/")
+                                if (
+                                    b_norm == target_clean
+                                    or b_norm.endswith("/" + target_clean)
+                                    or (target_stem and b_norm.endswith("/" + target_stem + ".md"))
+                                ):
+                                    bm = b_name
+                                    break
+
+                    # 2. 依次按锚点、文件名词干、标签文本、编号与章节查找
+                    if not bm and hasattr(expressions, "find_bookmark_for_section"):
+                        if frag_part:
+                            bm = expressions.find_bookmark_for_section(frag_part)
+                        if not bm and target_stem:
+                            bm = expressions.find_bookmark_for_section(target_stem)
+                        if not bm:
+                            bm = expressions.find_bookmark_for_section(label)
+                        if not bm:
+                            m_num = re.search(r"(\d+(?:\.\d+)+)", label)
+                            if m_num:
+                                bm = expressions.find_bookmark_for_section(m_num.group(1))
+                        if not bm and frag_part:
+                            m_num_frag = re.search(r"(\d+(?:\.\d+)+)", frag_part)
+                            if m_num_frag:
+                                bm = expressions.find_bookmark_for_section(m_num_frag.group(1))
+                        if not bm:
+                            m_ch = re.search(r"(第\s*\d+\s*章)", label)
+                            if m_ch:
+                                bm = expressions.find_bookmark_for_section(m_ch.group(1))
+
+                if bm:
+                    append_link(paragraph, label, bm)
+                else:
+                    append_plain(paragraph, label)
+                pos = end
+            if pos < len(line):
+                append_plain(paragraph, line[pos:])
+            continue
+
         if expressions is None:
             append_plain(paragraph, line)
             continue

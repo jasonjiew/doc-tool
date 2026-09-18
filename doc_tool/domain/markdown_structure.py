@@ -335,6 +335,43 @@ def check_mermaid_structure(lines: Sequence[str]) -> List[StructureFinding]:
     from doc_tool.application.content.mermaid import extract_blocks, validate
 
     findings: List[StructureFinding] = []
+    # 检查残缺的 Mermaid 围栏前缀（如 ``mermaid 或 ~mermaid，少于 3 个反引号/波浪线）
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line_no, line in enumerate(lines, start=1):
+        stripped = str(line).strip()
+        fence_match = re.match(r"^(`{3,}|~{3,})", stripped)
+        if fence_match:
+            flen = len(fence_match.group(1))
+            fchar = fence_match.group(1)[0]
+            if not in_fence:
+                in_fence = True
+                fence_char = fchar
+                fence_len = flen
+            elif fchar == fence_char and flen >= fence_len:
+                in_fence = False
+            continue
+        if in_fence:
+            continue
+
+        m = re.match(r"^(`{1,2}|~{1,2})\s*mermaid\b", stripped, re.I)
+        if m:
+            delims = m.group(1)
+            rest = stripped[m.end():]
+            # 严格检查行内闭合：需匹配相同字符与长度的闭合标记（如 ` 对 `，`` 对 ``）
+            if re.search(re.escape(delims), rest):
+                continue
+            findings.append(
+                StructureFinding(
+                    line_no=line_no,
+                    rule="mermaid_syntax",
+                    message="Mermaid 代码围栏标记不完整：发现 '{0}'，标准 Markdown 代码围栏至少需要 3 个反引号（```mermaid）。".format(stripped),
+                    hint="请将代码块围栏反引号补齐为至少 3 个：```mermaid",
+                    blocking=True,
+                )
+            )
+
     md_text = "\n".join(str(line).rstrip("\r\n") for line in lines)
     blocks = extract_blocks(md_text)
     for block in blocks:

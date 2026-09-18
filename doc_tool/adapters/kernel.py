@@ -49,6 +49,7 @@ def ensure_kernel_importable() -> None:
 def _effective_heading_styles(
     manifest: ProjectManifest,
     template_path: Path,
+    usage: Optional[Dict[str, int]] = None,
 ) -> Dict[int, str]:
     """返回可用于段落 ``pStyle`` 的 Heading 样式。
 
@@ -61,9 +62,26 @@ def _effective_heading_styles(
     （即使其名字不匹配 ``Heading N`` 命名）——样式映射导入依赖该映射
     驱动往返门禁比对，擅自替换会让试构建用别的 styleId、而门禁仍按
     原映射识别，误报关键差异并阻断导入。
+
+    唯一的例外是「同名派生样式顶掉内置 Heading」：Word 里基于内置
+    ``heading 1`` 派生的自定义样式（如 ``标题1``）名字同样命中级别 1，
+    早期导入器按 styles.xml 出现顺序反查时会让它胜出并写进清单。此时
+    章节标题会被写成自定义样式，丢掉内置 Heading 的大纲级别、编号
+    （``numId``）关联与 TOC 归属。这类值必须纠正为内置 Heading，否则
+    已存在的项目会一直带着错误映射构建。
+
+    ``usage`` 为源文档的 ``pStyle`` 使用计数：只有真正在用的样式才是
+    「文档本来就是这个样子」。源文档确实大量使用某个派生样式时，它会被
+    选为胜者，配置值原样保留——修复不得改写既有文档的语义。
     """
-    from doc_tool.adapters.importer import _parse_heading_styles
-    from doc_tool.domain.ooxml import OOXMLSecurityError, read_docx_package
+    from doc_tool.domain.ooxml import (
+        OOXMLSecurityError,
+        heading_style_candidates,
+        parse_heading_styles,
+        parse_xml_safe,
+        read_docx_package,
+        resolve_heading_styles,
+    )
 
     try:
         with read_docx_package(template_path) as package:
@@ -71,14 +89,49 @@ def _effective_heading_styles(
     except (OSError, KeyError, OOXMLSecurityError):
         return dict(manifest.headingStyles)
 
-    style_to_level = _parse_heading_styles(styles_xml)
-    discovered = {level: style_id for style_id, level in style_to_level.items()}
+    style_to_level = parse_heading_styles(styles_xml)
     paragraph_ids = _paragraph_style_ids(styles_xml)
+
+    # 同一级别存在多个候选时，判定配置值是否属于「派生样式顶掉内置 Heading」。
+    try:
+        styles_root = parse_xml_safe(styles_xml, "word/styles.xml")
+    except OOXMLSecurityError:
+        styles_root = None
+    derived_winners: Dict[str, str] = {}
+    winners: Dict[int, str] = {}
+    if styles_root is not None:
+        candidates = heading_style_candidates(styles_root)
+        heading_ids = {candidate.style_id for candidate in candidates}
+        winners = resolve_heading_styles(styles_root, usage=usage)
+        for candidate in candidates:
+            winner = winners.get(candidate.level)
+            # 仅纠正「自定义 + 基于其他 Heading 派生」的重复样式；用户手工
+            # 映射的独立自定义样式（不基于 Heading）不在此列，保持原样。
+            if (
+                winner
+                and winner != candidate.style_id
+                and candidate.custom
+                and candidate.based_on in heading_ids
+            ):
+                derived_winners[candidate.style_id] = winner
+
+    # 兜底替换必须同样消解冲突：直接反查识别映射会让靠后的派生样式
+    # （如「标题1」）顶掉内置 Heading，修复就只在部分路径生效了。
+    if winners:
+        discovered = dict(winners)
+    else:
+        discovered = {level: style_id for style_id, level in style_to_level.items()}
+
     effective: Dict[int, str] = {}
     changed = False
     for level, configured_style in manifest.headingStyles.items():
         level = int(level)
         configured_style = str(configured_style)
+        replacement = derived_winners.get(configured_style)
+        if replacement:
+            effective[level] = replacement
+            changed = True
+            continue
         if style_to_level.get(configured_style) == level:
             effective[level] = configured_style
             continue
@@ -124,6 +177,31 @@ def _paragraph_style_ids(styles_xml: bytes) -> set:
     }
 
 
+def _source_style_usage(
+    paths: ProjectPaths, manifest: ProjectManifest
+) -> Optional[Dict[str, int]]:
+    """源 DOCX 的 ``pStyle`` 使用计数；不可读时返回 ``None``（退化为样式形态择优）。"""
+    from doc_tool.domain.ooxml import (
+        OOXMLSecurityError,
+        heading_style_usage,
+        parse_xml_safe,
+        read_docx_package,
+    )
+
+    try:
+        source = paths.resolve(manifest.relative_source_docx())
+        if not source.is_file():
+            return None
+        with read_docx_package(source) as package:
+            document_xml = package.read("word/document.xml")
+    except (OSError, KeyError, OOXMLSecurityError):
+        return None
+    try:
+        return heading_style_usage(parse_xml_safe(document_xml, "word/document.xml"))
+    except OOXMLSecurityError:
+        return None
+
+
 def config_from_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
@@ -136,7 +214,9 @@ def config_from_project(
     """
     doc_type = manifest.documentType
     template_path = paths.resolve(manifest.relative_template_docx())
-    heading_styles = _effective_heading_styles(manifest, template_path)
+    heading_styles = _effective_heading_styles(
+        manifest, template_path, usage=_source_style_usage(paths, manifest)
+    )
     # 版本号在这里再规范一次：管线同步修订记录版本号时是直接赋值给 dataclass
     # 字段的（绕过 ``__post_init__``），内核拿到的值必须已无 V 前缀，否则封面
     # 「版本号」和页眉「版次」会被写成 V3.8，与模板/历史产物写法不一致。

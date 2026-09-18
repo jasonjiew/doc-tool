@@ -396,3 +396,52 @@ def renumber_command(args) -> CommandResult:
         )
 
     return run_per_project("renumber", [args.project], operation)
+
+
+def autolink_command(args) -> CommandResult:
+    """为项目 content/<类型>/_revision_record.md 自动赋值章节文档超链接。"""
+    from doc_tool.application.content.revision_record import autolink_revision_record
+    from doc_tool.domain.manifest import ProjectManifest
+    from doc_tool.domain.paths import ProjectPaths
+
+    target_ver = "latest" if getattr(args, "latest_only", False) else getattr(args, "target_version", None)
+    dry_run = getattr(args, "dry_run", False)
+
+    def operation(root: Path) -> ProjectCommandResult:
+        manifest = ProjectManifest.load(root)
+        paths = ProjectPaths(root)
+        content_root = paths.resolve(manifest.relative_content_root())
+        rev_path = content_root / "_revision_record.md"
+        if not rev_path.is_file():
+            return ProjectCommandResult(
+                str(root),
+                False,
+                "E4040",
+                "请确认 content/<类型>/_revision_record.md 文件存在",
+                data={"message": "未找到修订记录文件: {0}".format(rev_path)},
+            )
+        updated_rows, total_links, _ = autolink_revision_record(
+            rev_path,
+            content_root=content_root,
+            target_version=target_ver,
+            dry_run=dry_run,
+        )
+        mode_str = " [预览]" if dry_run else ""
+        msg = "{0}修订记录: {1} 行已更新，新增 {2} 个文档超链接 -> {3}".format(
+            mode_str, updated_rows, total_links, rev_path
+        )
+        return ProjectCommandResult(
+            str(root),
+            True,
+            data={
+                "message": msg,
+                "revisionRecord": str(rev_path),
+                "updatedRows": updated_rows,
+                "totalLinks": total_links,
+                "dryRun": dry_run,
+                "targetVersion": target_ver,
+            },
+        )
+
+    projects = args.project if isinstance(args.project, list) else [args.project]
+    return run_per_project("autolink", projects, operation)

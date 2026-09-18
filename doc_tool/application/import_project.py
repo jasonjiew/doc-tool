@@ -272,7 +272,9 @@ def import_first_time(
         # 10b. 往返差异门禁 (2.5)：trial_build 后、publish 前，fail-closed。
         _check_cancel()
         _record(result, STAGE_ROUNDTRIP_CHECK, "started")
-        roundtrip_report = _run_roundtrip_check(request, paths.source_docx, trial_output)
+        roundtrip_report = _run_roundtrip_check(
+            request, paths.source_docx, trial_output, manifest.headingStyles
+        )
         if roundtrip_report.has_block or (
             request.require_exact_roundtrip and roundtrip_report.issues
         ):
@@ -385,13 +387,23 @@ def _build_manifest(
     doc_type = request.document_type
     if request.heading_style_map:
         # 用户映射（styleId -> 级别）写入清单的 headingStyles（级别 -> styleId）。
-        heading_styles = {
-            level: style_id for style_id, level in request.heading_style_map.items()
-        }
+        # 两个 styleId 被映射到同一级别时不能让「靠后的」静默胜出：映射由样式
+        # 映射页按候选优先级（已识别 > 疑似标题 > 使用次数）生成，取先出现者
+        # 才符合界面呈现的优先次序。
+        heading_styles = {}
+        for style_id, level in request.heading_style_map.items():
+            heading_styles.setdefault(int(level), str(style_id))
     else:
-        heading_styles = {
-            level: sid for sid, level in template_meta.heading_styles.items()
-        }
+        # 优先使用模板生成阶段已消解同级冲突的决策映射。直接反查识别映射会
+        # 让 styles.xml 中靠后的自定义样式（如基于 heading 1 派生的「标题1」）
+        # 顶掉真正的内置 Heading，章节标题随之丢掉大纲级别与编号关联。
+        decisions = getattr(template_meta, "heading_style_decisions", None) or {}
+        if decisions:
+            heading_styles = {int(level): sid for level, sid in decisions.items()}
+        else:
+            heading_styles = {
+                level: sid for sid, level in template_meta.heading_styles.items()
+            }
     manifest = ProjectManifest(
         documentType=doc_type,
         documentNo=request.document_no,
@@ -490,16 +502,29 @@ def _remove_trial_output(trial_output: str) -> None:
         pass
 
 
-def _run_roundtrip_check(request: ImportRequest, source_docx: Path, trial_output: str):
-    """执行源 Word 与试构建重建 Word 的往返差异对比。"""
+def _run_roundtrip_check(
+    request: ImportRequest,
+    source_docx: Path,
+    trial_output: str,
+    manifest_heading_styles: Optional[Dict[int, str]] = None,
+):
+    """执行源 Word 与试构建重建 Word 的往返差异对比。
+
+    标题识别必须与试构建实际写入的样式一致：试构建用的是清单里的
+    ``headingStyles``，比对时若只靠样式名启发式，遇到名称不匹配
+    ``Heading N`` 的自定义样式就会认不出标题、把整章误判成正文差异。
+    """
     from doc_tool.adapters.roundtrip import roundtrip_diff
 
-    # 样式映射导入的文档标题识别依赖用户映射（级别 -> styleId）。
-    heading_styles = None
+    # 用户映射（styleId -> 级别）优先；否则用清单已消解冲突的决策映射
+    # （级别 -> styleId），两者都是「试构建实际用的样式」。
+    heading_styles: Optional[Dict[int, str]] = None
     if request.heading_style_map:
         heading_styles = {
             level: style_id for style_id, level in request.heading_style_map.items()
         }
+    elif manifest_heading_styles:
+        heading_styles = {int(level): str(sid) for level, sid in manifest_heading_styles.items()}
     try:
         return roundtrip_diff(source_docx, trial_output, heading_styles=heading_styles)
     except Exception as exc:

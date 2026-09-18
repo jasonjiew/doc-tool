@@ -171,6 +171,32 @@ def ensure_revision_record(
         return False
 
 
+def _split_markdown_table_row(line: str) -> List[str]:
+    r"""将 Markdown 表格行按未转义的管道符 `|` 分割为单元格，保留 `\|` 转义与末尾空列。"""
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    cells: List[str] = []
+    current: List[str] = []
+    escaped = False
+    for ch in s:
+        if escaped:
+            current.append(ch)
+            escaped = False
+        elif ch == "\\":
+            current.append(ch)
+            escaped = True
+        elif ch == "|":
+            cells.append("".join(current).strip())
+            current = []
+        else:
+            current.append(ch)
+    cells.append("".join(current).strip())
+    return cells
+
+
 def _revision_table_rows(md_path: Path) -> Optional[List[List[str]]]:
     """修订记录表的非分隔行单元格矩阵；文件不存在或无 ``|`` 块返回 None。
 
@@ -194,7 +220,7 @@ def _revision_table_rows(md_path: Path) -> Optional[List[List[str]]]:
         return None
     rows: List[List[str]] = []
     for line in table_lines:
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        cells = _split_markdown_table_row(line)
         if cells and all(_SEP_CELL_RE.fullmatch(cell) for cell in cells):
             continue  # 分隔行
         rows.append(cells)
@@ -229,3 +255,380 @@ def document_version_from_record(md_path: Path) -> Optional[str]:
         return normalize_revision_version(version)
     except Exception:  # noqa: BLE001
         return None
+
+
+# ---------------------------------------------------------------------------
+# 自动赋值章节文档超链接 (Autolink)
+# ---------------------------------------------------------------------------
+
+
+def safe_markdown_url(rel_path: str, is_dir: bool = False) -> str:
+    """把章节相对路径编码为对 Markdown 链接安全的 URL（保留中文表意文字，转义空格与括号）。"""
+    posix_path = rel_path.replace("\\", "/")
+    if is_dir and not posix_path.endswith("/"):
+        posix_path += "/"
+    return posix_path.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+
+
+def _normalize_cjk_token(s: str) -> str:
+    """归一化 CJK 文本标点与空白，增强全半角斜杠/括号/空格的模糊匹配能力。"""
+    s = s.replace("／", "/").replace("（", "(").replace("）", ")")
+    return re.sub(r"\s+", "", s)
+
+
+class SectionCatalog:
+    """章节与文档目录树快速检索索引。
+
+    扫描 content_root 下全部文档及子目录，构建全名、章节编号、去空格标题的多级索引，
+    供修订记录自动赋值超链接时进行稳定定位。
+    """
+
+    def __init__(self, content_root: Path) -> None:
+        self.root = Path(content_root).resolve()
+        self.exact_map: Dict[str, str] = {}
+        self.num_map: Dict[str, str] = {}
+        self.num_entry_map: Dict[str, Tuple[str, str, str]] = {}
+        self.chap_map: Dict[str, str] = {}
+        self.title_map: Dict[str, str] = {}
+        self._build()
+
+    def _build(self) -> None:
+        import os
+
+        if not self.root.is_dir():
+            return
+        for dirpath, dirnames, filenames in os.walk(self.root):
+            rel_dir = Path(dirpath).relative_to(self.root)
+            for d in dirnames:
+                if d.startswith("."):
+                    continue
+                rel_d = (rel_dir / d).as_posix()
+                d_url = safe_markdown_url(rel_d, is_dir=True)
+                self.exact_map[d] = d_url
+                self.exact_map[d.replace(" ", "")] = d_url
+                self.exact_map[_normalize_cjk_token(d)] = d_url
+                m_ch = re.match(r"^(第\s*(\d+)\s*章)(?:\s+(.+))?", d)
+                if m_ch:
+                    ch_key = "第{0}章".format(m_ch.group(2))
+                    self.chap_map[ch_key] = d_url
+                    self.chap_map[d] = d_url
+                    self.chap_map[d.replace(" ", "")] = d_url
+                    if m_ch.group(3):
+                        ch_title = m_ch.group(3)
+                        self.exact_map[ch_title] = d_url
+                        self.exact_map[ch_title.replace(" ", "")] = d_url
+                        self.exact_map[_normalize_cjk_token(ch_title)] = d_url
+                        self.title_map[_normalize_cjk_token(ch_title)] = d_url
+                m_num = re.match(r"^(\d+(?:\.\d+)+)(?:\s+(.+))?", d)
+                if m_num:
+                    num = m_num.group(1)
+                    title = m_num.group(2) or ""
+                    self.num_map[num] = d_url
+                    self.num_entry_map[num] = (title, d_url, d)
+                    if title:
+                        self.exact_map[title] = d_url
+                        self.exact_map[title.replace(" ", "")] = d_url
+                        self.exact_map[_normalize_cjk_token(title)] = d_url
+                        self.title_map[_normalize_cjk_token(title)] = d_url
+
+            for f in filenames:
+                if not f.endswith(_MD_SUFFIXES) or Path(f).name in _REVISION_RECORD_NAMES:
+                    continue
+                rel_f = (rel_dir / f).as_posix()
+                f_url = safe_markdown_url(rel_f, is_dir=False)
+                stem = Path(f).stem
+                self.exact_map[stem] = f_url
+                self.exact_map[stem.replace(" ", "")] = f_url
+                self.exact_map[_normalize_cjk_token(stem)] = f_url
+                m_num = re.match(r"^(\d+(?:\.\d+)+)(?:\s+(.+))?", stem)
+                if m_num:
+                    num = m_num.group(1)
+                    title = m_num.group(2) or ""
+                    self.num_map[num] = f_url
+                    self.num_entry_map[num] = (title, f_url, stem)
+                    if title:
+                        self.exact_map[title] = f_url
+                        self.exact_map[title.replace(" ", "")] = f_url
+                        self.exact_map[_normalize_cjk_token(title)] = f_url
+                        self.title_map[_normalize_cjk_token(title)] = f_url
+
+    def find_num_entry(self, num: str) -> Tuple[Optional[str], Optional[Tuple[str, str, str]]]:
+        """精确或按最长前缀查找编号对应的章节条目。
+
+        例如输入 4.1.6.4 时，若该小节没有独立 md 文件，则回退查找父小节 4.1.6
+        （对应 4.1.6 设备管理.md），保证细化逻辑可跳转到所属上级文档。
+        """
+        if num in self.num_entry_map:
+            return num, self.num_entry_map[num]
+        parts = num.split(".")
+        while len(parts) > 2:
+            parts.pop()
+            p_num = ".".join(parts)
+            if p_num in self.num_entry_map:
+                return p_num, self.num_entry_map[p_num]
+        return None, None
+
+    def resolve(self, token: str) -> Optional[str]:
+        t = token.strip()
+        if not t:
+            return None
+        if t in self.exact_map:
+            return self.exact_map[t]
+        t_nosp = t.replace(" ", "")
+        if t_nosp in self.exact_map:
+            return self.exact_map[t_nosp]
+        norm_t = _normalize_cjk_token(t)
+        if norm_t in self.exact_map:
+            return self.exact_map[norm_t]
+        m_num = re.match(r"^(\d+(?:\.\d+)+)", t)
+        if m_num:
+            _, entry = self.find_num_entry(m_num.group(1))
+            if entry:
+                return entry[1]
+        m_ch = re.match(r"^(第\s*\d+\s*章)", t)
+        if m_ch:
+            ch_k = m_ch.group(1).replace(" ", "")
+            if ch_k in self.chap_map:
+                return self.chap_map[ch_k]
+        if norm_t in self.title_map:
+            return self.title_map[norm_t]
+        return None
+
+
+_STOP_WORDS = frozenset(["等", "各", "及", "和", "与", "包含", "新增", "修改", "删除", "模块", "子模块"])
+
+
+def link_revision_summary(text: str, catalog: SectionCatalog) -> str:
+    """在修订摘要文本中识别章节/小节标题或编号，自动替换为 Markdown 超链接（严格幂等）。"""
+    saved_links: List[str] = []
+
+    def _save_link(m: re.Match) -> str:
+        saved_links.append(m.group(0))
+        return "\x00MDLINK_{0}\x00".format(len(saved_links) - 1)
+
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", _save_link, text)
+
+    pattern = re.compile(
+        r"(第\s*\d+\s*章(?:\s+[^\s\n（\(\)\）\[\]【】<>{}:：，,;；“”\"\'->→。!！?？~]+)?|"
+        r"(?<![0-9a-zA-Z\.])\d+(?:\.\d+)+)"
+    )
+
+    out: List[str] = []
+    pos = 0
+    for match in pattern.finditer(text):
+        start, end = match.span()
+        if start < pos:
+            continue
+        out.append(text[pos:start])
+        matched_str = match.group(0)
+
+        # 1. 检查是否为章级标题（如 "第4章 WEB端功能设计" 或 "第4章"）
+        m_chap = re.match(r"^(第\s*(\d+)\s*章)(?:\s+(.+))?$", matched_str)
+        if m_chap:
+            raw_chap = m_chap.group(1)
+            raw_title = m_chap.group(3)
+            if raw_title:
+                full_k = raw_chap + " " + raw_title
+                url = catalog.chap_map.get(full_k) or catalog.exact_map.get(_normalize_cjk_token(full_k))
+                if url:
+                    out.append("[{0}]({1})".format(full_k, url))
+                    pos = end
+                    continue
+            ch_k = "第{0}章".format(m_chap.group(2))
+            url = catalog.chap_map.get(ch_k)
+            if url:
+                if raw_title:
+                    out.append("[{0}]({1}) {2}".format(raw_chap, url, raw_title))
+                else:
+                    out.append("[{0}]({1})".format(raw_chap, url))
+                pos = end
+                continue
+            out.append(matched_str)
+            pos = end
+            continue
+
+        # 2. 编号小节匹配（如 4.8.5、10.1、15.1.6、4.1.6.4）
+        num = matched_str
+        rest_text = text[end:]
+        _, entry = catalog.find_num_entry(num)
+
+        if entry:
+            known_title, url, stem = entry
+            lead_spaces = len(rest_text) - len(rest_text.lstrip(" \t"))
+            rest_no_lead = rest_text[lead_spaces:]
+
+            matched_len = 0
+            if known_title:
+                norm_kt = _normalize_cjk_token(known_title)
+                cur_norm = ""
+                for i, char in enumerate(rest_no_lead):
+                    if char in "\r\n<>[【】":
+                        break
+                    cur_norm += _normalize_cjk_token(char)
+                    if cur_norm == norm_kt:
+                        matched_len = lead_spaces + i + 1
+                        break
+                    elif not norm_kt.startswith(cur_norm):
+                        break
+
+            if matched_len > 0:
+                full_label = text[start : end + matched_len]
+                out.append("[{0}]({1})".format(full_label, url))
+                pos = end + matched_len
+                continue
+
+            # 别名/短标题前缀匹配（如 3.1呼吸机结果集上传，或 16.16 波形数据Protobuf上传）
+            m_chunk = re.match(
+                r"^[ \t]*([^\s\n（\(\)\）\[\]【】<>{}:：，,;；“”\"\'->→。!！?？~]+)", rest_text
+            )
+            if m_chunk:
+                chunk = m_chunk.group(1)
+                chunk_len = len(m_chunk.group(0))
+                if chunk not in _STOP_WORDS and not any(chunk.startswith(sw) for sw in ("各", "等")):
+                    norm_c = _normalize_cjk_token(chunk)
+                    norm_k = _normalize_cjk_token(known_title)
+                    if known_title and (
+                        norm_c in norm_k or norm_k in norm_c or (len(norm_c) >= 2 and norm_c[:2] in norm_k)
+                    ):
+                        full_label = text[start : end + chunk_len]
+                        out.append("[{0}]({1})".format(full_label, url))
+                        pos = end + chunk_len
+                        continue
+
+            out.append("[{0}]({1})".format(num, url))
+            pos = end
+            continue
+
+        # 3. 容错：若编号未命中（如手写错 4.14证书管理），尝试按紧随其后的标题反查
+        m_chunk = re.match(
+            r"^[ \t]*([^\s\n（\(\)\）\[\]【】<>{}:：，,;；“”\"\'->→。!！?？~]+)", rest_text
+        )
+        if m_chunk:
+            chunk = m_chunk.group(1)
+            chunk_len = len(m_chunk.group(0))
+            norm_c = _normalize_cjk_token(chunk)
+            if norm_c in catalog.title_map:
+                url = catalog.title_map[norm_c]
+                full_label = text[start : end + chunk_len]
+                out.append("[{0}]({1})".format(full_label, url))
+                pos = end + chunk_len
+                continue
+
+        out.append(num)
+        pos = end
+
+    out.append(text[pos:])
+    linked = "".join(out)
+
+    for i, orig in enumerate(saved_links):
+        linked = linked.replace("\x00MDLINK_{0}\x00".format(i), orig)
+    return linked
+
+
+def autolink_revision_record_text(
+    markdown_text: str,
+    content_root: Path,
+    target_version: Optional[str] = None,
+) -> Tuple[str, int, int]:
+    """解析修订记录 Markdown 表格，为修改摘要列自动赋超链接。
+
+    Args:
+        markdown_text: 原始修订记录 Markdown 文本
+        content_root: 内容根目录（用于建立章节索引）
+        target_version: 目标版本号；若为 "latest" 则仅处理末尾最新一行；None 则处理所有数据行。
+
+    Returns:
+        (new_markdown_text, updated_rows_count, total_links_count)
+    """
+    cat = SectionCatalog(content_root)
+    lines = markdown_text.splitlines()
+    new_lines: List[str] = []
+    header_seen = False
+    updated_rows = 0
+    total_links = 0
+
+    latest_row_idx = None
+    if target_version == "latest":
+        header_passed = False
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("|"):
+                if re.match(r"^\|[\s\-:|]+\|$", stripped):
+                    header_passed = True
+                    continue
+                if header_passed:
+                    cells = _split_markdown_table_row(line)
+                    if len(cells) >= 2 and cells[0]:
+                        latest_row_idx = idx
+            elif header_passed:
+                break
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("|"):
+            if re.match(r"^\|[\s\-:|]+\|$", stripped):
+                header_seen = True
+                new_lines.append(line)
+                continue
+            cells = _split_markdown_table_row(line)
+            if not header_seen:
+                header_seen = True
+                new_lines.append(line)
+                continue
+
+            if header_seen and len(cells) >= 2:
+                ver = cells[0]
+                summary = cells[1]
+
+                should_process = True
+                if target_version == "latest":
+                    should_process = (idx == latest_row_idx)
+                elif target_version:
+                    norm_ver = ver.strip().lstrip("vV")
+                    norm_target = str(target_version).strip().lstrip("vV")
+                    should_process = (norm_ver == norm_target)
+
+                if should_process:
+                    linked_summary = link_revision_summary(summary, cat)
+                    links_in_row = len(re.findall(r"\[[^\]]+\]\([^\)]+\)", linked_summary)) - len(
+                        re.findall(r"\[[^\]]+\]\([^\)]+\)", summary)
+                    )
+                    if linked_summary != summary:
+                        updated_rows += 1
+                        total_links += max(0, links_in_row)
+                        cells[1] = linked_summary
+                        new_lines.append("| " + " | ".join(cells) + " |")
+                        continue
+
+            new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    result_text = "\n".join(new_lines)
+    if markdown_text.endswith("\n") and not result_text.endswith("\n"):
+        result_text += "\n"
+    return result_text, updated_rows, total_links
+
+
+def autolink_revision_record(
+    md_path: Path,
+    content_root: Optional[Path] = None,
+    target_version: Optional[str] = None,
+    dry_run: bool = False,
+) -> Tuple[int, int, str]:
+    """读取文件并为修订记录赋超链接；返回 (更新行数, 新增超链接数, 处理后的全文)。"""
+    md_path = Path(md_path).resolve()
+    if not md_path.is_file():
+        raise FileNotFoundError("修订记录文件不存在: {0}".format(md_path))
+    if content_root is None:
+        content_root = md_path.parent
+    else:
+        content_root = Path(content_root).resolve()
+
+    original_text = md_path.read_text(encoding="utf-8")
+    new_text, updated_rows, total_links = autolink_revision_record_text(
+        original_text, content_root, target_version=target_version
+    )
+    if updated_rows > 0 and not dry_run:
+        atomic_write(md_path, new_text)
+    return updated_rows, total_links, new_text

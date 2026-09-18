@@ -16,6 +16,7 @@ XML 部件，消除各链路独立的包读取/解析实现，保证安全参数
 
 from __future__ import annotations
 
+import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -299,11 +300,197 @@ def is_xml_part(name: str) -> bool:
     return name.endswith(".xml") or name.endswith(".rels")
 
 
+# --- Heading 样式识别（全仓库唯一实现） ---------------------------------
+
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_W = "{" + _W_NS + "}"
+
+# 本工具只处理 Heading 1~6。
+HEADING_LEVEL_MIN = 1
+HEADING_LEVEL_MAX = 6
+
+# 样式名 -> 级别。英文内置名（"heading 1"）先于本地化名（"标题1"）匹配：
+# 两者可能同时存在，内置名是「这是真正的 Word Heading」更可靠的信号。
+_HEADING_NAME_PATTERNS = (
+    (re.compile(r"(?i)heading\s*(\d+)"), True),
+    (re.compile(r"标题\s*(\d+)"), False),
+)
+
+
+def _qn(tag: str) -> str:
+    """限定为 WordprocessingML 主命名空间的标签名。"""
+    return _W + tag
+
+
+@dataclass(frozen=True)
+class HeadingStyleCandidate:
+    """``styles.xml`` 中一个声称属于某 Heading 级别的段落样式。
+
+    Word 允许用户基于内置 Heading 派生自定义样式并沿用相似名称（例如
+    ``标题1`` 基于 ``heading 1``），此时同一级别会有多个候选。这里保留
+    全部候选及其判定依据，由 :func:`resolve_heading_styles` 确定性择优。
+    """
+
+    style_id: str
+    level: int
+    name: str
+    index: int
+    custom: bool
+    outline_level: Optional[int]
+    based_on: str
+    builtin_name: bool
+
+
+def _style_outline_level(style) -> Optional[int]:
+    """读取 ``w:pPr/w:outlineLvl`` 的大纲级别（0 基）；缺失返回 ``None``。"""
+    properties = style.find(_qn("pPr"))
+    if properties is None:
+        return None
+    outline = properties.find(_qn("outlineLvl"))
+    if outline is None:
+        return None
+    try:
+        return int(outline.get(_qn("val")))
+    except (TypeError, ValueError):
+        return None
+
+
+def heading_style_candidates(styles_root) -> List[HeadingStyleCandidate]:
+    """列出已解析 ``w:styles`` 根元素中全部 Heading 段落样式候选（按出现顺序）。"""
+    if styles_root is None:
+        return []
+    candidates: List[HeadingStyleCandidate] = []
+    for index, style in enumerate(styles_root.iter(_qn("style"))):
+        if style.get(_qn("type")) != "paragraph":
+            continue
+        style_id = style.get(_qn("styleId"))
+        name_elem = style.find(_qn("name"))
+        if not style_id or name_elem is None:
+            continue
+        name = name_elem.get(_qn("val")) or ""
+        level = 0
+        builtin_name = False
+        for pattern, is_builtin in _HEADING_NAME_PATTERNS:
+            match = pattern.match(name)
+            if match:
+                level = int(match.group(1))
+                builtin_name = is_builtin
+                break
+        if not HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX:
+            continue
+        based_on_elem = style.find(_qn("basedOn"))
+        candidates.append(
+            HeadingStyleCandidate(
+                style_id=style_id,
+                level=level,
+                name=name,
+                index=index,
+                custom=style.get(_qn("customStyle")) == "1",
+                outline_level=_style_outline_level(style),
+                based_on=(based_on_elem.get(_qn("val")) or "") if based_on_elem is not None else "",
+                builtin_name=builtin_name,
+            )
+        )
+    return candidates
+
+
+def heading_style_usage(document_root) -> Dict[str, int]:
+    """统计 ``document.xml`` 中各段落样式（``w:pStyle``）被引用的次数。"""
+    if document_root is None:
+        return {}
+    usage: Dict[str, int] = {}
+    for style_ref in document_root.iter(_qn("pStyle")):
+        style_id = style_ref.get(_qn("val"))
+        if style_id:
+            usage[style_id] = usage.get(style_id, 0) + 1
+    return usage
+
+
+def _candidate_rank(
+    candidate: HeadingStyleCandidate,
+    heading_ids: set,
+    usage: Optional[Dict[str, int]] = None,
+) -> tuple:
+    """候选优先级排序键（元组越小越优先）。
+
+    文档实际使用次数是最强信号：正文真的在用哪个样式，就应当继续用哪个。
+    没有 usage 信息（或并列）时才退化为「哪个更像内置 Heading」。
+    """
+    count = usage.get(candidate.style_id, 0) if usage else 0
+    return (
+        -count,
+        1 if candidate.custom else 0,
+        0 if candidate.outline_level is not None else 1,
+        1 if candidate.based_on in heading_ids else 0,
+        0 if candidate.builtin_name else 1,
+        candidate.index,
+    )
+
+
+def resolve_heading_styles(
+    styles_root, usage: Optional[Dict[str, int]] = None
+) -> Dict[int, str]:
+    """建立 Heading 级别 -> styleId 映射，并确定性消解同级多候选冲突。
+
+    这是「构建时要写哪个 styleId」的唯一决策点。同一级别出现多个候选时，
+    依次比较：文档实际使用次数、是否自定义样式、是否显式声明大纲级别、
+    是否基于其他 Heading 派生、是否英文内置样式名、``styles.xml`` 中的位置。
+
+    缺省按出现顺序覆盖会让靠后的自定义样式（如基于 ``heading 1`` 派生的
+    ``标题1``）顶掉真正的内置 Heading，构建出的章节标题因此丢掉内置样式
+    语义（大纲级别、编号关联 ``numId``、TOC 归属），故必须显式择优。
+    """
+    candidates = heading_style_candidates(styles_root)
+    if not candidates:
+        return {}
+    heading_ids = {candidate.style_id for candidate in candidates}
+    best: Dict[int, HeadingStyleCandidate] = {}
+    for candidate in candidates:
+        current = best.get(candidate.level)
+        if current is None or _candidate_rank(
+            candidate, heading_ids, usage
+        ) < _candidate_rank(current, heading_ids, usage):
+            best[candidate.level] = candidate
+    return {level: candidate.style_id for level, candidate in sorted(best.items())}
+
+
+def resolve_heading_styles_from_xml(
+    styles_xml: bytes, usage: Optional[Dict[str, int]] = None
+) -> Dict[int, str]:
+    """:func:`resolve_heading_styles` 的字节入口，内部安全解析 ``styles.xml``。"""
+    if not styles_xml:
+        return {}
+    return resolve_heading_styles(
+        parse_xml_safe(styles_xml, "word/styles.xml"), usage=usage
+    )
+
+
+def parse_heading_styles(styles_xml: bytes) -> Dict[str, int]:
+    """从 ``styles.xml`` 建立 styleId -> Heading 级别（1~6）识别映射。
+
+    识别映射刻意保留**全部**同级候选（不做择优）：正文里出现的任何一种
+    标题样式都必须能被认出来，否则标题树会漏掉整章内容。择优只发生在
+    :func:`resolve_heading_styles`（决定构建时写哪个 styleId）。
+    """
+    if not styles_xml:
+        return {}
+    root = parse_xml_safe(styles_xml, "word/styles.xml")
+    return {candidate.style_id: candidate.level for candidate in heading_style_candidates(root)}
+
+
 # 兼容性别名：旧调用方按 ``OOXMLSecurityError`` 或 ``is_*`` 辅助使用。
 __all__ = [
     "OOXMLSecurityError",
     "PARSE_LIMITS",
     "DocxPackage",
+    "HeadingStyleCandidate",
+    "HEADING_LEVEL_MAX",
+    "HEADING_LEVEL_MIN",
+    "heading_style_candidates",
+    "heading_style_usage",
+    "parse_heading_styles",
+    "resolve_heading_styles",
+    "resolve_heading_styles_from_xml",
     "read_docx_package",
     "parse_xml_safe",
     "is_xml_part",

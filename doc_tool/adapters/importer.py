@@ -32,8 +32,11 @@ import yaml
 from lxml import etree
 
 from doc_tool.domain.ooxml import (
+    heading_style_usage,
+    parse_heading_styles,
     parse_xml_safe,
     read_docx_package,
+    resolve_heading_styles_from_xml,
 )
 
 
@@ -94,14 +97,19 @@ class TemplateMeta:
     """模板生成结果。
 
     Attributes:
-        heading_styles: styleId -> Heading 级别（1~6），写入清单的 headingStyles。
+        heading_styles: styleId -> Heading 级别（1~6）识别映射，保留同级全部
+            候选，供定位第一个 Heading 1 等识别用途。
         body_style: 正文（Normal）样式的 styleId，写入清单的 bodyStyle。
         body_start_index: 第一个 Heading 1 在 body 中的子元素索引（诊断用）。
+        heading_style_decisions: 级别 -> styleId 决策映射，已消解同级多候选
+            冲突（优先内置 Heading）。它写入清单的 headingStyles，决定构建时
+            实际写入哪个段落样式。
     """
 
     heading_styles: Dict[str, int]
     body_style: str
     body_start_index: int
+    heading_style_decisions: Dict[int, str] = field(default_factory=dict)
 
 
 def generate_template(
@@ -145,13 +153,23 @@ def generate_template(
     if body is None:
         raise ValueError("源文档 document.xml 缺少 w:body，无法生成模板。")
 
+    user_heading_map: Optional[Dict[str, int]] = None
     if heading_style_map is None:
         heading_style_map = _parse_heading_styles(styles_xml)
     else:
+        user_heading_map = dict(heading_style_map)
         heading_style_map = dict(heading_style_map)
     if not heading_style_map:
         raise ValueError("源文档 styles.xml 未定义任何 Heading 样式，无法生成模板。")
     body_style = _find_body_style(styles_xml)
+
+    # 构建时实际写入的 styleId（级别 -> styleId）：按源文档的真实使用情况
+    # 消解同级多候选冲突，用户显式映射优先。heading_style_map 是识别映射，
+    # 刻意保留同级全部候选供 _find_first_heading1 使用。
+    decisions = resolve_heading_styles_from_xml(styles_xml, usage=heading_style_usage(root))
+    if user_heading_map:
+        for style_id, level in user_heading_map.items():
+            decisions[int(level)] = style_id
 
     children = list(body)
     start_idx = _find_first_heading1(children, heading_style_map)
@@ -180,31 +198,17 @@ def generate_template(
         heading_styles=dict(heading_style_map),
         body_style=body_style,
         body_start_index=start_idx,
+        heading_style_decisions=dict(decisions),
     )
 
 
 def _parse_heading_styles(styles_xml: bytes) -> Dict[str, int]:
-    """从 styles.xml 建立 styleId -> Heading 级别（1~6）映射。"""
-    if not styles_xml:
-        return {}
-    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
-    heading_map: Dict[str, int] = {}
-    for style in sroot.iter(_qn("style")):
-        if style.get(_qn("type")) != "paragraph":
-            continue
-        style_id = style.get(_qn("styleId"))
-        name_elem = style.find(_qn("name"))
-        if name_elem is None or not style_id:
-            continue
-        name_val = name_elem.get(_qn("val")) or ""
-        m = re.match(r"(?i)heading\s*(\d+)", name_val)
-        if not m:
-            m = re.match(r"标题\s*(\d+)", name_val)
-        if m:
-            level = int(m.group(1))
-            if 1 <= level <= 6:
-                heading_map[style_id] = level
-    return heading_map
+    """从 styles.xml 建立 styleId -> Heading 级别（1~6）识别映射。
+
+    实现统一在 :mod:`doc_tool.domain.ooxml`（全仓库唯一事实源），此薄壳仅为
+    兼容既有调用方与测试的导入路径。
+    """
+    return parse_heading_styles(styles_xml)
 
 
 def _find_body_style(styles_xml: bytes) -> str:

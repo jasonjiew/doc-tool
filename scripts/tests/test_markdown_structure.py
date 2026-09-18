@@ -514,6 +514,67 @@ class MarkdownStructureLintRuleTests(unittest.TestCase):
         findings = check_mermaid_structure(lines)
         self.assertEqual(len(findings), 0)
 
+    def test_check_mermaid_structure_detects_broken_fence(self):
+        """Mermaid 围栏反引号少于 3 个（如 ``mermaid）时应报告语法错误。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "## 章节标题",
+            "",
+            "``mermaid",
+            "flowchart TD",
+            "  A --> B",
+            "``",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertTrue(any(f.rule == "mermaid_syntax" and "3 个反引号" in f.message for f in findings))
+
+    def test_check_mermaid_structure_ignores_inline_code_span(self):
+        """行首包含行内代码如 `mermaid` 语法时，不应被误报为残缺围栏。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "## 章节标题",
+            "",
+            "`mermaid` 是标准的图表画图语法。",
+            "另外也支持 ``mermaid`` 这种双反引号行内标记。",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+
+    def test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block(self):
+        """代码块内部引用残缺 mermaid 示例（如 ```markdown 块内）不应误报阻断错误。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "## 语法说明",
+            "",
+            "```markdown",
+            "示例残缺代码块：",
+            "``mermaid",
+            "flowchart TD",
+            "  A --> B",
+            "``",
+            "```",
+            "",
+            "正文描述继续。",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertEqual(len(findings), 0)
+
+    def test_check_mermaid_structure_detects_mismatched_inline_backticks(self):
+        """双反引号开头但单反引号闭合的残缺标记应被正确判定为未闭合。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "## 章节标题",
+            "",
+            "``mermaid ` 未正确闭合",
+        ]
+        findings = check_mermaid_structure(lines)
+        self.assertTrue(any(f.rule == "mermaid_syntax" for f in findings))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

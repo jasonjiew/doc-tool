@@ -900,7 +900,9 @@ class ChangeDetectionService:
             self.invalidate_cache()
         return ok, err
 
-    def stash(self, message: str = "") -> Tuple[bool, Optional[str]]:
+    def stash(
+        self, message: str = "", *, include_untracked: bool = False
+    ) -> Tuple[bool, Optional[str]]:
         """暂存工作区未提交改动。"""
         report = self.detect()
         if report.source != "git":
@@ -908,7 +910,12 @@ class ChangeDetectionService:
         root_text = (report.repository_root or "").strip()
         if not root_text:
             return False, "Git 仓库根不可用"
-        ok, err = git_stash_save(Path(root_text), message, runner=self._git_runner)
+        ok, err = git_stash_save(
+            Path(root_text),
+            message,
+            include_untracked=include_untracked,
+            runner=self._git_runner,
+        )
         if ok:
             self.invalidate_cache()
         return ok, err
@@ -1649,13 +1656,69 @@ def _git_pull_changes(
         return PullResult(ok=False, summary="", error="git pull 执行失败")
     output = (_decode(proc.stdout) + _decode(proc.stderr)).strip()
     if proc.returncode != 0:
-        conflicts = _git_unmerged_paths(repo_root, git, timeout, runner)
-        error = (
-            "git pull 失败：{0}".format(output)
-            if output
-            else "git pull 失败（退出码 {0}）".format(proc.returncode)
+        # 当本地存在未提交修改导致 pull 被拒绝时，尝试带 --autostash 重新拉取
+        is_untracked = (
+            "untracked working tree files would be overwritten" in output
+            or "未跟踪的工作区文件将被覆盖" in output
+            or "未跟踪的文件将被覆盖" in output
         )
+        is_dirty_worktree = (
+            "would be overwritten by merge" in output
+            or "stash them before you merge" in output
+            or "将因合并而覆盖" in output
+            or "合并前暂存" in output
+            or "在合并前暂存" in output
+            or "本地修改将被合并操作覆盖" in output
+        ) and not is_untracked
+        if is_dirty_worktree:
+            proc_stash = run_capture(["pull", "--autostash"])
+            if proc_stash is not None:
+                stash_output = (_decode(proc_stash.stdout) + _decode(proc_stash.stderr)).strip()
+                if proc_stash.returncode == 0:
+                    proc = proc_stash
+                    output = stash_output
+                elif "unknown switch" not in stash_output.lower() and "unknown option" not in stash_output.lower():
+                    proc = proc_stash
+                    output = stash_output
+
+    if proc.returncode != 0:
+        conflicts = _git_unmerged_paths(repo_root, git, timeout, runner)
+        # 重新根据最终 output 综合判定（兼容中英文 Git 诊断信息）
+        is_untracked_conflict = (
+            "untracked working tree files would be overwritten" in output
+            or "未跟踪的工作区文件将被覆盖" in output
+            or "未跟踪的文件将被覆盖" in output
+        )
+        is_dirty_conflict = (
+            "would be overwritten by merge" in output
+            or "stash them before you merge" in output
+            or "将因合并而覆盖" in output
+            or "合并前暂存" in output
+            or "在合并前暂存" in output
+            or "本地修改将被合并操作覆盖" in output
+        )
+        if is_untracked_conflict:
+            error = (
+                "本地存在未跟踪的新增文件与远端冲突，导致拉取被中止。\n"
+                "建议先暂存（包含未跟踪文件）或删除/移动这些本地文件后再拉取。\n\n"
+                "Git 详细输出：\n{0}".format(output)
+            )
+        elif is_dirty_conflict:
+            error = (
+                "本地存在未提交的改动与远端冲突，导致拉取被中止。\n"
+                "建议先点击「暂存改动 (Stash)」或提交本地修改后再拉取。\n\n"
+                "Git 详细输出：\n{0}".format(output)
+            )
+        else:
+            error = (
+                "git pull 失败：{0}".format(output)
+                if output
+                else "git pull 失败：退出码 {0}。".format(proc.returncode)
+            )
         return PullResult(ok=False, summary="", conflicts=conflicts, error=error)
+
+    # 当 proc.returncode == 0 时，检查是否有未合并的冲突（例如 autostash pop 产生冲突）
+    conflicts = _git_unmerged_paths(repo_root, git, timeout, runner)
 
     post: Optional[str] = None
     proc2 = run_capture(["rev-parse", "HEAD"])
@@ -1672,7 +1735,11 @@ def _git_pull_changes(
                 if line.strip()
             ]
     summary = "已是最新版本" if not changed else "更新了 {0} 个文件".format(len(changed))
-    return PullResult(ok=True, summary=summary, changed_files=tuple(changed))
+    if conflicts:
+        summary += "（本地改动与远端冲突，存在 {0} 处文件冲突需手工解决）".format(len(conflicts))
+    elif "Applying autostash resulted in conflicts" in output or "safe in the stash" in output:
+        summary += "（本地暂存改动与远端冲突，已安全保存至 Stash，可通过 Git 菜单解决冲突）"
+    return PullResult(ok=True, summary=summary, conflicts=conflicts, changed_files=tuple(changed))
 
 
 def _svn_pull_changes(
@@ -1976,6 +2043,7 @@ def git_stash_save(
     repo_root: Path,
     message: str = "",
     *,
+    include_untracked: bool = False,
     timeout: float = 30.0,
     runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
 ) -> Tuple[bool, Optional[str]]:
@@ -1983,6 +2051,8 @@ def git_stash_save(
     repo_root = Path(repo_root).resolve()
     git = shutil.which("git") or "git"
     cmd = [git, "stash", "push"]
+    if include_untracked:
+        cmd.append("-u")
     if message:
         cmd.extend(["-m", message])
     try:
@@ -1991,7 +2061,12 @@ def git_stash_save(
         return False, str(exc)[:200]
     if proc.returncode != 0:
         err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        if "initial commit yet" in err.lower() or "尚未有初始提交" in err or "没有初始提交" in err:
+            return False, "当前仓库尚未创建初始提交，无法使用暂存功能。"
         return False, err or "暂存改动失败"
+    output = (_decode(proc.stdout) + _decode(proc.stderr)).strip()
+    if "No local changes to save" in output or "没有要保存的本地修改" in output:
+        return False, "当前工作区没有需要暂存的改动。"
     return True, None
 
 
@@ -2010,6 +2085,10 @@ def git_stash_pop(
         return False, str(exc)[:200]
     if proc.returncode != 0:
         err = _decode(proc.stderr).strip() or _decode(proc.stdout).strip()
+        if "initial commit yet" in err.lower() or "尚未有初始提交" in err or "没有初始提交" in err:
+            return False, "当前仓库尚未创建初始提交，无法使用暂存功能。"
+        if "No stash entries found" in err or "No stash found" in err or "没有找到 stash" in err or "未找到 stash" in err:
+            return False, "当前没有可恢复的暂存改动（暂存区为空）。"
         return False, err or "恢复暂存改动失败"
     return True, None
 

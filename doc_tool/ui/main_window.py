@@ -3295,8 +3295,40 @@ class MainWindow(QMainWindow):
                 )
                 self._status_label.setText(f"拉取完成但有 {len(res.conflicts)} 个冲突，需手工解决")
             elif not res.ok:
-                QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{res.error}")
-                self._status_label.setText(f"拉取失败：{res.error}")
+                first_line = res.error.strip().splitlines()[0] if res.error else "未知错误"
+                self._status_label.setText(f"拉取失败：{first_line}")
+                is_conflict = (
+                    "未提交的改动与远端冲突" in (res.error or "")
+                    or "未跟踪的新增文件与远端冲突" in (res.error or "")
+                    or "would be overwritten by merge" in (res.error or "")
+                    or "将因合并而覆盖" in (res.error or "")
+                    or "本地修改将被合并操作覆盖" in (res.error or "")
+                    or "未跟踪的工作区文件将被覆盖" in (res.error or "")
+                )
+                if is_conflict:
+                    is_untracked = (
+                        "未跟踪" in (res.error or "")
+                        or "untracked working tree files" in (res.error or "")
+                    )
+                    ans = QMessageBox.question(
+                        self,
+                        "拉取失败 - 本地改动冲突",
+                        f"{res.error}\n\n是否尝试「暂存本地改动{'（含未跟踪文件）' if is_untracked else ''}并重新拉取」？",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    )
+                    if ans == QMessageBox.StandardButton.Yes:
+                        st_ok, st_err = ws.stash_changes(
+                            "拉取更新前自动暂存", include_untracked=is_untracked
+                        )
+                        if st_ok:
+                            from PySide6.QtCore import QTimer
+                            QTimer.singleShot(100, self._on_git_pull_menu_clicked)
+                            return
+                        else:
+                            QMessageBox.warning(self, "暂存失败", f"自动暂存本地改动失败：\n\n{st_err}")
+                            return
+                else:
+                    QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{res.error}")
             else:
                 QMessageBox.information(self, "拉取完成", res.summary or "已拉取最新更新！")
                 ws._after_restore()
@@ -3324,6 +3356,21 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "暂存成功", "当前工作区的全部未提交改动已成功暂存 (git stash)。")
                 self._update_git_branch_ui()
                 self._status_label.setText("✓ 未提交改动已安全暂存 (git stash)")
+            elif err and "没有需要暂存" in err:
+                ans = QMessageBox.question(
+                    self,
+                    "暂存改动",
+                    "当前已跟踪文件没有改动。是否包含未跟踪的新增文件一起暂存？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if ans == QMessageBox.StandardButton.Yes:
+                    st_ok, st_err = ws.stash_changes("暂存改动（含未跟踪文件）", include_untracked=True)
+                    if st_ok:
+                        QMessageBox.information(self, "暂存成功", "当前工作区改动（含未跟踪文件）已成功暂存。")
+                        self._update_git_branch_ui()
+                        self._status_label.setText("✓ 未提交改动已安全暂存 (git stash)")
+                    else:
+                        QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{st_err}")
             else:
                 QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
 
@@ -3333,11 +3380,7 @@ class MainWindow(QMainWindow):
         def _on_stash_success(result):
             ok, err = result
             if ok:
-                if hasattr(ws, "tabs_host"):
-                    for rel in ws.tabs_host.open_rel_paths():
-                        ws.tabs_host.reload_file(rel)
-                ws._rebuild_index()
-                ws._refresh_changes_panel()
+                ws._after_restore()
             _on_stash_done(result)
 
         run_async_operation(
@@ -3361,6 +3404,14 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "恢复暂存成功", "已成功恢复最近一次暂存的改动 (git stash pop)。")
                 self._update_git_branch_ui()
                 self._status_label.setText("✓ 已恢复最近一次暂存的改动")
+            elif err and ("conflict" in err.lower() or "unmerged" in err.lower()):
+                self._status_label.setText("恢复暂存时发生冲突，请解决冲突后提交。")
+                self._update_git_branch_ui()
+                QMessageBox.warning(
+                    self,
+                    "恢复暂存发生冲突",
+                    f"恢复暂存改动时发生文件冲突：\n\n{err}\n\n冲突标记已写入对应文件，暂存记录仍被保留。请解决冲突后提交。",
+                )
             else:
                 QMessageBox.warning(self, "恢复暂存失败", f"恢复暂存改动失败：\n\n{err}")
 
@@ -3369,12 +3420,8 @@ class MainWindow(QMainWindow):
 
         def _on_pop_success(result):
             ok, err = result
-            if ok:
-                if hasattr(ws, "tabs_host"):
-                    for rel in ws.tabs_host.open_rel_paths():
-                        ws.tabs_host.reload_file(rel)
-                ws._rebuild_index()
-                ws._refresh_changes_panel()
+            if ok or (err and ("conflict" in err.lower() or "unmerged" in err.lower())):
+                ws._after_restore()
             _on_pop_done(result)
 
         run_async_operation(

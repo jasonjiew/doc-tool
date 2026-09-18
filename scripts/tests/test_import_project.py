@@ -87,7 +87,10 @@ CONTENT_TYPES_XML = (
 ).format(ct=CT_NS)
 
 
-def _styles_xml(localized=False, include_character_heading_styles=False) -> bytes:
+def _styles_xml(
+    localized=False, include_character_heading_styles=False,
+    derived_heading1_style_id=None,
+) -> bytes:
     styles = []
     for level in range(1, 7):
         style_name = "标题 {0}".format(level) if localized else "heading {0}".format(level)
@@ -102,6 +105,15 @@ def _styles_xml(localized=False, include_character_heading_styles=False) -> byte
                     54 + level, level
                 )
             )
+    if derived_heading1_style_id is not None:
+        # 复刻真实设计模板的冲突：基于内置 heading 1 派生的自定义「标题1」，
+        # customStyle=1、basedOn=1、无 outlineLvl，名字同样命中级别 1。
+        styles.append(
+            '<w:style w:type="paragraph" w:customStyle="1" w:styleId="{0}">'
+            '<w:name w:val="标题1"/><w:basedOn w:val="1"/></w:style>'.format(
+                derived_heading1_style_id
+            )
+        )
     styles.append('<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style>')
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -249,6 +261,7 @@ def write_synthetic_docx(
     localized_styles=False,
     include_character_heading_styles=False,
     with_comment=False,
+    derived_heading1_style_id=None,
 ):
     """写入结构完整的合成 DOCX，可往返通过导入与试构建。"""
     body = _build_body_xml(
@@ -265,6 +278,7 @@ def write_synthetic_docx(
             _styles_xml(
                 localized=localized_styles,
                 include_character_heading_styles=include_character_heading_styles,
+                derived_heading1_style_id=derived_heading1_style_id,
             ),
         )
         zf.writestr("word/settings.xml", _settings_xml())
@@ -481,6 +495,37 @@ class ImportEndToEndTests(unittest.TestCase):
             self.assertEqual(result.error_code, "E1001")
             self.assertFalse(os.path.exists(target), "不应创建半成品目录")
             self.assertIn("通用", result.events[-1].detail)
+
+    def test_derived_heading1_style_does_not_win_collision(self):
+        """派生自定义「标题1」不得顶掉内置 heading 1（真实设计模板缺陷）。
+
+        源文档同时定义内置 heading 1（styleId 1）与基于它派生的自定义
+        「标题1」（styleId 140）。清单必须记住内置样式，否则构建出的全部
+        一级章会写成自定义样式，丢掉大纲级别与编号关联。
+        """
+        src = os.path.join(self._tmp, "冲突样式.docx")
+        write_synthetic_docx(src, derived_heading1_style_id="140")
+        target = os.path.join(self._tmp, "冲突样式项目")
+        request = ImportRequest(
+            source_docx=Path(src),
+            target_project_root=Path(target),
+            document_type="general",
+            document_no="GX-TEST-003",
+            document_name="冲突样式文档",
+            document_version="1.0",
+        )
+        result = import_first_time(request)
+        self.assertTrue(result.success, "导入应成功：{0}".format(
+            [(e.stage, e.status, e.detail) for e in result.events]
+        ))
+        from doc_tool.domain.manifest import ProjectManifest
+
+        loaded = ProjectManifest.load(target)
+        self.assertEqual(loaded.headingStyles[1], "1")
+        self.assertNotEqual(loaded.headingStyles[1], "140")
+        self.assertEqual(
+            loaded.headingStyles, {level: str(level) for level in range(1, 7)}
+        )
 
     def test_general_docx_without_company_cover_full_import(self):
         """通用大文档不要求星河封面、文档编号或版本。"""

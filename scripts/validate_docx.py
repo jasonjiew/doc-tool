@@ -38,6 +38,7 @@ from docx_common import (
     resolve_resource,
     validate_content_tree,
 )
+from doc_tool.domain.ooxml import heading_style_candidates  # noqa: E402
 
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -172,22 +173,11 @@ class DocxPackage:
         self.relationship_map = {relationship.get("Id"): relationship for relationship in self.relationships}
 
     def _heading_style_map(self) -> Dict[str, int]:
-        result: Dict[str, int] = {}
-        for style in self.styles.iter(qn("style")):
-            if style.get(qn("type")) != "paragraph":
-                continue
-            name = style.find(qn("name"))
-            if name is None:
-                continue
-            style_name = name.get(qn("val")) or ""
-            match = re.match(r"(?i)heading\s*(\d+)", style_name)
-            if not match:
-                match = re.match(r"标题\s*(\d+)", style_name)
-            if match:
-                level = int(match.group(1))
-                if 1 <= level <= 6:
-                    result[style.get(qn("styleId"))] = level
-        return result
+        """名称启发式 styleId -> 级别（1~6）识别映射（保留同级全部候选）。"""
+        return {
+            candidate.style_id: candidate.level
+            for candidate in heading_style_candidates(self.styles)
+        }
 
     def paragraph_level(self, paragraph) -> Optional[int]:
         properties = paragraph.find(qn("pPr"))

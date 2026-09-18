@@ -11,15 +11,21 @@ import urllib.parse
 import urllib.request
 
 
+<<<<<<< HEAD
 # 内网 GitLab 地址与项目信息一律由环境变量注入，避免把内部主机名/项目 id 固化进源码。
 GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
 PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
 PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
+=======
+GITLAB_BASE = os.getenv("GITLAB_BASE", "http://192.168.0.242:8899")
+PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
+>>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
 VERSION = "2.5.0"
 TAG_NAME = "v2.5.0"
 PACKAGE_NAME = "DocTool"
 
 
+<<<<<<< HEAD
 def get_project_id() -> int:
     """返回 GitLab 项目 id；未配置时给出明确报错。"""
     if not PROJECT_ID_RAW:
@@ -30,6 +36,8 @@ def get_project_id() -> int:
 PROJECT_ID = get_project_id() if PROJECT_ID_RAW else 0
 
 
+=======
+>>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
 def get_token() -> str:
     token = os.getenv("GITLAB_TOKEN")
     if not token and len(sys.argv) > 1:
@@ -185,7 +193,11 @@ def main():
 
     for filename, display_name in link_specs:
         if item := name_to_file.get(filename):
+<<<<<<< HEAD
             url = f"{GITLAB_BASE}/{PROJECT_PATH}/-/package_files/{item['id']}/download"
+=======
+            url = f"{GITLAB_BASE}/application/ai/doc-tool/-/package_files/{item['id']}/download"
+>>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
             links.append({
                 "name": display_name,
                 "url": url,
@@ -310,7 +322,11 @@ def main():
 
     rel = create_or_update_release(token, description, links)
     print("\nRelease 发布成功！")
+<<<<<<< HEAD
     print(f"Release URL: {GITLAB_BASE}/{PROJECT_PATH}/-/releases/{TAG_NAME}")
+=======
+    print(f"Release URL: {GITLAB_BASE}/application/ai/doc-tool/-/releases/{TAG_NAME}")
+>>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
 
 
 if __name__ == "__main__":

@@ -669,15 +669,19 @@ def heading_level_counts(docx_path: PathLike) -> Dict[int, int]:
     """
     from lxml import etree
 
-    from doc_tool.adapters.importer import _parse_heading_styles
-    from doc_tool.domain.ooxml import OOXMLSecurityError, parse_xml_safe, read_docx_package
+    from doc_tool.domain.ooxml import (
+        OOXMLSecurityError,
+        parse_heading_styles,
+        parse_xml_safe,
+        read_docx_package,
+    )
 
     w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
     try:
         with read_docx_package(Path(docx_path)) as package:
             styles_xml = package.read("word/styles.xml")
             root = parse_xml_safe(package.read("word/document.xml"), "word/document.xml")
-        style_to_level = _parse_heading_styles(styles_xml)
+        style_to_level = parse_heading_styles(styles_xml)
     except Exception:
         # 只是一条界面提示：任何读取/解析问题都降级成「未核验到」，
         # 不能让异常将一次已经成功的转换标成失败。

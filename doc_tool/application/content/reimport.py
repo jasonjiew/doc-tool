@@ -285,6 +285,29 @@ class ReimportService:
         except Exception:
             pass
 
+    def _heading_style_map(self, new_source: Path) -> Optional[Dict[str, int]]:
+        """新源文档的 styleId -> 级别识别映射（清单映射 ∪ 新源自身名称启发式）。
+
+        清单里的 styleId 属于旧源/模板；换源后 Word 可能重编号，仅按清单识别
+        会让标题树整章漏掉。并集保证两套 styleId 都能被认出来。仅作识别用途，
+        不改变清单里「构建时写哪个 styleId」的决策。
+        """
+        from doc_tool.domain.ooxml import (
+            OOXMLSecurityError,
+            parse_heading_styles,
+            read_docx_package,
+        )
+
+        merged: Dict[str, int] = {}
+        try:
+            with read_docx_package(new_source) as package:
+                merged.update(parse_heading_styles(package.read("word/styles.xml")))
+        except (OSError, KeyError, OOXMLSecurityError):
+            pass
+        for level, style_id in self.manifest.headingStyles.items():
+            merged.setdefault(str(style_id), int(level))
+        return merged or None
+
     def reimport(
         self,
         new_source: Path,
@@ -311,14 +334,15 @@ class ReimportService:
                 from doc_tool.adapters.importer import extract_content, split_into_tree
                 from doc_tool.adapters.preflight import preflight
 
-                preflight(new_source, heading_style_map={value: key for key, value in self.manifest.headingStyles.items()} or None)
+                heading_map = self._heading_style_map(new_source)
+                preflight(new_source, heading_style_map=heading_map)
                 extract_content(
                     new_source,
                     incoming,
                     staging / "images",
                     staging / "tables",
                     self.manifest.documentType,
-                    heading_style_map={value: key for key, value in self.manifest.headingStyles.items()} or None,
+                    heading_style_map=heading_map,
                 )
                 split_into_tree(incoming)
             else:

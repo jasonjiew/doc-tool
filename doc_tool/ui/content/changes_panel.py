@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCursor, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -83,6 +83,8 @@ class ChangesPanel(QWidget):
         on_commit_files: Optional[Callable[[Sequence[str], str], List[str]]] = None,
         on_pull: Optional[Callable[[], PullResult]] = None,
         on_push: Optional[Callable[[], PushResult]] = None,
+        on_stash: Optional[Callable[[str], Tuple[bool, Optional[str]]]] = None,
+        on_pop_stash: Optional[Callable[[], Tuple[bool, Optional[str]]]] = None,
         on_export_review: Optional[Callable[[], None]] = None,
         on_detection_mode_changed: Optional[Callable[[str], None]] = None,
         initial_detection_mode: str = "vcs",
@@ -105,6 +107,8 @@ class ChangesPanel(QWidget):
         self._on_commit_files = on_commit_files
         self._on_pull = on_pull
         self._on_push = on_push
+        self._on_stash = on_stash
+        self._on_pop_stash = on_pop_stash
         self._on_export_review = on_export_review
         self._on_detection_mode_changed = on_detection_mode_changed
         self._on_set_baseline = on_set_baseline
@@ -161,6 +165,14 @@ class ChangesPanel(QWidget):
         self._pull_btn.setProperty("btnRole", "secondary")
         self._pull_btn.clicked.connect(self._on_pull_clicked)
         top.addWidget(self._pull_btn)
+        self._stash_btn = QPushButton("暂存改动", self)
+        self._stash_btn.setProperty("btnRole", "secondary")
+        self._stash_btn.clicked.connect(self._on_stash_clicked)
+        top.addWidget(self._stash_btn)
+        self._pop_stash_btn = QPushButton("恢复暂存", self)
+        self._pop_stash_btn.setProperty("btnRole", "secondary")
+        self._pop_stash_btn.clicked.connect(self._on_pop_stash_clicked)
+        top.addWidget(self._pop_stash_btn)
         self._rollback_all_btn = QPushButton("回滚全部会话改动", self)
         self._rollback_all_btn.setProperty("btnRole", "secondary")
         self._rollback_all_btn.clicked.connect(self._on_rollback_all)
@@ -710,6 +722,9 @@ class ChangesPanel(QWidget):
         self._pull_btn.setEnabled(self._writable and vcs_managed)
         can_push = self._writable and (self._source == "git") and (self._on_push is not None)
         self._push_btn.setEnabled(can_push)
+        can_stash = self._writable and (self._source == "git") and (self._on_stash is not None)
+        self._stash_btn.setEnabled(can_stash)
+        self._pop_stash_btn.setEnabled(can_stash and (self._on_pop_stash is not None))
 
         if self._source == "git":
             self._commit_btn.setToolTip(
@@ -717,6 +732,8 @@ class ChangesPanel(QWidget):
             )
             self._push_btn.setToolTip("git push：推送当前分支改动至远端仓库")
             self._pull_btn.setToolTip("git pull：拉取远端最新变更")
+            self._stash_btn.setToolTip("git stash push：暂存当前工作区所有改动")
+            self._pop_stash_btn.setToolTip("git stash pop：恢复最近一次暂存的改动")
         elif self._source == "svn":
             self._commit_btn.setToolTip(
                 "svn add + svn rm + svn commit -m（限定当前项目路径）"
@@ -727,6 +744,8 @@ class ChangesPanel(QWidget):
             self._commit_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
             self._push_btn.setToolTip("仅在 Git 项目中可用")
             self._pull_btn.setToolTip("仅在版本控制项目（Git/SVN）中可用")
+            self._stash_btn.setToolTip("仅在 Git 项目中可用")
+            self._pop_stash_btn.setToolTip("仅在 Git 项目中可用")
 
     def _on_item_double_clicked(self, list_item: QListWidgetItem) -> None:
         item: Optional[ChangeItem] = list_item.data(Qt.ItemDataRole.UserRole)
@@ -991,6 +1010,65 @@ class ChangesPanel(QWidget):
             on_success=_on_commit_done,
         )
 
+    def _on_stash_clicked(self) -> None:
+        """「暂存改动」：将当前工作区改动暂存（git stash push）。"""
+        if self._on_stash is None:
+            return
+        msg, ok = QInputDialog.getText(
+            self,
+            "暂存工作区改动",
+            "请输入暂存备注（可留空）：",
+            QLineEdit.EchoMode.Normal,
+            "",
+        )
+        if not ok:
+            return
+        success, err = self._on_stash(msg.strip())
+        if not success:
+            if "没有需要暂存" in (err or ""):
+                ans = QMessageBox.question(
+                    self,
+                    "暂存改动",
+                    "当前已跟踪文件没有改动。是否包含未跟踪的新增文件一起暂存？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if ans == QMessageBox.StandardButton.Yes:
+                    try:
+                        success, err = self._on_stash(msg.strip(), include_untracked=True)
+                    except TypeError:
+                        success, err = self._on_stash(msg.strip())
+                    if not success:
+                        QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+                        return
+                    else:
+                        self._status_label.setText("已暂存当前工作区改动（含未跟踪文件）。")
+                        self._update_action_state()
+                        return
+            QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
+        else:
+            self._status_label.setText("已暂存当前工作区改动。")
+            self._update_action_state()
+
+    def _on_pop_stash_clicked(self) -> None:
+        """「恢复暂存」：恢复最近一次暂存的改动（git stash pop）。"""
+        if self._on_pop_stash is None:
+            return
+        success, err = self._on_pop_stash()
+        if not success:
+            if err and ("conflict" in err.lower() or "unmerged" in err.lower()):
+                self._status_label.setText("恢复暂存时发生冲突，请解决冲突后提交。")
+                self._update_action_state()
+                QMessageBox.warning(
+                    self,
+                    "恢复暂存发生冲突",
+                    f"恢复暂存改动时发生文件冲突：\n\n{err}\n\n冲突标记已写入对应文件，暂存记录仍被保留。请解决冲突后提交。",
+                )
+            else:
+                QMessageBox.warning(self, "恢复暂存失败", f"恢复暂存改动失败：\n\n{err}")
+        else:
+            self._status_label.setText("已恢复最近一次暂存的改动。")
+            self._update_action_state()
+
     def _on_push_clicked(self) -> None:
         """「推送代码」：确认后执行 git push，将本地提交推送到远端。"""
         if not self._writable or self._source != "git":
@@ -1076,7 +1154,40 @@ class ChangesPanel(QWidget):
                 self._status_label.setText(
                     "拉取失败：{0}".format(result.error or "未知原因")
                 )
-                QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{result.error}")
+                is_conflict = (
+                    "未提交的改动与远端冲突" in (result.error or "")
+                    or "未跟踪的新增文件与远端冲突" in (result.error or "")
+                    or "would be overwritten by merge" in (result.error or "")
+                    or "将因合并而覆盖" in (result.error or "")
+                    or "本地修改将被合并操作覆盖" in (result.error or "")
+                    or "未跟踪的工作区文件将被覆盖" in (result.error or "")
+                )
+                if is_conflict and self._on_stash is not None:
+                    is_untracked = (
+                        "未跟踪" in (result.error or "")
+                        or "untracked working tree files" in (result.error or "")
+                    )
+                    ans = QMessageBox.question(
+                        self,
+                        "拉取失败 - 本地改动冲突",
+                        f"{result.error}\n\n是否尝试「暂存本地改动{'（含未跟踪文件）' if is_untracked else ''}并重新拉取」？",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    )
+                    if ans == QMessageBox.StandardButton.Yes:
+                        try:
+                            st_ok, st_err = self._on_stash(
+                                "拉取更新前自动暂存", include_untracked=is_untracked
+                            )
+                        except TypeError:
+                            st_ok, st_err = self._on_stash("拉取更新前自动暂存")
+                        if st_ok:
+                            QTimer.singleShot(100, self._on_pull_clicked)
+                            return
+                        else:
+                            QMessageBox.warning(self, "暂存失败", f"自动暂存本地改动失败：\n\n{st_err}")
+                            return
+                else:
+                    QMessageBox.warning(self, "拉取失败", f"拉取更新失败：\n\n{result.error}")
                 return
             else:
                 message = "拉取完成：{0}".format(result.summary or "已更新")

@@ -1330,6 +1330,114 @@ class VcsCommitPullTests(RepoFixtureMixin, unittest.TestCase):
             "project", self._git_out(work, "log", "--format=%s", "-5")
         )
 
+    def test_pull_git_autostash_when_dirty(self):
+        """本地存在未提交修改但与远端不冲突时，自动带 --autostash 拉取并无缝还原本地改动。"""
+        origin = self._tmp / "origin_autostash"
+        origin.mkdir()
+        init_repo(origin)
+        (origin / "remote_file.txt").write_text("v1\n", encoding="utf-8")
+        (origin / "local_file.txt").write_text("v1\n", encoding="utf-8")
+        commit_all(origin, "init")
+
+        work = self._tmp / "work_autostash"
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(work)],
+            check=True,
+            capture_output=True,
+        )
+        _run_git(work, "config", "user.email", "t@t.t")
+        _run_git(work, "config", "user.name", "t")
+
+        # 远端修改 remote_file.txt
+        (origin / "remote_file.txt").write_text("v2 remote\n", encoding="utf-8")
+        commit_all(origin, "remote update")
+
+        # 本地修改 local_file.txt（未提交，如果直接 pull 会因 dirty tree 提示 stash）
+        (work / "local_file.txt").write_text("v1 dirty local\n", encoding="utf-8")
+
+        report = ChangeReport(
+            source="git", repository_root=str(work), project_root=str(work)
+        )
+        result = vcs_pull_changes(report)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.conflicts, ())
+        self.assertIn("1 个文件", result.summary)
+        # 本地未提交修改被安全还原
+        self.assertEqual((work / "local_file.txt").read_text(encoding="utf-8"), "v1 dirty local\n")
+        # 远端修改已合并
+        self.assertEqual((work / "remote_file.txt").read_text(encoding="utf-8"), "v2 remote\n")
+
+    def test_pull_git_autostash_conflicting(self):
+        """本地未提交修改与远端发生冲突时，autostash 产生冲突并在 result.conflicts 中准确报告。"""
+        origin = self._tmp / "origin_autostash_conflict"
+        origin.mkdir()
+        init_repo(origin)
+        (origin / "shared.txt").write_text("v1\n", encoding="utf-8")
+        commit_all(origin, "init")
+
+        work = self._tmp / "work_autostash_conflict"
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(work)],
+            check=True,
+            capture_output=True,
+        )
+        _run_git(work, "config", "user.email", "t@t.t")
+        _run_git(work, "config", "user.name", "t")
+
+        (origin / "shared.txt").write_text("v2 remote conflict\n", encoding="utf-8")
+        commit_all(origin, "remote update")
+
+        (work / "shared.txt").write_text("v1 local dirty conflict\n", encoding="utf-8")
+
+        report = ChangeReport(
+            source="git", repository_root=str(work), project_root=str(work)
+        )
+        result = vcs_pull_changes(report)
+        self.assertTrue(result.ok)
+        self.assertIn("shared.txt", result.conflicts)
+        self.assertIn("冲突", result.summary)
+
+    def test_pull_git_untracked_conflict_and_stash_recovery(self):
+        """本地未跟踪文件与远端冲突时，给出明确未跟踪提示，并可通过 include_untracked 暂存后成功拉取。"""
+        origin = self._tmp / "origin_untracked"
+        origin.mkdir()
+        init_repo(origin)
+        (origin / "init.txt").write_text("init\n", encoding="utf-8")
+        commit_all(origin, "init")
+
+        work = self._tmp / "work_untracked"
+        subprocess.run(
+            ["git", "clone", "-q", str(origin), str(work)],
+            check=True,
+            capture_output=True,
+        )
+        _run_git(work, "config", "user.email", "t@t.t")
+        _run_git(work, "config", "user.name", "t")
+
+        # 远端新增 new_file.txt
+        (origin / "new_file.txt").write_text("remote new\n", encoding="utf-8")
+        commit_all(origin, "add new_file")
+
+        # 本地创建同名未跟踪文件
+        (work / "new_file.txt").write_text("local untracked\n", encoding="utf-8")
+
+        report = ChangeReport(
+            source="git", repository_root=str(work), project_root=str(work)
+        )
+        result = vcs_pull_changes(report)
+        self.assertFalse(result.ok)
+        self.assertIn("未跟踪", result.error or "")
+
+        # 使用 include_untracked 暂存
+        st_ok, st_err = git_stash_save(work, "stash untracked", include_untracked=True)
+        self.assertTrue(st_ok)
+        self.assertFalse((work / "new_file.txt").exists())
+
+        # 重新拉取成功
+        result2 = vcs_pull_changes(report)
+        self.assertTrue(result2.ok)
+        self.assertEqual((work / "new_file.txt").read_text(encoding="utf-8"), "remote new\n")
+
     def test_pull_svn_invokes_svn_update(self):
         wc = self._tmp / "wc"
         (wc / ".svn").mkdir(parents=True)
@@ -1564,6 +1672,66 @@ class GitBranchAndWorkflowTests(RepoFixtureMixin, unittest.TestCase):
         # 改动被恢复
         self.assertEqual(target_file.read_text(encoding="utf-8"), "v2 modified\n")
 
+    def test_git_stash_clean_and_empty_pop(self):
+        # 无初始提交时应明确提示
+        ok, err = git_stash_save(self.repo)
+        self.assertFalse(ok)
+        self.assertIn("尚未创建初始提交", err or "")
+
+        # 创建初始提交后
+        make_project(self.repo, "doc", {"content/init.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        # 干净工作区暂存应提示无需暂存
+        ok, err = git_stash_save(self.repo)
+        self.assertFalse(ok)
+        self.assertIn("没有需要暂存", err or "")
+
+        # 空暂存区 pop 应提示无暂存
+        ok, err = git_stash_pop(self.repo)
+        self.assertFalse(ok)
+        self.assertIn("没有可恢复的暂存改动", err or "")
+
+    def test_git_stash_include_untracked(self):
+        make_project(self.repo, "doc", {"content/init.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        untracked_file = self.repo / "doc" / "content" / "new_untracked.md"
+        untracked_file.write_text("new untracked\n", encoding="utf-8")
+
+        # Without include_untracked, stash should report no local changes
+        ok, err = git_stash_save(self.repo, "no untracked", include_untracked=False)
+        self.assertFalse(ok)
+        self.assertIn("没有需要暂存", err or "")
+        self.assertTrue(untracked_file.exists())
+
+        # With include_untracked, stash should succeed and file should disappear
+        ok, err = git_stash_save(self.repo, "with untracked", include_untracked=True)
+        self.assertTrue(ok)
+        self.assertFalse(untracked_file.exists())
+
+        # Pop should restore the untracked file
+        ok, err = git_stash_pop(self.repo)
+        self.assertTrue(ok)
+        self.assertTrue(untracked_file.exists())
+        self.assertEqual(untracked_file.read_text(encoding="utf-8"), "new untracked\n")
+
+    def test_git_stash_pop_conflict(self):
+        project = make_project(self.repo, "doc", {"content/c.md": "base\n"})
+        commit_all(self.repo, "init c")
+
+        target_file = project / "content" / "c.md"
+        target_file.write_text("local edit\n", encoding="utf-8")
+        ok, err = git_stash_save(self.repo, "stash local")
+        self.assertTrue(ok)
+
+        target_file.write_text("commit edit\n", encoding="utf-8")
+        commit_all(self.repo, "remote edit")
+
+        ok, err = git_stash_pop(self.repo)
+        self.assertFalse(ok)
+        self.assertIn("conflict", (err or "").lower())
+
     def test_commit_files_selective(self):
         project = make_project(
             self.repo, "doc", {"content/a.md": "a1\n", "content/b.md": "b1\n"}
@@ -1691,6 +1859,40 @@ class GitBranchAndWorkflowTests(RepoFixtureMixin, unittest.TestCase):
         report_after = svc.detect()
         # a.md 和 c.md 都已入库，工作区干净
         self.assertEqual(len(report_after.files), 0)
+
+
+    def test_pull_git_chinese_locale_conflict_messages(self):
+        """中文 Git 环境下的未提交冲突与未跟踪冲突应被正确识别并提示暂存。"""
+        import subprocess
+        from doc_tool.application.content.vcs_changes import ChangeReport, _git_pull_changes
+
+        report = ChangeReport(
+            source="git", repository_root=str(self._tmp), project_root=str(self._tmp)
+        )
+
+        # 1. 模拟中文环境下的工作区修改将被覆盖
+        def mock_runner_dirty(*args, **kwargs):
+            cmd = args[0]
+            if "pull" in cmd:
+                out = "错误：您对以下文件的本地修改将被合并操作覆盖：\n\ttest.txt\n请在合并前暂存或提交您的修改。"
+                return subprocess.CompletedProcess(cmd, 1, stdout=out.encode("utf-8"), stderr=b"")
+            return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
+
+        res_dirty = _git_pull_changes(report, timeout=5.0, runner=mock_runner_dirty)
+        self.assertFalse(res_dirty.ok)
+        self.assertIn("本地存在未提交的改动与远端冲突", res_dirty.error)
+
+        # 2. 模拟中文环境下的未跟踪文件将被覆盖
+        def mock_runner_untracked(*args, **kwargs):
+            cmd = args[0]
+            if "pull" in cmd:
+                out = "错误：以下未跟踪的工作区文件将被覆盖：\n\tnew_untracked.txt\n请在合并前移动或删除。"
+                return subprocess.CompletedProcess(cmd, 1, stdout=out.encode("utf-8"), stderr=b"")
+            return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
+
+        res_untracked = _git_pull_changes(report, timeout=5.0, runner=mock_runner_untracked)
+        self.assertFalse(res_untracked.ok)
+        self.assertIn("本地存在未跟踪的新增文件与远端冲突", res_untracked.error)
 
 
 if __name__ == "__main__":

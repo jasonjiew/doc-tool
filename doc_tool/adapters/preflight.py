@@ -35,6 +35,7 @@ from doc_tool.domain.errors import (
 )
 from doc_tool.domain.ooxml import (
     OOXMLSecurityError,
+    parse_heading_styles,
     parse_xml_safe,
     read_docx_package,
 )
@@ -428,29 +429,16 @@ def _check_body_resource_references(
 
 
 def _parse_heading_styles(parts: Dict[str, bytes]) -> Dict[str, int]:
-    """从 ``styles.xml`` 建立 styleId -> Heading 级别（1~6）映射。"""
+    """从 ``styles.xml`` 建立 styleId -> Heading 级别（1~6）识别映射。
+
+    实现统一在 :mod:`doc_tool.domain.ooxml`（全仓库唯一事实源）。识别映射
+    保留同级全部候选：正文里出现的任何标题样式都必须能被认出来，否则标题
+    树会整章漏掉。
+    """
     styles_xml = parts.get("word/styles.xml")
     if styles_xml is None:
         return {}
-    sroot = parse_xml_safe(styles_xml, "word/styles.xml")
-    heading_map: Dict[str, int] = {}
-    for style in sroot.iter(_qn("style")):
-        if style.get(_qn("type")) != "paragraph":
-            continue
-        style_id = style.get(_qn("styleId"))
-        name_elem = style.find(_qn("name"))
-        if name_elem is None:
-            continue
-        name_val = name_elem.get(_qn("val")) or ""
-        # 匹配 "heading 1"、"Heading 2"、"标题 1" 等
-        m = re.match(r"(?i)heading\s*(\d+)", name_val)
-        if not m:
-            m = re.match(r"标题\s*(\d+)", name_val)
-        if m:
-            level = int(m.group(1))
-            if MIN_HEADING_LEVEL <= level <= MAX_HEADING_LEVEL and style_id:
-                heading_map[style_id] = level
-    return heading_map
+    return parse_heading_styles(styles_xml)
 
 
 def census_paragraph_styles(parts: Dict[str, bytes]) -> Dict[str, StyleCensus]:

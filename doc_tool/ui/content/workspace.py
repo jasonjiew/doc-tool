@@ -422,6 +422,8 @@ class ContentWorkspace(QWidget):
             on_commit_files=self._commit_selected_changes,
             on_pull=self._pull_changes,
             on_push=self._push_changes,
+            on_stash=self.stash_changes,
+            on_pop_stash=self.pop_stash,
             on_export_review=self._on_export_review_clicked,
             on_detection_mode_changed=self.set_change_detection_mode,
             initial_detection_mode=self._change_detection_mode,
@@ -907,39 +909,33 @@ class ContentWorkspace(QWidget):
             self._on_branch_changed(new_name)
         return ok, err
 
-    def stash_changes(self, message: str = "") -> Tuple[bool, Optional[str]]:
+    def stash_changes(
+        self, message: str = "", *, include_untracked: bool = False
+    ) -> Tuple[bool, Optional[str]]:
         """暂存工作区未提交改动并刷新。"""
-        ok, err = self._vcs.stash(message)
+        ok, err = self._vcs.stash(message, include_untracked=include_untracked)
         if ok:
-            if hasattr(self, "tabs_host"):
-                for rel in self.tabs_host.open_rel_paths():
-                    self.tabs_host.reload_file(rel)
-            self._rebuild_index()
-            self._refresh_changes_panel()
+            self._after_restore()
         return ok, err
 
     def pop_stash(self) -> Tuple[bool, Optional[str]]:
         """弹出恢复暂存改动并刷新。"""
         ok, err = self._vcs.pop_stash()
-        if ok:
-            if hasattr(self, "tabs_host"):
-                for rel in self.tabs_host.open_rel_paths():
-                    self.tabs_host.reload_file(rel)
-            self._rebuild_index()
-            self._refresh_changes_panel()
+        if ok or (err and ("conflict" in err.lower() or "unmerged" in err.lower())):
+            self._after_restore()
         return ok, err
 
     def _pull_changes(self) -> PullResult:
-        """改动面板「拉取更新」：git pull / svn update，返回带统计的结果。
+        """改动面板「拉取更新」（git pull / svn update）附带统计的结果。
 
-        结果含成功摘要（更新了 N 个文件 / 已是最新版本）、带入文件清单与
-        冲突文件；失败时含命令错误文本。缓存失效由本方法完成，界面刷新由
-        面板经 ``on_restored`` 触发。
+        成功后摘要列更新 N 个文件 / 已是最新版本；存在未合并冲突时附带
+        冲突文件清单；失败时带命令错误文本。缓存失效在完成时触发，刷新
+        由面板 ``on_restored`` 或主窗口回调触发（必须在主线程执行）。
         """
         report = self._vcs.detect()
         if report.source not in ("git", "svn"):
             return PullResult(
-                ok=False, summary="", error="当前项目不在版本控制内，无法拉取"
+                ok=False, summary="", error="当前项目未在版本控制内，无法拉取"
             )
         result = pull_changes(report)
         self._vcs.invalidate_cache()
