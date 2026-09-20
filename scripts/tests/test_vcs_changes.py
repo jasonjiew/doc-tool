@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1794,6 +1795,23 @@ class GitBranchAndWorkflowTests(RepoFixtureMixin, unittest.TestCase):
         branches_after, _ = svc.branches()
         cur = next(b for b in branches_after if b.is_current)
         self.assertEqual(cur.name, "test-svc-branch")
+
+    def test_branches_cache_and_invalidation(self):
+        project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})
+        commit_all(self.repo, "init")
+
+        svc = self.service(project)
+        b1, _ = svc.branches()
+        self.assertIsNotNone(svc._branches_cache)
+
+        with mock.patch("doc_tool.application.content.vcs_changes.list_git_branches") as mock_list:
+            b2, _ = svc.branches()
+            mock_list.assert_not_called()
+            self.assertEqual(b1, b2)
+
+        svc.invalidate_cache()
+        self.assertIsNone(svc._branches_cache)
+
 
     def test_list_git_branches_detached_head(self):
         project = make_project(self.repo, "doc", {"content/a.md": "v1\n"})

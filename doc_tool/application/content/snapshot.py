@@ -77,6 +77,7 @@ class ContentSnapshot:
         self._file: Path = Path(state_dir) / BASELINE_FILE_NAME
         self._content_dir: Path = Path(state_dir) / BASELINE_CONTENT_DIR_NAME
         self._entries: Dict[str, FileSnapshot] = {}
+        self._loaded: bool = False
 
     @property
     def file(self) -> Path:
@@ -86,9 +87,19 @@ class ContentSnapshot:
     def entries(self) -> Dict[str, FileSnapshot]:
         return dict(self._entries)
 
+    @property
+    def has_baseline(self) -> bool:
+        """是否已建立基线（内存中有条目，或基线文件已成功加载/存在）。"""
+        if self._entries:
+            return True
+        if self._loaded and self._file.exists():
+            return True
+        return False
+
     def load(self) -> None:
         """从磁盘加载；缺失或损坏视为无基线（下次打开会重新打基线）。"""
         self._entries = {}
+        self._loaded = False
         if not self._file.exists():
             return
         try:
@@ -102,22 +113,37 @@ class ContentSnapshot:
                 if snap.rel_path:
                     entries[snap.rel_path] = snap
             self._entries = entries
+            if isinstance(data, dict) and "baseline" in data:
+                self._loaded = True
         except (json.JSONDecodeError, OSError):
             self._entries = {}
+            self._loaded = False
 
     def save(self) -> None:
         """持久化基线到磁盘（原子写，与改动清单同套路）。"""
         self._file.parent.mkdir(parents=True, exist_ok=True)
         data = {"baseline": [snap.to_dict() for snap in self._entries.values()]}
         atomic_write(self._file, json.dumps(data, ensure_ascii=False, indent=2))
+        self._loaded = True
 
-    def take(self, content_root: Path, files: Sequence[str]) -> None:
+    def take(self, content_root: Path, files: Optional[Sequence[str]] = None) -> None:
         """把当前文件快照记为基线（跳过缺失文件，避免与磁盘瞬时状态竞争）。
 
         同时把每个文件内容复制到 baseline 目录，供改动面板做「基线 vs 当前」
         diff；单文件复制失败跳过，不阻断打基线。
+        如果 files 为 None，则取已有条目或扫描 content_root。
         """
         content_root = Path(content_root).resolve()
+        if files is None:
+            if self._entries:
+                files = list(self._entries.keys())
+            else:
+                from doc_tool.application.content.index import ContentIndexService
+
+                files = [
+                    rel
+                    for rel, _ in ContentIndexService(content_root).discover_files()
+                ]
         entries: Dict[str, FileSnapshot] = {}
         for rel_path in files:
             target = content_root / rel_path
@@ -125,7 +151,7 @@ class ContentSnapshot:
                 st = target.stat()
                 sha1 = _sha1_of(target)
             except OSError:
-                # stat 与读取之间文件被锁/删除：统一跳过，不中断整个打基线。
+                # stat 与读取之间文件被改/删除：统一跳过，不中断整个打基线。
                 continue
             entries[rel_path] = FileSnapshot(
                 rel_path=rel_path,
@@ -134,6 +160,7 @@ class ContentSnapshot:
                 sha1=sha1,
             )
         self._entries = entries
+        self._loaded = True
         self._write_content_copies(content_root, files)
 
     # --- 基线内容副本 ---

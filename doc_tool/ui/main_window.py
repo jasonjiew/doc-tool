@@ -1036,16 +1036,18 @@ class MainWindow(QMainWindow):
         # 未保存保护：当前工作区存在脏标签时先确认；取消则中止打开新项目。
         if not self._confirm_switch_project():
             if hasattr(self, "_loading_overlay"):
-                self._loading_overlay.finish()
+                self._loading_overlay.finish_immediately()
             return
         # 保存旧项目会话（在旧工作区销毁前收集）。
         self._persist_workspace_session()
 
         if hasattr(self, "_loading_overlay"):
-            if not self._loading_overlay.isVisible():
-                self._loading_overlay.start(summary.project_root.name, "正在准备工作区…")
-            else:
-                self._loading_overlay.show_stage("正在准备工作区…")
+            target_title = f"打开项目: {summary.project_root.name}"
+            current_title = getattr(self._loading_overlay, "_title_label", None)
+            is_finishing = getattr(self._loading_overlay, "_is_finishing", False)
+            if not self._loading_overlay.isVisible() or is_finishing or (current_title and current_title.text() != target_title):
+                self._loading_overlay.start(summary.project_root.name, "正在解析项目配置与元数据…")
+            self._loading_overlay.raise_()
             QApplication.processEvents()
 
         self._project_summary = summary
@@ -1075,12 +1077,14 @@ class MainWindow(QMainWindow):
         self._refresh_recent_projects()
         self._task_dock.show_idle(None, project_open=True)
         self._refresh_interaction_state()
-        try:
-            from doc_tool.application.content.reimport import ReimportService
-            if ReimportService(summary.manifest, summary.paths).source_changed():
-                self._status_label.setText("检测到源 Word 已变化，可从工具菜单重新导入")
-        except (OSError, AttributeError):
-            pass
+        def _check_source_reimport():
+            try:
+                from doc_tool.application.content.reimport import ReimportService
+                if ReimportService(summary.manifest, summary.paths).source_changed():
+                    self._status_label.setText("检测到源 Word 已变化，可从工具菜单重新导入")
+            except (OSError, AttributeError):
+                pass
+        QTimer.singleShot(150, _check_source_reimport)
 
     def _open_project_path(self, path: str) -> None:
         if self.runner.is_running:
@@ -1103,18 +1107,18 @@ class MainWindow(QMainWindow):
 
         try:
             summary = open_project(path)
+            self.show_project(summary)
+            self._append_log("已打开项目：{0}".format(summary.project_root.name))
         except DocToolError as exc:
             if hasattr(self, "_loading_overlay"):
-                self._loading_overlay.finish()
+                self._loading_overlay.finish_immediately()
             self._show_error("打开项目失败", exc.user_message, exc.suggested_action)
             return
         except Exception as exc:  # noqa: BLE001
             if hasattr(self, "_loading_overlay"):
-                self._loading_overlay.finish()
+                self._loading_overlay.finish_immediately()
             self._show_error("打开项目失败", str(exc)[:200])
             return
-        self.show_project(summary)
-        self._append_log("已打开项目：{0}".format(summary.project_root.name))
 
     def _on_open_recent(self, path: str) -> None:
         """最近项目点击：在新窗口打开，不在当前窗口切换项目。
@@ -1179,7 +1183,10 @@ class MainWindow(QMainWindow):
         self._panels_dock.setMinimumHeight(180)
 
         self._rebuild_view_menu()
-        QTimer.singleShot(0, self._update_git_branch_ui)
+        if hasattr(self, "_loading_overlay") and self._loading_overlay.isVisible():
+            self._loading_overlay.setGeometry(self.rect())
+            self._loading_overlay.raise_()
+        # 分支 UI 在 _on_content_index_ready 中就绪时统一刷新，避免在此处阻塞主线程加载动画
 
     def _remove_content_docks(self) -> None:
         for name in ("chapterTreeDock", "panelsDock"):
@@ -1205,9 +1212,9 @@ class MainWindow(QMainWindow):
     def _on_content_index_ready(self) -> None:
         self._content_index_ready = True
         self._refresh_interaction_state()
-        self._update_git_branch_ui()
         if hasattr(self, "_loading_overlay"):
             self._loading_overlay.finish()
+        self._update_git_branch_ui()
 
     def _on_content_open_file(self, rel_path: str) -> None:
         self._content_current_file = rel_path
@@ -1373,10 +1380,10 @@ class MainWindow(QMainWindow):
             self._show_error("打开项目失败", str(exc)[:200])
             return
         new_window = self._window_factory()
-        new_window.show_project(summary)
         new_window.show()
         new_window.raise_()
         new_window.activateWindow()
+        new_window.show_project(summary)
 
     def _activate_window(self, window) -> None:
         """激活已有窗口并提示（重复打开保护）。"""
@@ -2456,8 +2463,7 @@ class MainWindow(QMainWindow):
                 "请先执行「操作 → 校验项目」生成报告。",
             )
             return
-        if not self._open_file(path):
-            self._show_validation_report_preview(path)
+        self._show_validation_report_preview(path)
 
     def _on_open_result_output(self, path: str) -> None:
         p = Path(path)
@@ -2543,7 +2549,7 @@ class MainWindow(QMainWindow):
             self._show_error("复制失败", "无法复制日志内容。")
 
     def _show_validation_report_preview(self, path: Path) -> None:
-        """系统关联程序不可用时，以只读窗口展示校验报告。"""
+        """系统关联程序不可用时，以交互式窗口展示校验报告（支持分类筛选与搜索）。"""
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
@@ -2553,22 +2559,110 @@ class MainWindow(QMainWindow):
                 "请检查文件权限，或在文件管理器中手动打开该文件。",
             )
             return
+
+        from PySide6.QtWidgets import QComboBox, QLineEdit
+        from doc_tool.application.project_service import (
+            filter_validation_report_content,
+            read_validation_report_summary,
+        )
+
+        summary = read_validation_report_summary(path)
+
         dialog = QDialog(self)
         dialog.setWindowTitle("校验报告预览")
-        dialog.resize(760, 560)
+        dialog.resize(800, 580)
         layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
         path_label = QLabel(str(path), dialog)
         path_label.setObjectName("statusMuted")
         path_label.setWordWrap(True)
         layout.addWidget(path_label)
+
+        filter_bar = QHBoxLayout()
+        filter_bar.setSpacing(6)
+
+        lbl_cat = QLabel("分类：", dialog)
+        filter_bar.addWidget(lbl_cat)
+        status_combo = QComboBox(dialog)
+        pass_cnt = summary.get("passCount", 0)
+        fail_cnt = summary.get("failCount", 0)
+        status_combo.addItem("全部内容", "")
+        status_combo.addItem("仅失败项 [FAIL] ({0})".format(fail_cnt), "FAIL")
+        status_combo.addItem("仅通过项 [PASS] ({0})".format(pass_cnt), "PASS")
+        status_combo.addItem("关键指标与统计", "METRICS")
+        filter_bar.addWidget(status_combo)
+
+        lbl_search = QLabel("搜索：", dialog)
+        filter_bar.addWidget(lbl_search)
+        search_input = QLineEdit(dialog)
+        search_input.setPlaceholderText("在报告中搜索关键词...")
+        search_input.setClearButtonEnabled(True)
+        filter_bar.addWidget(search_input, 1)
+
+        reset_btn = QPushButton("重置", dialog)
+        reset_btn.setProperty("btnRole", "compact")
+        filter_bar.addWidget(reset_btn)
+
+        layout.addLayout(filter_bar)
+
+        count_lbl = QLabel(
+            "共 {0} 项检查（通过 {1}，失败 {2}）".format(
+                pass_cnt + fail_cnt, pass_cnt, fail_cnt
+            ),
+            dialog,
+        )
+        count_lbl.setObjectName("statusMuted")
+        layout.addWidget(count_lbl)
+
         text = QPlainTextEdit(dialog)
         text.setReadOnly(True)
         text.setPlainText(content)
         layout.addWidget(text, 1)
+
+        def update_preview() -> None:
+            sf = str(status_combo.currentData() or "")
+            kw = search_input.text().strip()
+            if not sf and not kw:
+                text.setPlainText(content)
+                count_lbl.setText(
+                    "共 {0} 项检查（通过 {1}，失败 {2}）".format(
+                        pass_cnt + fail_cnt, pass_cnt, fail_cnt
+                    )
+                )
+            else:
+                filtered_text, count = filter_validation_report_content(
+                    content, status_filter=sf, keyword=kw
+                )
+                text.setPlainText(filtered_text)
+                count_lbl.setText("已筛选出 {0} 条相关内容".format(count))
+
+        def reset_filters() -> None:
+            status_combo.setCurrentIndex(0)
+            search_input.clear()
+            update_preview()
+
+        status_combo.currentIndexChanged.connect(update_preview)
+        search_input.textChanged.connect(update_preview)
+        reset_btn.clicked.connect(reset_filters)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        btn_row.addStretch(1)
+
+        ext_btn = QPushButton("在外部编辑器打开", dialog)
+        ext_btn.setProperty("btnRole", "secondary")
+        ext_btn.setToolTip("在系统关联的外部文本/Markdown 编辑器中打开原始报告文件")
+        ext_btn.clicked.connect(lambda: self._open_file(path))
+        btn_row.addWidget(ext_btn)
+
         close_btn = QPushButton("关闭", dialog)
         close_btn.setProperty("btnRole", "secondary")
         close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
+        btn_row.addWidget(close_btn)
+
+        layout.addLayout(btn_row)
         dialog.exec()
 
     def _on_about(self) -> None:
@@ -2739,6 +2833,8 @@ class MainWindow(QMainWindow):
             apply_theme(QApplication.instance(), dark=target_dark)
             self._dark = target_dark
             self._task_dock.set_dark(target_dark)
+            if hasattr(self, "_loading_overlay"):
+                self._loading_overlay.set_dark(target_dark)
             self._theme_action.setText(
                 "切换浅色主题" if target_dark else "切换深色主题"
             )
@@ -2825,6 +2921,11 @@ class MainWindow(QMainWindow):
             self._persist_geometry()
         except Exception:  # noqa: BLE001
             pass
+        if hasattr(self, "_content_workspace") and self._content_workspace is not None:
+            try:
+                self._content_workspace.shutdown()
+            except Exception:
+                pass
         self.close()
 
     # --- Git 分支与工作流 ---
@@ -2845,7 +2946,11 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            branches, _ = ws.list_branches()
+            cached_branches, has_cache = ws.get_cached_branches()
+            if has_cache:
+                branches = cached_branches
+            else:
+                branches, _ = ws.list_branches(timeout=1.5)
         except Exception:  # noqa: BLE001
             branches = []
 
@@ -3451,6 +3556,11 @@ class MainWindow(QMainWindow):
                 return
             self._persist_workspace_session()
             self._persist_geometry()
+            if hasattr(self, "_content_workspace") and self._content_workspace is not None:
+                try:
+                    self._content_workspace.shutdown()
+                except Exception:
+                    pass
             # 关闭后从注册表移除：避免已关闭窗口继续占用项目、
             # 也避免重复打开保护命中已关闭窗口。
             self._closed = True

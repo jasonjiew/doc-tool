@@ -273,19 +273,40 @@ class ContentLinter:
                 ))
             else:
                 seen[key] = (rel_path, line_no)
-        # 标题锚点唯一性：跨文件重复的 slug 锚点同样报告（同文件内重复也报告，
-        # 因 slug 冲突会让锚点链接定位歧义）。
-        seen_anchors = {}
+        # 标题锚点唯一性：
+        # 1. 同文件内：检查同文件内的锚点重复（如同一文件中重复定义相同锚点）。
+        # 2. 跨文件：仅对未带章节编号的顶层标题（level 1）检查全局唯一性（如跨文件重复的 # 范围），
+        #    避免将不同章节下通用的子标题（如各章下的 ## 流程图、## 接口设计）误报为跨文件冲突。
+        # 注意：标题锚点重复不属于编号冲突，严重级别固定为 warning，不阻断构建与发布。
+        from doc_tool.application.content.references import leading_number, section_no_of_file
+
+        seen_top_anchors = {}
         for rel_path in self._index.all_files():
+            file_seen_anchors = {}
             for heading in self._index.headings.get(rel_path, []):
-                if heading.anchor_id in seen_anchors:
+                # 1. 同文件内锚点重复检查（同一文件内重复定义相同锚点）
+                if heading.anchor_id in file_seen_anchors:
                     issues.append(LintIssue(
                         "numbering_uniqueness", rel_path, heading.line_no,
-                        "标题锚点重复：{0}（首次位于 {1}:{2}）。".format(heading.text, *seen_anchors[heading.anchor_id]),
-                        "numbering_uniqueness", rule.severity,
+                        "标题锚点重复：{0}（首次位于 {1}:{2}）。".format(heading.text, *file_seen_anchors[heading.anchor_id]),
+                        "numbering_uniqueness", "warning",
                     ))
                 else:
-                    seen_anchors[heading.anchor_id] = (rel_path, heading.line_no)
+                    file_seen_anchors[heading.anchor_id] = (rel_path, heading.line_no)
+
+                # 2. 跨文件锚点重复检查：仅针对无章节编号的顶层标题（避免子章节同名误报）
+                if heading.level == 1 and not section_no_of_file(rel_path) and not leading_number(heading.text):
+                    if heading.anchor_id in seen_top_anchors:
+                        first_rel, first_line = seen_top_anchors[heading.anchor_id]
+                        if first_rel != rel_path:
+                            issues.append(LintIssue(
+                                "numbering_uniqueness", rel_path, heading.line_no,
+                                "标题锚点重复：{0}（首次位于 {1}:{2}）。".format(heading.text, first_rel, first_line),
+                                "numbering_uniqueness", "warning",
+                            ))
+                    else:
+                        seen_top_anchors[heading.anchor_id] = (rel_path, heading.line_no)
+
         return issues
 
     def check_interface_table_structure(self, rule) -> List[LintIssue]:
@@ -599,4 +620,125 @@ def apply_all_quick_fixes(content: str, issues: List[LintIssue]) -> Tuple[str, i
             current_content = updated
             fixed_count += 1
     return current_content, fixed_count
+
+# --- 规则分类与标签定义 ---
+
+RULE_CATEGORY_GROUPS: dict[str, list[str]] = {
+    "格式规范": ["heading_format", "markdown_structure", "mermaid_syntax"],
+    "内容质量": ["todo_residual", "term_case", "duplicate_title"],
+    "结构完整": ["required_section", "field_completeness", "interface_table_structure"],
+    "合规与安全": ["sensitive_info", "numbering_uniqueness"],
+}
+
+RULE_CATEGORIES: dict[str, str] = {
+    rule: cat for cat, rules in RULE_CATEGORY_GROUPS.items() for rule in rules
+}
+
+RULE_LABELS: dict[str, str] = {
+    "heading_format": "标题格式",
+    "markdown_structure": "表格结构",
+    "mermaid_syntax": "流程图语法",
+    "todo_residual": "待办残留",
+    "term_case": "术语大小写",
+    "duplicate_title": "重复标题",
+    "required_section": "必备章节",
+    "field_completeness": "字段完整性",
+    "interface_table_structure": "接口表结构",
+    "numbering_uniqueness": "编号唯一性",
+    "sensitive_info": "敏感信息",
+}
+
+SEVERITY_LABELS: dict[str, str] = {
+    "error": "阻断",
+    "warning": "警告",
+    "info": "提示",
+}
+
+
+def filter_lint_issues(
+    issues,
+    *,
+    category: str = "",
+    rule_id: str = "",
+    severity: str = "",
+    quick_fixable = None,
+    keyword: str = "",
+):
+    """按分类大类/单规则、严重度、修复状态及关键词综合筛选格式检查问题。
+
+    Args:
+        issues: 原始问题列表。
+        category: 分类大类（如 '格式规范'、'group:格式规范'）或单规则 ID / 规则中文名。
+        rule_id: 指定单规则 ID（精确匹配）。
+        severity: 严重度（如 'error', 'warning', 'info'）。
+        quick_fixable: 是否支持一键自动修复过滤（True: 仅支持，False: 仅不支持，None: 全部）。
+        keyword: 关键词搜索（不区分大小写，检索文件名、行号、问题描述、规则名称及中文分类）。
+
+    Returns:
+        筛选后的 LintIssue 列表。
+    """
+    kw = (keyword or "").strip().lower()
+    cat = (category or "").strip()
+    rule_filter = (rule_id or "").strip()
+    sev_filter = (severity or "").strip().lower()
+
+    filtered = []
+    for issue in issues:
+        rid = getattr(issue, "rule_id", "") or getattr(issue, "rule", "")
+
+        # 1. 规则精确匹配
+        if rule_filter and rid != rule_filter and getattr(issue, "rule", "") != rule_filter:
+            continue
+
+        # 2. 分类匹配
+        if cat:
+            if cat.startswith("group:"):
+                grp = cat[len("group:"):].strip()
+                allowed_rules = RULE_CATEGORY_GROUPS.get(grp)
+                if allowed_rules is None or rid not in allowed_rules:
+                    continue
+            elif cat in RULE_CATEGORY_GROUPS:
+                if rid not in RULE_CATEGORY_GROUPS[cat]:
+                    continue
+            else:
+                expected_label = RULE_LABELS.get(rid, rid)
+                if cat != rid and cat != expected_label:
+                    continue
+
+        # 3. 严重度匹配
+        if sev_filter:
+            issue_sev = str(getattr(issue, "severity", "") or "").lower()
+            if issue_sev != sev_filter:
+                continue
+
+        # 4. 修复状态匹配
+        if quick_fixable is not None:
+            if can_quick_fix(issue) != quick_fixable:
+                continue
+
+        # 5. 关键词搜索
+        if kw:
+            rule_label = RULE_LABELS.get(rid, rid)
+            cat_name = RULE_CATEGORIES.get(rid, "")
+            sev_label = SEVERITY_LABELS.get(getattr(issue, "severity", ""), "")
+            tokens = [
+                str(getattr(issue, "rel_path", "") or ""),
+                str(getattr(issue, "line_no", "") or ""),
+                str(getattr(issue, "message", "") or ""),
+                rid,
+                str(getattr(issue, "rule", "") or ""),
+                rule_label,
+                cat_name,
+                sev_label,
+            ]
+            if can_quick_fix(issue):
+                tokens.extend(["可修复", "⚡可修复", "一键修复"])
+            haystack = " ".join(tokens).lower()
+            words = kw.split()
+            if not all(w in haystack for w in words):
+                continue
+
+        filtered.append(issue)
+
+    return filtered
 

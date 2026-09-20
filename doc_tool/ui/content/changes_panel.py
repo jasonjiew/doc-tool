@@ -474,10 +474,13 @@ class ChangesPanel(QWidget):
 
         def _do_baseline():
             if self._snapshot is not None and self._writer is not None:
-                self._snapshot.take(
-                    self._content_root,
-                    [rel for rel, _ in self._writer.manifest.entries] if not self._snapshot.entries else None,
-                )
+                from doc_tool.application.content.index import ContentIndexService
+
+                files = [
+                    rel
+                    for rel, _ in ContentIndexService(self._content_root).discover_files()
+                ]
+                self._snapshot.take(self._content_root, files)
                 self._snapshot.save()
                 if hasattr(self._writer, "manifest"):
                     self._writer.manifest.clear()
@@ -1043,11 +1046,17 @@ class ChangesPanel(QWidget):
                     else:
                         self._status_label.setText("已暂存当前工作区改动（含未跟踪文件）。")
                         self._update_action_state()
+                        if self._on_restored is not None:
+                            self._on_restored()
                         return
+                else:
+                    return
             QMessageBox.warning(self, "暂存失败", f"暂存改动失败：\n\n{err}")
         else:
             self._status_label.setText("已暂存当前工作区改动。")
             self._update_action_state()
+            if self._on_restored is not None:
+                self._on_restored()
 
     def _on_pop_stash_clicked(self) -> None:
         """「恢复暂存」：恢复最近一次暂存的改动（git stash pop）。"""
@@ -1068,6 +1077,8 @@ class ChangesPanel(QWidget):
         else:
             self._status_label.setText("已恢复最近一次暂存的改动。")
             self._update_action_state()
+            if self._on_restored is not None:
+                self._on_restored()
 
     def _on_push_clicked(self) -> None:
         """「推送代码」：确认后执行 git push，将本地提交推送到远端。"""

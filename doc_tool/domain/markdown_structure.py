@@ -360,7 +360,9 @@ def check_mermaid_structure(lines: Sequence[str]) -> List[StructureFinding]:
             delims = m.group(1)
             rest = stripped[m.end():]
             # 严格检查行内闭合：需匹配相同字符与长度的闭合标记（如 ` 对 `，`` 对 ``）
-            if re.search(re.escape(delims), rest):
+            ch = delims[0]
+            close_pat = rf"(?<!{re.escape(ch)}){re.escape(delims)}(?!{re.escape(ch)})"
+            if re.search(close_pat, rest):
                 continue
             findings.append(
                 StructureFinding(

@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -53,7 +55,21 @@ class IssuesPanel(QWidget):
         )
         self._severity = self._new_filter("严重度", filters)
         self._file = self._new_filter("文件", filters)
-        filters.addStretch(1)
+
+        search_lbl = QLabel("搜索：", self)
+        filters.addWidget(search_lbl)
+        self._search_input = QLineEdit(self)
+        self._search_input.setPlaceholderText("搜索问题描述、错误码、文件或行号...")
+        self._search_input.setClearButtonEnabled(True)
+        self._search_input.textChanged.connect(self._render)
+        filters.addWidget(self._search_input, 1)
+
+        self._reset_btn = QPushButton("重置", self)
+        self._reset_btn.setProperty("btnRole", "compact")
+        self._reset_btn.setToolTip("重置所有分类筛选与搜索关键词")
+        self._reset_btn.clicked.connect(self.reset_filters)
+        filters.addWidget(self._reset_btn)
+
         outer.addLayout(filters)
 
         self._summary = QLabel("error 0 · warning 0 · info 0", self)
@@ -101,38 +117,76 @@ class IssuesPanel(QWidget):
         return str(combo.currentData() or "")
 
     @staticmethod
-    def _reset_options(combo: QComboBox, values: Iterable[str]) -> None:
+    def _reset_options(
+        combo: QComboBox,
+        values: Iterable[str],
+        label_formatter: Optional[Callable[[str], str]] = None,
+    ) -> None:
         selected = str(combo.currentData() or "")
         combo.blockSignals(True)
         combo.clear()
         combo.addItem(_ALL, "")
         for value in sorted(set(v for v in values if v)):
-            combo.addItem(value, value)
+            label = label_formatter(value) if label_formatter else value
+            combo.addItem(label, value)
         index = combo.findData(selected)
         combo.setCurrentIndex(index if index >= 0 else 0)
         combo.blockSignals(False)
 
+    def reset_filters(self) -> None:
+        self._type.blockSignals(True)
+        self._type.setCurrentIndex(0)
+        self._type.blockSignals(False)
+
+        self._document_type.blockSignals(True)
+        self._document_type.setCurrentIndex(0)
+        self._document_type.blockSignals(False)
+
+        self._severity.blockSignals(True)
+        self._severity.setCurrentIndex(0)
+        self._severity.blockSignals(False)
+
+        self._file.blockSignals(True)
+        self._file.setCurrentIndex(0)
+        self._file.blockSignals(False)
+
+        if hasattr(self, "_search_input"):
+            self._search_input.blockSignals(True)
+            self._search_input.clear()
+            self._search_input.blockSignals(False)
+
+        self._render()
+
     def clear_project(self) -> None:
         self._has_project = False
         self._issues = []
+        if hasattr(self, "_search_input"):
+            self._search_input.blockSignals(True)
+            self._search_input.clear()
+            self._search_input.blockSignals(False)
         self._render()
 
     def set_issues(self, issues: Iterable[IssueRecord]) -> None:
         self._has_project = True
         self._issues = list(issues)
-        self._reset_options(self._type, (i.issue_type for i in self._issues))
+        from doc_tool.application.content.lint import RULE_LABELS, SEVERITY_LABELS
+        type_formatter = lambda v: f"{RULE_LABELS.get(v, v)} ({v})" if v in RULE_LABELS else v
+        sev_formatter = lambda v: f"{SEVERITY_LABELS.get(v, v)} ({v})" if v in SEVERITY_LABELS else v
+        self._reset_options(self._type, (i.issue_type for i in self._issues), type_formatter)
         self._reset_options(self._document_type, (i.document_type for i in self._issues))
-        self._reset_options(self._severity, (i.severity for i in self._issues))
+        self._reset_options(self._severity, (i.severity for i in self._issues), sev_formatter)
         self._reset_options(self._file, (i.rel_path for i in self._issues))
         self._render()
 
     def filtered_issues(self) -> List[IssueRecord]:
+        kw = self._search_input.text().strip() if hasattr(self, "_search_input") else ""
         return filter_issues(
             self._issues,
             issue_type=self._selected(self._type),
             document_type=self._selected(self._document_type),
             severity=self._selected(self._severity),
             rel_path=self._selected(self._file),
+            keyword=kw,
         )
 
     def _render(self, _index: int = 0) -> None:

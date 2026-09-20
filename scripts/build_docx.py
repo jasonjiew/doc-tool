@@ -136,10 +136,75 @@ def parse_inline_runs(text: str) -> List[Tuple[str, str]]:
     return tokens or [(text, "")]
 
 
-def _append_styled_run(parent, value: str, style: str = "") -> None:
+RPR_CHILD_TAGS = [
+    qn("rStyle"),
+    qn("rFonts"),
+    qn("b"),
+    qn("bCs"),
+    qn("i"),
+    qn("iCs"),
+    qn("caps"),
+    qn("smallCaps"),
+    qn("strike"),
+    qn("dstrike"),
+    qn("outline"),
+    qn("shadow"),
+    qn("emboss"),
+    qn("imprint"),
+    qn("noProof"),
+    qn("snapToGrid"),
+    qn("vanish"),
+    qn("webHidden"),
+    qn("color"),
+    qn("spacing"),
+    qn("w"),
+    qn("kern"),
+    qn("position"),
+    qn("sz"),
+    qn("szCs"),
+    qn("highlight"),
+    qn("u"),
+    qn("effect"),
+    qn("bdr"),
+    qn("shd"),
+    qn("fitText"),
+    qn("vertAlign"),
+    qn("rtl"),
+    qn("cs"),
+    qn("em"),
+    qn("lang"),
+    qn("eastAsianLayout"),
+    qn("specVanish"),
+    qn("oMath"),
+]
+RPR_TAG_INDEX = {tag: idx for idx, tag in enumerate(RPR_CHILD_TAGS)}
+
+
+def _normalize_rpr_order(rpr) -> None:
+    """按 OOXML CT_RPr XSD 规范对 rPr 下子元素严格升序排列，避免 Word 样式解析异常。"""
+    children = list(rpr)
+    if len(children) <= 1:
+        return
+    sorted_children = sorted(children, key=lambda el: RPR_TAG_INDEX.get(el.tag, 999))
+    if sorted_children != children:
+        for child in children:
+            rpr.remove(child)
+        for child in sorted_children:
+            rpr.append(child)
+
+
+def _append_styled_run(
+    parent,
+    value: str,
+    style: str = "",
+    is_hyperlink: bool = False,
+    hyperlink_style_id: str = "Hyperlink",
+) -> None:
     run = etree.SubElement(parent, qn("r"))
-    if style:
+    if is_hyperlink or style:
         rpr = etree.SubElement(run, qn("rPr"))
+        if is_hyperlink:
+            etree.SubElement(rpr, qn("rStyle")).set(qn("val"), hyperlink_style_id)
         if style == "bold":
             etree.SubElement(rpr, qn("b"))
         elif style == "italic":
@@ -148,10 +213,22 @@ def _append_styled_run(parent, value: str, style: str = "") -> None:
             fonts = etree.SubElement(rpr, qn("rFonts"))
             for attribute in ("ascii", "hAnsi", "eastAsia"):
                 fonts.set(qn(attribute), "Consolas")
+        if is_hyperlink:
+            etree.SubElement(rpr, qn("color")).set(qn("val"), "0563C1")
+            etree.SubElement(rpr, qn("u")).set(qn("val"), "single")
+        _normalize_rpr_order(rpr)
     append_text(run, value)
 
 
-def append_inline(paragraph, text: str, expressions=None, source_path: str = "", line_no: int = 0) -> None:
+def append_inline(
+    paragraph,
+    text: str,
+    expressions=None,
+    source_path: str = "",
+    line_no: int = 0,
+    is_hyperlink: bool = False,
+    hyperlink_style_id: str = "Hyperlink",
+) -> None:
     if expressions is not None:
         cursor = 0
         pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\[\^([^\]]+)\]")
@@ -172,7 +249,13 @@ def append_inline(paragraph, text: str, expressions=None, source_path: str = "",
                 append_inline(paragraph, text[cursor:], None)
             return
     for value, style in parse_inline_runs(text):
-        _append_styled_run(paragraph, value, style)
+        _append_styled_run(
+            paragraph,
+            value,
+            style,
+            is_hyperlink=is_hyperlink,
+            hyperlink_style_id=hyperlink_style_id,
+        )
 
 
 def apply_para_fmt(ppr, fmt: Optional[str]) -> None:
@@ -228,6 +311,35 @@ def make_paragraph(
     return paragraph
 
 
+def _chinese_to_int(s: str):
+    """将中文数字（一至九百九十九）或纯阿拉伯数字字符串解析为整数。"""
+    s = s.strip()
+    if not s:
+        return None
+    if s.isdigit():
+        return int(s)
+    cn_digits = {
+        "零": 0, "一": 1, "壹": 1, "二": 2, "贰": 2, "两": 2, "三": 3, "叁": 3,
+        "四": 4, "肆": 4, "五": 5, "伍": 5, "六": 6, "陆": 6,
+        "七": 7, "柒": 7, "八": 8, "捌": 8, "九": 9, "玖": 9,
+    }
+    val = 0
+    temp = 0
+    for ch in s:
+        if ch in cn_digits:
+            temp = cn_digits[ch]
+        elif ch in ("百", "佰"):
+            val += (temp if temp != 0 else 1) * 100
+            temp = 0
+        elif ch in ("十", "拾"):
+            val += (temp if temp != 0 else 1) * 10
+            temp = 0
+        else:
+            return None
+    val += temp
+    return val if (val > 0 or s == "零") else None
+
+
 def stable_bookmark_name(value: str) -> str:
     readable = re.sub(r"[^0-9A-Za-z_]+", "_", value).strip("_")[:24] or "section"
     return "doc_{0}_{1}".format(readable, hashlib.sha1(value.encode("utf-8")).hexdigest()[:10])
@@ -250,16 +362,84 @@ class ExpressionManager:
         self.footnote_defs: Dict[str, str] = {}
         self.footnote_ids: Dict[str, int] = {}
         self.warnings: List[str] = []
+        self.hyperlink_style_id = "Hyperlink"
+        styles_xml = items.get("word/styles.xml") if isinstance(items, dict) else None
+        if styles_xml:
+            try:
+                styles_root = _parse_xml_safe(styles_xml, "word/styles.xml")
+                for s in styles_root.findall(qn("style")):
+                    if s.get(qn("type")) == "character":
+                        name_el = s.find(qn("name"))
+                        if name_el is not None and (name_el.get(qn("val")) or "").lower() == "hyperlink":
+                            self.hyperlink_style_id = s.get(qn("styleId")) or "Hyperlink"
+                            break
+                else:
+                    for s in styles_root.findall(qn("style")):
+                        if s.get(qn("type")) == "character":
+                            if (s.get(qn("styleId")) or "").lower() == "hyperlink":
+                                self.hyperlink_style_id = s.get(qn("styleId")) or "Hyperlink"
+                                break
+            except Exception:
+                pass
         self.path_by_abs = {}
         root = os.path.abspath(entries[0][0].path) if entries else ""
         for entry, markdown_path in entries:
             if markdown_path:
                 self.path_by_abs[os.path.abspath(markdown_path)] = markdown_path
+            if getattr(entry, "kind", "") == "dir":
+                self.path_by_abs[os.path.abspath(entry.path)] = entry.path
         # 站内链接按文件名反查索引：覆盖内容根相对（章节树「复制 Markdown 引用」
         # 生成的 ``requirement/xxx.md`` 形式）与裸文件名两种链接写法。
         self._abs_by_name: Dict[str, str] = {}
         for abs_path in self.path_by_abs:
             self._abs_by_name.setdefault(os.path.basename(abs_path), abs_path)
+
+        # 章节编号与大纲序号快速反查 Word 书签
+        self.section_number_map: Dict[str, str] = {}
+        self.section_title_map: Dict[str, str] = {}
+        self.chapter_bookmark_by_source: Dict[str, str] = {}
+        current_chapter_bm = None
+        for entry, markdown_path in entries:
+            key = os.path.abspath(markdown_path) if markdown_path else os.path.abspath(entry.path)
+            bm_name = self.register_bookmark(key)
+            if getattr(entry, "depth", 0) == 1:
+                current_chapter_bm = bm_name
+            if current_chapter_bm:
+                if markdown_path:
+                    self.chapter_bookmark_by_source[os.path.abspath(markdown_path)] = current_chapter_bm
+                self.chapter_bookmark_by_source[os.path.abspath(entry.path)] = current_chapter_bm
+
+            if markdown_path and getattr(entry, "kind", "") == "dir":
+                self.bookmarks.setdefault(os.path.abspath(entry.path), bm_name)
+                self.bookmarks.setdefault(os.path.abspath(entry.path).replace("\\", "/"), bm_name)
+            if getattr(entry, "number", None):
+                num_str = ".".join(str(n) for n in entry.number)
+                self.section_number_map[num_str] = bm_name
+                if getattr(entry, "depth", 0) == 1:
+                    self.section_number_map["第{0}章".format(entry.number[0])] = bm_name
+                    self.section_number_map[str(entry.number[0])] = bm_name
+            if getattr(entry, "title", None):
+                t = entry.title.strip()
+                if t:
+                    self.section_title_map[t] = bm_name
+                    self.section_title_map[re.sub(r"\s+", "", t)] = bm_name
+                    if getattr(entry, "number", None):
+                        full_t = "{0} {1}".format(num_str, t)
+                        self.section_title_map[full_t] = bm_name
+                        self.section_title_map[re.sub(r"\s+", "", full_t)] = bm_name
+                        if getattr(entry, "depth", 0) == 1:
+                            chap_t = "第{0}章 {1}".format(entry.number[0], t)
+                            self.section_title_map[chap_t] = bm_name
+                            self.section_title_map[re.sub(r"\s+", "", chap_t)] = bm_name
+
+    def get_chapter_bookmark_for_source(self, source_path: str) -> Optional[str]:
+        """根据当前 Markdown 源文件路径解析其所属的第1级大章节书签。"""
+        if not source_path:
+            return None
+        abs_src = os.path.abspath(source_path)
+        if abs_src in self.chapter_bookmark_by_source:
+            return self.chapter_bookmark_by_source[abs_src]
+        return self.bookmarks.get(abs_src)
 
     def register_bookmark(self, key: str) -> str:
         if key in self.bookmarks:
@@ -310,6 +490,7 @@ class ExpressionManager:
 
     def append_hyperlink(self, paragraph, label, target, source_path, line_no) -> None:
         hyperlink = etree.SubElement(paragraph, qn("hyperlink"))
+        hyperlink.set(qn("history"), "1")
         if re.match(r"^(?:https?|mailto):", target, re.IGNORECASE):
             rid = "rId{0}".format(self.next_rid)
             self.next_rid += 1
@@ -320,22 +501,96 @@ class ExpressionManager:
             relationship.set("TargetMode", "External")
             hyperlink.set(R_NS + "id", rid)
         else:
-            path_target, _, anchor = target.partition("#")
-            resolved = self._resolve_internal_abs(source_path, path_target)
-            if resolved is None:
-                self.warnings.append("{0}:{1} 链接目标不存在：{2}".format(source_path, line_no, target))
-                paragraph.remove(hyperlink)
-                append_inline(paragraph, label, None)
-                return
-            base = resolved + (("#" + anchor) if anchor else "")
-            bookmark = self.bookmarks.get(base) or self.bookmarks.get(resolved)
+            unquoted_target = urllib.parse.unquote(target).strip()
+            path_target, _, anchor = unquoted_target.partition("#")
+            clean_anchor = anchor.strip()
+            clean_path = path_target.strip()
+            bookmark = None
+
+            # 情况 A: 目标带有锚点 (如 "#3.2.1", "#蓝牙配对", "file.md#sec", "#本章", "#本节")
+            if clean_anchor:
+                # A1. 若指定了文件路径，优先在目标文件的书签中查找
+                if clean_path:
+                    resolved = self._resolve_internal_abs(source_path, clean_path)
+                    if resolved is not None:
+                        bookmark = (
+                            self.bookmarks.get(resolved + "#" + clean_anchor)
+                            or self.bookmarks.get(resolved + "#" + anchor)
+                        )
+                # A2. 未指定文件路径时，优先在源文件自身书签查找
+                if bookmark is None and source_path:
+                    src_abs = os.path.abspath(source_path)
+                    bookmark = (
+                        self.bookmarks.get(src_abs + "#" + clean_anchor)
+                        or self.bookmarks.get(src_abs + "#" + anchor)
+                    )
+                # A3. 按锚点 slug 跨文档与段落反查
+                if bookmark is None and hasattr(self, "bookmarks"):
+                    anchor_slug = re.sub(r"\s+", "-", re.sub(r"[^\w\s一-鿿\.\-]+", "", clean_anchor.lower(), flags=re.UNICODE)).strip("-")
+                    anchor_slug_nodot = re.sub(r"\s+", "-", re.sub(r"[^\w\s一-鿿\-]+", "", clean_anchor.lower(), flags=re.UNICODE)).strip("-")
+                    for b_key, b_val in self.bookmarks.items():
+                        if "#" in b_key:
+                            b_frag = b_key.split("#", 1)[1]
+                            b_frag_clean = urllib.parse.unquote(b_frag).strip()
+                            if b_frag_clean in (clean_anchor, anchor_slug, anchor_slug_nodot):
+                                bookmark = b_val
+                                break
+                # A4. 查找章节号与小节标题映射（支持 cross-chapter / section 锚点如 #3.2.1）
+                if bookmark is None and hasattr(self, "find_bookmark_for_section"):
+                    bookmark = self.find_bookmark_for_section(clean_anchor)
+                # A5. “本章” / “本节” 语义解析
+                if bookmark is None and clean_anchor in ("top", "本章", "本章节", "本节"):
+                    if clean_anchor != "本节" and hasattr(self, "get_chapter_bookmark_for_source"):
+                        bookmark = self.get_chapter_bookmark_for_source(source_path)
+                    if bookmark is None and source_path:
+                        bookmark = self.bookmarks.get(os.path.abspath(source_path))
+                # A6. 若指定了文件路径但未命中锚点，降级至该目标文件的起始书签
+                if bookmark is None and clean_path:
+                    resolved = self._resolve_internal_abs(source_path, clean_path)
+                    if resolved is not None:
+                        bookmark = self.bookmarks.get(resolved)
+
+            # 情况 B: 无锚点 (如 target="#", "", ".", "3.4", "3.4.md", "第3章", "本章")
+            else:
+                # B1. “跳转本章节” / 本章 / 本节 / "#" / "." / "" 快捷语法
+                if not clean_path or clean_path in (".", "#", "本章", "本章节", "本节"):
+                    if clean_path != "本节" and hasattr(self, "get_chapter_bookmark_for_source"):
+                        bookmark = self.get_chapter_bookmark_for_source(source_path)
+                    if bookmark is None and source_path:
+                        bookmark = self.bookmarks.get(os.path.abspath(source_path))
+                # B2. 文件路径精确解析
+                if bookmark is None and clean_path:
+                    resolved = self._resolve_internal_abs(source_path, clean_path)
+                    if resolved is not None:
+                        bookmark = self.bookmarks.get(resolved)
+                # B3. 章节号或标题匹配
+                if bookmark is None and clean_path and hasattr(self, "find_bookmark_for_section"):
+                    bookmark = self.find_bookmark_for_section(clean_path)
+
+            # 情况 C: 根据超链接文本 label 智能反查书签
+            if bookmark is None and hasattr(self, "find_bookmark_for_section") and label:
+                clean_label = label.strip()
+                if clean_label in ("本章", "本章节") and hasattr(self, "get_chapter_bookmark_for_source"):
+                    bookmark = self.get_chapter_bookmark_for_source(source_path)
+                if bookmark is None:
+                    bookmark = self.find_bookmark_for_section(clean_label)
+                if bookmark is None and clean_label in ("本章", "本章节", "本节") and source_path:
+                    bookmark = self.bookmarks.get(os.path.abspath(source_path))
+
             if bookmark is None:
-                self.warnings.append("{0}:{1} 链接目标不存在：{2}".format(source_path, line_no, target))
+                self.warnings.append("{0}:{1} 目标不存在：{2}".format(source_path, line_no, target))
                 paragraph.remove(hyperlink)
                 append_inline(paragraph, label, None)
                 return
             hyperlink.set(qn("anchor"), bookmark)
-        append_inline(hyperlink, label, None)
+
+        append_inline(
+            hyperlink,
+            label,
+            None,
+            is_hyperlink=True,
+            hyperlink_style_id=getattr(self, "hyperlink_style_id", "Hyperlink"),
+        )
 
     def collect_footnotes(self, entries) -> None:
         definition = re.compile(r"^\[\^([^\]]+)\]:\s*(.*)$")
@@ -394,31 +649,137 @@ class ExpressionManager:
             self.items["[Content_Types].xml"] = etree.tostring(content_types, xml_declaration=True, encoding="UTF-8")
 
     def find_bookmark_for_section(self, token: str) -> Optional[str]:
-        """按章节编号（如 4.8.4、3.7.9）或小节标题文本查找对应的 Word 书签名称。"""
+        """按章节编号（如 3.4、4.8.4、第3章、第三章）或小节标题文本查找对应的 Word 书签名称。"""
         cleaned = token.strip()
         if not cleaned:
             return None
         if cleaned in self.bookmarks:
             return self.bookmarks[cleaned]
-        cleaned_no_space = cleaned.replace(" ", "")
+
+        # 剥离开头的 #、外层包裹括号与末尾标点、以及 .md 后缀
+        norm_token = cleaned.lstrip("#").strip()
+        if norm_token.lower().endswith((".md", ".markdown")):
+            norm_token = norm_token.rsplit(".", 1)[0].strip()
+        norm_token = re.sub(r"^[\(（\[【]+|[\)）\]】]+$", "", norm_token).strip().rstrip(".。、:：")
+        if not norm_token:
+            norm_token = cleaned
+
+        token_spaces = re.sub(r"[-_]+", " ", norm_token).strip()
+
+        # 0. 尝试直接在 section_title_map 中匹配（全词、去空格、下划线/短横转空格）
+        if hasattr(self, "section_title_map"):
+            for cand in (norm_token, token_spaces, cleaned):
+                if cand in self.section_title_map:
+                    return self.section_title_map[cand]
+                cand_no_space = re.sub(r"\s+", "", cand)
+                if cand_no_space in self.section_title_map:
+                    return self.section_title_map[cand_no_space]
+
+        # 1. 尝试匹配多级章节号（如 3.4、4.8.4、10.1.1、4.5.1.1.3）
+        m_num = re.match(r"^(\d+(?:\.\d+)+)", norm_token) or re.match(r"^(\d+(?:\.\d+)+)", token_spaces)
+        if m_num and hasattr(self, "section_number_map"):
+            num_str = m_num.group(1)
+            # 1.1 精确章节号匹配
+            if num_str in self.section_number_map:
+                return self.section_number_map[num_str]
+            # 1.2 若带标题，尝试多级标题匹配
+            rest_title = norm_token[m_num.end():].strip(" .、:：-_")
+            if rest_title and hasattr(self, "section_title_map"):
+                for t_cand in (rest_title, re.sub(r"\s+", "", rest_title)):
+                    if t_cand in self.section_title_map:
+                        return self.section_title_map[t_cand]
+            # 1.3 前缀降级匹配（如 4.5.1.1.3 -> 4.5.1.1 -> 4.5.1）
+            parts = num_str.split(".")
+            for l in range(len(parts) - 1, 1, -1):
+                parent_prefix = ".".join(parts[:l])
+                if parent_prefix in self.section_number_map:
+                    return self.section_number_map[parent_prefix]
+            if len(parts) > 1:
+                ch_key = "第{0}章".format(parts[0])
+                if ch_key in self.section_number_map:
+                    return self.section_number_map[ch_key]
+                if parts[0] in self.section_number_map:
+                    return self.section_number_map[parts[0]]
+
+        # 2. 尝试大章节匹配（如 第3章、第三章、第 3 章、第3节、第3、3章）
+        chap_match = (
+            re.match(r"^第\s*([0-9一二三四五六七八九十百]+)\s*[章节]?(?:\s+(.+))?$", norm_token)
+            or re.match(r"^第?\s*([0-9一二三四五六七八九十百]+)\s*[章节](?:\s+(.+))?$", norm_token)
+            or re.match(r"^第\s*([0-9一二三四五六七八九十百]+)\s*[章节]?(?:\s+(.+))?$", token_spaces)
+            or re.match(r"^第?\s*([0-9一二三四五六七八九十百]+)\s*[章节](?:\s+(.+))?$", token_spaces)
+        )
+        if chap_match and hasattr(self, "section_number_map"):
+            cn_digits = chap_match.group(1)
+            num_val = _chinese_to_int(cn_digits)
+            if num_val is not None:
+                ch_key = "第{0}章".format(num_val)
+                if ch_key in self.section_number_map:
+                    return self.section_number_map[ch_key]
+                if str(num_val) in self.section_number_map:
+                    return self.section_number_map[str(num_val)]
+
+        # 3. 尝试单数字大章匹配（如 "1" 或 "1 概述" 或 "1.0"，注意排除 "1.1" 等多级小节）
+        if re.match(r"^\d+\.0+$", norm_token):
+            ch_k = norm_token.split(".")[0]
+            if hasattr(self, "section_number_map"):
+                if "第{0}章".format(ch_k) in self.section_number_map:
+                    return self.section_number_map["第{0}章".format(ch_k)]
+                if ch_k in self.section_number_map:
+                    return self.section_number_map[ch_k]
+
+        m_single_lbl = re.match(r"^(\d+)(?!\.\d)(?:[\.、\s]+(.*)|$)", norm_token)
+        if m_single_lbl and hasattr(self, "section_number_map"):
+            ch_k = m_single_lbl.group(1)
+            ch_title = (m_single_lbl.group(2) or "").strip()
+            # 若带有标题，优先匹配标题
+            if ch_title and hasattr(self, "section_title_map"):
+                if ch_title in self.section_title_map:
+                    return self.section_title_map[ch_title]
+                if re.sub(r"\s+", "", ch_title) in self.section_title_map:
+                    return self.section_title_map[re.sub(r"\s+", "", ch_title)]
+            if "第{0}章".format(ch_k) in self.section_number_map:
+                return self.section_number_map["第{0}章".format(ch_k)]
+            if ch_k in self.section_number_map:
+                return self.section_number_map[ch_k]
+
+        # 4. 中文数字单章（如 "一"、"三"、"叁"、"拾"）
+        num_val = _chinese_to_int(norm_token)
+        if num_val is not None and hasattr(self, "section_number_map"):
+            ch_key = "第{0}章".format(num_val)
+            if ch_key in self.section_number_map:
+                return self.section_number_map[ch_key]
+            if str(num_val) in self.section_number_map:
+                return self.section_number_map[str(num_val)]
+
+        # 5. 遍历已注册书签匹配（兼容 _index.md 上级目录、标题锚点、slug、stem编号前缀）
+        cleaned_no_space = re.sub(r"\s+", "", cleaned)
+        norm_no_space = re.sub(r"\s+", "", norm_token)
         for key, bookmark_name in self.bookmarks.items():
             base = os.path.basename(key.split("#")[0])
-            stem = os.path.splitext(base)[0]
-            stem_no_space = stem.replace(" ", "")
-            if cleaned_no_space == stem_no_space or cleaned == stem:
+            if base.lower() in ("_index.md", "_index.markdown", "_index"):
+                base = os.path.basename(os.path.dirname(key.split("#")[0]))
+            if base.lower().endswith((".md", ".markdown")):
+                stem = base.rsplit(".", 1)[0]
+            else:
+                stem = base
+            stem_no_space = re.sub(r"\s+", "", stem)
+            if cleaned_no_space == stem_no_space or cleaned == stem or norm_no_space == stem_no_space or norm_token == stem:
                 return bookmark_name
-            m = re.match(r"^(\d+(?:\.\d+)*)", stem)
-            if m and (m.group(1) == cleaned or m.group(1) == cleaned_no_space):
+            m_prefix = re.match(r"^(\d+(?:\.\d+)+)", stem)
+            if m_prefix and m_prefix.group(1) in (cleaned, norm_token, cleaned_no_space, norm_no_space):
                 return bookmark_name
-            m_chap = re.match(r"^(第\s*\d+\s*章)", stem)
-            if m_chap and m_chap.group(1).replace(" ", "") == cleaned_no_space:
-                return bookmark_name
+            m_chap_stem = re.match(r"^第?\s*([0-9一二三四五六七八九十百]+)\s*章", stem)
+            if m_chap_stem:
+                c_val = _chinese_to_int(m_chap_stem.group(1))
+                if c_val is not None and "第{0}章".format(c_val) in (cleaned, norm_token, cleaned_no_space, norm_no_space):
+                    return bookmark_name
             if "#" in key:
                 heading = key.split("#", 1)[1].strip()
-                if cleaned == heading or cleaned_no_space == heading.replace(" ", ""):
+                h_no_space = re.sub(r"\s+", "", heading)
+                if heading in (cleaned, norm_token, token_spaces) or h_no_space in (cleaned_no_space, norm_no_space):
                     return bookmark_name
-        return None
 
+        return None
 
 
 def _ensure_numbering_relationship(relationships) -> None:
@@ -1298,7 +1659,7 @@ def _set_revision_cell_text(cell, text) -> None:
 
 
 def _set_revision_summary_cell(cell, text, expressions=None) -> None:
-    """写入修订摘要单元格，为识别到的章节标题或编号添加内部超链接，并保留换行与样式。"""
+    """写入修订摘要单元格；为识别到的章节编号生成内部超链接。"""
     paragraphs = cell.findall(qn("p"))
     if paragraphs:
         paragraph = paragraphs[0]
@@ -1326,197 +1687,233 @@ def _set_revision_summary_cell(cell, text, expressions=None) -> None:
         t.text = plain_text
         t.set(XML_NS + "space", "preserve")
 
+    hl_style_id = getattr(expressions, "hyperlink_style_id", "Hyperlink") if expressions else "Hyperlink"
+
     def append_link(parent, link_text, bookmark):
+        if not link_text:
+            return
+        leading_ws = link_text[: len(link_text) - len(link_text.lstrip())]
+        trailing_ws = link_text[len(link_text.rstrip()) :]
+        clean_text = link_text.strip()
+        if leading_ws:
+            append_plain(parent, leading_ws)
+        if not clean_text:
+            if trailing_ws:
+                append_plain(parent, trailing_ws)
+            return
+
         hl = etree.SubElement(parent, qn("hyperlink"))
         hl.set(qn("anchor"), bookmark)
+        hl.set(qn("history"), "1")
         r = etree.SubElement(hl, qn("r"))
         rpr = etree.SubElement(r, qn("rPr"))
         if run_properties is not None:
             for child in run_properties:
-                if child.tag not in (qn("u"), qn("color")):
+                if child.tag not in (qn("u"), qn("color"), qn("rStyle")):
                     rpr.append(copy.deepcopy(child))
+        etree.SubElement(rpr, qn("rStyle")).set(qn("val"), hl_style_id)
         etree.SubElement(rpr, qn("color")).set(qn("val"), "0563C1")
         etree.SubElement(rpr, qn("u")).set(qn("val"), "single")
+        _normalize_rpr_order(rpr)
         t = etree.SubElement(r, qn("t"))
-        t.text = link_text
+        t.text = clean_text
         t.set(XML_NS + "space", "preserve")
+        if trailing_ws:
+            append_plain(parent, trailing_ws)
 
-    lines = str(text).splitlines()
-    for line_idx, line in enumerate(lines):
-        if line_idx > 0:
-            br_run = etree.SubElement(paragraph, qn("r"))
-            etree.SubElement(br_run, qn("br"))
-        if not line:
-            continue
+    md_link_re = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+    sec_num_pattern = re.compile(
+        r"(第\s*[0-9一二三四五六七八九十百]+\s*[章节]|第?\s*[0-9一二三四五六七八九十百]+\s*章|(?<![0-9a-zA-Z\.])\d+(?:\.\d+)+)"
+    )
 
-        # 0. 优先解析 Markdown 显式超链接 [文本](目标路径)
-        md_link_re = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-        if md_link_re.search(line):
+    def render_plain_segment(parent, seg):
+        if not seg:
+            return
+        if expressions is None:
+            append_plain(parent, seg)
+            return
+        plain_num_pattern = re.compile(
+            r"(第\s*[0-9一二三四五六七八九十百]+\s*[章节]|第?\s*[0-9一二三四五六七八九十百]+\s*章|(?<![0-9a-zA-Z\.])\d+(?:\.\d+)+|(?<![0-9a-zA-Z\.])\d+(?=[\s\.、]))"
+        )
+        pos = 0
+        for m in plain_num_pattern.finditer(seg):
+            s_start, s_end = m.span()
+            if s_start < pos:
+                continue
+            tok = m.group(0)
+            bm = None
+            if tok.isdigit() and "." not in tok:
+                if hasattr(expressions, "find_bookmark_for_section"):
+                    cand_bm = expressions.find_bookmark_for_section(tok)
+                    if cand_bm:
+                        rest_clean = seg[s_end:].lstrip(" .、\t")
+                        is_title_match = False
+                        if hasattr(expressions, "section_title_map"):
+                            for check_len in (8, 6, 4, 2):
+                                sub = rest_clean[:check_len].strip()
+                                if sub and (f"{tok} {sub}" in expressions.section_title_map or sub in expressions.section_title_map):
+                                    is_title_match = True
+                                    break
+                        if is_title_match:
+                            bm = cand_bm
+            else:
+                if hasattr(expressions, "find_bookmark_for_section"):
+                    bm = expressions.find_bookmark_for_section(tok)
+
+            if bm:
+                if s_start > pos:
+                    append_plain(parent, seg[pos:s_start])
+                append_link(parent, tok, bm)
+                pos = s_end
+        if pos < len(seg):
+            append_plain(parent, seg[pos:])
+
+    def render_line(parent, line_text):
+        if not line_text:
+            return
+
+        # 支持 Markdown 形式 [文本](目标路径)
+        if md_link_re.search(line_text):
             pos = 0
-            for match in md_link_re.finditer(line):
+            for match in md_link_re.finditer(line_text):
                 start, end = match.span()
                 if start > pos:
-                    append_plain(paragraph, line[pos:start])
+                    render_plain_segment(parent, line_text[pos:start])
                 label, target = match.groups()
                 bm = None
+                frag_part = ""
                 if expressions is not None:
-                    # 1. 优先按目标路径与锚点精确反查 Word 书签
                     unquoted_target = urllib.parse.unquote(target).replace("\\", "/")
                     path_part, _, frag_part = unquoted_target.partition("#")
                     target_clean = path_part.rstrip("/")
-                    target_stem = os.path.splitext(os.path.basename(target_clean))[0] if target_clean else ""
+                    if target_clean.lower().endswith((".md", ".markdown")):
+                        target_stem = os.path.basename(target_clean).rsplit(".", 1)[0]
+                    else:
+                        target_stem = os.path.basename(target_clean) if target_clean else ""
 
-                    if hasattr(expressions, "bookmarks"):
-                        # 1a. 优先全路径精确匹配（含 #frag 锚点）
-                        for b_key, b_name in expressions.bookmarks.items():
-                            b_norm = b_key.replace("\\", "/").rstrip("/")
-                            if b_norm == unquoted_target or b_norm.endswith("/" + unquoted_target):
-                                bm = b_name
-                                break
-                        # 1b. 锚点对应书签查找
-                        if not bm and frag_part and hasattr(expressions, "find_bookmark_for_section"):
-                            bm = expressions.find_bookmark_for_section(frag_part)
-                        # 1c. 降级为目标文件路径匹配
-                        if not bm and target_clean:
+                    # 1. 优先按锚点与章节编号/小节名称查找文档内书签（避免直接链接到外部文件）
+                    # 1.1 若存在 #frag 锚点，优先在 bookmarks 中寻找精确内部书签或通过 find_bookmark_for_section 查找
+                    if frag_part:
+                        frag_clean = urllib.parse.unquote(frag_part).strip()
+                        if hasattr(expressions, "bookmarks"):
                             for b_key, b_name in expressions.bookmarks.items():
                                 b_norm = b_key.replace("\\", "/").rstrip("/")
                                 if (
-                                    b_norm == target_clean
-                                    or b_norm.endswith("/" + target_clean)
-                                    or (target_stem and b_norm.endswith("/" + target_stem + ".md"))
+                                    b_norm == unquoted_target
+                                    or b_norm.endswith("/" + unquoted_target)
+                                    or (frag_clean and (b_norm.endswith("#" + frag_clean) or b_norm.endswith("#" + urllib.parse.quote(frag_clean))))
                                 ):
                                     bm = b_name
                                     break
+                        if not bm and hasattr(expressions, "find_bookmark_for_section"):
+                            bm = expressions.find_bookmark_for_section(frag_clean)
+                            if not bm:
+                                m_num_frag = sec_num_pattern.search(frag_clean)
+                                if m_num_frag:
+                                    bm = expressions.find_bookmark_for_section(m_num_frag.group(0))
 
-                    # 2. 依次按锚点、文件名词干、标签文本、编号与章节查找
+                    # 1.2 优先从 label 中识别章节编号或小节标题进行书签反查
                     if not bm and hasattr(expressions, "find_bookmark_for_section"):
-                        if frag_part:
-                            bm = expressions.find_bookmark_for_section(frag_part)
+                        if label:
+                            m_lbl = sec_num_pattern.search(label)
+                            if m_lbl:
+                                bm = expressions.find_bookmark_for_section(m_lbl.group(0))
+                            if not bm:
+                                m_top_lbl = re.match(r"^(\d+)(?:[\.、\s]+|$)", label.strip())
+                                if m_top_lbl:
+                                    bm = expressions.find_bookmark_for_section(m_top_lbl.group(1))
+                            if not bm:
+                                bm = expressions.find_bookmark_for_section(label)
                         if not bm and target_stem:
-                            bm = expressions.find_bookmark_for_section(target_stem)
-                        if not bm:
-                            bm = expressions.find_bookmark_for_section(label)
-                        if not bm:
-                            m_num = re.search(r"(\d+(?:\.\d+)+)", label)
-                            if m_num:
-                                bm = expressions.find_bookmark_for_section(m_num.group(1))
-                        if not bm and frag_part:
-                            m_num_frag = re.search(r"(\d+(?:\.\d+)+)", frag_part)
-                            if m_num_frag:
-                                bm = expressions.find_bookmark_for_section(m_num_frag.group(1))
-                        if not bm:
-                            m_ch = re.search(r"(第\s*\d+\s*章)", label)
-                            if m_ch:
-                                bm = expressions.find_bookmark_for_section(m_ch.group(1))
+                            m_stem = sec_num_pattern.search(target_stem)
+                            if m_stem:
+                                bm = expressions.find_bookmark_for_section(m_stem.group(0))
+                            if not bm:
+                                m_top_stem = re.match(r"^(\d+)(?:[\.、\s]+|$)", target_stem.strip())
+                                if m_top_stem:
+                                    bm = expressions.find_bookmark_for_section(m_top_stem.group(1))
+                            if not bm:
+                                bm = expressions.find_bookmark_for_section(target_stem)
 
-                if bm:
-                    append_link(paragraph, label, bm)
+                    # 2. 兜底匹配 bookmarks 中的内部文件路径（外部协议 URL 不匹配文件书签）
+                    if not bm and hasattr(expressions, "bookmarks"):
+                        is_external_url = unquoted_target.lower().startswith(("http://", "https://", "ftp://", "file://", "mailto:"))
+                        if not is_external_url:
+                            for b_key, b_name in expressions.bookmarks.items():
+                                b_norm = b_key.replace("\\", "/").rstrip("/")
+                                if b_norm == unquoted_target or b_norm.endswith("/" + unquoted_target):
+                                    bm = b_name
+                                    break
+                            if not bm and target_clean:
+                                for b_key, b_name in expressions.bookmarks.items():
+                                    b_norm = b_key.replace("\\", "/").rstrip("/")
+                                    if (
+                                        b_norm == target_clean
+                                        or b_norm.endswith("/" + target_clean)
+                                        or (target_stem and b_norm.endswith("/" + target_stem + ".md"))
+                                    ):
+                                        bm = b_name
+                                        break
+
+                # 3. 渲染超链接文本：若 label 中包含章节/小节编号，严格仅为章节号加超链接，其余文字保持普通正文
+                matches = list(sec_num_pattern.finditer(label)) if (expressions is not None) else []
+                if not matches and expressions is not None:
+                    m_single = re.match(r"^(\s*)(\d+)([\.、\s]+.*)?$", label)
+                    if m_single:
+                        ch_digit = m_single.group(2)
+                        ch_bm = expressions.find_bookmark_for_section(ch_digit)
+                        if ch_bm or bm:
+                            lead_sp = m_single.group(1)
+                            rest_txt = m_single.group(3) or ""
+                            if lead_sp:
+                                append_plain(parent, lead_sp)
+                            append_link(parent, ch_digit, ch_bm or bm)
+                            if rest_txt:
+                                append_plain(parent, rest_txt)
+                            pos = end
+                            continue
+                if matches:
+                    l_pos = 0
+                    for lm in matches:
+                        ls, le = lm.span()
+                        if ls > l_pos:
+                            append_plain(parent, label[l_pos:ls])
+                        tok = lm.group(0)
+                        tok_bm = None
+                        if hasattr(expressions, "find_bookmark_for_section"):
+                            tok_bm = expressions.find_bookmark_for_section(tok)
+                        if frag_part and bm:
+                            link_bm = bm
+                        else:
+                            link_bm = tok_bm or bm
+                        if link_bm:
+                            append_link(parent, tok, link_bm)
+                        else:
+                            append_plain(parent, tok)
+                        l_pos = le
+                    if l_pos < len(label):
+                        append_plain(parent, label[l_pos:])
                 else:
-                    append_plain(paragraph, label)
+                    if bm:
+                        append_link(parent, label, bm)
+                    else:
+                        append_plain(parent, label)
                 pos = end
-            if pos < len(line):
-                append_plain(paragraph, line[pos:])
-            continue
-
-        if expressions is None:
-            append_plain(paragraph, line)
-            continue
-
-        if "->" in line:
-            parts = re.split(r"(->)", line)
-            for part in parts:
-                if part == "->":
-                    append_plain(paragraph, "->")
-                    continue
-                lead_space = part[:len(part) - len(part.lstrip())]
-                trail_space = part[len(part.rstrip()):]
-                part_strip = part.strip()
-                if not part_strip:
-                    if part:
-                        append_plain(paragraph, part)
-                    continue
-
-                # 1. 优先尝试直接全词匹配书签
-                bm = expressions.find_bookmark_for_section(part_strip)
-                if bm:
-                    if lead_space:
-                        append_plain(paragraph, lead_space)
-                    append_link(paragraph, part_strip, bm)
-                    if trail_space:
-                        append_plain(paragraph, trail_space)
-                    continue
-
-                # 2. 若带有括号/冒号等补充描述（如 "4.8.4 APP 用户管理（Tab 复合标签页展现: 合并智护士..."）
-                # 剥离出核心编号与标题，让超链接精准加在小节上，后面的补充说明作为普通正文追加
-                m_sub = re.match(r"^(\d+(?:\.\d+)+(?:\s+[^（\(\n:：，,\[【]+)?)(.*)$", part_strip)
-                if m_sub:
-                    core_title_raw, extra_note = m_sub.groups()
-                    core_title = core_title_raw.rstrip()
-                    trail_core = core_title_raw[len(core_title):]
-                    core_strip = core_title.strip()
-                    bm_core = expressions.find_bookmark_for_section(core_strip)
-                    if not bm_core:
-                        m_num = re.match(r"^(\d+(?:\.\d+)+)", core_strip)
-                        if m_num:
-                            bm_core = expressions.find_bookmark_for_section(m_num.group(1))
-                    if bm_core:
-                        if lead_space:
-                            append_plain(paragraph, lead_space)
-                        append_link(paragraph, core_title, bm_core)
-                        if trail_core or extra_note:
-                            append_plain(paragraph, trail_core + (extra_note or ""))
-                        if trail_space:
-                            append_plain(paragraph, trail_space)
-                        continue
-
-                # 3. 兜底尝试正则匹配其中的章节号如 "4.8.4"
-                m_num = re.search(r"(\d+(?:\.\d+)+)", part_strip)
-                if m_num:
-                    bm_num = expressions.find_bookmark_for_section(m_num.group(1))
-                    if bm_num:
-                        n_start = m_num.start(1)
-                        n_end = m_num.end(1)
-                        pre = part_strip[:n_start]
-                        num_str = part_strip[n_start:n_end]
-                        post = part_strip[n_end:]
-                        if lead_space or pre:
-                            append_plain(paragraph, lead_space + pre)
-                        append_link(paragraph, num_str, bm_num)
-                        if post or trail_space:
-                            append_plain(paragraph, post + trail_space)
-                        continue
-
-                append_plain(paragraph, part)
+            if pos < len(line_text):
+                render_plain_segment(parent, line_text[pos:])
         else:
-            m_sec = re.match(r"^(\s*)(\d+(?:\.\d+)+(?:\s+[^（\(\n:：，,\[【]+)?)(.*)$", line)
-            if m_sec:
-                lead_space, sec_raw, rest = m_sec.groups()
-                sec_text = sec_raw.rstrip()
-                trail_sec = sec_raw[len(sec_text):]
-                sec_strip = sec_text.strip()
-                bm = expressions.find_bookmark_for_section(sec_strip)
-                if not bm:
-                    m_num = re.match(r"^(\d+(?:\.\d+)+)", sec_strip)
-                    if m_num:
-                        bm = expressions.find_bookmark_for_section(m_num.group(1))
-                if bm:
-                    if lead_space:
-                        append_plain(paragraph, lead_space)
-                    append_link(paragraph, sec_text, bm)
-                    if trail_sec or rest:
-                        append_plain(paragraph, trail_sec + (rest or ""))
-                    continue
-            bm = expressions.find_bookmark_for_section(line.strip())
-            if bm:
-                lead_space = line[:len(line) - len(line.lstrip())]
-                trail_space = line[len(line.rstrip()):]
-                if lead_space:
-                    append_plain(paragraph, lead_space)
-                append_link(paragraph, line.strip(), bm)
-                if trail_space:
-                    append_plain(paragraph, trail_space)
-            else:
-                append_plain(paragraph, line)
+            render_plain_segment(parent, line_text)
+
+    raw_lines = str(text).splitlines()
+    line_idx = 0
+    for raw_line in raw_lines:
+        sub_lines = re.split(r"<br\s*/?>", raw_line, flags=re.IGNORECASE)
+        for sub_line in sub_lines:
+            if line_idx > 0:
+                br_run = etree.SubElement(paragraph, qn("r"))
+                etree.SubElement(br_run, qn("br"))
+            render_line(paragraph, sub_line)
+            line_idx += 1
 
 
 def _clone_revision_row(prototype, values, expressions=None):
@@ -1942,7 +2339,34 @@ def build(
         for line in markdown_lines:
             heading = re.match(r"^#{1,9}\s+(.+)$", line.strip())
             if heading:
-                expressions.register_bookmark(absolute + "#" + heading.group(1).strip())
+                h_text = re.sub(r"<br\s*/?>", "\n", heading.group(1).strip(), flags=re.IGNORECASE)
+                h_bm = expressions.register_bookmark(absolute + "#" + h_text)
+                slug_text = re.sub(r"\s+", "-", re.sub(r"[^\w\s一-鿿]+", "", h_text.lower(), flags=re.UNICODE)).strip("-")
+                if slug_text:
+                    slug_key = absolute + "#" + slug_text
+                    if slug_key not in expressions.bookmarks:
+                        expressions.bookmarks[slug_key] = h_bm
+                m_hnum = re.match(r"^(\d+(?:\.\d+)+)", h_text)
+                if m_hnum and hasattr(expressions, "section_number_map"):
+                    expressions.section_number_map.setdefault(m_hnum.group(1), h_bm)
+                    sub_title = h_text[m_hnum.end():].strip()
+                    if sub_title and hasattr(expressions, "section_title_map"):
+                        expressions.section_title_map.setdefault(sub_title, h_bm)
+                        expressions.section_title_map.setdefault(re.sub(r"\s+", "", sub_title), h_bm)
+                m_hchap = re.match(r"^第?\s*([0-9一二三四五六七八九十百]+)\s*[章节]", h_text)
+                if m_hchap and hasattr(expressions, "section_number_map"):
+                    ch_val = _chinese_to_int(m_hchap.group(1))
+                    if ch_val is not None:
+                        expressions.section_number_map.setdefault("第{0}章".format(ch_val), h_bm)
+                        expressions.section_number_map.setdefault(str(ch_val), h_bm)
+                m_single_ch = re.match(r"^(\d+)(?:\s+|$)", h_text)
+                if m_single_ch and hasattr(expressions, "section_number_map"):
+                    ch_val = int(m_single_ch.group(1))
+                    expressions.section_number_map.setdefault("第{0}章".format(ch_val), h_bm)
+                    expressions.section_number_map.setdefault(str(ch_val), h_bm)
+                if hasattr(expressions, "section_title_map"):
+                    expressions.section_title_map.setdefault(h_text, h_bm)
+                    expressions.section_title_map.setdefault(re.sub(r"\s+", "", h_text), h_bm)
 
     inserted = 0
     images = 0

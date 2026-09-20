@@ -682,6 +682,10 @@ class AutolinkRevisionRecordTest(unittest.TestCase):
         self.assertEqual(hyperlinks[0].get(qn("anchor")), "bm_ch16")
         self.assertEqual(hyperlinks[1].get(qn("anchor")), "bm_161")
 
+        # 验证超链接严格仅包含章节/小节编号，后随说明文字为普通文本
+        hl_texts = ["".join(t.text or "" for t in hl.iter(qn("t"))) for hl in hyperlinks]
+        self.assertEqual(hl_texts, ["第16章", "16.1"])
+
         # 验证显示文字不含原始 Markdown 标记
         t_nodes = p.iter(qn("t"))
         all_text = "".join(t.text or "" for t in t_nodes)
@@ -903,6 +907,726 @@ class AutolinkRevisionRecordTest(unittest.TestCase):
         hyperlinks = paragraphs[0].findall(qn("hyperlink"))
         self.assertEqual(len(hyperlinks), 1)
         self.assertEqual(hyperlinks[0].get(qn("anchor")), "bm_exact_frag")
+
+
+
+
+    def test_build_docx_links_only_section_number_in_summary(self):
+        """正式生成修订表时，仅为章节号与小节序号添加内部超链接，其余文本保持普通纯文本。"""
+        from lxml import etree
+        from build_docx import _set_revision_summary_cell, qn
+
+        class FakeExpressions:
+            def __init__(self):
+                self.section_number_map = {
+                    "第3章": "bm_ch3",
+                    "3.4": "bm_34",
+                    "第4章": "bm_ch4",
+                    "4.5.1": "bm_451",
+                    "4.5.1.1": "bm_4511",
+                }
+            def find_bookmark_for_section(self, token):
+                return self.section_number_map.get(token)
+
+        cell = etree.Element(qn("tc"))
+        text = "新增模块：第3章,3.4呼吸机同步时区第4章，4.5.1呼吸睡眠报告 -> 4.5.1.1 流程图"
+        _set_revision_summary_cell(cell, text, expressions=FakeExpressions())
+
+        p = cell.find(qn("p"))
+        hyperlinks = p.findall(qn("hyperlink"))
+        self.assertEqual(len(hyperlinks), 5)
+        self.assertEqual(hyperlinks[0].get(qn("anchor")), "bm_ch3")
+        self.assertEqual(hyperlinks[1].get(qn("anchor")), "bm_34")
+        self.assertEqual(hyperlinks[2].get(qn("anchor")), "bm_ch4")
+        self.assertEqual(hyperlinks[3].get(qn("anchor")), "bm_451")
+        self.assertEqual(hyperlinks[4].get(qn("anchor")), "bm_4511")
+
+        hl_texts = ["".join(t.text or "" for t in hl.iter(qn("t"))) for hl in hyperlinks]
+        self.assertEqual(hl_texts, ["第3章", "3.4", "第4章", "4.5.1", "4.5.1.1"])
+
+        all_text = "".join(t.text or "" for t in p.iter(qn("t")))
+        self.assertEqual(all_text, text)
+
+    def test_build_docx_chinese_chapter_number_matching(self):
+        """支持中文大写章节号（如 第三章、第八章）匹配对应章节书签。"""
+        from lxml import etree
+        from build_docx import ExpressionManager, _set_revision_summary_cell, qn
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        expr = ExpressionManager(items, rels_el, [])
+        expr.section_number_map["第3章"] = "bm_ch3"
+        expr.section_number_map["第8章"] = "bm_ch8"
+        expr.section_number_map["8.4"] = "bm_84"
+
+        cell = etree.Element(qn("tc"))
+        text = "第八章安全需求->8.4设备证书 第三章功能需求"
+        _set_revision_summary_cell(cell, text, expressions=expr)
+
+        p = cell.find(qn("p"))
+        hyperlinks = p.findall(qn("hyperlink"))
+        self.assertEqual(len(hyperlinks), 3)
+        self.assertEqual(hyperlinks[0].get(qn("anchor")), "bm_ch8")
+        self.assertEqual(hyperlinks[1].get(qn("anchor")), "bm_84")
+        self.assertEqual(hyperlinks[2].get(qn("anchor")), "bm_ch3")
+
+        hl_texts = ["".join(t.text or "" for t in hl.iter(qn("t"))) for hl in hyperlinks]
+        self.assertEqual(hl_texts, ["第八章", "8.4", "第三章"])
+
+    def test_find_bookmark_for_section_directory_stem_with_dot(self):
+        """目录名包含点号（如 3.4 呼吸机同步时区）时，find_bookmark_for_section 能精准匹配。"""
+        from lxml import etree
+        from build_docx import ExpressionManager
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        expr = ExpressionManager(items, rels_el, [])
+        key = "D:/content/design/第3章 设备端功能设计/3.4 呼吸机同步时区"
+        expr.wrap_bookmark(etree.Element("p"), key)
+
+        bm = expr.find_bookmark_for_section("3.4")
+        self.assertIsNotNone(bm)
+        self.assertTrue(bm.startswith("doc_"))
+
+    def test_find_bookmark_prefix_fallback_for_deep_section(self):
+        """深层未定义标题的编号（如 4.5.1.1.3）能安全降级定位至父级小节（4.5.1）。"""
+        from lxml import etree
+        from build_docx import ExpressionManager
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        expr = ExpressionManager(items, rels_el, [])
+        expr.section_number_map["4.5.1"] = "bm_parent_451"
+
+        bm = expr.find_bookmark_for_section("4.5.1.1.3")
+        self.assertEqual(bm, "bm_parent_451")
+
+    def test_find_bookmark_for_section_chinese_numerals_beyond_twenty(self):
+        """测试中文章节数字超过二十（如第二十一章、第三十章）与省略第字（如3章）能精准标准化匹配。"""
+        from lxml import etree
+        from build_docx import ExpressionManager
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        expr = ExpressionManager(items, rels_el, [])
+        expr.section_number_map["第21章"] = "bm_ch21"
+        expr.section_number_map["第30章"] = "bm_ch30"
+        expr.section_number_map["第3章"] = "bm_ch3"
+
+        self.assertEqual(expr.find_bookmark_for_section("第二十一章"), "bm_ch21")
+        self.assertEqual(expr.find_bookmark_for_section("第三十章"), "bm_ch30")
+        self.assertEqual(expr.find_bookmark_for_section("3章"), "bm_ch3")
+
+    def test_find_bookmark_for_section_directory_with_index_md(self):
+        """测试包含 _index.md 的父目录章节能通过标题与全称匹配到稳定书签。"""
+        from lxml import etree
+        from build_docx import ExpressionManager
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        expr = ExpressionManager(items, rels_el, [])
+        key = "D:/content/design/第3章 设备端功能设计/3.2 呼吸机治疗数据上传/_index.md"
+        expr.wrap_bookmark(etree.Element("p"), key)
+
+        bm = expr.find_bookmark_for_section("3.2 呼吸机治疗数据上传")
+        self.assertIsNotNone(bm)
+        self.assertTrue(bm.startswith("doc_"))
+
+    def test_build_docx_revision_summary_real_world_rows(self):
+        """针对真实生产文档修订摘要文本进行综合渲染测试，验证章节号匹配与内部书签跳转。"""
+        from lxml import etree
+        from build_docx import _set_revision_summary_cell, qn
+
+        class FakeExpressions:
+            def __init__(self):
+                self.section_number_map = {
+                    "第3章": "bm_ch3",
+                    "3.1": "bm_sec_31",
+                    "3.1.1": "bm_sec_311",
+                    "3.1.1.4": "bm_sec_3114",
+                    "3.2": "bm_sec_32",
+                    "3.4": "bm_sec_34",
+                    "第4章": "bm_ch4",
+                    "4.1.6.4": "bm_sec_4164",
+                    "4.1.13": "bm_sec_4113",
+                    "第8章": "bm_ch8",
+                    "8.4": "bm_sec_84",
+                    "第10章": "bm_ch10",
+                    "10.1": "bm_sec_101",
+                    "10.2": "bm_sec_102",
+                    "10.3": "bm_sec_103",
+                }
+            def find_bookmark_for_section(self, token):
+                if token == "第三章":
+                    return "bm_ch3"
+                if token == "第八章":
+                    return "bm_ch8"
+                return self.section_number_map.get(token)
+
+        expr = FakeExpressions()
+        cases = [
+            (
+                "新增模块：第3章 3.2 呼吸机治疗数据上传",
+                [("第3章", "bm_ch3"), ("3.2", "bm_sec_32")],
+            ),
+            (
+                "3.4 呼吸机同步时区",
+                [("3.4", "bm_sec_34")],
+            ),
+            (
+                "修改模块：第3章，3.1呼吸机结果集上传->更新各个模块内容新增模块：第10章，10.1结果集覆盖更新第10章，10.2数据补偿",
+                [
+                    ("第3章", "bm_ch3"),
+                    ("3.1", "bm_sec_31"),
+                    ("第10章", "bm_ch10"),
+                    ("10.1", "bm_sec_101"),
+                    ("第10章", "bm_ch10"),
+                    ("10.2", "bm_sec_102"),
+                ],
+            ),
+            (
+                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1KSOA -> 3.1.1登录页 -> 3.1.1.4布局",
+                [
+                    ("3.1", "bm_sec_31"),
+                    ("3.1.1", "bm_sec_311"),
+                    ("3.1.1.4", "bm_sec_3114"),
+                ],
+            ),
+            (
+                "第八章安全需求->8.4设备证书 第三章功能需求",
+                [
+                    ("第八章", "bm_ch8"),
+                    ("8.4", "bm_sec_84"),
+                    ("第三章", "bm_ch3"),
+                ],
+            ),
+            (
+                "第10章，10.3云平台显示兼容 -> 设置值超限值兼容。修改模块：第4章，4.1.6.4设备管理->修改批量分配核心逻辑",
+                [
+                    ("第10章", "bm_ch10"),
+                    ("10.3", "bm_sec_103"),
+                    ("第4章", "bm_ch4"),
+                    ("4.1.6.4", "bm_sec_4164"),
+                ],
+            ),
+        ]
+
+        for text, expected_links in cases:
+            cell = etree.Element(qn("tc"))
+            _set_revision_summary_cell(cell, text, expressions=expr)
+            p = cell.find(qn("p"))
+            hyperlinks = p.findall(qn("hyperlink"))
+            actual_links = [
+                ("".join(t.text or "" for t in hl.iter(qn("t"))), hl.get(qn("anchor")))
+                for hl in hyperlinks
+            ]
+            self.assertEqual(actual_links, expected_links, f"Failed for text: {text}")
+            all_text = "".join(t.text or "" for t in p.iter(qn("t")))
+            self.assertEqual(all_text, text, f"Text corrupted for: {text}")
+
+
+    def test_build_docx_revision_summary_with_real_expression_manager(self):
+        """使用真实的 ExpressionManager（注册包含完整标题的目录与文件条目）测试真实修订记录行，
+        确保即使存在同名完整标题，也精准只为章节号（如 3.4, 第3章）添加超链接，正文文字不被污染。"""
+        import re
+        from lxml import etree
+        from build_docx import ExpressionManager, _set_revision_summary_cell, qn
+        from docx_common import ChapterEntry
+
+        items = {"word/document.xml": b"<w:document/>"}
+        rels_el = etree.Element("Relationships")
+        entries = [
+            (ChapterEntry("dir", (3,), "设备端功能设计", "D:/content/第3章 设备端功能设计", 1), None),
+            (ChapterEntry("file", (3, 1), "呼吸机结果集上传", "D:/content/第3章 设备端功能设计/3.1 呼吸机结果集上传.md", 2), "D:/content/第3章 设备端功能设计/3.1 呼吸机结果集上传.md"),
+            (ChapterEntry("file", (3, 1, 1), "设备管理", "D:/content/第3章 设备端功能设计/3.1.1 设备管理.md", 3), "D:/content/第3章 设备端功能设计/3.1.1 设备管理.md"),
+            (ChapterEntry("file", (3, 1, 1, 4), "布局", "D:/content/第3章 设备端功能设计/3.1.1.4 布局.md", 4), "D:/content/第3章 设备端功能设计/3.1.1.4 布局.md"),
+            (ChapterEntry("file", (3, 2), "呼吸机治疗数据上传", "D:/content/第3章 设备端功能设计/3.2 呼吸机治疗数据上传.md", 2), "D:/content/第3章 设备端功能设计/3.2 呼吸机治疗数据上传.md"),
+            (ChapterEntry("file", (3, 4), "呼吸机同步时区", "D:/content/第3章 设备端功能设计/3.4 呼吸机同步时区.md", 2), "D:/content/第3章 设备端功能设计/3.4 呼吸机同步时区.md"),
+            (ChapterEntry("dir", (4,), "WEB端功能设计", "D:/content/第4章 WEB端功能设计", 1), None),
+            (ChapterEntry("file", (4, 1, 6, 4), "设备管理", "D:/content/第4章 WEB端功能设计/4.1.6.4 设备管理.md", 4), "D:/content/第4章 WEB端功能设计/4.1.6.4 设备管理.md"),
+            (ChapterEntry("dir", (8,), "安全需求", "D:/content/第8章 安全需求", 1), None),
+            (ChapterEntry("file", (8, 4), "设备证书", "D:/content/第8章 安全需求/8.4 设备证书.md", 2), "D:/content/第8章 安全需求/8.4 设备证书.md"),
+            (ChapterEntry("dir", (10,), "兼容设计", "D:/content/第10章 兼容设计", 1), None),
+            (ChapterEntry("file", (10, 1), "结果集覆盖更新", "D:/content/第10章 兼容设计/10.1 结果集覆盖更新.md", 2), "D:/content/第10章 兼容设计/10.1 结果集覆盖更新.md"),
+            (ChapterEntry("file", (10, 2), "数据补偿", "D:/content/第10章 兼容设计/10.2 数据补偿.md", 2), "D:/content/第10章 兼容设计/10.2 数据补偿.md"),
+            (ChapterEntry("file", (10, 3), "云平台显示兼容", "D:/content/第10章 兼容设计/10.3 云平台显示兼容.md", 2), "D:/content/第10章 兼容设计/10.3 云平台显示兼容.md"),
+        ]
+        expr = ExpressionManager(items, rels_el, entries)
+
+        # 验证章标题自动注册到 section_title_map
+        self.assertIn("第3章 设备端功能设计", expr.section_title_map)
+        self.assertIn("第3章设备端功能设计", expr.section_title_map)
+
+        cases = [
+            (
+                "新增模块：第3章 3.2 呼吸机治疗数据上传",
+                [
+                    ("第3章", expr.find_bookmark_for_section("第3章")),
+                    ("3.2", expr.find_bookmark_for_section("3.2")),
+                ],
+            ),
+            (
+                "3.4 呼吸机同步时区",
+                [("3.4", expr.find_bookmark_for_section("3.4"))],
+            ),
+            (
+                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1KSOA -> 3.1.1登录页 -> 3.1.1.4布局",
+                [
+                    ("3.1", expr.find_bookmark_for_section("3.1")),
+                    ("3.1.1", expr.find_bookmark_for_section("3.1.1")),
+                    ("3.1.1.4", expr.find_bookmark_for_section("3.1.1.4")),
+                ],
+            ),
+            (
+                "第八章安全需求->8.4设备证书 第三章功能需求",
+                [
+                    ("第八章", expr.find_bookmark_for_section("第八章")),
+                    ("8.4", expr.find_bookmark_for_section("8.4")),
+                    ("第三章", expr.find_bookmark_for_section("第三章")),
+                ],
+            ),
+            (
+                "更新：[3.4 呼吸机同步时区](D:/content/第3章%20设备端功能设计/3.4%20呼吸机同步时区.md)（新协议）",
+                [("3.4", expr.find_bookmark_for_section("3.4"))],
+            ),
+            (
+                "新增模块：[第3章 设备端功能设计](D:/content/第3章%20设备端功能设计) -> [3.2 呼吸机治疗数据上传](D:/content/第3章%20设备端功能设计/3.2%20呼吸机治疗数据上传.md)",
+                [
+                    ("第3章", expr.find_bookmark_for_section("第3章")),
+                    ("3.2", expr.find_bookmark_for_section("3.2")),
+                ],
+            ),
+        ]
+
+        for text, expected_links in cases:
+            cell = etree.Element(qn("tc"))
+            _set_revision_summary_cell(cell, text, expressions=expr)
+            p = cell.find(qn("p"))
+            hyperlinks = p.findall(qn("hyperlink"))
+            actual_links = [
+                ("".join(t.text or "" for t in hl.iter(qn("t"))), hl.get(qn("anchor")))
+                for hl in hyperlinks
+            ]
+            self.assertEqual(actual_links, expected_links, f"Failed for text: {text}")
+            all_text = "".join(t.text or "" for t in p.iter(qn("t")))
+            expected_text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+            self.assertEqual(all_text, expected_text, f"Text corrupted for: {text}")
+
+
+    def test_build_docx_markdown_links_prioritize_section_over_file(self):
+        """Markdown 链接优先按章节号查找锚点，严格仅为序号加超链接，避免链接到外部文件或污染文字。"""
+        from lxml import etree
+        from build_docx import _set_revision_summary_cell, qn
+
+        class FakeExpressions:
+            def __init__(self):
+                self.bookmarks = {
+                    "D:/repo/content/03_requirements.md": "bm_file_req",
+                    "D:/repo/content/16.1 验证码服务.md": "bm_file_161",
+                }
+                self.section_number_map = {
+                    "3.4": "bm_sec_34",
+                    "16.1": "bm_sec_161",
+                    "第3章": "bm_ch_3",
+                }
+            def find_bookmark_for_section(self, token):
+                return self.section_number_map.get(token)
+
+        expr = FakeExpressions()
+
+        # 场景 1：目标为 .md 文件路径（无 #），但 label 含有小节编号 3.4，优先匹配 3.4 章节书签且仅链接 3.4
+        cell1 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell1, "[3.4 呼吸机同步时区](03_requirements.md)", expressions=expr)
+        p1 = cell1.find(qn("p"))
+        hls1 = p1.findall(qn("hyperlink"))
+        self.assertEqual(len(hls1), 1)
+        self.assertEqual(hls1[0].get(qn("anchor")), "bm_sec_34")
+        self.assertEqual("".join(hls1[0].itertext()), "3.4")
+        self.assertEqual("".join(p1.itertext()), "3.4 呼吸机同步时区")
+
+        # 场景 2：外部 HTTP 链接中含有 3.4 编号，依然匹配内部 3.4 书签跳转，不产生外部文件链接
+        cell2 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell2, "[3.4 呼吸机同步时区](https://example.com/spec.md)", expressions=expr)
+        p2 = cell2.find(qn("p"))
+        hls2 = p2.findall(qn("hyperlink"))
+        self.assertEqual(len(hls2), 1)
+        self.assertEqual(hls2[0].get(qn("anchor")), "bm_sec_34")
+        self.assertEqual("".join(hls2[0].itertext()), "3.4")
+        self.assertEqual("".join(p2.itertext()), "3.4 呼吸机同步时区")
+
+        # 场景 3：外部链接无任何章节序号，不生成超链接，降级为普通正文
+        cell3 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell3, "[外部参考规范](https://example.com/spec.md)", expressions=expr)
+        p3 = cell3.find(qn("p"))
+        self.assertEqual(len(p3.findall(qn("hyperlink"))), 0)
+        self.assertEqual("".join(p3.itertext()), "外部参考规范")
+
+        # 场景 4：一行内包含多个 Markdown 链接，验证章与节均仅链接各自序号
+        cell4 = etree.Element(qn("tc"))
+        text4 = "新增：[第3章 设备端设计](03.md) -> [3.4 呼吸机同步时区](3.4.md)"
+        _set_revision_summary_cell(cell4, text4, expressions=expr)
+        p4 = cell4.find(qn("p"))
+        hls4 = p4.findall(qn("hyperlink"))
+        self.assertEqual(len(hls4), 2)
+        self.assertEqual(hls4[0].get(qn("anchor")), "bm_ch_3")
+        self.assertEqual("".join(hls4[0].itertext()), "第3章")
+        self.assertEqual(hls4[1].get(qn("anchor")), "bm_sec_34")
+        self.assertEqual("".join(hls4[1].itertext()), "3.4")
+        self.assertEqual("".join(p4.itertext()), "新增：第3章 设备端设计 -> 3.4 呼吸机同步时区")
+
+
+
+    def test_find_bookmark_for_section_variants_and_punctuation(self):
+        """测试书签查找支持括号变体、末尾标点、X.0 降级、繁体大写中文数字。"""
+        from build_docx import ExpressionManager
+        from docx_common import ChapterEntry
+        from lxml import etree
+        import build_docx as bdocx
+
+        items = {}
+        rels_el = etree.Element(bdocx.RP_NS + "Relationships")
+        entries = [
+            (ChapterEntry("dir", (1,), "项目概述", "D:/content/01_overview", 1), "D:/content/01_overview/_index.md"),
+            (ChapterEntry("dir", (3,), "设备端功能设计", "D:/content/第3章 设备端功能设计", 1), None),
+            (ChapterEntry("file", (3, 4), "呼吸机同步时区", "D:/content/第3章 设备端功能设计/3.4 呼吸机同步时区.md", 2), "D:/content/第3章 设备端功能设计/3.4 呼吸机同步时区.md"),
+            (ChapterEntry("dir", (10,), "兼容设计", "D:/content/第10章 兼容设计", 1), None),
+        ]
+        expr = ExpressionManager(items, rels_el, entries)
+        bm_34 = expr.section_number_map["3.4"]
+        bm_ch3 = expr.section_number_map["第3章"]
+        bm_ch1 = expr.section_number_map["第1章"]
+        bm_ch10 = expr.section_number_map["第10章"]
+
+        # 变体测试：(3.4)、（3.4）、[3.4]、3.4.、3.4:
+        self.assertEqual(expr.find_bookmark_for_section("(3.4)"), bm_34)
+        self.assertEqual(expr.find_bookmark_for_section("（3.4）"), bm_34)
+        self.assertEqual(expr.find_bookmark_for_section("[3.4]"), bm_34)
+        self.assertEqual(expr.find_bookmark_for_section("【3.4】"), bm_34)
+        self.assertEqual(expr.find_bookmark_for_section("3.4."), bm_34)
+        self.assertEqual(expr.find_bookmark_for_section("3.4:"), bm_34)
+
+        # 章变体测试：第 3 章、第三章、第3、第3节、第三节、三、拾
+        self.assertEqual(expr.find_bookmark_for_section("第 3 章"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("第三章"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("第3节"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("第3"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("三"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("叁"), bm_ch3)
+        self.assertEqual(expr.find_bookmark_for_section("第十章"), bm_ch10)
+        self.assertEqual(expr.find_bookmark_for_section("拾"), bm_ch10)
+
+        # X.0 降级至第 X 章
+        self.assertEqual(expr.find_bookmark_for_section("1.0"), bm_ch1)
+        self.assertEqual(expr.find_bookmark_for_section("3.0"), bm_ch3)
+
+    def test_directory_chapter_with_and_without_index_md_bookmarks(self):
+        """测试目录型章节不论是否有 _index.md 均能双向命中目录路径和文件路径。"""
+        from build_docx import ExpressionManager
+        from docx_common import ChapterEntry
+        from lxml import etree
+        import build_docx as bdocx
+
+        items = {}
+        rels_el = etree.Element(bdocx.RP_NS + "Relationships")
+        entries = [
+            (ChapterEntry("dir", (1,), "项目概述", "D:/content/01_overview", 1), "D:/content/01_overview/_index.md"),
+            (ChapterEntry("dir", (2,), "无索引目录", "D:/content/02_noindex", 1), None),
+        ]
+        expr = ExpressionManager(items, rels_el, entries)
+        bm_ch1 = expr.section_number_map["第1章"]
+        bm_ch2 = expr.section_number_map["第2章"]
+
+        # 有 _index.md：目录路径与 _index.md 均映射到同一书签
+        self.assertIn(os.path.abspath("D:/content/01_overview"), expr.bookmarks)
+        self.assertIn(os.path.abspath("D:/content/01_overview/_index.md"), expr.bookmarks)
+        self.assertEqual(expr.bookmarks[os.path.abspath("D:/content/01_overview")], bm_ch1)
+        self.assertEqual(expr.bookmarks[os.path.abspath("D:/content/01_overview/_index.md")], bm_ch1)
+
+        # 无 _index.md：目录路径直接注册书签
+        self.assertIn(os.path.abspath("D:/content/02_noindex"), expr.bookmarks)
+        self.assertEqual(expr.bookmarks[os.path.abspath("D:/content/02_noindex")], bm_ch2)
+
+    def test_section_catalog_internal_headings_indexing(self):
+        """测试 SectionCatalog 扫描 markdown 内部通过 ## 3.4.1 定义的小节标题。"""
+        from doc_tool.application.content.revision_record import SectionCatalog
+        import tempfile
+        import shutil
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            ch_dir = Path(temp_dir) / "第3章 设备端功能设计"
+            ch_dir.mkdir(parents=True)
+            doc_file = ch_dir / "3.2 设备控制.md"
+            doc_file.write_text(
+                "# 3.2 设备控制\n\n### 3.2.1 蓝牙配对\n\n逻辑说明\n\n### 3.2.2 协议交互\n\n协议说明\n",
+                encoding="utf-8"
+            )
+
+            cat = SectionCatalog(temp_dir)
+            self.assertIn("3.2", cat.num_map)
+            self.assertIn("3.2.1", cat.num_map)
+            self.assertIn("3.2.2", cat.num_map)
+            self.assertIn("#", cat.num_map["3.2.1"])
+            self.assertIn("#", cat.num_map["3.2.2"])
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_end_to_end_docx_generation_with_revision_hyperlinks(self):
+        """端到端真机测试：构建实际 DOCX 压缩包，校验 document.xml 中修订表所有的 w:anchor 100% 存在且均为纯序号。"""
+        import tempfile
+        import shutil
+        import zipfile
+        import re
+        import build_docx as bdocx
+        from build_docx import qn
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        template_path = str(repo_root / "templates" / "requirement-template.docx")
+        if not os.path.isfile(template_path):
+            self.skipTest("未找到 requirement-template.docx 模板文件")
+
+        temp_dir = tempfile.mkdtemp(prefix="docx_audit_test_")
+        try:
+            content_dir = os.path.join(temp_dir, "content")
+            output_docx = os.path.join(temp_dir, "output.docx")
+            os.makedirs(content_dir)
+
+            # 构造完整合规的章节树
+            ch1_dir = os.path.join(content_dir, "第1章 项目概述")
+            os.makedirs(ch1_dir)
+            with open(os.path.join(ch1_dir, "_index.md"), "w", encoding="utf-8") as f:
+                f.write("系统项目概述。\n")
+
+            ch2_dir = os.path.join(content_dir, "第2章 架构设计")
+            os.makedirs(ch2_dir)
+            with open(os.path.join(ch2_dir, "2.1 整体架构.md"), "w", encoding="utf-8") as f:
+                f.write("系统整体架构。\n")
+
+            ch3_dir = os.path.join(content_dir, "第3章 设备端功能设计")
+            os.makedirs(ch3_dir)
+            with open(os.path.join(ch3_dir, "_index.md"), "w", encoding="utf-8") as f:
+                f.write("设备端功能总述。\n")
+            with open(os.path.join(ch3_dir, "3.1 呼吸机治疗数据上传.md"), "w", encoding="utf-8") as f:
+                f.write("呼吸机治疗数据上传。\n")
+            with open(os.path.join(ch3_dir, "3.2 设备控制.md"), "w", encoding="utf-8") as f:
+                f.write("设备控制。\n\n### 3.2.1 蓝牙配对\n\n配对说明。\n\n### 3.2.2 协议交互\n\n交互说明。\n")
+            with open(os.path.join(ch3_dir, "3.3 结果集更新.md"), "w", encoding="utf-8") as f:
+                f.write("结果集更新。\n")
+            with open(os.path.join(ch3_dir, "3.4 呼吸机同步时区.md"), "w", encoding="utf-8") as f:
+                f.write("时区同步。\n")
+
+            ch4_dir = os.path.join(content_dir, "第4章 WEB端功能设计", "4.1 设备中心", "4.1.1 设备配置")
+            os.makedirs(ch4_dir)
+            with open(os.path.join(ch4_dir, "4.1.1.1 设备管理.md"), "w", encoding="utf-8") as f:
+                f.write("设备管理。\n")
+
+            ch5_dir = os.path.join(content_dir, "第5章 兼容设计")
+            os.makedirs(ch5_dir)
+            with open(os.path.join(ch5_dir, "5.1 结果集覆盖更新.md"), "w", encoding="utf-8") as f:
+                f.write("结果集覆盖更新。\n")
+
+            ch6_dir = os.path.join(content_dir, "第6章 RespGo移动端设计")
+            os.makedirs(ch6_dir)
+            with open(os.path.join(ch6_dir, "6.1 验证码服务.md"), "w", encoding="utf-8") as f:
+                f.write("验证码服务。\n")
+
+            rev_md = os.path.join(content_dir, "_revision_record.md")
+            with open(rev_md, "w", encoding="utf-8") as f:
+                f.write("""# 修订记录
+
+| 版本 | 修改摘要 | 修改时间 | 修改人 |
+|------|----------|----------|--------|
+| 1.0 | 首次创建 | 2026-01-01 | 张三 |
+| 1.1 | 新增模块：第3章 3.2 设备控制，包含3.2.1 蓝牙配对 | 2026-02-01 | 李四 |
+| 1.2 | 更新：[3.4 呼吸机同步时区](第3章%20设备端功能设计/3.4%20呼吸机同步时区.md) | 2026-03-01 | 王五 |
+| 1.3 | 新增小节：3.4. 呼吸机同步时区 及 (5.1) 结果集更新 | 2026-04-01 | 赵六 |
+| 1.4 | 优化：第三章 设备端功能设计 -> [3.1 呼吸机治疗数据上传](第3章%20设备端功能设计/3.1%20呼吸机治疗数据上传.md) | 2026-05-01 | 钱七 |
+| 1.5 | 重构：第 4 章 WEB端功能设计 -> 4.1.1.1 设备管理 | 2026-06-01 | 孙八 |
+| 1.6 | 更新：第6章 RespGo移动端设计（6.1 验证码服务） | 2026-07-01 | 周九 |
+| 1.7 | 新增章节：1.0 项目概述 架构总览 | 2026-08-01 | 孙八 |
+| 1.8 | 修复：[3.2.1 蓝牙配对](第3章%20设备端功能设计/3.2%20设备控制.md#321-蓝牙配对) 协议交互修复 | 2026-08-15 | 周九 |
+| 1.9 | 参考：第3节 设备端功能设计 | 2026-09-01 | 钱七 |
+| 2.0 | 更新：[1 项目概述](第1章%20项目概述/_index.md) 补充说明 | 2026-09-10 | 张三 |
+| 2.1 | 变体：1 项目概述 前言调整 | 2026-09-18 | 李四 |
+""")
+
+            config = {
+                "documentType": "audit_e2e_test",
+                "documentNo": "DOC-TEST-001",
+                "documentName": "全链路测试说明书",
+                "documentVersion": "1.6",
+                "template": {"file": template_path},
+                "contentRoot": {"path": content_dir},
+                "headingStyles": {1: "2", 2: "3", 3: "5", 4: "6", 5: "7", 6: "8"},
+                "bodyStyle": "4",
+                "paths": {
+                    "template": template_path,
+                    "content_root": content_dir,
+                    "revision_record": rev_md,
+                    "asset_root": os.path.join(temp_dir, "assets"),
+                    "table_root": os.path.join(temp_dir, "tables"),
+                },
+            }
+            os.makedirs(config["paths"]["asset_root"], exist_ok=True)
+            os.makedirs(config["paths"]["table_root"], exist_ok=True)
+
+            bdocx.build(output_override=output_docx, config=config)
+            self.assertTrue(os.path.isfile(output_docx))
+
+            with zipfile.ZipFile(output_docx, "r") as zf:
+                doc_xml = zf.read("word/document.xml")
+            from lxml import etree
+            doc_tree = etree.fromstring(doc_xml)
+
+            all_bookmarks = {}
+            for p in doc_tree.iter(qn("p")):
+                p_text = "".join(p.itertext())
+                for bm_start in p.findall(qn("bookmarkStart")):
+                    bm_name = bm_start.get(qn("name"))
+                    all_bookmarks[bm_name] = (p, p_text)
+
+            body = doc_tree.find(qn("body"))
+            rev_tbl = bdocx._find_revision_record_table(body)
+            self.assertIsNotNone(rev_tbl)
+
+            rows = rev_tbl.findall(qn("tr"))
+            data_rows = rows[2:]
+            total_links = 0
+            num_pattern = re.compile(r"^(第\s*[0-9一二三四五六七八九十百]+\s*[章节]|第?\s*[0-9一二三四五六七八九十百]+\s*章|\d+(?:\.\d+)+|\d+)$")
+            for r_idx, row in enumerate(data_rows):
+                cells = row.findall(qn("tc"))
+                summary_cell = cells[1]
+                summary_p = summary_cell.find(qn("p"))
+                hyperlinks = summary_p.findall(qn("hyperlink"))
+                for hl in hyperlinks:
+                    anchor = hl.get(qn("anchor"))
+                    link_text = "".join(hl.itertext())
+                    total_links += 1
+
+                    # 1. 每一个 w:anchor 都有 100% 对应的 bookmarkStart
+                    self.assertIn(anchor, all_bookmarks, f"锚点 {anchor} 在 document.xml 中不存在")
+
+                    # 2. 超链接文字严格仅为序号
+                    self.assertTrue(bool(num_pattern.match(link_text.strip())), f"链接文字不是纯序号: {link_text}")
+
+                    # 3. 书签段落为标题段落
+                    target_p, _ = all_bookmarks[anchor]
+                    pPr = target_p.find(qn("pPr"))
+                    pStyle = pPr.find(qn("pStyle")).get(qn("val")) if pPr is not None and pPr.find(qn("pStyle")) is not None else "None"
+                    self.assertIn(pStyle, ["2", "3", "5", "6", "7", "8"])
+
+            self.assertGreaterEqual(total_links, 17)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+class SectionCatalogEnhanceTest(unittest.TestCase):
+    """测试 SectionCatalog 与 link_revision_summary 对阿拉伯数字目录、中文大写章节、前缀降级与变体的支持。"""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tmp, "1 概述"))
+        with open(os.path.join(self.tmp, "1 概述", "_index.md"), "w", encoding="utf-8") as f:
+            f.write("概述说明。\n")
+        os.makedirs(os.path.join(self.tmp, "2 系统架构"))
+        with open(os.path.join(self.tmp, "2 系统架构", "2.1 模块划分.md"), "w", encoding="utf-8") as f:
+            f.write("模块说明。\n")
+        os.makedirs(os.path.join(self.tmp, "第三章 详细设计"))
+        with open(os.path.join(self.tmp, "第三章 详细设计", "3.4 设备管理.md"), "w", encoding="utf-8") as f:
+            f.write("设备说明。\n")
+        from doc_tool.application.content.revision_record import SectionCatalog
+        self.cat = SectionCatalog(Path(self.tmp))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_top_level_arabic_chapter_catalog(self):
+        self.assertIn("第1章", self.cat.chap_map)
+        self.assertIn("1", self.cat.chap_map)
+        from doc_tool.application.content.revision_record import link_revision_summary
+        res = link_revision_summary("第1章 概述 补充说明", self.cat)
+        self.assertIn("[第1章 概述](1%20概述/_index.md)", res)
+
+    def test_chinese_numeral_chapter_catalog(self):
+        self.assertIn("第3章", self.cat.chap_map)
+        self.assertIn("3", self.cat.chap_map)
+        from doc_tool.application.content.revision_record import link_revision_summary
+        res = link_revision_summary("第三章 详细设计 补充接口", self.cat)
+        self.assertIn("[第三章 详细设计](第三章%20详细设计/)", res)
+
+    def test_x_dot_zero_fallback(self):
+        entry, val = self.cat.find_num_entry("1.0")
+        self.assertEqual(entry, "1")
+
+    def test_deep_prefix_fallback_to_chapter(self):
+        entry, val = self.cat.find_num_entry("2.5.1")
+        self.assertEqual(entry, "2")
+
+
+    def test_section_variant_and_arabic_numeral_linking(self):
+        """测试 第3节、单数字章节（1 概述、[1 概述]）与纯数字序号超链接。"""
+        from doc_tool.application.content.revision_record import link_revision_summary
+        res_sec = link_revision_summary("参考第3节 界面设计相关规范", self.cat)
+        # 支持 [章节] 变体
+        self.assertIn("[第3节", res_sec)
+
+    def test_build_docx_renders_arabic_chapter_and_clean_number_links(self):
+        """Word 构建侧验证：单数字章节、带点、带括号变体均严格仅链接序号。"""
+        from lxml import etree
+        from build_docx import _set_revision_summary_cell, qn, ExpressionManager
+
+        class MockExpr:
+            def __init__(self):
+                self.section_number_map = {
+                    "1": "bm_ch1",
+                    "第1章": "bm_ch1",
+                    "3": "bm_ch3",
+                    "第3章": "bm_ch3",
+                    "3.4": "bm_34",
+                }
+                self.section_title_map = {
+                    "1 概述": "bm_ch1",
+                    "概述": "bm_ch1",
+                    "3 详细设计": "bm_ch3",
+                    "详细设计": "bm_ch3",
+                    "3.4 呼吸机同步时区": "bm_34",
+                    "呼吸机同步时区": "bm_34",
+                }
+                self.bookmarks = {
+                    "D:/repo/01 概述/_index.md": "bm_ch1",
+                    "D:/repo/03 详细设计/3.4 呼吸机同步时区.md": "bm_34",
+                }
+            def find_bookmark_for_section(self, tok):
+                em = ExpressionManager.__new__(ExpressionManager)
+                em.bookmarks = self.bookmarks
+                em.section_number_map = self.section_number_map
+                em.section_title_map = self.section_title_map
+                return em.find_bookmark_for_section(tok)
+
+        expr = MockExpr()
+        # 1. 单数字章节 Markdown 链接：严格仅链接序号 "1"
+        cell1 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell1, "[1 概述](01%20概述/_index.md) 补充背景说明", expressions=expr)
+        hls1 = cell1.findall(".//" + qn("hyperlink"))
+        self.assertEqual(len(hls1), 1)
+        self.assertEqual("".join(hls1[0].itertext()), "1")
+        self.assertEqual(hls1[0].get(qn("anchor")), "bm_ch1")
+
+        # 2. 单数字章节纯文本：严格仅链接序号 "1"
+        cell2 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell2, "1 概述 补充背景说明", expressions=expr)
+        hls2 = cell2.findall(".//" + qn("hyperlink"))
+        self.assertEqual(len(hls2), 1)
+        self.assertEqual("".join(hls2[0].itertext()), "1")
+        self.assertEqual(hls2[0].get(qn("anchor")), "bm_ch1")
+
+        # 3. 常见非章节数字（如 "修改了 5 个页面"）：不产生误报链接
+        cell3 = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell3, "修改了 5 个页面，2026年9月发布", expressions=expr)
+        hls3 = cell3.findall(".//" + qn("hyperlink"))
+        self.assertEqual(len(hls3), 0)
 
 
 if __name__ == "__main__":

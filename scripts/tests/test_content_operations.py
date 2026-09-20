@@ -2991,6 +2991,82 @@ class PreviewCodeHighlightTests(unittest.TestCase):
         self.assertIn('<pre class="code-block language-bash"><a name="line-5"></a>', html_out)
 
 
+
+class WorkspaceBaselineFallbackTests(unittest.TestCase):
+    """测试工作区基线兜底与空工程冷启动行为。"""
+
+    def setUp(self):
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.project_root = Path(self.temp_dir.name)
+        self.content_root = self.project_root / "content"
+        self.content_root.mkdir(parents=True, exist_ok=True)
+        self.state_dir = self.project_root / ".state"
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_empty_project_adding_first_file_detected_as_added(self):
+        from doc_tool.ui.content.workspace import ContentWorkspace
+        from doc_tool.application.content.index import ContentIndexService
+
+        ws = ContentWorkspace(self.content_root, state_dir=self.state_dir)
+        ws._index = ContentIndexService(self.content_root).build()
+        self.assertTrue(ws._snapshot.has_baseline)
+        self.assertEqual(ws._tree._model._status, {})
+
+        # 在空项目中添加第一个文件，徽标必须为 added，不得被误吞为新基线
+        (self.content_root / "first_doc.md").write_text("# First Doc\n", encoding="utf-8")
+        ws._rebuild_index()
+
+        self.assertEqual(ws._tree._model._status.get("first_doc.md"), "added")
+        self.assertNotIn("first_doc.md", ws._snapshot.entries)
+
+    def test_snapshot_take_with_none_defaults_to_discovered_files(self):
+        from doc_tool.application.content.snapshot import ContentSnapshot
+
+        (self.content_root / "sample.md").write_text("# Sample\n", encoding="utf-8")
+        snap = ContentSnapshot(self.state_dir)
+        # None 不得抛出 TypeError，应自动发现现有文件
+        snap.take(self.content_root, None)
+        self.assertTrue(snap.has_baseline)
+        self.assertIn("sample.md", snap.entries)
+
+    def test_changes_panel_set_baseline_resets_snapshot(self):
+        from unittest.mock import patch, MagicMock
+        from PySide6.QtWidgets import QMessageBox
+        from doc_tool.application.content.writer import ContentWriter
+        from doc_tool.application.content.snapshot import ContentSnapshot
+        from doc_tool.ui.content.changes_panel import ChangesPanel
+
+        (self.content_root / "doc.md").write_text("# Doc\n", encoding="utf-8")
+        writer = ContentWriter(self.content_root, self.state_dir)
+        snap = ContentSnapshot(self.state_dir)
+        snap.take(self.content_root, ["doc.md"])
+        snap.save()
+
+        mock_cb = MagicMock()
+        panel = ChangesPanel(
+            content_root=self.content_root,
+            writer=writer,
+            snapshot=snap,
+            on_set_baseline=mock_cb,
+        )
+
+        with patch("doc_tool.ui.content.changes_panel.run_async_operation") as mock_async, \
+             patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            panel._on_set_baseline_clicked()
+            args, kwargs = mock_async.call_args
+            task_fn = args[1]
+            task_fn()
+            on_success = kwargs.get("on_success")
+            if on_success:
+                on_success(None)
+
+        self.assertTrue(mock_cb.called)
+        self.assertIn("doc.md", panel._snapshot.entries)
+
+
 if __name__ == "__main__":
     unittest.main()
 

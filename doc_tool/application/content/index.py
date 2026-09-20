@@ -97,6 +97,9 @@ class ContentIndexService:
         for base in roots:
             for suffix in MD_SUFFIXES:
                 for file_path in base.rglob("*" + suffix):
+                    rel_parts = file_path.relative_to(base).parts[:-1]
+                    if any(p.startswith(".") or p in ("node_modules", "output", "logs") for p in rel_parts):
+                        continue
                     rel = file_path.relative_to(self._content_root).as_posix()
                     result.append((rel, file_path))
         result.sort(key=lambda item: item[0])

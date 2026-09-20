@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import posixpath
 import re
+import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -354,8 +355,9 @@ class ReferenceScanner:
 
     def _anchor_exists(self, rel_path: str, anchor: str) -> bool:
         """锚点目标是否存在于某文件的标题清单。"""
-        slug = slugify_heading(anchor)
-        raw = anchor.strip()
+        unquoted = urllib.parse.unquote(anchor).strip()
+        slug = slugify_heading(unquoted)
+        raw = unquoted
         for anchor_id, text in self._anchors.get(rel_path, []):
             if (
                 anchor_id == slug

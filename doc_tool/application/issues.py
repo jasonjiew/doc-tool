@@ -250,7 +250,7 @@ def issues_from_lint(
     generated = generated_at or utc_now()
     records: List[IssueRecord] = []
     for issue in issues:
-        rule = str(getattr(issue, "rule", "lint") or "lint")
+        rule = str(getattr(issue, "rule_id", "") or getattr(issue, "rule", "lint") or "lint")
         rel_path = str(getattr(issue, "rel_path", "") or "")
         inferred_type = document_type
         if not inferred_type:
@@ -272,16 +272,55 @@ def issues_from_lint(
 
 
 def filter_issues(
-    issues: Iterable[IssueRecord], *, issue_type: str = "", document_type: str = "",
-    severity: str = "", rel_path: str = ""
+    issues: Iterable[IssueRecord],
+    *,
+    issue_type: str = "",
+    document_type: str = "",
+    severity: str = "",
+    rel_path: str = "",
+    keyword: str = "",
 ) -> List[IssueRecord]:
-    return [
-        issue for issue in issues
-        if (not issue_type or issue.issue_type == issue_type)
-        and (not document_type or issue.document_type == document_type)
-        and (not severity or issue.severity == severity)
-        and (not rel_path or issue.rel_path == rel_path)
-    ]
+    kw = (keyword or "").strip().lower()
+    words = kw.split() if kw else []
+
+    from doc_tool.application.content.lint import (
+        RULE_CATEGORIES,
+        RULE_LABELS,
+        SEVERITY_LABELS,
+    )
+
+    result = []
+    for issue in issues:
+        if issue_type and issue.issue_type != issue_type:
+            continue
+        if document_type and issue.document_type != document_type:
+            continue
+        if severity and issue.severity != severity:
+            continue
+        if rel_path and issue.rel_path != rel_path:
+            continue
+        if words:
+            rule_label = RULE_LABELS.get(issue.issue_type, issue.issue_type)
+            cat_name = RULE_CATEGORIES.get(issue.issue_type, "")
+            sev_label = SEVERITY_LABELS.get(issue.severity, "")
+            haystack = " ".join([
+                issue.rel_path,
+                "" if issue.line_no is None else str(issue.line_no),
+                issue.message,
+                issue.error_code or "",
+                issue.issue_type,
+                rule_label,
+                cat_name,
+                issue.suggested_action,
+                issue.document_type,
+                issue.severity,
+                sev_label,
+                issue.source,
+            ]).lower()
+            if not all(w in haystack for w in words):
+                continue
+        result.append(issue)
+    return result
 
 
 def severity_summary(issues: Iterable[IssueRecord]) -> dict:

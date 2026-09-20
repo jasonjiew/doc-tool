@@ -1114,7 +1114,7 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertEqual(len(hyperlinks), 1)
         self.assertEqual(hyperlinks[0].get(qn("anchor")), "_bm_sec_4_8_4")
         link_text = "".join(hyperlinks[0].itertext())
-        self.assertEqual(link_text, "4.8.4 APP 用户管理")
+        self.assertEqual(link_text, "4.8.4")
         all_text = "".join(cell.itertext())
         self.assertEqual(all_text, text)
 
@@ -1133,11 +1133,7 @@ class MermaidServiceTests(unittest.TestCase):
         )
         items = {"docProps/custom.xml": custom_xml}
         config = {
-<<<<<<< HEAD
             "documentNo": "DOC-0000-0-000",
-=======
-            "documentNo": "KF-2090-1-006",
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
             "documentVersion": "2.6.0",
             "documentName": "\xe5\xba\xb7\xe5\xb0\x9a\xe5\x81\xa5\xe5\xba\xb7\xe4\xba\x91",
         }
@@ -1161,11 +1157,7 @@ class MermaidServiceTests(unittest.TestCase):
             ),
         }
         config = {
-<<<<<<< HEAD
             "documentNo": "DOC-0000-0-000",
-=======
-            "documentNo": "KF-2090-1-006",
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
             "documentVersion": "2.6.0",
             "documentName": "测试文档",
         }

@@ -276,6 +276,35 @@ def _normalize_cjk_token(s: str) -> str:
     return re.sub(r"\s+", "", s)
 
 
+def _chinese_to_int(s: str):
+    """将中文数字（一至九百九十九）或纯阿拉伯数字字符串解析为整数。"""
+    s = s.strip()
+    if not s:
+        return None
+    if s.isdigit():
+        return int(s)
+    cn_digits = {
+        "零": 0, "一": 1, "壹": 1, "二": 2, "贰": 2, "两": 2, "三": 3, "叁": 3,
+        "四": 4, "肆": 4, "五": 5, "伍": 5, "六": 6, "陆": 6,
+        "七": 7, "柒": 7, "八": 8, "捌": 8, "九": 9, "玖": 9,
+    }
+    val = 0
+    temp = 0
+    for ch in s:
+        if ch in cn_digits:
+            temp = cn_digits[ch]
+        elif ch in ("百", "佰"):
+            val += (temp if temp != 0 else 1) * 100
+            temp = 0
+        elif ch in ("十", "拾"):
+            val += (temp if temp != 0 else 1) * 10
+            temp = 0
+        else:
+            return None
+    val += temp
+    return val if (val > 0 or s == "零") else None
+
+
 class SectionCatalog:
     """章节与文档目录树快速检索索引。
 
@@ -303,22 +332,64 @@ class SectionCatalog:
                 if d.startswith("."):
                     continue
                 rel_d = (rel_dir / d).as_posix()
-                d_url = safe_markdown_url(rel_d, is_dir=True)
+                index_cand = None
+                for idx_name in ("_index.md", "_index.markdown"):
+                    if (Path(dirpath) / d / idx_name).is_file():
+                        index_cand = idx_name
+                        break
+                if index_cand:
+                    d_url = safe_markdown_url(rel_d + "/" + index_cand, is_dir=False)
+                else:
+                    d_url = safe_markdown_url(rel_d, is_dir=True)
                 self.exact_map[d] = d_url
                 self.exact_map[d.replace(" ", "")] = d_url
                 self.exact_map[_normalize_cjk_token(d)] = d_url
-                m_ch = re.match(r"^(第\s*(\d+)\s*章)(?:\s+(.+))?", d)
+                if index_cand:
+                    self.exact_map[safe_markdown_url(rel_d, is_dir=True)] = d_url
+                m_ch = re.match(r"^(第?\s*([0-9一二三四五六七八九十百]+)\s*[章节])(?:\s+(.+))?", d)
                 if m_ch:
-                    ch_key = "第{0}章".format(m_ch.group(2))
-                    self.chap_map[ch_key] = d_url
-                    self.chap_map[d] = d_url
-                    self.chap_map[d.replace(" ", "")] = d_url
-                    if m_ch.group(3):
-                        ch_title = m_ch.group(3)
-                        self.exact_map[ch_title] = d_url
-                        self.exact_map[ch_title.replace(" ", "")] = d_url
-                        self.exact_map[_normalize_cjk_token(ch_title)] = d_url
-                        self.title_map[_normalize_cjk_token(ch_title)] = d_url
+                    cn_val = _chinese_to_int(m_ch.group(2))
+                    if cn_val is not None:
+                        ch_num = str(cn_val)
+                        ch_key = "第{0}章".format(ch_num)
+                        self.chap_map[ch_key] = d_url
+                        self.chap_map[ch_num] = d_url
+                        self.chap_map[d] = d_url
+                        self.chap_map[d.replace(" ", "")] = d_url
+                        self.num_map.setdefault(ch_num, d_url)
+                        self.num_entry_map.setdefault(ch_num, (m_ch.group(3) or "", d_url, d))
+                        if m_ch.group(3):
+                            ch_title = m_ch.group(3)
+                            self.exact_map[ch_title] = d_url
+                            self.exact_map[ch_title.replace(" ", "")] = d_url
+                            self.exact_map[_normalize_cjk_token(ch_title)] = d_url
+                            self.title_map[_normalize_cjk_token(ch_title)] = d_url
+                            full_k1 = "{0} {1}".format(ch_key, ch_title)
+                            self.chap_map[full_k1] = d_url
+                            self.chap_map[full_k1.replace(" ", "")] = d_url
+                            raw_k = "{0} {1}".format(m_ch.group(1), ch_title)
+                            self.chap_map[raw_k] = d_url
+                            self.chap_map[raw_k.replace(" ", "")] = d_url
+                else:
+                    m_top = re.match(r"^(\d+)(?:\s+(.+))?$", d)
+                    if m_top:
+                        ch_num = str(int(m_top.group(1)))
+                        ch_key = "第{0}章".format(ch_num)
+                        ch_title = m_top.group(2) or ""
+                        self.chap_map[ch_key] = d_url
+                        self.chap_map[ch_num] = d_url
+                        self.chap_map[d] = d_url
+                        self.chap_map[d.replace(" ", "")] = d_url
+                        self.num_map.setdefault(ch_num, d_url)
+                        self.num_entry_map.setdefault(ch_num, (ch_title, d_url, d))
+                        if ch_title:
+                            self.exact_map[ch_title] = d_url
+                            self.exact_map[ch_title.replace(" ", "")] = d_url
+                            self.exact_map[_normalize_cjk_token(ch_title)] = d_url
+                            self.title_map[_normalize_cjk_token(ch_title)] = d_url
+                            full_k2 = "{0} {1}".format(ch_key, ch_title)
+                            self.chap_map[full_k2] = d_url
+                            self.chap_map[full_k2.replace(" ", "")] = d_url
                 m_num = re.match(r"^(\d+(?:\.\d+)+)(?:\s+(.+))?", d)
                 if m_num:
                     num = m_num.group(1)
@@ -340,6 +411,25 @@ class SectionCatalog:
                 self.exact_map[stem] = f_url
                 self.exact_map[stem.replace(" ", "")] = f_url
                 self.exact_map[_normalize_cjk_token(stem)] = f_url
+                m_ch_f = re.match(r"^(第?\s*([0-9一二三四五六七八九十百]+)\s*章)(?:\s+(.+))?", stem)
+                if m_ch_f:
+                    cn_val = _chinese_to_int(m_ch_f.group(2))
+                    if cn_val is not None:
+                        ch_num = str(cn_val)
+                        ch_key = "第{0}章".format(ch_num)
+                        self.chap_map.setdefault(ch_key, f_url)
+                        self.chap_map.setdefault(ch_num, f_url)
+                        self.num_map.setdefault(ch_num, f_url)
+                        self.num_entry_map.setdefault(ch_num, (m_ch_f.group(3) or "", f_url, stem))
+                else:
+                    m_top_f = re.match(r"^(\d+)(?:\s+(.+))?$", stem)
+                    if m_top_f:
+                        ch_num = str(int(m_top_f.group(1)))
+                        ch_key = "第{0}章".format(ch_num)
+                        self.chap_map.setdefault(ch_key, f_url)
+                        self.chap_map.setdefault(ch_num, f_url)
+                        self.num_map.setdefault(ch_num, f_url)
+                        self.num_entry_map.setdefault(ch_num, (m_top_f.group(2) or "", f_url, stem))
                 m_num = re.match(r"^(\d+(?:\.\d+)+)(?:\s+(.+))?", stem)
                 if m_num:
                     num = m_num.group(1)
@@ -352,6 +442,37 @@ class SectionCatalog:
                         self.exact_map[_normalize_cjk_token(title)] = f_url
                         self.title_map[_normalize_cjk_token(title)] = f_url
 
+                # 解析 markdown 文件内部定义的子标题（如 ## 3.4.1 蓝牙交互）
+                full_f_path = Path(dirpath) / f
+                try:
+                    with open(full_f_path, "r", encoding="utf-8", errors="ignore") as md_f:
+                        for md_line in md_f:
+                            m_h = re.match(r"^#{1,6}\s+(.+)$", md_line.strip())
+                            if m_h:
+                                h_text = m_h.group(1).strip()
+                                m_hnum = re.match(r"^(\d+(?:\.\d+)+)(?:\s+(.+))?", h_text)
+                                if m_hnum:
+                                    h_num = m_hnum.group(1)
+                                    h_title = m_hnum.group(2) or ""
+                                    frag_url = f_url + "#" + safe_markdown_url(h_text)
+                                    self.num_map.setdefault(h_num, frag_url)
+                                    self.num_entry_map.setdefault(h_num, (h_title, frag_url, h_text))
+                                    if h_title:
+                                        self.exact_map.setdefault(h_title, frag_url)
+                                        self.title_map.setdefault(_normalize_cjk_token(h_title), frag_url)
+                                m_hch = re.match(r"^(第?\s*([0-9一二三四五六七八九十百]+)\s*[章节])(?:\s+(.+))?", h_text)
+                                if m_hch:
+                                    ch_val = _chinese_to_int(m_hch.group(2))
+                                    if ch_val is not None:
+                                        ch_k = "第{0}章".format(ch_val)
+                                        frag_url = f_url + "#" + safe_markdown_url(h_text)
+                                        self.chap_map.setdefault(ch_k, frag_url)
+                                        self.chap_map.setdefault(str(ch_val), frag_url)
+                                        self.num_map.setdefault(str(ch_val), frag_url)
+                                        self.num_entry_map.setdefault(str(ch_val), (m_hch.group(3) or "", frag_url, h_text))
+                except Exception:
+                    pass
+
     def find_num_entry(self, num: str) -> Tuple[Optional[str], Optional[Tuple[str, str, str]]]:
         """精确或按最长前缀查找编号对应的章节条目。
 
@@ -361,7 +482,9 @@ class SectionCatalog:
         if num in self.num_entry_map:
             return num, self.num_entry_map[num]
         parts = num.split(".")
-        while len(parts) > 2:
+        if len(parts) == 2 and parts[1] == "0" and parts[0] in self.num_entry_map:
+            return parts[0], self.num_entry_map[parts[0]]
+        while len(parts) > 1:
             parts.pop()
             p_num = ".".join(parts)
             if p_num in self.num_entry_map:
@@ -385,11 +508,14 @@ class SectionCatalog:
             _, entry = self.find_num_entry(m_num.group(1))
             if entry:
                 return entry[1]
-        m_ch = re.match(r"^(第\s*\d+\s*章)", t)
+        m_ch = re.match(r"^(第?\s*([0-9一二三四五六七八九十百]+)\s*[章节])", t)
         if m_ch:
-            ch_k = m_ch.group(1).replace(" ", "")
+            cn_val = _chinese_to_int(m_ch.group(2))
+            ch_k = "第{0}章".format(cn_val) if cn_val is not None else m_ch.group(1).replace(" ", "")
             if ch_k in self.chap_map:
                 return self.chap_map[ch_k]
+            if cn_val is not None and str(cn_val) in self.chap_map:
+                return self.chap_map[str(cn_val)]
         if norm_t in self.title_map:
             return self.title_map[norm_t]
         return None
@@ -409,7 +535,7 @@ def link_revision_summary(text: str, catalog: SectionCatalog) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", _save_link, text)
 
     pattern = re.compile(
-        r"(第\s*\d+\s*章(?:\s+[^\s\n（\(\)\）\[\]【】<>{}:：，,;；“”\"\'->→。!！?？~]+)?|"
+        r"(第?\s*[0-9一二三四五六七八九十百]+\s*[章节](?:\s+[^\s\n（\(\)\）\[\]【】<>{}:：，,;；“”\"\'->→。!！?？~]+)?|"
         r"(?<![0-9a-zA-Z\.])\d+(?:\.\d+)+)"
     )
 
@@ -422,20 +548,26 @@ def link_revision_summary(text: str, catalog: SectionCatalog) -> str:
         out.append(text[pos:start])
         matched_str = match.group(0)
 
-        # 1. 检查是否为章级标题（如 "第4章 WEB端功能设计" 或 "第4章"）
-        m_chap = re.match(r"^(第\s*(\d+)\s*章)(?:\s+(.+))?$", matched_str)
+        # 1. 检查是否为章级标题（如 "第4章 WEB端功能设计" 或 "第三章"）
+        m_chap = re.match(r"^(第?\s*([0-9一二三四五六七八九十百]+)\s*[章节])(?:\s+(.+))?$", matched_str)
         if m_chap:
             raw_chap = m_chap.group(1)
+            cn_digits = m_chap.group(2)
             raw_title = m_chap.group(3)
+            num_val = _chinese_to_int(cn_digits)
+            ch_k = "第{0}章".format(num_val) if num_val is not None else raw_chap.replace(" ", "")
             if raw_title:
                 full_k = raw_chap + " " + raw_title
-                url = catalog.chap_map.get(full_k) or catalog.exact_map.get(_normalize_cjk_token(full_k))
+                url = (
+                    catalog.chap_map.get(full_k)
+                    or catalog.exact_map.get(_normalize_cjk_token(full_k))
+                    or catalog.chap_map.get(ch_k)
+                )
                 if url:
                     out.append("[{0}]({1})".format(full_k, url))
                     pos = end
                     continue
-            ch_k = "第{0}章".format(m_chap.group(2))
-            url = catalog.chap_map.get(ch_k)
+            url = catalog.chap_map.get(ch_k) or (catalog.chap_map.get(str(num_val)) if num_val is not None else None)
             if url:
                 if raw_title:
                     out.append("[{0}]({1}) {2}".format(raw_chap, url, raw_title))

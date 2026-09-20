@@ -84,6 +84,7 @@ def build_content_context(
     assets_root: Optional[Path] = None,
     cancel_token=None,
     state_dir: Optional[Path] = None,
+    vcs_service: Optional[Any] = None,
 ) -> ContentIndex:
     """后台任务：构建索引 + 引用扫描 + 快照基线维护（供 TaskRunner 执行）。"""
     service = ContentIndexService(content_root)
@@ -94,11 +95,22 @@ def build_content_context(
             snapshot = ContentSnapshot(state_dir)
             snapshot.load()
             rel_files = index.all_files()
-            if not snapshot.entries:
+            if not snapshot.has_baseline:
                 snapshot.take(content_root, rel_files)
                 snapshot.save()
             else:
                 snapshot.ensure_baseline_content(content_root, rel_files)
+        except Exception:
+            pass
+    if cancel_token and cancel_token.is_cancelled:
+        return index
+    if vcs_service is not None:
+        try:
+            # 在后台线程中预热 VCS 变更与分支缓存，彻底消除主线程在加载完成时的卡顿
+            vcs_service.detect()
+            if cancel_token and cancel_token.is_cancelled:
+                return index
+            vcs_service.branches()
         except Exception:
             pass
     return index
@@ -200,13 +212,13 @@ class ContentWorkspace(QWidget):
         self._autosave = AutoSaveStore(self._state_dir)
         self._session_store = WorkspaceStateStore(self._state_dir)
 
-        # 内容快照基线：首次打开打基线（此后徽标=相对基线的所有真实变动，含外部编辑）。
+        # 内容快照基线：首次打开打基线兜底（测试与独立创建工作区时确保基线就绪；后台任务也会异步校准）。
         self._snapshot = ContentSnapshot(self._state_dir)
         try:
             self._snapshot.load()
         except Exception:
             pass
-        if not self._snapshot.entries:
+        if not self._snapshot.has_baseline:
             try:
                 self._snapshot.take(
                     self._content_root,
@@ -284,7 +296,9 @@ class ContentWorkspace(QWidget):
                     "content_root": self._content_root,
                     "assets_root": self._assets_root,
                     "state_dir": self._state_dir,
+                    "vcs_service": self._vcs,
                 },
+                timeout_seconds=120.0,
             ),
             on_done=self._on_index_done,
         )
@@ -316,27 +330,56 @@ class ContentWorkspace(QWidget):
         if result is None:
             if self._on_status is not None:
                 self._on_status("内容索引构建失败或已取消")
+            # 索引构建失败或取消时，必须唤醒回调以结束加载遮罩，避免永久卡死在遮罩状态
+            if self._on_index_ready is not None:
+                self._on_index_ready()
             return
         self._index = result
-        self._populate_panels()
-        if self._on_status is not None:
+        try:
+            self._snapshot.load()
+        except Exception:
+            pass
+        self._ensure_snapshot_baseline()
+        if getattr(self, "_on_stage", None) is not None:
+            self._on_stage("正在准备工作区视图…")
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+        try:
+            self._populate_panels()
+        except Exception as exc:  # noqa: BLE001
+            if self._on_status is not None:
+                self._on_status("面板初始化失败：{0}".format(str(exc)[:120]))
+
+        if self._on_status is not None and self._index is not None:
             self._on_status(
                 "内容索引就绪：{0} 个文件".format(len(self._index.files))
             )
         try:
-            # 会话/草稿恢复失败不应阻断索引就绪，但必须提示用户，不能静默跳过。
-            self._restore_drafts_and_session()
+            # 恢复会话正式打开标签（缺失跳过，不弹窗）
+            session = self._session_store.load()
+            if not session.empty:
+                self._restore_session_tabs(session)
         except Exception as exc:  # noqa: BLE001
             if self._on_status is not None:
-                self._on_status("会话/草稿恢复失败：{0}".format(str(exc)[:120]))
+                self._on_status("会话恢复失败：{0}".format(str(exc)[:120]))
+
+        # 核心：索引就绪立即通知主窗口关闭加载遮罩并进入可交互状态
         if self._on_index_ready is not None:
             self._on_index_ready()
 
+        # 草稿恢复提示（若有弹窗）通过 singleShot 异步唤起，绝不阻塞加载遮罩淡出
+        drafts = self._autosave.list_drafts()
+        if drafts:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: self._prompt_restore_drafts(drafts))
+
     def _populate_panels(self) -> None:
         assert self._index is not None
+        status = self._status_map()
         items = build_tree(self._index.all_files())
         self._tree.set_items(items)
-        self._apply_status_map()
+        self._tree.set_status_map(status)
 
         search = SearchPanel(
             SearchService(self._index),
@@ -433,7 +476,12 @@ class ContentWorkspace(QWidget):
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
         self._changes_panel = changes
-        self._refresh_changes_panel()
+        self._refresh_changes_panel(status)
+        if self._on_branch_changed is not None and self._change_source == "git":
+            try:
+                self._on_branch_changed(self.current_branch_name())
+            except Exception:
+                pass
 
         project_paths = (
             ProjectPaths(self._project_root)
@@ -608,6 +656,25 @@ class ContentWorkspace(QWidget):
 
     # --- 写后联动 ---
 
+    def _ensure_snapshot_baseline(self) -> None:
+        """确保快照基线存在（在无基线时安全兜底，避免将现有所有文件误判为 added）。"""
+        if not self._snapshot.has_baseline:
+            try:
+                self._snapshot.load()
+            except Exception:
+                pass
+            if not self._snapshot.has_baseline:
+                files = (
+                    self._index.all_files()
+                    if self._index is not None
+                    else [rel for rel, _ in self._index_service.discover_files()]
+                )
+                try:
+                    self._snapshot.take(self._content_root, files)
+                    self._snapshot.save()
+                except Exception:
+                    pass
+
     def _status_map(self) -> Dict[str, str]:
         """Git > SVN > 本地快照 → 徽标状态（需索引已就绪）。
 
@@ -620,6 +687,7 @@ class ContentWorkspace(QWidget):
         is_vcs = report.source in ("git", "svn")
         self._vcs_managed = is_vcs
         self._writer.set_backup_enabled(not self._vcs_managed)
+        self._ensure_snapshot_baseline()
 
         if self._change_detection_mode == "local":
             status = self._snapshot.diff(
@@ -850,9 +918,13 @@ class ContentWorkspace(QWidget):
         self._vcs.invalidate_cache()
         return result
 
-    def list_branches(self) -> Tuple[List[GitBranch], Optional[str]]:
+    def get_cached_branches(self) -> Tuple[List[GitBranch], bool]:
+        """获取当前有效缓存的分支列表（若有且在 TTL 内）。"""
+        return self._vcs.get_cached_branches()
+
+    def list_branches(self, timeout: Optional[float] = None) -> Tuple[List[GitBranch], Optional[str]]:
         """获取当前仓库的分支列表。"""
-        return self._vcs.branches()
+        return self._vcs.branches(timeout=timeout)
 
     def current_branch_name(self) -> str:
         """获取当前检出分支的名称。"""
@@ -916,6 +988,7 @@ class ContentWorkspace(QWidget):
         ok, err = self._vcs.stash(message, include_untracked=include_untracked)
         if ok:
             self._after_restore()
+            self._refresh_changes_panel()
         return ok, err
 
     def pop_stash(self) -> Tuple[bool, Optional[str]]:
@@ -923,6 +996,7 @@ class ContentWorkspace(QWidget):
         ok, err = self._vcs.pop_stash()
         if ok or (err and ("conflict" in err.lower() or "unmerged" in err.lower())):
             self._after_restore()
+            self._refresh_changes_panel()
         return ok, err
 
     def _pull_changes(self) -> PullResult:
@@ -948,6 +1022,7 @@ class ContentWorkspace(QWidget):
             return
         mode = panel.detection_mode() if hasattr(panel, "detection_mode") else self._change_detection_mode
         if mode == "local":
+            self._ensure_snapshot_baseline()
             local_status = self._snapshot.diff(
                 self._content_root, self._index.all_files()
             )
@@ -1110,7 +1185,7 @@ class ContentWorkspace(QWidget):
     def reload_baseline(self) -> None:
         """重新从磁盘加载内容基线快照并刷新树状态与改动面板（例如在正式合并之后）。"""
         self._snapshot.load()
-        if not self._snapshot.entries and self._index is not None:
+        if not self._snapshot.has_baseline and self._index is not None:
             self._snapshot.take(
                 self._content_root, self._index.all_files()
             )
@@ -1139,6 +1214,7 @@ class ContentWorkspace(QWidget):
             ReferenceScanner(self._index, assets_root=self._assets_root).scan_all()
             items = build_tree(self._index.all_files())
             self._tree.set_items(items)
+            self._ensure_snapshot_baseline()
             self._apply_status_map()
             if hasattr(self, "_refactor_panel"):
                 self._refactor_panel.set_files(self._index.all_files())
@@ -1561,7 +1637,7 @@ class ContentWorkspace(QWidget):
         from PySide6.QtWidgets import QMessageBox
 
         self._snapshot.load()
-        if not self._snapshot.entries:
+        if not self._snapshot.has_baseline and not self._snapshot.entries:
             return
         answer = QMessageBox.question(
             self,

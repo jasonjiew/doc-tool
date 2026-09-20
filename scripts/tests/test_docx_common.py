@@ -395,5 +395,257 @@ class NeutralizeHyperlinkFieldsTests(unittest.TestCase):
         self.assertEqual(removed, 0)
         self.assertEqual(self._text(document).strip(), "NUMPAGES \\* MERGEFORMAT 12")
 
+
+
+class HyperlinkOOXMLStructureAndJumpTests(unittest.TestCase):
+    """测试 Word 内部超链接 OOXML 标准结构、样式与跳转语法。"""
+
+    def test_hyperlink_ooxml_structure_and_style(self):
+        from build_docx import RP_NS, R_NS, qn
+
+        relationships = etree.Element(RP_NS + "Relationships")
+        manager = ExpressionManager({}, relationships, [])
+        target = os.path.abspath("content/3.1.md")
+        manager.register_bookmark(target)
+        paragraph = etree.Element(qn("p"))
+
+        manager.append_hyperlink(paragraph, "外部链接", "https://example.com", "source.md", 1)
+        manager.append_hyperlink(paragraph, "站内章节", target, "source.md", 2)
+
+        links = paragraph.findall(qn("hyperlink"))
+        self.assertEqual(len(links), 2)
+
+        # 1. 检验 w:history="1"
+        self.assertEqual(links[0].get(qn("history")), "1")
+        self.assertEqual(links[1].get(qn("history")), "1")
+
+        # 2. 外部与内部目标规范
+        self.assertTrue(links[0].get(R_NS + "id"))
+        self.assertEqual(links[1].get(qn("anchor")), manager.bookmarks[target])
+
+        # 3. 检验内部 run 的字符样式与格式
+        for hl in links:
+            runs = hl.findall(qn("r"))
+            self.assertGreaterEqual(len(runs), 1)
+            for r in runs:
+                rpr = r.find(qn("rPr"))
+                self.assertIsNotNone(rpr, "超链接 run 必须包含 rPr")
+                rstyle = rpr.find(qn("rStyle"))
+                self.assertIsNotNone(rstyle, "超链接 run 必须包含 rStyle")
+                self.assertEqual(rstyle.get(qn("val")), manager.hyperlink_style_id)
+                color = rpr.find(qn("color"))
+                self.assertIsNotNone(color)
+                self.assertEqual(color.get(qn("val")), "0563C1")
+                u = rpr.find(qn("u"))
+                self.assertIsNotNone(u)
+                self.assertEqual(u.get(qn("val")), "single")
+
+    def test_jump_to_current_chapter_and_section_fallbacks(self):
+        from build_docx import RP_NS, qn
+
+        relationships = etree.Element(RP_NS + "Relationships")
+        manager = ExpressionManager({}, relationships, [])
+        cur_file = os.path.abspath("content/3.2.md")
+        cur_bm = manager.register_bookmark(cur_file)
+        ch3_bm = manager.register_bookmark("content/ch3")
+        sec34_bm = manager.register_bookmark("content/3.4")
+        manager.section_number_map["第3章"] = ch3_bm
+        manager.section_number_map["3"] = ch3_bm
+        manager.section_number_map["3.4"] = sec34_bm
+
+        p = etree.Element(qn("p"))
+
+        # 1. 跳转本章节（使用 "#", ".", "本章节" 等语法）
+        manager.append_hyperlink(p, "本章节", "#", cur_file, 1)
+        manager.append_hyperlink(p, "跳转本章节", "本章节", cur_file, 2)
+        manager.append_hyperlink(p, "本节", ".", cur_file, 3)
+
+        # 2. 章节号与标题智能查找
+        manager.append_hyperlink(p, "小节3.4", "3.4", cur_file, 4)
+        manager.append_hyperlink(p, "第三章总览", "第3章", cur_file, 5)
+
+        hls = p.findall(qn("hyperlink"))
+        self.assertEqual(len(hls), 5)
+        self.assertEqual(hls[0].get(qn("anchor")), cur_bm)
+        self.assertEqual(hls[1].get(qn("anchor")), cur_bm)
+        self.assertEqual(hls[2].get(qn("anchor")), cur_bm)
+        self.assertEqual(hls[3].get(qn("anchor")), sec34_bm)
+        self.assertEqual(hls[4].get(qn("anchor")), ch3_bm)
+
+    def test_dynamic_hyperlink_style_id_from_styles_xml(self):
+        from build_docx import RP_NS, qn
+
+        # 模板样式 id 为 51 的情况
+        styles_51 = (
+            '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:style w:type="character" w:styleId="51"><w:name w:val="Hyperlink"/></w:style>'
+            '</w:styles>'
+        ).encode('utf-8')
+        m51 = ExpressionManager({"word/styles.xml": styles_51}, etree.Element(RP_NS + "Relationships"), [])
+        self.assertEqual(m51.hyperlink_style_id, "51")
+
+        # 模板样式 id 为 53 的情况
+        styles_53 = (
+            '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:style w:type="character" w:styleId="53"><w:name w:val="Hyperlink"/></w:style>'
+            '</w:styles>'
+        ).encode('utf-8')
+        m53 = ExpressionManager({"word/styles.xml": styles_53}, etree.Element(RP_NS + "Relationships"), [])
+        self.assertEqual(m53.hyperlink_style_id, "53")
+
+        # 默认无 styles.xml 回退
+        m_def = ExpressionManager({}, etree.Element(RP_NS + "Relationships"), [])
+        self.assertEqual(m_def.hyperlink_style_id, "Hyperlink")
+
+    def test_revision_summary_cell_hyperlink_structure(self):
+        from build_docx import _set_revision_summary_cell, qn
+
+        class FakeExpr:
+            hyperlink_style_id = "51"
+            bookmarks = {}
+            def find_bookmark_for_section(self, tok):
+                return "bm_ch3" if "3" in tok else None
+
+        cell = etree.Element(qn("tc"))
+        _set_revision_summary_cell(cell, "新增：第3章 蓝牙交互", FakeExpr())
+
+        hls = cell.findall(".//" + qn("hyperlink"))
+        self.assertEqual(len(hls), 1)
+        hl = hls[0]
+        self.assertEqual(hl.get(qn("anchor")), "bm_ch3")
+        self.assertEqual(hl.get(qn("history")), "1")
+
+        r = hl.find(qn("r"))
+        self.assertIsNotNone(r)
+        rpr = r.find(qn("rPr"))
+        self.assertIsNotNone(rpr)
+        self.assertEqual(rpr.find(qn("rStyle")).get(qn("val")), "51")
+        self.assertEqual(rpr.find(qn("color")).get(qn("val")), "0563C1")
+        self.assertEqual(rpr.find(qn("u")).get(qn("val")), "single")
+
+
+    def test_rpr_child_element_order_canonical_ooxml(self):
+        """测试超链接与格式化文本的 rPr 子元素严格遵循 OOXML CT_RPr 顺序：rStyle -> rFonts/b/i -> color -> u。"""
+        from build_docx import _append_styled_run, qn, RPR_TAG_INDEX
+
+        parent = etree.Element(qn("p"))
+        # 混合超链接 + 粗体
+        _append_styled_run(parent, "加粗超链接", style="bold", is_hyperlink=True, hyperlink_style_id="51")
+        r = parent.find(qn("r"))
+        rpr = r.find(qn("rPr"))
+        self.assertIsNotNone(rpr)
+        children = list(rpr)
+        tag_indices = [RPR_TAG_INDEX[c.tag] for c in children]
+        self.assertEqual(tag_indices, sorted(tag_indices), f"rPr 子元素未按规范顺序排列: {[c.tag for c in children]}")
+        self.assertEqual(children[0].tag, qn("rStyle"))
+        self.assertEqual(children[0].get(qn("val")), "51")
+        self.assertEqual(children[1].tag, qn("b"))
+        self.assertEqual(children[2].tag, qn("color"))
+        self.assertEqual(children[3].tag, qn("u"))
+
+    def test_cross_file_and_section_anchor_resolution_not_swallowed(self):
+        """测试锚点链接（如 #3.4、#第3章、#蓝牙配对）不会被当前文件起始书签错误吞噬。"""
+        from build_docx import ExpressionManager, RP_NS, qn
+
+        relationships = etree.Element(RP_NS + "Relationships")
+        mgr = ExpressionManager({}, relationships, [])
+        source_file = os.path.abspath("content/1.1.md")
+        ch1_file = os.path.abspath("content/ch1.md")
+        sec34_file = os.path.abspath("content/3.4.md")
+
+        src_bm = mgr.register_bookmark(source_file)
+        sec34_bm = mgr.register_bookmark(sec34_file)
+        ch3_bm = mgr.register_bookmark("content/ch3")
+        heading_bm = mgr.register_bookmark(source_file + "#配对说明")
+
+        mgr.section_number_map["3.4"] = sec34_bm
+        mgr.section_number_map["第3章"] = ch3_bm
+        mgr.section_title_map["呼吸机同步时区"] = sec34_bm
+
+        p = etree.Element(qn("p"))
+
+        # 1. 跨小节锚点：#3.4 必须跳转到 3.4，不能落回 source_file 的书签
+        mgr.append_hyperlink(p, "查看3.4", "#3.4", source_file, 1)
+        # 2. 跨大章锚点：#第3章 必须跳转到 第3章
+        mgr.append_hyperlink(p, "查看第3章", "#第3章", source_file, 2)
+        # 3. 标题锚点：#配对说明 精确命中文件内标题
+        mgr.append_hyperlink(p, "配对说明", "#配对说明", source_file, 3)
+        # 4. 跨小节标题锚点：#呼吸机同步时区 命中 3.4
+        mgr.append_hyperlink(p, "同步时区", "#呼吸机同步时区", source_file, 4)
+
+        hls = p.findall(qn("hyperlink"))
+        self.assertEqual(len(hls), 4)
+        self.assertEqual(hls[0].get(qn("anchor")), sec34_bm)
+        self.assertEqual(hls[1].get(qn("anchor")), ch3_bm)
+        self.assertEqual(hls[2].get(qn("anchor")), heading_bm)
+        self.assertEqual(hls[3].get(qn("anchor")), sec34_bm)
+
+    def test_parent_chapter_bookmark_resolution_for_subsections(self):
+        """测试多级目录下子文件通过 '#本章' 或 '本章节' 精确跳转到所属第1级父章节。"""
+        from build_docx import ExpressionManager, RP_NS, qn
+        from docx_common import ChapterEntry
+
+        relationships = etree.Element(RP_NS + "Relationships")
+        entries = [
+            (ChapterEntry("dir", (1,), "引言", "D:/content/01_intro", 1), None),
+            (ChapterEntry("file", (1, 1), "目的", "D:/content/01_intro/1.1_purpose.md", 2), "D:/content/01_intro/1.1_purpose.md"),
+            (ChapterEntry("dir", (2,), "功能设计", "D:/content/02_design", 1), None),
+            (ChapterEntry("file", (2, 1), "登录", "D:/content/02_design/2.1_login.md", 2), "D:/content/02_design/2.1_login.md"),
+        ]
+        mgr = ExpressionManager({}, relationships, entries)
+        ch1_bm = mgr.bookmarks[os.path.abspath("D:/content/01_intro")]
+        sub11_bm = mgr.bookmarks[os.path.abspath("D:/content/01_intro/1.1_purpose.md")]
+        sub11_file = "D:/content/01_intro/1.1_purpose.md"
+
+        p = etree.Element(qn("p"))
+        # 本章 / 本章节 -> 父章节第1章
+        mgr.append_hyperlink(p, "返回本章", "#本章", sub11_file, 1)
+        mgr.append_hyperlink(p, "跳转本章节", "#本章节", sub11_file, 2)
+        mgr.append_hyperlink(p, "顶部", "#", sub11_file, 3)
+        # 本节 -> 子文件自身 1.1
+        mgr.append_hyperlink(p, "回到本节", "#本节", sub11_file, 4)
+
+        hls = p.findall(qn("hyperlink"))
+        self.assertEqual(len(hls), 4)
+        self.assertEqual(hls[0].get(qn("anchor")), ch1_bm)
+        self.assertEqual(hls[1].get(qn("anchor")), ch1_bm)
+        self.assertEqual(hls[2].get(qn("anchor")), ch1_bm)
+        self.assertEqual(hls[3].get(qn("anchor")), sub11_bm)
+
+    def test_find_bookmark_for_section_disambiguation(self):
+        """测试 find_bookmark_for_section 不会把带标题的多级小节（如 '1.1 目的'、'3.4 同步'）误识别为第1章或第3章。"""
+        from build_docx import ExpressionManager, RP_NS
+        from docx_common import ChapterEntry
+
+        entries = [
+            (ChapterEntry("dir", (1,), "引言", "D:/content/ch1", 1), None),
+            (ChapterEntry("file", (1, 1), "目的", "D:/content/ch1/1.1.md", 2), "D:/content/ch1/1.1.md"),
+            (ChapterEntry("dir", (3,), "设备", "D:/content/ch3", 1), None),
+            (ChapterEntry("file", (3, 4), "呼吸机同步时区", "D:/content/ch3/3.4.md", 2), "D:/content/ch3/3.4.md"),
+        ]
+        mgr = ExpressionManager({}, etree.Element(RP_NS + "Relationships"), entries)
+        ch1_bm = mgr.section_number_map["第1章"]
+        sub11_bm = mgr.section_number_map["1.1"]
+        ch3_bm = mgr.section_number_map["第3章"]
+        sub34_bm = mgr.section_number_map["3.4"]
+
+        # 验证 1.1 与 1.1 目的 不会被截断为 1
+        self.assertEqual(mgr.find_bookmark_for_section("1.1"), sub11_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("1.1 目的"), sub11_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("1.1 目的.md"), sub11_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("目的"), sub11_bm)
+
+        # 验证 3.4 与 3.4 呼吸机同步时区 不会被截断为 3
+        self.assertEqual(mgr.find_bookmark_for_section("3.4"), sub34_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("3.4 呼吸机同步时区"), sub34_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("3.4 呼吸机同步时区.md"), sub34_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("呼吸机同步时区"), sub34_bm)
+
+        # 验证单数字与大章仍准确匹配大章
+        self.assertEqual(mgr.find_bookmark_for_section("1"), ch1_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("第1章"), ch1_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("3"), ch3_bm)
+        self.assertEqual(mgr.find_bookmark_for_section("第3章"), ch3_bm)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

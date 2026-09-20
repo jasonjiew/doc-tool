@@ -3,19 +3,11 @@
 > **Docs-as-Code for Enterprise Documents**  
 > 把大型 Word 文档工程化拆解为可版本追踪、可多人协同、可严谨审查的 Markdown 章节树，并在出稿时一键可靠重建为符合企业规范的正式 DOCX 交付物。
 
-<<<<<<< HEAD
-[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](https://github.com/wangjie0721666-web/doc-tool/releases/tag/v2.5.0)
+[![Version](https://img.shields.io/badge/version-2.5.1-blue.svg)](https://github.com/wangjie0721666-web/doc-tool/releases/tag/v2.5.1)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **当前版本**：`v2.5.0`（企业安装版 + 免安装便携版）
-=======
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/wangjie0721666-web/doc-tool/releases/tag/v2.3.0)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-- **当前版本**：`v2.3.0`（企业安装版 + 免安装便携版）
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+- **当前版本**：`v2.5.1`（企业安装版 + 免安装便携版）
 - **代码仓库**：<https://github.com/wangjie0721666-web/doc-tool>
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md)
@@ -84,11 +76,7 @@ graph LR
 - **双向往返门禁（Roundtrip Guard）**：导入时自动进行预检与试构建，确保解析与还原可逆保真；
 - **单点修订维护**：以 `_revision_record.md` 为唯一维护点，末行版本号严格绑定为文档交付版本号。
 
-<<<<<<< HEAD
-### 2. 现代化桌面创作工作台（v2.5.0）
-=======
-### 2. 现代化桌面创作工作台（v2.3.0）
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+### 2. 现代化桌面创作工作台（v2.5.1）
 - **全局命令面板（`Ctrl+K` / `Ctrl+Shift+P`）**：无边框居中浮层，一处聚合新建/打开项目、出稿构建、全库校验、Word 逆向导入与诊断等全部操作；
 - **章节秒开与快速跳转（`Ctrl+P`）**：毫秒级遍历索引全库 Markdown 章节，支持拼音与文本模糊过滤，键盘回车秒开；
 - **Markdown 表格智能编辑与等宽管道对齐**：
@@ -127,13 +115,8 @@ graph LR
 
 | 分发方式 | 文件名示例 | 说明与推荐场景 |
 | :--- | :--- | :--- |
-<<<<<<< HEAD
-| **安装版（推荐）** | `DocTool-Setup-2.5.0.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
-| **免安装便携版** | `DocTool-2.5.0-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
-=======
-| **安装版（推荐）** | `DocTool-Setup-2.3.0.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
-| **免安装便携版** | `DocTool-2.3.0-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+| **安装版（推荐）** | `DocTool-Setup-2.5.1.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
+| **免安装便携版** | `DocTool-2.5.1-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
 
 > **诊断提示**：若在特殊加密环境遇到启动问题，双击安装目录或便携包根目录下的 `diagnose.cmd`，将生成的 `DocTool-diagnose.txt` 发送给维护人员。
 

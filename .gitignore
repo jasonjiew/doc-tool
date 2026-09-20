@@ -83,3 +83,12 @@ tmp/npm-cache/
 # DeepSeek Harness 本地工具（不属于产品代码）
 dsh-patches/
 start-dsh-web.cmd
+
+# 本地临时调研与分析产物
+*INVESTIGATION_REPORT*.md
+*GAP_ANALYSIS_REPORT*.md
+l0_report.txt
+step2_prompt.txt
+git_sync_task.py
+invoke_args.json
+*调研提示词*.md

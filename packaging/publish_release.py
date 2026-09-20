@@ -7,37 +7,63 @@ import hashlib
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
 
-<<<<<<< HEAD
+def _force_utf8_stdio() -> None:
+    """在非 UTF-8 控制台下强制使用 UTF-8 输出，避免打印中文时触发 UnicodeEncodeError。"""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is not None and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+_force_utf8_stdio()
+
 # 内网 GitLab 地址与项目信息一律由环境变量注入，避免把内部主机名/项目 id 固化进源码。
 GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
 PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
 PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
-=======
-GITLAB_BASE = os.getenv("GITLAB_BASE", "http://192.168.0.242:8899")
-PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID", "119"))
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
-VERSION = "2.5.0"
-TAG_NAME = "v2.5.0"
+VERSION = "2.5.1"
+TAG_NAME = "v2.5.1"
 PACKAGE_NAME = "DocTool"
 
 
-<<<<<<< HEAD
+def get_gitlab_base() -> str:
+    """返回 GitLab 基础 URL；未配置时给出明确报错。"""
+    base = os.getenv("GITLAB_BASE", GITLAB_BASE).rstrip("/")
+    if not base:
+        raise RuntimeError("请设置 GITLAB_BASE 环境变量（GitLab 实例地址，如 http://192.168.0.242:8899）")
+    return base
+
+
 def get_project_id() -> int:
     """返回 GitLab 项目 id；未配置时给出明确报错。"""
-    if not PROJECT_ID_RAW:
+    raw = os.getenv("GITLAB_PROJECT_ID", PROJECT_ID_RAW).strip()
+    if not raw:
         raise RuntimeError("请设置 GITLAB_PROJECT_ID 环境变量（GitLab 项目 id）")
-    return int(PROJECT_ID_RAW)
+    try:
+        return int(raw)
+    except ValueError:
+        raise RuntimeError(f"GITLAB_PROJECT_ID 环境变量值无效（必须为整数）：{raw}")
 
 
-PROJECT_ID = get_project_id() if PROJECT_ID_RAW else 0
+def get_project_path() -> str:
+    """返回 GitLab 项目路径；未配置时给出明确报错。"""
+    path = os.getenv("GITLAB_PROJECT_PATH", PROJECT_PATH).strip("/")
+    if not path:
+        raise RuntimeError("请设置 GITLAB_PROJECT_PATH 环境变量（GitLab 项目路径，如 application/ai/doc-tool）")
+    return path
 
 
-=======
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+PROJECT_ID = int(PROJECT_ID_RAW) if PROJECT_ID_RAW.strip().isdigit() else 0
+
+
 def get_token() -> str:
     token = os.getenv("GITLAB_TOKEN")
     if not token and len(sys.argv) > 1:
@@ -56,7 +82,9 @@ def calc_sha256(filepath: str) -> str:
 
 
 def upload_file(token: str, filename: str, filepath: str) -> None:
-    url = f"{GITLAB_BASE}/api/v4/projects/{PROJECT_ID}/packages/generic/{PACKAGE_NAME}/{VERSION}/{filename}"
+    base = GITLAB_BASE or get_gitlab_base()
+    project_id = PROJECT_ID or get_project_id()
+    url = f"{base}/api/v4/projects/{project_id}/packages/generic/{PACKAGE_NAME}/{VERSION}/{filename}"
     size_mb = os.path.getsize(filepath) / (1024 * 1024)
     print(f"正在上传 {filename} ({size_mb:.1f} MB)...", flush=True)
 
@@ -76,8 +104,10 @@ def upload_file(token: str, filename: str, filepath: str) -> None:
 
 
 def get_package_files(token: str) -> list[dict]:
+    base = GITLAB_BASE or get_gitlab_base()
+    project_id = PROJECT_ID or get_project_id()
     # 1. 获取 package_id
-    url = f"{GITLAB_BASE}/api/v4/projects/{PROJECT_ID}/packages?package_name={PACKAGE_NAME}"
+    url = f"{base}/api/v4/projects/{project_id}/packages?package_name={PACKAGE_NAME}"
     req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
     with urllib.request.urlopen(req) as resp:
         pkgs = json.loads(resp.read())
@@ -92,14 +122,16 @@ def get_package_files(token: str) -> list[dict]:
         raise RuntimeError(f"未找到 Package {PACKAGE_NAME} {VERSION}")
 
     # 2. 获取 package_files
-    url = f"{GITLAB_BASE}/api/v4/projects/{PROJECT_ID}/packages/{pkg_id}/package_files"
+    url = f"{base}/api/v4/projects/{project_id}/packages/{pkg_id}/package_files"
     req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read())
 
 
 def create_or_update_release(token: str, description: str, links: list[dict]) -> dict:
-    url = f"{GITLAB_BASE}/api/v4/projects/{PROJECT_ID}/releases"
+    base = GITLAB_BASE or get_gitlab_base()
+    project_id = PROJECT_ID or get_project_id()
+    url = f"{base}/api/v4/projects/{project_id}/releases"
     payload = {
         "name": TAG_NAME,
         "tag_name": TAG_NAME,
@@ -109,7 +141,7 @@ def create_or_update_release(token: str, description: str, links: list[dict]) ->
     data = json.dumps(payload).encode("utf-8")
 
     # 检查是否已存在
-    check_url = f"{GITLAB_BASE}/api/v4/projects/{PROJECT_ID}/releases/{TAG_NAME}"
+    check_url = f"{base}/api/v4/projects/{project_id}/releases/{TAG_NAME}"
     try:
         req = urllib.request.Request(check_url, headers={"PRIVATE-TOKEN": token})
         with urllib.request.urlopen(req) as resp:
@@ -142,7 +174,15 @@ def create_or_update_release(token: str, description: str, links: list[dict]) ->
 
 
 def main():
+    _force_utf8_stdio()
     token = get_token()
+    base = get_gitlab_base()
+    project_id = get_project_id()
+    project_path = get_project_path()
+    global GITLAB_BASE, PROJECT_ID, PROJECT_PATH
+    GITLAB_BASE = base
+    PROJECT_ID = project_id
+    PROJECT_PATH = project_path
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
@@ -193,11 +233,7 @@ def main():
 
     for filename, display_name in link_specs:
         if item := name_to_file.get(filename):
-<<<<<<< HEAD
-            url = f"{GITLAB_BASE}/{PROJECT_PATH}/-/package_files/{item['id']}/download"
-=======
-            url = f"{GITLAB_BASE}/application/ai/doc-tool/-/package_files/{item['id']}/download"
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+            url = f"{base}/{project_path}/-/package_files/{item['id']}/download"
             links.append({
                 "name": display_name,
                 "url": url,
@@ -212,7 +248,24 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 本版变更（2.5.0）
+## 亮点更新（2.5.1）
+
+- **格式检查规则分类检索与批量一键修复**：
+  - 问题检查面板（LintPanel）新增规则大类分类下拉框，带当前规则数量动态统计；
+  - 增强严重度多维级联筛选与多词空格分词求交，支持同时按大类、中文规则名与描述即时模糊检索；
+  - 底部操作栏新增「⚡ 修复当前筛选」与右键批量修复当前筛选条目，大幅提升大规模文档质检效率；
+  - 校验报告默认唤起内置交互式报告查看器（ValidationReportViewer），支持段落收敛与定位。
+- **项目加载非阻塞优化与平滑交互体验**：
+  - 项目加载遮罩（ProjectLoadingOverlay）淡出动画顺畅不卡死，淡出瞬间激活鼠标穿透，彻底杜绝点击假死；
+  - 后台任务并发预热 Git/SVN 版本控制与分支检测信息，消除打开项目时主线程同步执行 Git 命令造成的界面冻结；
+  - 本地快照新增 `has_baseline` 状态精准区分，彻底修复新建项目首个文件被误吞为基线的问题；
+  - 未保存草稿恢复弹窗改为异步延迟调度，避免与加载遮罩冲突定格。
+- **全仓代码审查与发布稳定性加固**：
+  - 修复 Mermaid 复杂语法校验分支的闭合误报断点；
+  - 强化 GitLab 发布脚本门禁与异常处理，保障自动化发布稳定可靠；
+  - 新增超链接自愈工具脚本（`scripts/autolink_revision_record.py`）与完备测试套件。
+
+## 历史更新（2.5.0）
 
 - **Word 导入向导大纲树实时预览与格式安全拦截**：
   - 样式映射步骤引入实时大纲树预览（`generate_preview_heading_tree` / `HeadingPreviewWidget`），支持各级标题层级即时诊断、空标题与跳级拦截；
@@ -322,11 +375,7 @@ def main():
 
     rel = create_or_update_release(token, description, links)
     print("\nRelease 发布成功！")
-<<<<<<< HEAD
-    print(f"Release URL: {GITLAB_BASE}/{PROJECT_PATH}/-/releases/{TAG_NAME}")
-=======
-    print(f"Release URL: {GITLAB_BASE}/application/ai/doc-tool/-/releases/{TAG_NAME}")
->>>>>>> fa51c9618cd827236a03a6afb362a6e2053e954e
+    print(f"Release URL: {base}/{project_path}/-/releases/{TAG_NAME}")
 
 
 if __name__ == "__main__":

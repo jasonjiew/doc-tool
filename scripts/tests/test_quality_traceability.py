@@ -111,6 +111,28 @@ class QualityRulesTests(unittest.TestCase):
             self.assertTrue(any("3.1" in issue.message for issue in numbers), "同文件重复编号未检出")
             self.assertTrue(anchors, "跨文件重复标题锚点未检出")
 
+    def test_numbering_uniqueness_subheadings_warning_and_not_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "content" / "requirement"
+            root.mkdir(parents=True)
+            (root / "3.1.1 模块A.md").write_text(
+                "# 3.1.1 模块A\n\n## 详情\n##### 基本信息\n\n## 随访\n##### 基本信息\n",
+                encoding="utf-8"
+            )
+            (root / "3.1.2 流程图.md").write_text("## 流程图\n", encoding="utf-8")
+            (root / "3.2.2 流程图.md").write_text("## 流程图\n", encoding="utf-8")
+
+            config = QualityRulesConfig(Path(tmp) / ".state", "requirement")
+            config.save([QualityRule("numbering_uniqueness", True, "error")])
+            issues = ContentLinter(ContentIndexService(root).build(), config).check_all([])
+
+            errors = [issue for issue in issues if issue.severity == "error"]
+            self.assertEqual(errors, [], "未带编号的子标题锚点重复不应产生阻断错误")
+
+            warnings = [issue for issue in issues if "标题锚点重复" in issue.message and issue.severity == "warning"]
+            self.assertEqual(len(warnings), 1, "同文件内的重复子标题应输出1条 warning 提示")
+            self.assertIn("基本信息", warnings[0].message)
+
     def test_numbering_uniqueness_own_title_not_self_reported(self):
         # 文件名章节号（3.1 概述.md -> 3.1）与其首个同号 H1 是同一逻辑位置：
         # H1 不在首行时若各自计数，会自我误报「章节编号重复」。

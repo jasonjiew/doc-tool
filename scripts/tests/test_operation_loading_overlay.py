@@ -147,5 +147,160 @@ class OperationLoadingOverlayTests(unittest.TestCase):
         self.assertFalse(overlay.isVisible())
 
 
+
+
+from PySide6.QtGui import QKeyEvent
+from PySide6.QtCore import QEvent
+from doc_tool.ui.project_loading_overlay import ProjectLoadingOverlay
+
+
+class ProjectLoadingOverlayTests(unittest.TestCase):
+    def setUp(self):
+        self.top_widget = QWidget()
+        self.top_widget.resize(800, 600)
+        self.top_widget.show()
+        app.processEvents()
+
+    def tearDown(self):
+        self.top_widget.close()
+        app.processEvents()
+
+    def test_project_overlay_theming(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        self.assertFalse(overlay._dark)
+        overlay.set_dark(True)
+        self.assertTrue(overlay._dark)
+
+    def test_project_overlay_start_and_stage_stepping(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("my_project", "正在解析项目元数据…")
+        app.processEvents()
+
+        self.assertTrue(overlay.isVisible())
+        self.assertIn("my_project", overlay._title_label.text())
+        self.assertEqual(overlay._current_step, 0)
+        self.assertEqual(overlay._progress_bar.value(), 15)
+        self.assertTrue(overlay._spinner._timer.isActive())
+
+        # 步进：全文索引
+        overlay.show_stage("正在构建全文索引…")
+        self.assertEqual(overlay._current_step, 1)
+        self.assertEqual(overlay._progress_bar.value(), 55)
+
+        # 步进：准备工作区
+        overlay.show_stage("正在准备工作区视图…")
+        self.assertEqual(overlay._current_step, 2)
+        self.assertEqual(overlay._progress_bar.value(), 75)
+
+        # 步进：恢复标签
+        overlay.show_stage("正在恢复标签…")
+        self.assertEqual(overlay._current_step, 3)
+        self.assertEqual(overlay._progress_bar.value(), 90)
+
+        # 步进：就绪（关键词包含准备时，必须优先匹配就绪，不回退进度）
+        overlay.show_stage("准备就绪")
+        self.assertEqual(overlay._current_step, 4)
+        self.assertEqual(overlay._progress_bar.value(), 100)
+
+    def test_project_overlay_finish_keeps_spinner_during_fadeout(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("test_proj")
+        app.processEvents()
+        self.assertTrue(overlay._spinner._timer.isActive())
+
+        done = []
+        overlay.finish(lambda: done.append(True))
+        # 验证在动画执行期间，spinner 依然处于运行状态，没有被提前停止冻结
+        self.assertTrue(overlay._is_finishing)
+        self.assertTrue(overlay._spinner._timer.isActive(), "Spinner 必须在淡出动画期间继续旋转，不可冻结")
+        self.assertEqual(overlay._stage_label.text(), "就绪")
+        self.assertEqual(overlay._progress_bar.value(), 100)
+
+        # 等待动画完成
+        loop = QEventLoop()
+        overlay._anim.finished.connect(loop.quit)
+        QTimer.singleShot(1500, loop.quit)
+        loop.exec()
+        app.processEvents()
+
+        self.assertTrue(done)
+        self.assertFalse(overlay.isVisible())
+        self.assertFalse(overlay._spinner._timer.isActive(), "动画结束后 Spinner 应该停止")
+        self.assertFalse(overlay._is_finishing)
+
+    def test_project_overlay_reentry_guard(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("test_proj")
+        app.processEvents()
+
+        cb_calls = []
+        overlay.finish(lambda: cb_calls.append(1))
+        # 再次调用 finish
+        overlay.finish(lambda: cb_calls.append(2))
+        self.assertEqual(cb_calls, [2], "重入时应直接触发新回调，不重置正在执行的淡出动画")
+
+        loop = QEventLoop()
+        overlay._anim.finished.connect(loop.quit)
+        QTimer.singleShot(1500, loop.quit)
+        loop.exec()
+        app.processEvents()
+        self.assertEqual(cb_calls, [2, 1])
+
+    def test_project_overlay_esc_key(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("test_proj")
+        app.processEvents()
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+        overlay.keyPressEvent(event)
+        self.assertTrue(overlay._is_finishing, "按 Esc 键应触发 finish")
+
+
+
+    def test_project_overlay_finish_immediately(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("test_proj")
+        app.processEvents()
+        self.assertTrue(overlay.isVisible())
+
+        done = []
+        overlay.finish_immediately(lambda: done.append(True))
+        app.processEvents()
+        self.assertFalse(overlay.isVisible())
+        self.assertFalse(overlay._is_finishing)
+        self.assertFalse(overlay._spinner._timer.isActive())
+        self.assertEqual(done, [True])
+
+    def test_project_overlay_safety_hide(self):
+        overlay = ProjectLoadingOverlay(self.top_widget, dark=False)
+        overlay.start("test_proj")
+        app.processEvents()
+        self.assertTrue(overlay.isVisible())
+
+        # 调用 _safety_hide
+        overlay._safety_hide()
+        app.processEvents()
+        self.assertFalse(overlay.isVisible())
+
+    def test_build_content_context_vcs_preheat(self):
+        import tempfile
+        from pathlib import Path
+        from doc_tool.ui.content.workspace import build_content_context
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            (p / "01-intro.md").write_text("# Intro\nhello", encoding="utf-8")
+            mock_calls = []
+            class DummyVCS:
+                def detect(self):
+                    mock_calls.append("detect")
+                def branches(self):
+                    mock_calls.append("branches")
+
+            vcs = DummyVCS()
+            idx = build_content_context(p, vcs_service=vcs)
+            self.assertIn("01-intro.md", idx.all_files())
+            self.assertEqual(mock_calls, ["detect", "branches"])
+
 if __name__ == "__main__":
     unittest.main()

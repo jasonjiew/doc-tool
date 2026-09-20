@@ -197,6 +197,21 @@ class WorkspaceChangesRefreshTests(unittest.TestCase):
         ws._apply_status_map.assert_called_once()
         self.assertIn("已刷新改动列表", status_msgs)
 
+    def test_workspace_on_index_done_none_dismisses_overlay(self):
+        from doc_tool.ui.content.workspace import ContentWorkspace
+        ws = ContentWorkspace.__new__(ContentWorkspace)
+        ws._closing = False
+        status_msgs = []
+        ready_called = []
+        ws._on_status = lambda msg: status_msgs.append(msg)
+        ws._on_index_ready = lambda: ready_called.append(True)
+
+        ws._on_index_done(None)
+
+        self.assertEqual(ready_called, [True], "索引失败时必须调用 on_index_ready 解除加载遮罩")
+        self.assertIn("内容索引构建失败或已取消", status_msgs)
+
+
 
 class MainWindowRefreshActionTests(unittest.TestCase):
     @classmethod

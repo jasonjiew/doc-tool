@@ -575,6 +575,22 @@ class MarkdownStructureLintRuleTests(unittest.TestCase):
         findings = check_mermaid_structure(lines)
         self.assertTrue(any(f.rule == "mermaid_syntax" for f in findings))
 
+    def test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch(self):
+        """单反引号开头但双反引号/三反引号结尾，或波浪线不匹配时均应报告语法错误。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        # 1. `mermaid code`` (1 开 2 闭)
+        findings1 = check_mermaid_structure(["`mermaid flowchart TD``"])
+        self.assertTrue(any(f.rule == "mermaid_syntax" for f in findings1))
+
+        # 2. ~mermaid flowchart TD~~ (1 波浪线开 2 波浪线闭)
+        findings2 = check_mermaid_structure(["~mermaid flowchart TD~~"])
+        self.assertTrue(any(f.rule == "mermaid_syntax" for f in findings2))
+
+        # 3. ``mermaid flowchart TD``` (2 开 3 闭)
+        findings3 = check_mermaid_structure(["``mermaid flowchart TD```"])
+        self.assertTrue(any(f.rule == "mermaid_syntax" for f in findings3))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

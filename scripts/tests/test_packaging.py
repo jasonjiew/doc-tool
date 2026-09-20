@@ -352,5 +352,201 @@ class PortablePackageTests(unittest.TestCase):
         self.assertNotIn("DOCTOOL_RELOCATED", heal)
         self.assertIn("MessageBoxW", heal)
 
+
+
+class PublishReleaseTests(unittest.TestCase):
+    """验证 packaging/publish_release.py 环境变量动态解析、防呆门禁与 API 包装行为。"""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        publish_py = Path(REPO_ROOT) / "packaging" / "publish_release.py"
+        spec = importlib.util.spec_from_file_location("packaging.publish_release", publish_py)
+        cls.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.mod)
+
+    def test_get_token_from_env(self):
+        with patch.dict(os.environ, {"GITLAB_TOKEN": "token_abc"}, clear=False):
+            self.assertEqual(self.mod.get_token(), "token_abc")
+
+    def test_get_token_from_argv(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "argv", ["publish_release.py", "token_xyz"]):
+            self.assertEqual(self.mod.get_token(), "token_xyz")
+
+    def test_get_token_missing_raises_runtime_error(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "argv", ["publish_release.py"]):
+            with self.assertRaises(RuntimeError) as ctx:
+                self.mod.get_token()
+            self.assertIn("GITLAB_TOKEN", str(ctx.exception))
+
+    def test_get_gitlab_base_valid(self):
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://192.168.1.100:8080/"}, clear=False):
+            self.assertEqual(self.mod.get_gitlab_base(), "http://192.168.1.100:8080")
+
+    def test_get_gitlab_base_missing_raises(self):
+        with patch.dict(os.environ, {"GITLAB_BASE": ""}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                self.mod.get_gitlab_base()
+            self.assertIn("GITLAB_BASE", str(ctx.exception))
+
+    def test_get_project_id_valid(self):
+        with patch.dict(os.environ, {"GITLAB_PROJECT_ID": "42"}, clear=False):
+            self.assertEqual(self.mod.get_project_id(), 42)
+
+    def test_get_project_id_missing_raises(self):
+        with patch.dict(os.environ, {"GITLAB_PROJECT_ID": ""}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                self.mod.get_project_id()
+            self.assertIn("GITLAB_PROJECT_ID", str(ctx.exception))
+
+    def test_get_project_id_invalid_type_raises(self):
+        with patch.dict(os.environ, {"GITLAB_PROJECT_ID": "not_an_int"}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                self.mod.get_project_id()
+            self.assertIn("无效", str(ctx.exception))
+
+    def test_get_project_path_valid(self):
+        with patch.dict(os.environ, {"GITLAB_PROJECT_PATH": "/mygroup/myproject/"}, clear=False):
+            self.assertEqual(self.mod.get_project_path(), "mygroup/myproject")
+
+    def test_get_project_path_missing_raises(self):
+        with patch.dict(os.environ, {"GITLAB_PROJECT_PATH": ""}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                self.mod.get_project_path()
+            self.assertIn("GITLAB_PROJECT_PATH", str(ctx.exception))
+
+    def test_calc_sha256(self):
+        with tempfile.NamedTemporaryFile("wb", delete=False) as f:
+            f.write(b"DocTool release package test content")
+            tmp_path = f.name
+        try:
+            import hashlib
+            expected = hashlib.sha256(b"DocTool release package test content").hexdigest().upper()
+            self.assertEqual(self.mod.calc_sha256(tmp_path), expected)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_upload_file_puts_to_correct_url(self):
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {
+            "GITLAB_BASE": "http://gitlab.test",
+            "GITLAB_PROJECT_ID": "99",
+        }, clear=False):
+            with tempfile.NamedTemporaryFile("wb", delete=False) as f:
+                f.write(b"binary payload")
+                tmp_path = f.name
+            try:
+                mock_resp = MagicMock()
+                mock_resp.status = 201
+                mock_resp.__enter__.return_value = mock_resp
+                mock_resp.__exit__.return_value = None
+
+                captured_req = []
+                def fake_urlopen(req):
+                    captured_req.append(req)
+                    return mock_resp
+
+                with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                    self.mod.upload_file("test-token", "package.zip", tmp_path)
+
+                self.assertEqual(len(captured_req), 1)
+                req = captured_req[0]
+                self.assertIn(f"http://gitlab.test/api/v4/projects/99/packages/generic/DocTool/{self.mod.VERSION}/package.zip", req.full_url)
+                self.assertEqual(req.get_header("Private-token"), "test-token")
+                self.assertEqual(req.get_method(), "PUT")
+                self.assertEqual(req.data, b"binary payload")
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+
+
+    def test_get_package_files_success(self):
+        import json
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://gitlab.test", "GITLAB_PROJECT_ID": "99"}):
+            mock_resp_pkgs = MagicMock()
+            mock_resp_pkgs.read.return_value = json.dumps([{"name": "DocTool", "version": self.mod.VERSION, "id": 888}]).encode("utf-8")
+            mock_resp_pkgs.__enter__.return_value = mock_resp_pkgs
+            mock_resp_pkgs.__exit__.return_value = None
+
+            mock_resp_files = MagicMock()
+            mock_resp_files.read.return_value = json.dumps([{"file_name": f"DocTool-Setup-{self.mod.VERSION}.exe", "id": 1001}]).encode("utf-8")
+            mock_resp_files.__enter__.return_value = mock_resp_files
+            mock_resp_files.__exit__.return_value = None
+
+            with patch("urllib.request.urlopen", side_effect=[mock_resp_pkgs, mock_resp_files]):
+                files = self.mod.get_package_files("token")
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0]["id"], 1001)
+
+    def test_get_package_files_missing_package_raises(self):
+        import json
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://gitlab.test", "GITLAB_PROJECT_ID": "99"}):
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps([]).encode("utf-8")
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.__exit__.return_value = None
+
+            with patch("urllib.request.urlopen", return_value=mock_resp):
+                with self.assertRaises(RuntimeError) as ctx:
+                    self.mod.get_package_files("token")
+                self.assertIn("未找到 Package", str(ctx.exception))
+
+    def test_create_or_update_release_creates_when_not_exists(self):
+        import json
+        import urllib.error
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://gitlab.test", "GITLAB_PROJECT_ID": "99"}):
+            err = urllib.error.HTTPError("url", 404, "Not Found", {}, None)
+            mock_post_resp = MagicMock()
+            mock_post_resp.read.return_value = json.dumps({"tag_name": self.mod.TAG_NAME, "status": "created"}).encode("utf-8")
+            mock_post_resp.__enter__.return_value = mock_post_resp
+            mock_post_resp.__exit__.return_value = None
+
+            calls = []
+            def fake_urlopen(req):
+                calls.append(req)
+                if len(calls) == 1:
+                    raise err
+                return mock_post_resp
+
+            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                result = self.mod.create_or_update_release("token", "desc", [])
+
+            self.assertEqual(result["status"], "created")
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[1].get_method(), "POST")
+
+    def test_create_or_update_release_updates_when_exists(self):
+        import json
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://gitlab.test", "GITLAB_PROJECT_ID": "99"}):
+            mock_check_resp = MagicMock()
+            mock_check_resp.status = 200
+            mock_check_resp.__enter__.return_value = mock_check_resp
+            mock_check_resp.__exit__.return_value = None
+
+            mock_put_resp = MagicMock()
+            mock_put_resp.read.return_value = json.dumps({"tag_name": self.mod.TAG_NAME, "status": "updated"}).encode("utf-8")
+            mock_put_resp.__enter__.return_value = mock_put_resp
+            mock_put_resp.__exit__.return_value = None
+
+            calls = []
+            def fake_urlopen(req):
+                calls.append(req)
+                if len(calls) == 1:
+                    return mock_check_resp
+                return mock_put_resp
+
+            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                result = self.mod.create_or_update_release("token", "new_desc", [])
+
+            self.assertEqual(result["status"], "updated")
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[1].get_method(), "PUT")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

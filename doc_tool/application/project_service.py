@@ -201,6 +201,98 @@ def read_validation_report_summary(report_path: Path) -> dict:
     return summary
 
 
+def filter_validation_report_content(
+    content: str,
+    *,
+    status_filter: str = "",
+    keyword: str = "",
+) -> tuple[str, int]:
+    """按状态（FAIL/PASS/指标）及关键词筛选校验报告内容。
+
+    Args:
+        content: 校验报告 Markdown 原文。
+        status_filter: 状态筛选，可选 'FAIL'、'PASS'、'METRICS'，或空字符串表示全量。
+        keyword: 检索关键词（不区分大小写，支持多词空格联合检索）。
+
+    Returns:
+        (过滤后的报告文本, 匹配的条目数)
+    """
+    if not content:
+        return "", 0
+    kw = (keyword or "").strip().lower()
+    words = kw.split() if kw else []
+    sf = (status_filter or "").strip().upper()
+
+    lines = content.splitlines()
+    if not sf and not words:
+        count = sum(1 for line in lines if line.strip().startswith("- ["))
+        return content, count
+
+    doc_title = ""
+    sections: List[Tuple[Optional[str], List[str]]] = []
+    cur_header: Optional[str] = None
+    cur_lines: List[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            doc_title = line
+        elif stripped.startswith("##"):
+            if cur_header is not None or cur_lines:
+                sections.append((cur_header, cur_lines))
+            cur_header = line
+            cur_lines = []
+        else:
+            cur_lines.append(line)
+    if cur_header is not None or cur_lines:
+        sections.append((cur_header, cur_lines))
+
+    result_lines: List[str] = []
+    if doc_title:
+        result_lines.append(doc_title)
+        result_lines.append("")
+
+    matched_count = 0
+    for header, sec_lines in sections:
+        header_name = header.strip() if header else ""
+        is_metrics_sec = any(k in header_name for k in ("关键指标", "总结", "Metrics", "Summary"))
+
+        if sf in ("FAIL", "PASS"):
+            if is_metrics_sec:
+                continue
+        elif sf == "METRICS":
+            if not is_metrics_sec:
+                continue
+
+        filtered_sec: List[str] = []
+        for line in sec_lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            is_fail = stripped.startswith("- [FAIL]")
+            is_pass = stripped.startswith("- [PASS]")
+            if sf == "FAIL" and not is_fail:
+                continue
+            if sf == "PASS" and not is_pass:
+                continue
+            if sf == "METRICS":
+                if not (stripped.startswith("- ") or stripped.startswith("|")):
+                    continue
+            if words and not all(w in stripped.lower() for w in words):
+                continue
+            filtered_sec.append(line)
+            matched_count += 1
+
+        if filtered_sec:
+            if header:
+                result_lines.append(header)
+                result_lines.append("")
+            result_lines.extend(filtered_sec)
+            result_lines.append("")
+
+    return "\n".join(result_lines).strip() + "\n", matched_count
+
+
 def load_recent_projects() -> List[RecentEntry]:
     """加载最近项目列表。"""
     recent_path = _recent_file()

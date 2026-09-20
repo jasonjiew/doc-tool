@@ -116,6 +116,8 @@ class ProjectLoadingOverlay(QWidget):
         super().__init__(parent)
         self._dark = dark
         self._on_finished_callback: Optional[Callable[[], None]] = None
+        self._is_finishing = False
+        self._anim_generation = 0
         self._current_step = 0
 
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
@@ -309,6 +311,10 @@ class ProjectLoadingOverlay(QWidget):
         else:
             self._title_label.setText("正在打开项目")
 
+        self._anim_generation += 1
+        self._on_finished_callback = None
+        self._is_finishing = False
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self._anim.stop()
         self._opacity_effect.setEnabled(False)
         self._opacity_effect.setOpacity(1.0)
@@ -320,72 +326,119 @@ class ProjectLoadingOverlay(QWidget):
         self._update_step_pills()
         self._spinner.start()
         self.show()
+        self.raise_()
         QApplication.processEvents()
 
     def show_stage(self, stage_text: str) -> None:
         """更新当前执行阶段文字并步进进度。"""
         self._stage_label.setText(stage_text)
 
-        # 智能匹配步进
-        if "配置" in stage_text or "元数据" in stage_text:
-            self._current_step = 0
-            self._progress_bar.setValue(25)
-        elif "索引" in stage_text:
-            self._current_step = 1
-            self._progress_bar.setValue(55)
-        elif "工作区" in stage_text or "准备" in stage_text:
-            self._current_step = 2
-            self._progress_bar.setValue(75)
+        # 智能匹配步进（先匹配终态与高位阶段，防止关键词包含误判）
+        if "就绪" in stage_text or "完成" in stage_text:
+            self._current_step = 4
+            self._progress_bar.setValue(100)
         elif "标签" in stage_text or "恢复" in stage_text:
             self._current_step = 3
             self._progress_bar.setValue(90)
-        elif "就绪" in stage_text or "完成" in stage_text:
-            self._current_step = 4
-            self._progress_bar.setValue(100)
+        elif "工作区" in stage_text or "准备" in stage_text or "视图" in stage_text:
+            self._current_step = 2
+            self._progress_bar.setValue(75)
+        elif "索引" in stage_text:
+            self._current_step = 1
+            self._progress_bar.setValue(55)
+        elif "配置" in stage_text or "元数据" in stage_text:
+            self._current_step = 0
+            self._progress_bar.setValue(25)
 
         self._update_step_pills()
         QApplication.processEvents()
 
-    def finish(self, on_finished: Optional[Callable[[], None]] = None) -> None:
+    def finish(self, on_finished: Optional[Callable[[], None]] = None, *args) -> None:
         """平滑淡出并隐藏遮罩。"""
-        self._on_finished_callback = on_finished
+        cb = on_finished if callable(on_finished) else None
+        if getattr(self, "_is_finishing", False):
+            if cb:
+                cb()
+            return
+
+        self._is_finishing = True
+        self._on_finished_callback = cb
         if not self.isVisible():
             self._spinner.stop()
             self._opacity_effect.setEnabled(False)
-            if on_finished:
-                on_finished()
+            self._is_finishing = False
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+            if cb:
+                cb()
             return
 
         self._current_step = 4
         self._progress_bar.setValue(100)
         self._update_step_pills()
         self._stage_label.setText("就绪")
-        self._spinner.stop()
+        # 淡出期间保持 spinner 顺畅旋转，直至 _on_animation_finished 彻底隐藏时停止
+
+        # 淡出期间将鼠标事件透传给下层工作区，避免 220ms 动画期间界面卡顿
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         if hasattr(self, "_card_shadow") and self._card_shadow:
             self._card_shadow.setEnabled(False)
 
         self._opacity_effect.setEnabled(True)
         self._opacity_effect.setOpacity(1.0)
+        self._anim_generation += 1
+        gen = self._anim_generation
         self._anim.stop()
         self._anim.setStartValue(1.0)
         self._anim.setEndValue(0.0)
         self._anim.start()
+        # 安全兜底：如果 QPropertyAnimation 因任何原因未正常触发 finished，定时器确保强行退出
+        QTimer.singleShot(self._anim.duration() + 80, lambda: self._safety_hide(gen))
 
     def _on_animation_finished(self) -> None:
         self._spinner.stop()
         self.hide()
+        self._is_finishing = False
         self._opacity_effect.setEnabled(False)
         self._opacity_effect.setOpacity(1.0)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         if hasattr(self, "_card_shadow") and self._card_shadow:
             self._card_shadow.setEnabled(True)
-        if self._on_finished_callback:
+        if self._on_finished_callback and callable(self._on_finished_callback):
             cb = self._on_finished_callback
             self._on_finished_callback = None
             cb()
+        else:
+            self._on_finished_callback = None
+
+    def finish_immediately(self, on_finished: Optional[Callable[[], None]] = None, *args) -> None:
+        """立即隐藏遮罩，不等待淡出动画（用于 Esc、跳过按钮或异常恢复）。"""
+        self._anim_generation += 1
+        self._anim.stop()
+        self._spinner.stop()
+        self.hide()
+        self._is_finishing = False
+        self._opacity_effect.setEnabled(False)
+        self._opacity_effect.setOpacity(1.0)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        if hasattr(self, "_card_shadow") and self._card_shadow:
+            self._card_shadow.setEnabled(True)
+        cb = on_finished if callable(on_finished) else self._on_finished_callback
+        self._on_finished_callback = None
+        if cb and callable(cb):
+            cb()
+
+    def _safety_hide(self, gen: Optional[int] = None) -> None:
+        if gen is not None and gen != self._anim_generation:
+            return
+        try:
+            if self.isVisible():
+                self._on_animation_finished()
+        except RuntimeError:
+            pass
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        """按 Esc 键直接退出遮罩。"""
+        """按 Esc 键平滑退出遮罩。"""
         if event.key() == Qt.Key.Key_Escape:
             self.finish()
             event.accept()

@@ -230,10 +230,16 @@ def find_git_repo_root(start: Path) -> Optional[Path]:
 
 def find_svn_wc_root(start: Path) -> Optional[Path]:
     """从 start 向父目录查找 .svn 元数据目录，返回工作副本根。"""
-    current = Path(start).resolve()
+    try:
+        current = Path(start).resolve()
+    except (OSError, RuntimeError):
+        return None
     for candidate in (current, *current.parents):
-        if (candidate / ".svn").is_dir():
-            return candidate
+        try:
+            if (candidate / ".svn").is_dir():
+                return candidate
+        except OSError:
+            continue
     return None
 
 
@@ -681,7 +687,7 @@ class ChangeDetectionService:
         content_root: Path,
         *,
         timeout: float = 20.0,
-        cache_ttl: float = 2.0,
+        cache_ttl: float = 15.0,
         git_runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
         svn_runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
     ) -> None:
@@ -697,6 +703,7 @@ class ChangeDetectionService:
         # 只在项目零变更时才需要，且跟踪状态几乎不变，用较长 TTL 避免
         # 每次刷新都多起一个 git 进程。
         self._tracked_cache: Optional[Tuple[float, bool]] = None
+        self._branches_cache: Optional[Tuple[float, List[GitBranch], Optional[str]]] = None
 
     @property
     def project_root(self) -> Path:
@@ -811,6 +818,8 @@ class ChangeDetectionService:
 
     def invalidate_cache(self) -> None:
         """项目内写操作后调用：使本窗口所属仓库的缓存失效，保证刷新及时。"""
+        self._branches_cache = None
+        self._tracked_cache = None
         repo_root = find_git_repo_root(self._project_root)
         if repo_root is not None:
             _GIT_CACHE.pop(str(repo_root), None)
@@ -820,19 +829,41 @@ class ChangeDetectionService:
 
     # --- Git 分支与推送/暂存操作 ---
 
-    def branches(self) -> Tuple[List[GitBranch], Optional[str]]:
+    def get_cached_branches(self) -> Tuple[List[GitBranch], bool]:
+        """获取当前有效缓存的分支列表（若有且在 TTL 内），返回 (branches, has_valid_cache)"""
+        if self._branches_cache is not None:
+            ts, b_list, _ = self._branches_cache
+            if time.monotonic() - ts <= self._cache_ttl:
+                return b_list, True
+        return [], False
+
+    def branches(self, *, timeout: Optional[float] = None) -> Tuple[List[GitBranch], Optional[str]]:
         """列出当前项目的 Git 分支列表（含本地与远程分支）。"""
+        if self._branches_cache is not None:
+            ts, b_list, b_err = self._branches_cache
+            if time.monotonic() - ts <= self._cache_ttl:
+                return b_list, b_err
         report = self.detect()
         if report.source != "git":
-            return [], "当前项目不在 Git 仓库内"
+            err_msg = report.error or "当前项目不在 Git 仓库内"
+            self._branches_cache = (time.monotonic(), [], err_msg)
+            return [], err_msg
         root_text = (report.repository_root or "").strip()
         if not root_text:
-            return [], "Git 仓库根不可用"
-        return list_git_branches(
-            Path(root_text),
-            runner=self._git_runner,
-            uncommitted_count=len(report.files),
-        )
+            err_msg = "Git 仓库根不可用"
+            self._branches_cache = (time.monotonic(), [], err_msg)
+            return [], err_msg
+        try:
+            branches, err = list_git_branches(
+                Path(root_text),
+                timeout=timeout or 10.0,
+                runner=self._git_runner,
+                uncommitted_count=len(report.files),
+            )
+        except Exception as exc:  # noqa: BLE001
+            branches, err = [], str(exc)[:200]
+        self._branches_cache = (time.monotonic(), branches, err)
+        return branches, err
 
     def switch_branch(
         self,
