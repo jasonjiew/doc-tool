@@ -165,6 +165,8 @@ a = Analysis(
         # 拦截冻结 exe 加载扩展模块。常规 GUI 与文档构建不依赖多进程 spawn；
         # Word 可用性预检在缺 multiprocessing 时降级为静态判定，不阻断流程。
         "multiprocessing",
+        # 排除 openpyxl 可选依赖 numpy，保持分发包轻量且与 CI 依赖严格一致
+        "numpy",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
