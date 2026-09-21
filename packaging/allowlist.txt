@@ -15,6 +15,8 @@ doc-tool-cli.exe
 _internal/python313.dll
 _internal/_*.dll
 _internal/*.dll
+_internal/_*.pyd
+_internal/*.pyd
 _internal/base_library.zip
 _internal/base_library.zip.bak
 # 1.4.4: base_library.zip 的备份（启动脚本检测到被安全软件改写时自动恢复）
@@ -44,6 +46,30 @@ _internal/setuptools/**
 # cryptography：PDF 工具箱 AES-256 加密解密支持
 _internal/cryptography/**
 _internal/cryptography-*.dist-info/**
+# openpyxl 与 et_xmlfile（XLSX/表格互转与数据表处理）
+_internal/openpyxl/**
+_internal/openpyxl-*.dist-info/**
+_internal/et_xmlfile/**
+_internal/et_xmlfile-*.dist-info/**
+
+# reportlab 与 pypdf（PDF 导出、拆分与页面重排）
+_internal/reportlab/**
+_internal/reportlab-*.dist-info/**
+_internal/pypdf/**
+_internal/pypdf-*.dist-info/**
+
+# cffi 与 pycparser（cryptography 底层依赖）
+_internal/cffi/**
+_internal/cffi-*.dist-info/**
+_internal/pycparser/**
+_internal/pycparser-*.dist-info/**
+
+# 依赖元数据包
+_internal/*.dist-info/**
+_internal/*-*.dist-info/**
+_internal/python_docx-*.dist-info/**
+_internal/docx-*.dist-info/**
+
 
 # === PySide6 / shiboken6（Qt Widgets 绑定与翻译） ===
 # PyInstaller 内置 PySide6 hook 按实际 import 收集 QtCore/QtGui/QtWidgets 的
@@ -65,6 +91,8 @@ _internal/doc_tool/**
 
 # === 内核脚本 ===
 _internal/scripts/*.pyc
+_internal/scripts/*.py
+_internal/scripts/**
 
 # === 许可文件 ===
 _internal/THIRD_PARTY_LICENSES.txt

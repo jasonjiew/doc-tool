@@ -169,6 +169,10 @@ jobs:
         shell: pwsh
         run: pyinstaller packaging/doc_tool.spec --noconfirm --clean
 
+      - name: 加固 dist（透明加密与字节码编译）
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File packaging\harden_dist.ps1
+
       - name: 冻结应用冒烟测试
         shell: pwsh
         run: python scripts\tests\test_frozen_smoke.py
@@ -206,6 +210,10 @@ jobs:
         with:
           name: dist-onedir
           path: dist/DocTool/
+
+      - name: 加固 dist（透明加密与字节码编译）
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File packaging\harden_dist.ps1
 
       - name: 重装 SBOM 生成工具依赖
         shell: pwsh
