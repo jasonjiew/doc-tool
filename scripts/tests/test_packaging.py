@@ -380,8 +380,8 @@ class PublishReleaseTests(unittest.TestCase):
             self.assertIn("GITLAB_TOKEN", str(ctx.exception))
 
     def test_get_gitlab_base_valid(self):
-        with patch.dict(os.environ, {"GITLAB_BASE": "http://192.168.1.100:8080/"}, clear=False):
-            self.assertEqual(self.mod.get_gitlab_base(), "http://192.168.1.100:8080")
+        with patch.dict(os.environ, {"GITLAB_BASE": "http://gitlab.example.internal:8080/"}, clear=False):
+            self.assertEqual(self.mod.get_gitlab_base(), "http://gitlab.example.internal:8080")
 
     def test_get_gitlab_base_missing_raises(self):
         with patch.dict(os.environ, {"GITLAB_BASE": ""}, clear=False):

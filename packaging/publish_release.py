@@ -38,7 +38,7 @@ def get_gitlab_base() -> str:
     """返回 GitLab 基础 URL；未配置时给出明确报错。"""
     base = os.getenv("GITLAB_BASE", GITLAB_BASE).rstrip("/")
     if not base:
-        raise RuntimeError("请设置 GITLAB_BASE 环境变量（GitLab 实例地址，如 http://192.168.0.242:8899）")
+        raise RuntimeError("请设置 GITLAB_BASE 环境变量（GitLab 实例地址，如 http://gitlab.example.internal:8899）")
     return base
 
 

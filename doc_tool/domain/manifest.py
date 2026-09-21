@@ -36,7 +36,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 from doc_tool.domain.errors import IncompatibleSchemaError, ProjectManifestError
 from doc_tool.domain.paths import (
@@ -206,6 +209,9 @@ class ProjectManifest:
         }
 
     def to_yaml(self) -> str:
+        global yaml
+        if yaml is None:
+            import yaml
         return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
 
     # --- 保存与备份 ---
@@ -268,9 +274,13 @@ class ProjectManifest:
                 suggested_action="请确认选择了正确的项目目录，或使用导入功能创建项目。",
                 details={"path": str(manifest_path)},
             )
+        global yaml
+        if yaml is None:
+            import yaml
+        yaml_error = getattr(yaml, "YAMLError", Exception)
         try:
             data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        except (yaml.YAMLError, UnicodeError, OSError) as exc:
+        except (yaml_error, UnicodeError, OSError) as exc:
             raise ProjectManifestError(
                 "项目清单 YAML 解析失败。",
                 details={"error": str(exc)},

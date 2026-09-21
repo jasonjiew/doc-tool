@@ -61,7 +61,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $tagVersion = '${{ github.ref_name }}'.TrimStart('v')
-          $appVersion = python -c "from doc_tool.domain.version import APP_VERSION; print(APP_VERSION)"
+          $appVersion = (Select-String -Path 'doc_tool\domain\version.py' -Pattern 'APP_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
           $installerVersion = (Select-String -Path 'packaging\installer.iss' -Pattern '#define\s+MyAppVersion\s+"([^"]+)"').Matches[0].Groups[1].Value
           $buildVersion = (Select-String -Path 'packaging\build.ps1' -Pattern '\$Version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
           Write-Host "tag=$tagVersion app=$appVersion installer=$installerVersion build=$buildVersion"
@@ -82,7 +82,7 @@ jobs:
             $dirty | Write-Host
             throw '工作树存在未提交或未跟踪文件，禁止正式发布'
           }
-          python -c "from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
+          python -c "import sys; sys.path.insert(0, '.'); from doc_tool.domain.version import get_commit_id; print('commit:', get_commit_id())"
 
   # ---------- 阶段 2：测试与合规产物 ----------
   test:

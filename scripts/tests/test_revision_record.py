@@ -1085,7 +1085,7 @@ class AutolinkRevisionRecordTest(unittest.TestCase):
                 ],
             ),
             (
-                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1KSOA -> 3.1.1登录页 -> 3.1.1.4布局",
+                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1SOA -> 3.1.1登录页 -> 3.1.1.4布局",
                 [
                     ("3.1", "bm_sec_31"),
                     ("3.1.1", "bm_sec_311"),
@@ -1170,7 +1170,7 @@ class AutolinkRevisionRecordTest(unittest.TestCase):
                 [("3.4", expr.find_bookmark_for_section("3.4"))],
             ),
             (
-                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1KSOA -> 3.1.1登录页 -> 3.1.1.4布局",
+                "优化模块：整体文档结构化，并按产品模块修改修改模块：3.1SOA -> 3.1.1登录页 -> 3.1.1.4布局",
                 [
                     ("3.1", expr.find_bookmark_for_section("3.1")),
                     ("3.1.1", expr.find_bookmark_for_section("3.1.1")),

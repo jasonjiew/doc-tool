@@ -942,30 +942,30 @@ class HyperlinkOOXMLStructureAndJumpTests(unittest.TestCase):
         from doc_tool.domain.paths import build_output_filename
         # 场景 1：documentName 带旧版本 (1.6)，升级为 1.7
         fn1 = build_output_filename(
-            "KF-2090-4-003",
-            "KF-2090-4-003 呼吸机软件通信协议说明书(1.6)",
+            "DOC-2090-4-003",
+            "DOC-2090-4-003 设备通信协议说明书(1.6)",
             "1.7",
             "general",
         )
-        self.assertEqual(fn1, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+        self.assertEqual(fn1, "DOC-2090-4-003 设备通信协议说明书(1.7).docx")
 
         # 场景 2：documentName 已带当前版本 (1.7)
         fn2 = build_output_filename(
-            "KF-2090-4-003",
-            "KF-2090-4-003 呼吸机软件通信协议说明书(1.7)",
+            "DOC-2090-4-003",
+            "DOC-2090-4-003 设备通信协议说明书(1.7)",
             "1.7",
             "general",
         )
-        self.assertEqual(fn2, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+        self.assertEqual(fn2, "DOC-2090-4-003 设备通信协议说明书(1.7).docx")
 
         # 场景 3：无版本号后缀
         fn3 = build_output_filename(
-            "KF-2090-4-003",
-            "呼吸机软件通信协议说明书",
+            "DOC-2090-4-003",
+            "设备通信协议说明书",
             "1.7",
             "general",
         )
-        self.assertEqual(fn3, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+        self.assertEqual(fn3, "DOC-2090-4-003 设备通信协议说明书(1.7).docx")
 
     def test_markdown_visible_text_italics_with_space(self):
         """测试 Markdown 行内斜体含空格时与 build_docx 生成的可见文本一致。"""
