@@ -626,6 +626,81 @@ def neutralize_hyperlink_fields(document_root) -> int:
     return removed
 
 
+def neutralize_dangling_hyperlinks(
+    document_root, available_bookmarks: Optional[Iterable[str]] = None
+) -> int:
+    """把指向不存在书签的原生 ``<w:hyperlink>`` 元素解除为静态文本（保留内部运行），返回解除数量。
+
+    注意：
+    1. 若超链接包含 ``r:id``，表示其为外部链接或关系目标链接（其 ``w:anchor`` 指向外部目标中的片段），
+       不属于当前文档书签引用，不得解除。
+    2. 解除超链接包装时，必须完整保留被解除节点的内部子节点、``text`` 与 ``tail`` 文本，避免 OOXML 内容丢失。
+    """
+    qn = _wqn
+    r_ns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    if available_bookmarks is None:
+        available = {
+            node.get(qn("name"))
+            for node in document_root.iter(qn("bookmarkStart"))
+            if node.get(qn("name"))
+        }
+    else:
+        available = set(available_bookmarks)
+
+    removed = 0
+    for hl in list(document_root.iter(qn("hyperlink"))):
+        rid = hl.get(r_ns + "id") or hl.get("r:id")
+        anchor = hl.get(qn("anchor"))
+        # 外部链接或带 r:id 关系的超链接不属于本地书签判定范畴
+        if rid:
+            continue
+        # 若无 rid 且 (未设置 anchor 或 anchor 不在可用书签中)，则判定为悬空超链接
+        if not anchor or anchor not in available:
+            parent = hl.getparent()
+            if parent is not None:
+                index = parent.index(hl)
+                children = list(hl)
+                if hl.text:
+                    if children:
+                        first_child = children[0]
+                        if first_child.tag == qn("r"):
+                            t_node = first_child.find(qn("t"))
+                            if t_node is not None:
+                                t_node.text = hl.text + (t_node.text or "")
+                            else:
+                                t_node = etree.Element(qn("t"))
+                                t_node.text = hl.text
+                                first_child.insert(0, t_node)
+                        else:
+                            r = etree.Element(qn("r"))
+                            t = etree.SubElement(r, qn("t"))
+                            t.text = hl.text
+                            children.insert(0, r)
+                    else:
+                        r = etree.Element(qn("r"))
+                        t = etree.SubElement(r, qn("t"))
+                        t.text = hl.text
+                        children.append(r)
+
+                for child in children:
+                    parent.insert(index, child)
+                    index += 1
+
+                if hl.tail:
+                    if children:
+                        children[-1].tail = (children[-1].tail or "") + hl.tail
+                    else:
+                        prev = hl.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or "") + hl.tail
+                        else:
+                            parent.text = (parent.text or "") + hl.tail
+
+                parent.remove(hl)
+                removed += 1
+    return removed
+
+
 def normalize_business_text(text: str) -> str:
     """Normalize representation-only differences, not business characters.
 
@@ -635,7 +710,435 @@ def normalize_business_text(text: str) -> str:
     strict.  These are the only normalization rules used by the validator.
     """
     value = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    value = value.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ")
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    # 过滤零宽字符与文本方向标记
+    for ch in ("\u200b", "\u200c", "\u200d", "\ufeff", "\u200e", "\u200f"):
+        value = value.replace(ch, "")
+    # 全角空格与各种 Unicode 空白字符归一化为半角空格
+    for ch in ("\u3000", "\u00a0", "\u2002", "\u2003", "\u2009"):
+        value = value.replace(ch, " ")
+    # 逐行折叠连续空白并去除首尾空白
     value = "\n".join(re.sub(r"[ \t]+", " ", line).strip() for line in value.split("\n")).strip()
     value = re.sub(r"^[\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043]\s*", "", value)
     return value
+
+
+def _normalize_event_text(s: str) -> str:
+    """对事件文本执行表示层深度归一化，消除 Markdown 与 Word 的表示层差异。"""
+    t = str(s).replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"<br\s*/?>", "\n", t, flags=re.IGNORECASE)
+    for ch in ("\u200b", "\u200c", "\u200d", "\ufeff", "\u200e", "\u200f"):
+        t = t.replace(ch, "")
+    for ch in ("\u3000", "\u00a0", "\u2002", "\u2003", "\u2009"):
+        t = t.replace(ch, " ")
+    # Markdown 常见转义字符还原
+    t = t.replace(r"\|", "|").replace(r"\*", "*").replace(r"\_", "_").replace(r"\[", "[").replace(r"\]", "]")
+    # 剥离项目符号
+    t = re.sub(r"^[\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043]\s*", "", t)
+    # 逐行去除首尾空格并丢弃空行
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in t.split("\n")]
+    return "\n".join(l for l in lines if l)
+
+
+def _normalize_formula_text(s: str) -> str:
+    """归一化公式/算式与常见标点的表示与空格差异（乘号、波浪号、正负号、全角半角标点等）。"""
+    t = s.replace("×", "*").replace("～", "~")
+    t = t.replace("－", "-").replace("–", "-").replace("—", "-")
+    t = t.replace("／", "/").replace("％", "%").replace("＋", "+").replace("＝", "=")
+    t = t.replace("＜", "<").replace("＞", ">")
+    t = t.replace("（", "(").replace("）", ")")
+    t = t.replace("【", "[").replace("】", "]")
+    t = t.replace("“", '"').replace("”", '"')
+    t = t.replace("‘", "'").replace("’", "'")
+    t = t.replace("：", ":").replace("；", ";").replace("，", ",")
+    t = re.sub(r"\s*([+\-*/=<>~:()[\]])\s*", r"\1", t)
+    t = re.sub(r"([;,])\s*", r"\1 ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _is_event_text_equivalent(val1: object, val2: object) -> bool:
+    """判断两个事件文本是否在语义上等价（放行格式表示层细节）。"""
+    s1 = str(val1)
+    s2 = str(val2)
+    if s1 == s2:
+        return True
+    n1 = _normalize_event_text(s1)
+    n2 = _normalize_event_text(s2)
+    if n1 == n2:
+        return True
+    f1 = _normalize_formula_text(n1)
+    f2 = _normalize_formula_text(n2)
+    return f1 == f2
+
+
+def _is_matrix_equivalent(m1, m2) -> bool:
+    """判断两个表格文本矩阵是否等价。"""
+    if len(m1) != len(m2):
+        return False
+    for r1, r2 in zip(m1, m2):
+        if len(r1) != len(r2):
+            return False
+        for c1, c2 in zip(r1, r2):
+            if not _is_event_text_equivalent(c1, c2):
+                return False
+    return True
+
+_MANUAL_PREFIX_RE = re.compile(
+    r"^(?:(?:\d{1,3}、\s*)|(?:\d{1,3}[.．](?!\d)\s*)|(?:[-*•+]\s+)|(?:[\(（\[【](?:\d{1,3}|[一二三四五六七八九十]+|[a-zA-Z]|[ivxIVX]+)[\)）\]】]\s*)|(?:[\u2460-\u2473①②③④⑤⑥⑦⑧⑨⑩]\s*)|(?:[一二三四五六七八九十]+[、.．]\s*)|(?:(?:\d{1,3}|[一二三四五六七八九十]+|[a-zA-Z]|[ivxIVX]+)[\)）]\s*)|(?:[a-zA-Z][.．](?!\w)\s*))"
+)
+
+
+def _strip_manual_prefix(text: str) -> str:
+    """去掉开头的字面编号或列表符号（如 ``1. 概述``、``1、概述``、``- 列表项``），用于段落文本对齐。"""
+    stripped = text.strip()
+    return _MANUAL_PREFIX_RE.sub("", stripped).strip()
+
+
+# --- 修订记录表（多行表头、语义列映射、尾部非版本截断） ---
+
+REVISION_VERSION_KEYWORDS = ("版本号", "版次", "版本", "version", "rev", "ver")
+REVISION_SUMMARY_KEYWORDS = (
+    "修改摘要", "更新摘要", "修订摘要", "变更摘要", "更改摘要",
+    "修改内容", "更新内容", "修订内容", "变更内容", "更改内容",
+    "修改说明", "修订说明", "变更说明", "更改说明",
+    "修改记录", "修订记录", "变更记录",
+    "摘要", "修订", "修改", "更改", "变更", "内容", "说明",
+    "summary", "description", "details", "change", "comment"
+)
+REVISION_DATE_KEYWORDS = (
+    "修改时间", "修订时间", "变更时间", "更改时间",
+    "修改日期", "修订日期", "变更日期", "更改日期",
+    "发布日期", "更新日期", "时间", "日期", "date", "time"
+)
+REVISION_AUTHOR_KEYWORDS = (
+    "修改人", "修订人", "变更人", "更改人",
+    "修改者", "修订者", "变更者", "更改者",
+    "编制人", "编写人", "起草人", "作者", "责任人",
+    "编制", "编写", "起草", "author", "editor", "modifier", "writer"
+)
+REVISION_FOOTER_KEYWORDS = (
+    "审核", "审批", "批准", "签批", "校对", "核对", "会签", "签字", "签名",
+    "部门", "密级", "受控", "说明：", "说明:", "备注：", "备注:", "注：", "注:",
+    "分发", "发放"
+)
+
+
+def _cell_text(cell) -> str:
+    r"""提取单元格纯文本，保留段落与手动换行（w:br/w:cr）的换行结构。"""
+    if cell is None:
+        return ""
+    lines: List[str] = []
+    for paragraph in cell.iter(_wqn("p")):
+        parts: List[str] = []
+        for node in paragraph.iter():
+            if node.tag == _wqn("t"):
+                parts.append(node.text or "")
+            elif node.tag in (_wqn("br"), _wqn("cr")):
+                parts.append("\n")
+            elif node.tag == _wqn("tab"):
+                parts.append("\t")
+        for line in "".join(parts).split("\n"):
+            stripped = line.strip()
+            if stripped:
+                lines.append(stripped)
+    return "\n".join(lines)
+
+
+def score_revision_header_row(cell_texts: Sequence[str]) -> int:
+    """计算一行作为修订记录表列头行的可信度评分。"""
+    if len(cell_texts) < 2:
+        return 0
+    non_empty = [t.strip() for t in cell_texts if t.strip()]
+    if len(non_empty) < 2:
+        return 0
+    # 如果大部分单元格都是长说明句或含有句号/描述词，判定为说明句而非列头
+    def _is_long_desc(t: str) -> bool:
+        if len(t) > 25 or "如下" in t or "。" in t or "详见" in t or "请参阅" in t:
+            return True
+        if ("：" in t or ":" in t) and len(t) > 8:
+            return True
+        return False
+
+    long_cells = sum(1 for t in non_empty if _is_long_desc(t))
+    if len(non_empty) == 2 and long_cells >= 1:
+        return 0
+    if long_cells * 2 >= len(non_empty):
+        return 0
+
+    norm_texts = [re.sub(r"\s+", "", t).lower() for t in non_empty]
+    v_indices = [
+        i for i, t in enumerate(norm_texts)
+        if any(vk in t for vk in REVISION_VERSION_KEYWORDS)
+        and not any(sk in t for sk in ("说明", "摘要", "内容", "记录"))
+    ]
+    s_indices = [
+        i for i, t in enumerate(norm_texts)
+        if any(sk in t for sk in REVISION_SUMMARY_KEYWORDS)
+    ]
+    # 版本列与修改摘要列必须为不同的列
+    if not any(v_i != s_i for v_i in v_indices for s_i in s_indices):
+        return 0
+
+    has_d = any(any(dk in t for dk in REVISION_DATE_KEYWORDS) for t in norm_texts)
+    has_a = any(
+        any(ak in t for ak in REVISION_AUTHOR_KEYWORDS)
+        or ("人" in t and "时间" not in t and "日期" not in t)
+        for t in norm_texts
+    )
+
+    score = 10
+    if has_d:
+        score += 10
+    if has_a:
+        score += 10
+    score += len(non_empty)
+    return score
+
+
+def is_revision_header_row(cell_texts: Sequence[str]) -> bool:
+    """判断一行文本是否为修订记录表的列头行。"""
+    return score_revision_header_row(cell_texts) > 0
+
+
+def map_revision_columns(
+    header_texts: Sequence[str],
+) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]:
+    """智能语义映射修订记录表列索引 -> (version_col, summary_col, date_col, author_col)。"""
+    v_col: Optional[int] = None
+    s_col: Optional[int] = None
+    d_col: Optional[int] = None
+    a_col: Optional[int] = None
+
+    norm_texts = [re.sub(r"\s+", "", t).lower() for t in header_texts]
+
+    # 1. 优先匹配修订日期列（优先匹配明确非审批的日期）
+    for i, t in enumerate(norm_texts):
+        if d_col is None and any(k in t for k in REVISION_DATE_KEYWORDS):
+            if not any(ak in t for ak in ("审核", "审批", "批准", "签批", "会签")):
+                d_col = i
+                break
+    if d_col is None:
+        for i, t in enumerate(norm_texts):
+            if any(k in t for k in REVISION_DATE_KEYWORDS):
+                d_col = i
+                break
+
+    # 2. 匹配人员列（排除已确认为日期的列，优先非审批人）
+    for i, t in enumerate(norm_texts):
+        if i == d_col:
+            continue
+        if any(ak in t for ak in ("审核", "审批", "批准", "签批", "会签")):
+            continue
+        if a_col is None and (
+            any(k in t for k in REVISION_AUTHOR_KEYWORDS)
+            or (any(k in t for k in ("人", "者", "员")) and not any(k in t for k in ("时间", "日期")))
+        ):
+            a_col = i
+            break
+    if a_col is None:
+        for i, t in enumerate(norm_texts):
+            if i == d_col:
+                continue
+            if (
+                any(k in t for k in REVISION_AUTHOR_KEYWORDS)
+                or (any(k in t for k in ("人", "者", "员")) and not any(k in t for k in ("时间", "日期")))
+            ):
+                a_col = i
+                break
+
+    # 3. 匹配版本列（排除日期、人员）
+    for i, t in enumerate(norm_texts):
+        if i in (d_col, a_col):
+            continue
+        if v_col is None and any(k in t for k in REVISION_VERSION_KEYWORDS):
+            if not any(sk in t for sk in ("说明", "摘要", "内容", "记录")):
+                v_col = i
+                break
+
+    # 4. 匹配摘要/修改说明列（排除版本、日期、人员）
+    # 单号/编号列（如"修订单号"、"变更单号"、"序号"）不得误判为修改摘要
+    def _is_summary_candidate(text: str) -> bool:
+        return not any(nk in text for nk in ("单号", "编号", "序号", "no.", "no"))
+
+    # 4a. 高可信优先：匹配具体的多字词（修改内容、修订摘要、变更说明等）
+    high_precision_summary = (
+        "修改内容", "更新内容", "修订内容", "变更内容", "更改内容",
+        "修改摘要", "更新摘要", "修订摘要", "变更摘要", "更改摘要",
+        "修改说明", "修订说明", "变更说明", "更改说明",
+        "修改记录", "修订记录", "变更记录",
+        "摘要", "内容", "说明", "summary", "description", "details"
+    )
+    for i, t in enumerate(norm_texts):
+        if i in (v_col, d_col, a_col):
+            continue
+        if s_col is None and _is_summary_candidate(t) and any(k in t for k in high_precision_summary):
+            s_col = i
+            break
+
+    # 4b. 兜底匹配次级关键词
+    if s_col is None:
+        for i, t in enumerate(norm_texts):
+            if i in (v_col, d_col, a_col):
+                continue
+            if _is_summary_candidate(t) and any(k in t for k in REVISION_SUMMARY_KEYWORDS):
+                s_col = i
+                break
+
+    # 5. 兜底映射未匹配的角色（优先选择非序号/单号列映射到版本与摘要）
+    used = {c for c in (v_col, s_col, d_col, a_col) if c is not None}
+    available = [i for i in range(len(header_texts)) if i not in used]
+
+    def _pick_available(prefer_non_index: bool = True) -> Optional[int]:
+        if not available:
+            return None
+        if prefer_non_index:
+            for idx in list(available):
+                if not any(nk in norm_texts[idx] for nk in ("单号", "编号", "序号", "no.", "no")):
+                    available.remove(idx)
+                    return idx
+        return available.pop(0)
+
+    if v_col is None:
+        v_col = _pick_available(prefer_non_index=True)
+    if s_col is None:
+        s_col = _pick_available(prefer_non_index=True)
+    if d_col is None:
+        d_col = _pick_available(prefer_non_index=False)
+    if a_col is None:
+        a_col = _pick_available(prefer_non_index=False)
+
+    return v_col, s_col, d_col, a_col
+
+
+def is_revision_footer_row(
+    cell_texts: Sequence[str], v_col: Optional[int] = 0
+) -> bool:
+    """判断是否为修订记录表尾部的非版本说明/签批/审核行。"""
+    if not cell_texts or not any(cell_texts):
+        return False
+    combined = "".join(cell_texts).strip()
+    if any(k in combined for k in (
+        "编制人", "审核人", "批准人", "签批人", "校对人", "复核人", "会签人",
+        "审核：", "审核:", "批准：", "批准:", "编制：", "编制:", "签批：", "签批:",
+        "校对：", "校对:", "会签：", "会签:",
+        "说明：", "说明:", "备注：", "备注:", "注：", "注:", "受控", "密级",
+    )):
+        return True
+    if combined.startswith(("说明", "备注", "注：", "注:", "提示")):
+        return True
+
+    # 检查单元格中是否存在独立的审批/说明/状态关键词（如 "审核", "批准", "编制", "会签" 等独立标签）
+    approval_standalone = {
+        "审核", "审批", "批准", "签批", "校对", "核对", "复核", "会签",
+        "签字", "签名", "编制", "编写", "起草", "部门", "密级", "受控", "分发", "发放"
+    }
+    for t in cell_texts:
+        stripped = t.strip()
+        if not stripped:
+            continue
+        if stripped in approval_standalone:
+            return True
+        if any(stripped.startswith(k) for k in (
+            "审核：", "审核:", "批准：", "批准:", "编制：", "编制:", "签批：", "签批:",
+            "校对：", "校对:", "会签：", "会签:", "说明：", "说明:", "备注：", "备注:", "注：", "注:"
+        )):
+            return True
+
+    v_idx = v_col if (v_col is not None and 0 <= v_col < len(cell_texts)) else 0
+    v_text = cell_texts[v_idx].strip()
+    if any(k in v_text for k in REVISION_FOOTER_KEYWORDS) and len(v_text) <= 15:
+        return True
+
+    # 版本特征：包含 ASCII 字母数字（如 1.0, V1, Rev A）或中文版本常用词（初版, 第一版, 初稿, 试行版, 正式版, 初始发布, 第一次修订, 基线一等）
+    is_version_like = (
+        any(c.isascii() and c.isalnum() for c in v_text)
+        or any(k in v_text for k in ("版", "稿", "发布", "修订", "变更", "基线", "版本"))
+        or (v_text.startswith("第") and any(k in v_text for k in ("次", "期", "卷", "批")))
+    )
+    if not is_version_like and v_text:
+        return True
+    return False
+
+
+def find_revision_table_info(
+    doc_root,
+) -> Optional[Tuple[object, int, Tuple[Optional[int], Optional[int], Optional[int], Optional[int]]]]:
+    """在文档正文中查找修订记录表，并返回 (table_element, header_row_index, (v_col, s_col, d_col, a_col))。
+
+    支持单行表头、多行表头（1~3行）、智能列语义识别。
+    未找到时返回 None。
+    """
+    if doc_root is None:
+        return None
+    if doc_root.tag == _wqn("body"):
+        body = doc_root
+    else:
+        body = doc_root.find(_wqn("body"))
+        if body is None:
+            body = doc_root
+
+    for tbl in body.iter(_wqn("tbl")):
+        rows = tbl.findall(_wqn("tr"))
+        if len(rows) < 2:
+            continue
+        best_row_idx = None
+        best_score = 0
+        best_mapping = None
+        # 在前 4 行中寻找评分最高的列头行（支持单行及多行表头组合识别）
+        for row_idx, row in enumerate(rows[:4]):
+            cells = row.findall(_wqn("tc"))
+            header_texts = [_cell_text(c).strip() for c in cells]
+            sc = score_revision_header_row(header_texts)
+            if sc > best_score:
+                best_score = sc
+                best_row_idx = row_idx
+                best_mapping = map_revision_columns(header_texts)
+
+            # 多行表头支持：检查将前置行与当前行合并后的列头评分
+            if row_idx > 0:
+                prev_cells = rows[row_idx - 1].findall(_wqn("tc"))
+                prev_texts = [_cell_text(c).strip() for c in prev_cells]
+                if len(prev_texts) == len(header_texts):
+                    combined_texts = [
+                        "{0} {1}".format(p, h).strip()
+                        for p, h in zip(prev_texts, header_texts)
+                    ]
+                    sc_comb = score_revision_header_row(combined_texts)
+                    if sc_comb > best_score:
+                        best_score = sc_comb
+                        best_row_idx = row_idx
+                        best_mapping = map_revision_columns(combined_texts)
+        if best_row_idx is not None and best_score > 0:
+            return tbl, best_row_idx, best_mapping
+    return None
+
+
+def is_baseline_error_blocking(error: str, source_events: Sequence, rebuilt_events: Sequence) -> bool:
+    """判定基线差异是否属于内容丢失/层级变更等阻断性错误（BLOCK），放行安全的表示层 WARN。"""
+    if error.startswith("业务元素数量不一致"):
+        return True
+    match = re.match(r"^#(\d+)\s+(?:基线)?(?:内容|类型)?(?:/位置)?不一致:\s*(.+)$", error)
+    if not match:
+        return True
+    index = int(match.group(1))
+    if index >= len(source_events) or index >= len(rebuilt_events):
+        return True
+
+    left_event = source_events[index]
+    right_event = rebuilt_events[index]
+    left_kind = left_event.kind
+    right_kind = right_event.kind
+
+    if left_kind == "H" or right_kind == "H":
+        return True
+    if left_kind == "I" or right_kind == "I":
+        return True
+    if left_kind in {"P", "L", "X"} and right_kind in {"P", "L", "X"}:
+        left_val = left_event.value[0] if (left_kind == "L" and isinstance(left_event.value, tuple)) else str(left_event.value)
+        right_val = right_event.value[0] if (right_kind == "L" and isinstance(right_event.value, tuple)) else str(right_event.value)
+        if _is_event_text_equivalent(_strip_manual_prefix(left_val), _strip_manual_prefix(right_val)):
+            return False  # 内容等价，降级 WARN
+        return True  # 文本实质变化，BLOCK
+    if left_kind in {"T", "C"} and right_kind in {"T", "C"}:
+        return False  # 表格表示差异，降级 WARN
+    return True

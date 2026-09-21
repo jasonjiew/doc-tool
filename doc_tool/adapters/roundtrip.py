@@ -32,6 +32,39 @@ class RoundtripIssue:
     severity: str
     message: str
     position: str
+    source_desc: str = ""
+    rebuilt_desc: str = ""
+
+    def to_dict(self) -> Dict[str, str]:
+        src = self.source_desc
+        reb = self.rebuilt_desc
+        if not src or not reb:
+            if "：源 " in self.message and "，重建 " in self.message:
+                m = re.search(r"：源 (.+?)，重建 (.+)$", self.message)
+                if m:
+                    src = src or m.group(1)
+                    reb = reb or m.group(2)
+            elif "：源 " in self.message:
+                m = re.search(r"：源 (.+)$", self.message)
+                if m:
+                    src = src or m.group(1)
+            elif "source " in self.message and "rebuild " in self.message:
+                m = re.search(r"source\s+([^;]+);\s*rebuild\s+(.+)$", self.message)
+                if m:
+                    src = src or m.group(1)
+                    reb = reb or m.group(2)
+            elif "expected=" in self.message and "actual=" in self.message:
+                m = re.search(r"expected=([^,]+),\s*actual=(.+)$", self.message)
+                if m:
+                    src = src or m.group(1)
+                    reb = reb or m.group(2)
+        return {
+            "severity": self.severity,
+            "position": self.position,
+            "message": self.message,
+            "source": src,
+            "rebuilt": reb,
+        }
 
 
 @dataclass(frozen=True)
@@ -53,6 +86,17 @@ class RoundtripReport:
     @property
     def warn_issues(self) -> Tuple[RoundtripIssue, ...]:
         return tuple(issue for issue in self.issues if issue.severity == SEVERITY_WARN)
+
+    def format_issues(self, max_count: int = 5, only_block: bool = True) -> List[str]:
+        """格式化差异列表，用于可读日志与错误提示。"""
+        pool = self.block_issues if only_block and self.has_block else self.issues
+        lines = [
+            "• [{0} {1}] {2}".format(issue.severity, issue.position, issue.message)
+            for issue in pool[:max_count]
+        ]
+        if len(pool) > max_count:
+            lines.append("• ... 另有 {0} 项差异未展示".format(len(pool) - max_count))
+        return lines
 
     def summary_text(self) -> str:
         """一行摘要（用于日志与成功项目持久化）。"""
@@ -128,41 +172,97 @@ def _classify_error(
 ) -> RoundtripIssue:
     """把 ``compare_baseline_events`` 的差异串按损失类型分级。"""
     if error.startswith("业务元素数量不一致"):
-        return RoundtripIssue(SEVERITY_BLOCK, error, "#count")
-    match = re.match(r"^#(\d+)\s+基线内容/位置不一致:\s*(.+)$", error)
+        return RoundtripIssue(
+            SEVERITY_BLOCK,
+            error,
+            "#count",
+            source_desc="count={0}".format(len(source_events)),
+            rebuilt_desc="count={0}".format(len(rebuilt_events)),
+        )
+    match = re.match(r"^#(\d+)\s+(?:基线)?(?:内容|类型)?(?:/位置)?不一致:\s*(.+)$", error)
     if not match:
         # 未识别的差异格式一律按内容丢失 BLOCK（fail-closed）：避免未来
         # compare_baseline_events 新增差异格式时被默认 WARN 静默放行。
         return RoundtripIssue(SEVERITY_BLOCK, error, "#?")
     index = int(match.group(1))
     detail = match.group(2)
-    left_kind = source_events[index].kind
-    right_kind = rebuilt_events[index].kind
     position = "#{0}".format(index)
+    if index >= len(source_events) or index >= len(rebuilt_events):
+        return RoundtripIssue(
+            SEVERITY_BLOCK,
+            error,
+            position,
+            source_desc="len={0}".format(len(source_events)),
+            rebuilt_desc="len={0}".format(len(rebuilt_events)),
+        )
+
+    left_event = source_events[index]
+    right_event = rebuilt_events[index]
+    left_kind = left_event.kind
+    right_kind = right_event.kind
+    src_desc = "{0}={1!r}".format(left_kind, left_event.value)
+    reb_desc = "{0}={1!r}".format(right_kind, right_event.value)
+
     if left_kind == "H" or right_kind == "H":
-        return RoundtripIssue(SEVERITY_BLOCK, "标题层级或文本变化：{0}".format(detail), position)
+        return RoundtripIssue(
+            SEVERITY_BLOCK,
+            "标题层级或文本变化：{0}".format(detail),
+            position,
+            source_desc=src_desc,
+            rebuilt_desc=reb_desc,
+        )
     if left_kind == "I" or right_kind == "I":
-        return RoundtripIssue(SEVERITY_BLOCK, "图片对象缺失或变化：{0}".format(detail), position)
-    if left_kind == "P" or right_kind == "P":
-        # 纯文本段落与列表项的表示差异：源 Word 里以字面编号开头（如 ``1. 概述``、
-        # 无 numPr）的段落，迁移成 markdown ``1. x`` 后会被重建为自动编号列表。
-        # 去掉 P 端字面编号前缀后文本一致 → 内容并未丢失，降级 WARN 放行，避免
-        # 合法文档在默认导入门禁被 BLOCK。文本确实不一致才按内容丢失 BLOCK。
-        if {left_kind, right_kind} == {"P", "L"}:
-            left_text = _event_text(source_events[index])
-            right_text = _event_text(rebuilt_events[index])
-            if _without_manual_number(left_text) == _without_manual_number(right_text):
-                return RoundtripIssue(
-                    SEVERITY_WARN,
-                    "正文段落以自动编号列表重建（内容保留）：{0}".format(detail),
-                    position,
-                )
-        return RoundtripIssue(SEVERITY_BLOCK, "正文段落丢失或文本变化：{0}".format(detail), position)
-    if left_kind == right_kind:
-        # 同 kind（T/C 表格）仅是文本矩阵表示差异，降 WARN 放行；
+        return RoundtripIssue(
+            SEVERITY_BLOCK,
+            "图片对象缺失或变化：{0}".format(detail),
+            position,
+            source_desc=src_desc,
+            rebuilt_desc=reb_desc,
+        )
+    if left_kind in {"P", "L", "X"} and right_kind in {"P", "L", "X"}:
+        left_text = _event_text(left_event)
+        right_text = _event_text(right_event)
+        from docx_common import _is_event_text_equivalent
+        if _is_event_text_equivalent(_strip_manual_prefix(left_text), _strip_manual_prefix(right_text)):
+            if {left_kind, right_kind} == {"P", "L"}:
+                msg = "正文段落以自动编号列表重建（内容保留）：{0}".format(detail)
+            elif "X" in {left_kind, right_kind}:
+                msg = "超链接或注记段落表示差异（内容保留）：{0}".format(detail)
+            elif left_kind == "L" and right_kind == "L":
+                msg = "列表项层级或格式表示差异（内容保留）：{0}".format(detail)
+            else:
+                msg = "正文段落格式或表示差异（内容保留）：{0}".format(detail)
+            return RoundtripIssue(
+                SEVERITY_WARN,
+                msg,
+                position,
+                source_desc=src_desc,
+                rebuilt_desc=reb_desc,
+            )
+        return RoundtripIssue(
+            SEVERITY_BLOCK,
+            "正文段落丢失或文本变化：{0}".format(detail),
+            position,
+            source_desc=src_desc,
+            rebuilt_desc=reb_desc,
+        )
+    if left_kind in {"T", "C"} and right_kind in {"T", "C"}:
+        # 同 kind（T/C 表格）仅是文本矩阵表示差异，按 WARN 放行；
         # 元素类型不一致（如 T 变 P）按内容丢失 BLOCK。
-        return RoundtripIssue(SEVERITY_WARN, "表格或元素表示差异：{0}".format(detail), position)
-    return RoundtripIssue(SEVERITY_BLOCK, "元素类型变化：{0}".format(detail), position)
+        return RoundtripIssue(
+            SEVERITY_WARN,
+            "表格表示差异：{0}".format(detail),
+            position,
+            source_desc=src_desc,
+            rebuilt_desc=reb_desc,
+        )
+    return RoundtripIssue(
+        SEVERITY_BLOCK,
+        "元素类型变化：{0}".format(detail),
+        position,
+        source_desc=src_desc,
+        rebuilt_desc=reb_desc,
+    )
 
 
 def _event_text(event) -> str:
@@ -171,9 +271,17 @@ def _event_text(event) -> str:
     return str(value[0]) if event.kind == "L" and isinstance(value, tuple) and value else str(value)
 
 
-_MANUAL_NUM_RE = re.compile(r"^\d+[.、．]\s*")
+_MANUAL_PREFIX_RE = re.compile(
+    r"^(?:(?:\d{1,3}、\s*)|(?:\d{1,3}[.．](?!\d)\s*)|(?:[-*•+]\s+)|(?:[\(（\[【](?:\d{1,3}|[一二三四五六七八九十]+|[a-zA-Z]|[ivxIVX]+)[\)）\]】]\s*)|(?:[\u2460-\u2473①②③④⑤⑥⑦⑧⑨⑩]\s*)|(?:[一二三四五六七八九十]+[、.．]\s*)|(?:(?:\d{1,3}|[一二三四五六七八九十]+|[a-zA-Z]|[ivxIVX]+)[\)）]\s*)|(?:[a-zA-Z][.．](?!\w)\s*))"
+)
+
+
+def _strip_manual_prefix(text: str) -> str:
+    """去掉开头的字面编号或列表符号（如 ``1. 概述``、``1、概述``、``- 列表项``），用于段落文本对齐。"""
+    stripped = text.strip()
+    return _MANUAL_PREFIX_RE.sub("", stripped).strip()
 
 
 def _without_manual_number(text: str) -> str:
-    """去掉开头的字面编号（``1. 概述`` → ``概述``），用于 P/L 文本对齐。"""
-    return _MANUAL_NUM_RE.sub("", text)
+    """向后兼容别名。"""
+    return _strip_manual_prefix(text)

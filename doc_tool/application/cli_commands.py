@@ -98,7 +98,10 @@ def run_per_project(
 ) -> CommandResult:
     results = []
     for raw_project in projects:
-        project = str(Path(raw_project).resolve())
+        project_path = Path(raw_project).resolve()
+        if project_path.is_file() or project_path.name.lower() in ("project.yml", "project.yaml"):
+            project_path = project_path.parent
+        project = str(project_path)
         try:
             results.append(operation(Path(project)))
         except Exception as exc:  # noqa: BLE001 - command boundary
@@ -148,12 +151,23 @@ def import_command(args) -> CommandResult:
         document_version=args.document_version,
     )
     result = import_first_time(request)
+    failure_msg = ""
+    if not result.success:
+        failed_events = [e for e in result.events if e.status == "failed" and e.detail]
+        if failed_events:
+            failure_msg = failed_events[-1].detail
+    suggested_action = (
+        result.suggested_action
+        if (not result.success and result.suggested_action)
+        else ("请查看导入诊断日志并修正源文档。" if not result.success else "")
+    )
     item = ProjectCommandResult(
         project=str(target),
         success=result.success,
         error_code=result.error_code or "",
-        suggested_action="请查看导入诊断日志并修正源文档。" if not result.success else "",
+        suggested_action=suggested_action,
         data={
+            "message": failure_msg,
             "projectRoot": str(result.project_root) if result.project_root else None,
             "sourceSha256": result.source_sha256,
             "events": [to_json_value(event) for event in result.events],

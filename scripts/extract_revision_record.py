@@ -23,7 +23,10 @@ from docx_common import (
     AutomationError,
     discover_document_types,
     encode_markdown_cell,
+    find_revision_table_info,
+    is_revision_footer_row,
     load_config,
+    map_revision_columns,
     parse_xml_safe,
     read_docx_package,
 )
@@ -46,6 +49,8 @@ def _cell_text(cell) -> str:
     域指令（``w:instrText``）不是正文，不参与提取；空段落丢弃，避免把
     Word 里作间距用的空行变成连续 ``<br>``。
     """
+    if cell is None:
+        return ""
     lines: List[str] = []
     for paragraph in cell.iter(qn("p")):
         parts: List[str] = []
@@ -64,35 +69,18 @@ def _cell_text(cell) -> str:
 
 
 def find_revision_table(doc_root) -> Optional[object]:
-    """在文档正文中查找修订记录表。
-
-    修订记录表的特征：第二行包含"版本"、"修改摘要"（或"修改"）、"修改时间"、"修改人"。
-    """
-    body = doc_root.find(qn("body"))
-    if body is None:
-        return None
-
-    for tbl in body.iter(qn("tbl")):
-        rows = tbl.findall(qn("tr"))
-        if len(rows) < 2:
-            continue
-        # 检查第二行（列名行）
-        header_row = rows[1]
-        header_texts = [_cell_text(cell) for cell in header_row.findall(qn("tc"))]
-        combined = "".join(header_texts)
-        if "版本" in combined and ("修订" in combined or "更新摘要" in combined):
-            # 至少需要 版本、修改摘要/修改 两列
-            col_count = len(header_texts)
-            if col_count >= 2:
-                return tbl
-    return None
+    """在文档正文中查找修订记录表（支持单/多行表头与灵活关键词）。"""
+    info = find_revision_table_info(doc_root)
+    return info[0] if info is not None else None
 
 
 def extract_revision_rows(template_path: str) -> List[List[str]]:
     """从模板中提取修订记录表数据行。
 
+    支持单/多行表头自适应、智能列语义映射（版本/摘要/时间/作者）、尾部非版本说明行自动截断。
+
     Returns:
-        数据行列表，每行为 [版本, 修改摘要, 修改时间, 修改人]。
+        数据行列表，每行为标准 [版本, 修改摘要, 修改时间, 修改人]。
     """
     with read_docx_package(template_path) as package:
         items = package.read_all()
@@ -100,20 +88,33 @@ def extract_revision_rows(template_path: str) -> List[List[str]]:
     doc_root = parse_xml_safe(
         items.get("word/document.xml", b""), "word/document.xml"
     )
-    tbl = find_revision_table(doc_root)
-    if tbl is None:
+    tbl_info = find_revision_table_info(doc_root)
+    if tbl_info is None:
         return []
 
+    tbl, header_row_idx, (v_col, s_col, d_col, a_col) = tbl_info
     rows = tbl.findall(qn("tr"))
-    if len(rows) < 2:
+    if len(rows) <= header_row_idx + 1:
         return []
 
     data_rows: List[List[str]] = []
-    for row in rows[2:]:  # 跳过前两行（标题行+列名行）
+    for row in rows[header_row_idx + 1:]:
         cells = row.findall(qn("tc"))
-        row_texts = [_cell_text(cell) for cell in cells]
-        if any(row_texts):  # 跳过空行
-            data_rows.append(row_texts)
+        row_texts = [_cell_text(cell).strip() for cell in cells]
+        if not any(row_texts):
+            continue  # 跳过空行
+
+        # 遇到审批/说明/非版本尾行时截断，停止后续数据提取
+        if is_revision_footer_row(row_texts, v_col):
+            break
+
+        # 语义映射到标准 4 列: [版本, 修改摘要, 修改时间, 修改人]
+        v = row_texts[v_col] if (v_col is not None and 0 <= v_col < len(row_texts)) else ""
+        s = row_texts[s_col] if (s_col is not None and 0 <= s_col < len(row_texts)) else ""
+        d = row_texts[d_col] if (d_col is not None and 0 <= d_col < len(row_texts)) else ""
+        a = row_texts[a_col] if (a_col is not None and 0 <= a_col < len(row_texts)) else ""
+
+        data_rows.append([v, s, d, a])
 
     return data_rows
 

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Union
 
@@ -44,7 +45,7 @@ def _sanitize_filename_part(value: str) -> str:
     return sanitized.strip().rstrip(" .")
 
 
-def normalize_document_version(value: str) -> str:
+def normalize_document_version(value: Optional[str]) -> str:
     """去掉文档版本号的 ``V``/``v`` 前缀（``V3.8`` → ``3.8``）。
 
     版本号会进入封面「版本号」、页眉「版次」和输出文件名，这三处在模板与
@@ -55,6 +56,8 @@ def normalize_document_version(value: str) -> str:
     只剥离紧跟数字的单个前缀字母；``1.0-rc1`` 这类其余写法原样保留，版本号
     格式本身仍由清单既有校验约束。
     """
+    if value is None:
+        return ""
     version = str(value).strip()
     if len(version) > 1 and version[0] in ("V", "v") and version[1].isdigit():
         return version[1:].strip()
@@ -99,14 +102,29 @@ def build_output_filename(
                 details={"field": field_name},
             )
 
-    if document_type == "general":
-        prefix = (values["documentNo"] + " ") if values["documentNo"] else ""
-        suffix = "({0})".format(values["documentVersion"]) if values["documentVersion"] else ""
-        filename = "{0}{1}{2}.docx".format(prefix, values["documentName"], suffix)
+    name = values["documentName"]
+    doc_no = values["documentNo"]
+    ver = values["documentVersion"]
+
+    # 避免文档编号重复前缀：若名称开头已包含文档编号，不再重复拼接
+    if doc_no and (name.startswith(doc_no) or name.lower().startswith(doc_no.lower())):
+        prefix = ""
+    elif doc_no:
+        prefix = doc_no + " "
     else:
-        filename = "{0} {1}({2}).docx".format(
-            values["documentNo"], values["documentName"], values["documentVersion"]
-        )
+        prefix = ""
+
+    # 避免版本号重复/冲突后缀：若名称末尾已包含版本括号（如 (1.6)、(1.7)、(v1.7)、（1.7）等），先剥离旧版本括号
+    clean_name = re.sub(r"[\(（][vV]?\d+(?:\.\d+)*(?:-[a-zA-Z0-9.]+)?[\)）]\s*$", "", name).strip()
+    suffix = "({0})".format(ver) if ver else ""
+
+    if document_type == "general":
+        filename = "{0}{1}{2}.docx".format(prefix, clean_name, suffix)
+    else:
+        if prefix:
+            filename = "{0}{1}{2}.docx".format(prefix, clean_name, suffix)
+        else:
+            filename = "{0}{1}.docx".format(clean_name, suffix)
     utf16_units = len(filename.encode("utf-16-le")) // 2
     if utf16_units > _MAX_OUTPUT_FILENAME_UTF16_UNITS:
         raise ProjectManifestError(
@@ -127,7 +145,10 @@ class ProjectPaths:
     """
 
     def __init__(self, project_root: Union[str, Path]) -> None:
-        self.root: Path = Path(project_root).resolve()
+        root = Path(project_root).resolve()
+        if root.is_file() or root.name.lower() in ("project.yml", "project.yaml"):
+            root = root.parent
+        self.root: Path = root
 
     # --- 标准路径属性 ---
 

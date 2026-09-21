@@ -31,12 +31,16 @@ from PIL import Image
 from docx_common import (
     AutomationError,
     ImageReference,
+    find_revision_table_info,
+    map_revision_columns,
+    is_revision_footer_row,
     OOXMLSecurityError,
     discover_document_types,
     error_location,
     format_location,
     iter_chapter_entries,
     load_config,
+    neutralize_dangling_hyperlinks,
     neutralize_hyperlink_fields,
     parse_image_reference,
     parse_markdown_table,
@@ -122,10 +126,51 @@ def parse_inline_runs(text: str) -> List[Tuple[str, str]]:
         if marker is None:
             cursor += 1
             continue
+
+        # 保护公式乘号、通配符、独立星号不被误判为斜体：
+        if marker == "*":
+            # 1. * 紧邻空格或换行 -> 不能作为开始定界符 (CommonMark 规范)
+            if cursor + width >= len(text) or text[cursor + width].isspace():
+                cursor += 1
+                continue
+            # 2. * 紧跟数字 (如 *0.5, *10) 或位于操作数之间 (如 2*3, 长度*0.5) -> 算术乘号，不得作为斜体定界符
+            prev_ch = text[cursor - 1] if cursor > 0 else ""
+            next_ch = text[cursor + width]
+            is_mul = False
+            if next_ch.isdigit():
+                is_mul = True
+            elif prev_ch and prev_ch != "*":
+                if (prev_ch.isalnum() or prev_ch in ")]）】") and (next_ch.isalnum() or next_ch in "([（【."):
+                    is_mul = True
+            if is_mul:
+                cursor += 1
+                continue
+            # 3. 通配符 *.ext
+            if next_ch == ".":
+                cursor += 1
+                continue
+
         closing = text.find(marker, cursor + width)
-        if closing < 0 or "\n" in text[cursor + width:closing]:
+        if (
+            closing < 0
+            or "\n" in text[cursor + width:closing]
+            or "<br" in text[cursor + width:closing].lower()
+        ):
             cursor += width
             continue
+
+        # 针对斜体 * 的闭合定界符防误判保护：
+        if marker == "*":
+            # 闭合 * 紧跟在空格后面 -> 不能作为闭合定界符
+            if text[closing - 1].isspace():
+                cursor += width
+                continue
+            # 斜体跨度不宜过长或跨越多句标点
+            span = text[cursor + width:closing]
+            if len(span) > 60 or any(p in span for p in ("。", "；", "！", "？", ";", "，", "：", ":")):
+                cursor += width
+                continue
+
         if cursor > plain_start:
             tokens.append((text[plain_start:cursor], ""))
         tokens.append((text[cursor + width:closing], style))
@@ -354,7 +399,22 @@ class ExpressionManager:
         self.bookmarks: Dict[str, str] = {}
         self.bookmark_names = set()
         self.emitted_bookmark_keys = set()
-        self.next_bookmark_id = 1
+        existing_ids = []
+        if isinstance(items, dict):
+            for part_name, part_bytes in items.items():
+                if part_name.startswith("word/") and part_name.endswith(".xml"):
+                    try:
+                        part_tree = _parse_xml_safe(part_bytes, part_name)
+                        for node in part_tree.iter(qn("bookmarkStart")):
+                            node_id = node.get(qn("id"))
+                            if node_id and node_id.isdigit():
+                                existing_ids.append(int(node_id))
+                            name = node.get(qn("name"))
+                            if name:
+                                self.bookmark_names.add(name)
+                    except Exception:
+                        pass
+        self.next_bookmark_id = (max(existing_ids) + 1) if existing_ids else 1
         self.next_rid = max(
             [int((node.get("Id") or "rId0")[3:]) for node in relationships if (node.get("Id") or "").startswith("rId") and (node.get("Id") or "")[3:].isdigit()]
             or [0]
@@ -1576,22 +1636,11 @@ def update_headers(items, config):
 
 def _find_revision_record_table(body):
     """Find the revision record table in the document body."""
-    for tbl in body.iter(qn("tbl")):
-        rows = tbl.findall(qn("tr"))
-        if len(rows) < 2:
-            continue
-        header_row = rows[1]
-        header_texts = []
-        for cell in header_row.findall(qn("tc")):
-            ct = "".join(t_node.text or "" for t_node in cell.iter(qn("t"))).strip()
-            header_texts.append(ct)
-        combined = "".join(header_texts)
-        if "版本" in combined and ("修订" in combined or "更新摘要" in combined):
-            return tbl
-    return None
+    info = find_revision_table_info(body)
+    return info[0] if info is not None else None
 
 
-def _parse_revision_markdown(file_path):
+def _parse_revision_markdown(file_path, return_header=False):
     """Parse revision record markdown table, return data rows."""
     from docx_common import parse_markdown_table
     with open(file_path, encoding="utf-8") as f:
@@ -1605,24 +1654,26 @@ def _parse_revision_markdown(file_path):
         elif in_table:
             break
     if not table_lines:
-        return []
+        return ([], []) if return_header else []
     rows = parse_markdown_table(table_lines)
+    header_row = rows[0] if rows else []
     data_rows = rows[1:] if len(rows) > 1 else []
+    if return_header:
+        return header_row, data_rows
     return data_rows
 
 
-def _make_revision_cell(cell_index, text):
+def _make_revision_cell(cell_index, text, is_summary=False):
     cell = etree.Element(qn("tc"))
     tc_pr = etree.SubElement(cell, qn("tcPr"))
     tc_w = etree.SubElement(tc_pr, qn("tcW"))
     widths = [1600, 5500, 1800, 1350]
-    if cell_index < len(widths):
-        tc_w.set(qn("w"), str(widths[cell_index]))
+    tc_w.set(qn("w"), str(widths[cell_index]) if cell_index < len(widths) else "1500")
     tc_w.set(qn("type"), "dxa")
     etree.SubElement(tc_pr, qn("vAlign")).set(qn("val"), "center")
     paragraph = etree.SubElement(cell, qn("p"))
     ppr = etree.SubElement(paragraph, qn("pPr"))
-    etree.SubElement(ppr, qn("jc")).set(qn("val"), "left" if cell_index == 1 else "center")
+    etree.SubElement(ppr, qn("jc")).set(qn("val"), "left" if (is_summary or cell_index == 1) else "center")
     run = etree.SubElement(paragraph, qn("r"))
     t_node = etree.SubElement(run, qn("t"))
     t_node.text = text
@@ -1650,7 +1701,13 @@ def _set_revision_cell_text(cell, text) -> None:
     run = etree.SubElement(paragraph, qn("r"))
     if run_properties is not None:
         run.append(run_properties)
-    for index, line in enumerate(str(text).splitlines() or [""]):
+    # 支持换行与 <br> 标签
+    raw_lines = str(text).splitlines() or [""]
+    all_lines: List[str] = []
+    for raw in raw_lines:
+        for sub in re.split(r"<br\s*/?>", raw, flags=re.IGNORECASE):
+            all_lines.append(sub)
+    for index, line in enumerate(all_lines or [""]):
         if index:
             etree.SubElement(run, qn("br"))
         t_node = etree.SubElement(run, qn("t"))
@@ -1916,14 +1973,16 @@ def _set_revision_summary_cell(cell, text, expressions=None) -> None:
             line_idx += 1
 
 
-def _clone_revision_row(prototype, values, expressions=None):
+def _clone_revision_row(prototype, values, expressions=None, summary_col_idx=None):
     """按模板数据行原型克隆一行并只替换文本；原型不可用时退回自建单元格。
 
     对长修订摘要移除 w:cantSplit，允许长内容跨页自然拆分，杜绝边框穿透页脚。
     """
+    if summary_col_idx is None:
+        summary_col_idx = 1
     if prototype is not None:
         row = copy.deepcopy(prototype)
-        summary_text = str(values[1]) if len(values) > 1 else ""
+        summary_text = str(values[summary_col_idx]) if len(values) > summary_col_idx else ""
         is_long = len(summary_text.splitlines()) >= 3 or len(summary_text) > 150
         tr_pr = row.find(qn("trPr"))
         if tr_pr is not None and is_long:
@@ -1949,40 +2008,41 @@ def _clone_revision_row(prototype, values, expressions=None):
                             qn("space"): "0",
                             qn("color"): "auto",
                         })
-                if idx == 1 and expressions is not None:
+                if idx == summary_col_idx and expressions is not None:
                     _set_revision_summary_cell(cell, text, expressions)
                 else:
                     _set_revision_cell_text(cell, text)
             return row
     row = etree.Element(qn("tr"))
     for index, text in enumerate(values):
-        if index == 1 and expressions is not None:
-            cell = _make_revision_cell(index, "")
+        if index == summary_col_idx and expressions is not None:
+            cell = _make_revision_cell(index, "", is_summary=(index == summary_col_idx))
             _set_revision_summary_cell(cell, text, expressions)
             row.append(cell)
         else:
-            row.append(_make_revision_cell(index, text))
+            row.append(_make_revision_cell(index, text, is_summary=(index == summary_col_idx)))
     return row
 
 
 def update_revision_record(document_root, config, expressions=None):
-    """用 ``_revision_record.md`` 的数据行替换模板修订记录表，返回写入行数。"""
+    """用 ``_revision_record.md`` 的数据行替换模板修订记录表，返回写入行数（尊重列语义与多行表头/尾行保留）。"""
     rev_path = config.get("paths", {}).get("revision_record")
     if not rev_path or not os.path.isfile(rev_path):
         return 0
-    data_rows = _parse_revision_markdown(rev_path)
+    header_row, data_rows = _parse_revision_markdown(rev_path, return_header=True)
     if not data_rows:
         return 0
     body = document_root.find(qn("body"))
     if body is None:
         return 0
-    tbl = _find_revision_record_table(body)
-    if tbl is None:
+    tbl_info = find_revision_table_info(body)
+    if tbl_info is None:
         return 0
+    tbl, header_row_idx, (v_col, s_col, d_col, a_col) = tbl_info
     rows = tbl.findall(qn("tr"))
-    if len(rows) < 2:
+    if len(rows) <= header_row_idx:
         return 0
-    header_rows = rows[:2]
+    header_rows = rows[:header_row_idx + 1]
     # 确保表头具有 tblHeader，以便跨页时自动重复表头
     for hr in header_rows:
         tr_pr = hr.find(qn("trPr"))
@@ -1991,16 +2051,95 @@ def update_revision_record(document_root, config, expressions=None):
         if tr_pr.find(qn("tblHeader")) is None:
             etree.SubElement(tr_pr, qn("tblHeader"))
 
-    prototypes = [copy.deepcopy(row) for row in rows[2:]]
-    for row in rows[2:]:
+    remaining_rows = rows[header_row_idx + 1:]
+    # 先剔除表格末尾纯空行，避免截断尾部审批/说明行 (footer_rows) 识别
+    while remaining_rows:
+        last_texts = [_cell_text(c).strip() for c in remaining_rows[-1].findall(qn("tc"))]
+        if not any(last_texts):
+            tbl.remove(remaining_rows.pop())
+        else:
+            break
+
+    # 识别尾部非版本审批/说明行 (footer_rows) 保留不删
+    footer_rows = []
+    data_candidate_rows = []
+    in_footer = True
+    for r in reversed(remaining_rows):
+        r_texts = [_cell_text(cell).strip() for cell in r.findall(qn("tc"))]
+        if in_footer and is_revision_footer_row(r_texts, v_col):
+            footer_rows.insert(0, r)
+        else:
+            in_footer = False
+            data_candidate_rows.insert(0, r)
+
+    # 选取用于克隆样式的原型行（仅从真实数据行中选取，杜绝克隆尾部审批/备注行的合并单元格与样式）
+    prototypes = [copy.deepcopy(row) for row in data_candidate_rows] if data_candidate_rows else []
+
+    for row in data_candidate_rows:
         tbl.remove(row)
-    insert_after = header_rows[1]
+
+    # 确定目标表格总列数（若有原型行优先以原型行实际单元格数为准，保证样式克隆能匹配到每个单元格）
+    header_cells = header_rows[-1].findall(qn("tc"))
+    if prototypes and len(prototypes[0].findall(qn("tc"))) > 0:
+        col_count = len(prototypes[0].findall(qn("tc")))
+    else:
+        col_count = len(header_cells) if header_cells else 4
+
+    # 解析 Markdown 表格的列头映射，支持非标准列顺序或附加列
+    md_v_col, md_s_col, md_d_col, md_a_col = (0, 1, 2, 3)
+    if header_row:
+        mv, ms, md, ma = map_revision_columns(header_row)
+        if mv is not None:
+            md_v_col = mv
+        if ms is not None:
+            md_s_col = ms
+        if md is not None:
+            md_d_col = md
+        if ma is not None:
+            md_a_col = ma
+
+    insert_after = header_rows[-1]
     for index, row_data in enumerate(data_rows):
-        values = (list(row_data) + ["", "", "", ""])[:4]
+        # Markdown 表格语义列: [version, summary, date, author]
+        v_val = row_data[md_v_col] if (md_v_col < len(row_data)) else ""
+        s_val = row_data[md_s_col] if (md_s_col < len(row_data)) else ""
+        d_val = row_data[md_d_col] if (md_d_col < len(row_data)) else ""
+        a_val = row_data[md_a_col] if (md_a_col < len(row_data)) else ""
+        md_vals = [v_val, s_val, d_val, a_val]
+        # 按模板表格列语义重排成目标 Word 行的数据列表
+        word_values = [""] * col_count
+        if v_col is not None and v_col < col_count:
+            word_values[v_col] = md_vals[0]
+        if s_col is not None and s_col < col_count:
+            word_values[s_col] = md_vals[1]
+        if d_col is not None and d_col < col_count:
+            word_values[d_col] = md_vals[2]
+        if a_col is not None and a_col < col_count:
+            word_values[a_col] = md_vals[3]
+
+        # 对未被映射到版本/摘要/日期/作者的其余列，若表头为序号/编号列，自动填入序号
+        for c in range(col_count):
+            if c not in (v_col, s_col, d_col, a_col):
+                # 检查所有表头行在该列的文本（兼容多行表头与纵向合并 w:vMerge）
+                h_parts = []
+                for hr in header_rows:
+                    hr_cells = hr.findall(qn("tc"))
+                    if c < len(hr_cells):
+                        h_parts.append("".join(hr_cells[c].itertext()).strip().lower())
+                h_text = " ".join(p for p in h_parts if p)
+                if any(k in h_text for k in ("序号", "no.", "no")):
+                    word_values[c] = str(index + 1)
+
         prototype = None
         if prototypes:
-            prototype = prototypes[min(index, len(prototypes) - 1)]
-        row = _clone_revision_row(prototype, values, expressions=expressions)
+            cand = prototypes[min(index, len(prototypes) - 1)]
+            if len(cand.findall(qn("tc"))) == col_count:
+                prototype = cand
+            elif len(prototypes[0].findall(qn("tc"))) == col_count:
+                prototype = prototypes[0]
+        row = _clone_revision_row(
+            prototype, word_values, expressions=expressions, summary_col_idx=s_col
+        )
         insert_after.addnext(row)
         insert_after = row
     return len(data_rows)
@@ -2402,17 +2541,19 @@ def build(
             images += image_count
             tables += table_count
 
-    # 模板修订/导航表与复杂表格资源中可能内嵌 HYPERLINK 域，
-    # 指向模板书签；重建文档不生成这些书签，统一解除为静态文本。
-    hyperlink_fields = neutralize_hyperlink_fields(document_root)
-    if hyperlink_fields:
-        print("[{0}] 解除 HYPERLINK 域 {1} 个（目标书签不存在，转为静态文本）".format(
-            doc_type, hyperlink_fields
-        ))
-
     revision_rows = update_revision_record(document_root, config, expressions)
     if revision_rows:
         print("[{0}] 修订记录: 写入 {1} 行".format(doc_type, revision_rows))
+
+    # 模板修订/导航表与复杂表格资源中可能内嵌 HYPERLINK 域与悬空超链接，
+    # 指向模板书签；重建文档不生成这些书签，统一解除为静态文本。
+    hyperlink_fields = neutralize_hyperlink_fields(document_root)
+    dangling_hyperlinks = neutralize_dangling_hyperlinks(document_root)
+    total_hyperlinks = hyperlink_fields + dangling_hyperlinks
+    if total_hyperlinks:
+        print("[{0}] 解除 HYPERLINK 域 {1} 个（目标书签不存在，转为静态文本）".format(
+            doc_type, total_hyperlinks
+        ))
     set_update_fields(items, document_root)
     numbering.save()
     expressions.save_footnotes()

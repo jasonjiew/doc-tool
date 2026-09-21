@@ -29,8 +29,8 @@ _force_utf8_stdio()
 GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
 PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
 PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
-VERSION = "2.5.1"
-TAG_NAME = "v2.5.1"
+VERSION = "2.5.2"
+TAG_NAME = "v2.5.2"
 PACKAGE_NAME = "DocTool"
 
 
@@ -248,7 +248,19 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 亮点更新（2.5.1）
+## 亮点更新（2.5.2）
+
+- **代码全量审计与缺陷修复**：
+  - 修复 `roundtrip` 错误分类及手动前缀过滤逻辑；
+  - 规范化 `open_project` 路径检查与 `add_recent_project` 跨平台路径大小写去重；
+  - 修复 `WindowRegistry` 空路径匹配漏洞；
+  - 完善 `ProjectManifest` 模式验证与兼容性边界处理。
+- **Word 与修订记录兼容性增强**：
+  - 增强修订表识别打分算法（`score_revision_header_row`），精准识别各类复杂 Word 修订历史表格；
+  - 提升 `extract_revision_record` 对换行、合并单元格与尾部空行的解析鲁棒性；
+  - 补充 `scripts/tests/test_audit_fixes.py` 与 `test_revision_compatibility.py` 全量回归测试。
+
+## 历史更新（2.5.1）
 
 - **格式检查规则分类检索与批量一键修复**：
   - 问题检查面板（LintPanel）新增规则大类分类下拉框，带当前规则数量动态统计；

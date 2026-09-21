@@ -70,7 +70,12 @@ class WindowRegistry:
         ``project_root`` 可为 str/Path；比较前做 resolve 归一化，
         避免同一目录的「./proj」与绝对路径被视为不同项目。
         """
-        target = str(Path(str(project_root)).resolve()).casefold()
+        if not project_root or not str(project_root).strip():
+            return None
+        target_path = Path(str(project_root)).resolve()
+        if target_path.is_file() or target_path.name.lower() in ("project.yml", "project.yaml"):
+            target_path = target_path.parent
+        target = str(target_path).casefold()
         for window in self.windows():
             # 已关闭（closeEvent accept）的窗口不再参与匹配。
             if getattr(window, "_closed", False):

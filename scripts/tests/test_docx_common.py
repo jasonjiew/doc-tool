@@ -24,11 +24,13 @@ from build_docx import (  # noqa: E402
 from docx_common import (  # noqa: E402
     AutomationError,
     iter_chapter_entries,
+    neutralize_dangling_hyperlinks,
     neutralize_hyperlink_fields,
     parse_image_reference,
     parse_markdown_table,
     validate_content_tree,
 )
+from validate_docx import markdown_visible_text
 
 
 class MarkdownContractTests(unittest.TestCase):
@@ -397,6 +399,260 @@ class NeutralizeHyperlinkFieldsTests(unittest.TestCase):
 
 
 
+class NeutralizeDanglingHyperlinksTests(unittest.TestCase):
+    """docx_common.neutralize_dangling_hyperlinks 解除指向不存在书签的原生超链接。"""
+
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+    def _document(self, body_xml: str):
+        xml = (
+            '<w:document xmlns:w="{0}" xmlns:r="{1}"><w:body>{2}</w:body></w:document>'
+        ).format(self.W, self.R, body_xml)
+        return etree.fromstring(xml.encode("utf-8"))
+
+    def _text(self, document) -> str:
+        return "".join(document.itertext())
+
+    def test_dangling_hyperlink_unlinked_when_bookmark_missing(self):
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="_Toc211330744">'
+            '<w:r><w:t>6.2.3 漏气量、压力</w:t></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "6.2.3 漏气量、压力")
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 0)
+        p = document.find(".//" + qn("p"))
+        self.assertEqual(len(p.findall(qn("r"))), 1)
+
+    def test_valid_hyperlink_preserved_when_bookmark_exists(self):
+        body = (
+            '<w:p>'
+            '<w:bookmarkStart w:id="10" w:name="doc_valid_bm"/>'
+            '<w:bookmarkEnd w:id="10"/>'
+            '<w:hyperlink w:anchor="doc_valid_bm">'
+            '<w:r><w:t>有效链接</w:t></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 1)
+
+    def test_external_hyperlink_with_rid_preserved(self):
+        body = (
+            '<w:p>'
+            '<w:hyperlink r:id="rId5">'
+            '<w:r><w:t>外部链接</w:t></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 1)
+
+    def test_custom_available_bookmarks_iterable(self):
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="bm1"><w:r><w:t>1</w:t></w:r></w:hyperlink>'
+            '<w:hyperlink w:anchor="bm2"><w:r><w:t>2</w:t></w:r></w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document, available_bookmarks=["bm1"])
+        self.assertEqual(removed, 1)
+        hls = document.findall(".//" + qn("hyperlink"))
+        self.assertEqual(len(hls), 1)
+        self.assertEqual(hls[0].get(qn("anchor")), "bm1")
+
+    def test_markdown_visible_text_preserves_multiplication_across_breaks(self):
+        sample = (
+            "单次呼气结束时漏气量计算：数据长度*0.5...<br>"
+            "单次吸气结束时漏气量计算：数据长度*0.95..."
+        )
+        res = markdown_visible_text(sample)
+        self.assertIn("数据长度*0.5", res)
+        self.assertIn("数据长度*0.95", res)
+
+        sample_crlf = "行1：a*b\r\n行2：c*d"
+        res_crlf = markdown_visible_text(sample_crlf)
+        self.assertIn("a*b", res_crlf)
+        self.assertIn("c*d", res_crlf)
+
+    def test_expression_manager_avoids_template_bookmark_id_collision(self):
+        from build_docx import RP_NS
+        body = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body>'
+            '<w:bookmarkStart w:id="36" w:name="_TocExisting"/>'
+            '<w:bookmarkEnd w:id="36"/>'
+            '</w:body>'
+            '</w:document>'
+        )
+        items = {"word/document.xml": body.encode("utf-8")}
+        relationships = etree.Element(RP_NS + "Relationships")
+        mgr = ExpressionManager(items, relationships, [])
+        self.assertGreaterEqual(mgr.next_bookmark_id, 37)
+        self.assertIn("_TocExisting", mgr.bookmark_names)
+
+    def test_external_hyperlink_with_rid_and_anchor_preserved(self):
+        # 外部链接同时包含 r:id 与 w:anchor（指向外部文档目标中的片段），不得误解为悬空本地书签
+        body = (
+            '<w:p>'
+            '<w:hyperlink r:id="rId8" w:anchor="ext_sec">'
+            '<w:r><w:t>外部文档锚点</w:t></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 1)
+
+    def test_dangling_hyperlink_preserves_tail_text(self):
+        # 解除悬空超链接时，必须完整保留 hl.tail 文本，避免 lxml remove 丢失后续内容
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="missing_bm">'
+            '<w:r><w:t>主正文</w:t></w:r>'
+            '</w:hyperlink>【后续说明】'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 1)
+        self.assertIn("主正文", self._text(document))
+        self.assertIn("【后续说明】", self._text(document))
+
+    def test_dangling_hyperlink_with_direct_text(self):
+        # 超链接节点若含直接 text 文本（非 run 子节点），解除时必须保留
+        body = (
+            '<w:p>'
+            '<w:hyperlink w:anchor="missing_bm">直接文本'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 1)
+        self.assertIn("直接文本", self._text(document))
+
+    def test_empty_hyperlink_without_target_unlinked(self):
+        # 既无 r:id 也无 anchor 的空超链接包装视为无效链接，安全解除
+        body = (
+            '<w:p>'
+            '<w:hyperlink>'
+            '<w:r><w:t>无目标链接</w:t></w:r>'
+            '</w:hyperlink>'
+            '</w:p>'
+        )
+        document = self._document(body)
+        removed = neutralize_dangling_hyperlinks(document)
+        self.assertEqual(removed, 1)
+        self.assertEqual(self._text(document), "无目标链接")
+        self.assertEqual(len(document.findall(".//" + qn("hyperlink"))), 0)
+
+    def test_expression_manager_scans_all_parts_for_bookmark_ids(self):
+        from build_docx import RP_NS
+        doc_body = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body>'
+            '<w:bookmarkStart w:id="10" w:name="_DocBm"/>'
+            '<w:bookmarkEnd w:id="10"/>'
+            '</w:body>'
+            '</w:document>'
+        )
+        fn_body = (
+            '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:footnote w:id="1">'
+            '<w:bookmarkStart w:id="55" w:name="_FootnoteBm"/>'
+            '<w:bookmarkEnd w:id="55"/>'
+            '</w:footnote>'
+            '</w:footnotes>'
+        )
+        items = {
+            "word/document.xml": doc_body.encode("utf-8"),
+            "word/footnotes.xml": fn_body.encode("utf-8"),
+        }
+        relationships = etree.Element(RP_NS + "Relationships")
+        mgr = ExpressionManager(items, relationships, [])
+        self.assertGreaterEqual(mgr.next_bookmark_id, 56)
+        self.assertIn("_DocBm", mgr.bookmark_names)
+        self.assertIn("_FootnoteBm", mgr.bookmark_names)
+
+    def test_expression_errors_ignores_external_hyperlink_anchor(self):
+        # 验证 DocxPackage.expression_errors：外部链接带锚点不被判定为缺失本地书签
+        from validate_docx import DocxPackage
+        doc_xml = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<w:body>'
+            '<w:p><w:hyperlink r:id="rId1" w:anchor="remote_target"><w:r><w:t>外部锚点</w:t></w:r></w:hyperlink></w:p>'
+            '</w:body></w:document>'
+        ).encode("utf-8")
+        rels_xml = (
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+            'Target="http://example.com/doc.html" TargetMode="External"/>'
+            '</Relationships>'
+        ).encode("utf-8")
+        pkg = DocxPackage.__new__(DocxPackage)
+        pkg.items = {"word/document.xml": doc_xml, "word/_rels/document.xml.rels": rels_xml}
+        pkg.xml_roots = {
+            "word/document.xml": etree.fromstring(doc_xml),
+            "word/_rels/document.xml.rels": etree.fromstring(rels_xml),
+        }
+        pkg.document = pkg.xml_roots["word/document.xml"]
+        pkg.relationship_map = {"rId1": "http://example.com/doc.html"}
+        errors = pkg.expression_errors()
+        self.assertEqual(errors, [])
+
+    def test_header_footer_signatures_preserves_order_mixed_fields(self):
+        # 验证 _header_footer_signatures 在 fldSimple 与 fldChar 混合时按文档顺序提取
+        from validate_docx import _header_footer_signatures, DocxPackage
+        # 模板态：instrText(DATE) -> fldSimple(PAGE) -> instrText(NUMPAGES)
+        tpl_hdr = (
+            '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText> DATE </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>2026</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+            '<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple>'
+            '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText> NUMPAGES </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>10</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:p>'
+            '</w:hdr>'
+        ).encode("utf-8")
+        # 刷新后态：Word 将 fldSimple(PAGE) 展开为标准的 fldChar(PAGE)
+        refreshed_hdr = (
+            '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:p>'
+            '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText> DATE </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>2026</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+            '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText> PAGE </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>1</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+            '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText> NUMPAGES </w:instrText><w:fldChar w:fldCharType="separate"/><w:t>10</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+            '</w:p>'
+            '</w:hdr>'
+        ).encode("utf-8")
+
+        pkg_tpl = DocxPackage.__new__(DocxPackage)
+        pkg_tpl.items = {"word/header1.xml": tpl_hdr}
+        pkg_tpl.xml_roots = {"word/header1.xml": etree.fromstring(tpl_hdr)}
+
+        pkg_ref = DocxPackage.__new__(DocxPackage)
+        pkg_ref.items = {"word/header1.xml": refreshed_hdr}
+        pkg_ref.xml_roots = {"word/header1.xml": etree.fromstring(refreshed_hdr)}
+
+        sig_tpl = _header_footer_signatures(pkg_tpl, "word/header")
+        sig_ref = _header_footer_signatures(pkg_ref, "word/header")
+        self.assertEqual(sig_tpl, sig_ref)
+
+
+
+
 class HyperlinkOOXMLStructureAndJumpTests(unittest.TestCase):
     """测试 Word 内部超链接 OOXML 标准结构、样式与跳转语法。"""
 
@@ -646,6 +902,80 @@ class HyperlinkOOXMLStructureAndJumpTests(unittest.TestCase):
         self.assertEqual(mgr.find_bookmark_for_section("第1章"), ch1_bm)
         self.assertEqual(mgr.find_bookmark_for_section("3"), ch3_bm)
         self.assertEqual(mgr.find_bookmark_for_section("第3章"), ch3_bm)
+
+
+    def test_punctuation_and_range_normalization(self):
+        """测试全角半角标点、数值区间波浪号与正负号等语义等价。"""
+        from docx_common import _is_event_text_equivalent
+        pairs = [
+            ("取值范围：0～100", "取值范围: 0~100"),
+            ("参数说明（可选）：中值", "参数说明(可选): 中值"),
+            ("误差范围：-1－2", "误差范围: -1-2"),
+            ("【注】详见通用响应数据包", "[注] 详见通用响应数据包"),
+            ("数据长度 * 0.5", "数据长度*0.5"),
+            ("2 * 3 = 6", "2*3=6"),
+            ("系数 × 10", "系数 * 10"),
+            ("状态: 正常；结果: 成功，耗时: 10ms", "状态：正常; 结果：成功, 耗时：10ms"),
+        ]
+        for a, b in pairs:
+            self.assertTrue(_is_event_text_equivalent(a, b), f"Should be equivalent: {a} vs {b}")
+
+    def test_strip_manual_prefix_letters_and_roman(self):
+        """测试字母序号与罗马数字列表前缀识别剥离。"""
+        from docx_common import _strip_manual_prefix
+        cases = [
+            ("a. 数据格式说明", "数据格式说明"),
+            ("A. 数据格式说明", "数据格式说明"),
+            ("b) 校验位计算", "校验位计算"),
+            ("(c) 附录参考", "附录参考"),
+            ("（d） 附录参考", "附录参考"),
+            ("(i) 第一次迭代", "第一次迭代"),
+            ("1.5 伏特电压", "1.5 伏特电压"),  # 小数不误剥离
+            ("- 普通列表项", "普通列表项"),
+            ("1. 正式条款", "正式条款"),
+        ]
+        for src, expected in cases:
+            self.assertEqual(_strip_manual_prefix(src), expected)
+
+    def test_output_filename_deduplication(self):
+        """测试升级版本时避免重复拼接版本号括号（如 (1.6)(1.7).docx）。"""
+        from doc_tool.domain.paths import build_output_filename
+        # 场景 1：documentName 带旧版本 (1.6)，升级为 1.7
+        fn1 = build_output_filename(
+            "KF-2090-4-003",
+            "KF-2090-4-003 呼吸机软件通信协议说明书(1.6)",
+            "1.7",
+            "general",
+        )
+        self.assertEqual(fn1, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+
+        # 场景 2：documentName 已带当前版本 (1.7)
+        fn2 = build_output_filename(
+            "KF-2090-4-003",
+            "KF-2090-4-003 呼吸机软件通信协议说明书(1.7)",
+            "1.7",
+            "general",
+        )
+        self.assertEqual(fn2, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+
+        # 场景 3：无版本号后缀
+        fn3 = build_output_filename(
+            "KF-2090-4-003",
+            "呼吸机软件通信协议说明书",
+            "1.7",
+            "general",
+        )
+        self.assertEqual(fn3, "KF-2090-4-003 呼吸机软件通信协议说明书(1.7).docx")
+
+    def test_markdown_visible_text_italics_with_space(self):
+        """测试 Markdown 行内斜体含空格时与 build_docx 生成的可见文本一致。"""
+        from validate_docx import markdown_visible_text
+        from build_docx import parse_inline_runs
+        text = "这是 *Hello World* 说明，带公式 *0.5* 与 2*3=6 以及 `code` 和 **bold**"
+        runs = parse_inline_runs(text)
+        docx_text = "".join(t for t, _ in runs)
+        vis_text = markdown_visible_text(text)
+        self.assertEqual(docx_text, vis_text)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -3,11 +3,11 @@
 > **Docs-as-Code for Enterprise Documents**  
 > 把大型 Word 文档工程化拆解为可版本追踪、可多人协同、可严谨审查的 Markdown 章节树，并在出稿时一键可靠重建为符合企业规范的正式 DOCX 交付物。
 
-[![Version](https://img.shields.io/badge/version-2.5.1-blue.svg)](https://github.com/wangjie0721666-web/doc-tool/releases/tag/v2.5.1)
+[![Version](https://img.shields.io/badge/version-2.5.2-blue.svg)](https://github.com/wangjie0721666-web/doc-tool/releases/tag/v2.5.2)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **当前版本**：`v2.5.1`（企业安装版 + 免安装便携版）
+- **当前版本**：`v2.5.2`（企业安装版 + 免安装便携版）
 - **代码仓库**：<https://github.com/wangjie0721666-web/doc-tool>
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md)
@@ -115,8 +115,8 @@ graph LR
 
 | 分发方式 | 文件名示例 | 说明与推荐场景 |
 | :--- | :--- | :--- |
-| **安装版（推荐）** | `DocTool-Setup-2.5.1.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
-| **免安装便携版** | `DocTool-2.5.1-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
+| **安装版（推荐）** | `DocTool-Setup-2.5.2.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
+| **免安装便携版** | `DocTool-2.5.2-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
 
 > **诊断提示**：若在特殊加密环境遇到启动问题，双击安装目录或便携包根目录下的 `diagnose.cmd`，将生成的 `DocTool-diagnose.txt` 发送给维护人员。
 

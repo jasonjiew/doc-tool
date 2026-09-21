@@ -32,19 +32,16 @@ from doc_tool.domain.version import can_write_schema
 MAX_RECENT_PROJECTS = 20
 
 # 最近项目列表存储位置
-def _recent_file() -> Path:
-    """返回最近项目列表文件路径（用户目录下）。"""
-    home = Path.home()
-    config_dir = home / ".{0}".format(USER_CONFIG_DIR_NAME)
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir / "recent.json"
-
-
 def _config_dir() -> Path:
-    """返回用户级配置目录（与最近项目列表同目录）。"""
+    """用户配置目录。"""
     config_dir = Path.home() / ".{0}".format(USER_CONFIG_DIR_NAME)
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
+
+
+def _recent_file() -> Path:
+    """最近项目列表文件路径。"""
+    return _config_dir() / "recent.json"
 
 
 def load_window_geometry() -> Optional[dict]:
@@ -138,7 +135,21 @@ def open_project(project_root: str) -> ProjectSummary:
         ProjectManifestError: 清单不存在或损坏。
         IncompatibleSchemaError: 模式版本不兼容。
     """
+    if not project_root or not str(project_root).strip():
+        raise ProjectManifestError(
+            "项目路径不能为空。",
+            suggested_action="请提供有效的项目根目录路径。",
+            details={"path": "(empty)"},
+        )
     root = Path(project_root).resolve()
+    if root.is_file() or root.name.lower() in ("project.yml", "project.yaml"):
+        root = root.parent
+    if not root.is_dir():
+        raise ProjectManifestError(
+            "项目目录不存在：{0}".format(project_root),
+            suggested_action="请确认项目路径是否有效。",
+            details={"path": str(project_root)},
+        )
     manifest = ProjectManifest.load(root)
     paths = manifest.resolve_paths(root)
     source_path = paths.resolve(manifest.relative_source_docx())
@@ -333,8 +344,12 @@ def add_recent_project(project_root: str, manifest: ProjectManifest) -> None:
         last_opened=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
     entries = load_recent_projects()
-    # 移除重复
-    entries = [e for e in entries if e.path != entry.path]
+    # 移除重复（规范化路径大小写与斜杠，防止 Windows 下出现重复条目）
+    norm_entry_path = os.path.normcase(os.path.normpath(entry.path))
+    entries = [
+        e for e in entries
+        if os.path.normcase(os.path.normpath(e.path)) != norm_entry_path
+    ]
     entries.insert(0, entry)
     entries = entries[:MAX_RECENT_PROJECTS]
     _save_recent_projects(entries)

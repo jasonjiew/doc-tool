@@ -298,10 +298,15 @@ def _prepare_revision_sync(
         )
 
         md_path = paths.resolve(manifest.relative_content_root()) / "_revision_record.md"
+        source_rel = None
+        if hasattr(manifest, "relative_source_docx") and callable(manifest.relative_source_docx):
+            source_rel = manifest.relative_source_docx()
+        source_p = paths.resolve(source_rel) if source_rel else None
         ensure_revision_record(
             md_path=md_path,
             template_path=paths.resolve(manifest.relative_template_docx()),
             document_type=manifest.documentType,
+            source_path=source_p if (source_p and source_p.is_file()) else None,
         )
         return {
             "md_path": md_path,

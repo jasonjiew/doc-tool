@@ -1089,6 +1089,12 @@ class MainWindow(QMainWindow):
     def _open_project_path(self, path: str) -> None:
         if self.runner.is_running:
             return
+        if not path or not str(path).strip():
+            return
+        path_obj = Path(path).resolve()
+        if path_obj.is_file() or path_obj.name.lower() in ("project.yml", "project.yaml"):
+            path_obj = path_obj.parent
+        path = str(path_obj)
         # 重复打开保护：同一项目已在其它窗口打开 → 激活已有窗口。
         registry = self._window_registry
         if registry is not None:
@@ -1354,6 +1360,12 @@ class MainWindow(QMainWindow):
         """
         if self.runner.is_running:
             return
+        if not path or not str(path).strip():
+            return
+        path_obj = Path(path).resolve()
+        if path_obj.is_file() or path_obj.name.lower() in ("project.yml", "project.yaml"):
+            path_obj = path_obj.parent
+        path = str(path_obj)
         registry = self._window_registry
         if registry is None or self._window_factory is None:
             # 单窗口环境（测试/无注册表）：退回当前窗口打开。

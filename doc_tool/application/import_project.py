@@ -54,6 +54,7 @@ from doc_tool.domain.manifest import (
     READABLE_DOCUMENT_TYPES,
     is_creatable_document_type,
 )
+from doc_tool.application.content.reimport import _is_revision_record
 from doc_tool.domain.paths import ProjectPaths
 
 
@@ -117,6 +118,7 @@ class ImportResult:
     events: List[ImportStageEvent] = field(default_factory=list)
     error_code: Optional[str] = None
     diagnostic_log: Optional[Path] = None
+    suggested_action: Optional[str] = None
 
     @property
     def last_stage(self) -> Optional[ImportStageEvent]:
@@ -247,6 +249,21 @@ def import_first_time(
             "indexes": split_result.indexes,
         })
 
+        # 7.5 初始化修订记录（从模板/源文档提取，无修订表时生成标准表头）
+        try:
+            from doc_tool.application.content.revision_record import ensure_revision_record
+            content_dir = paths.content_dir(request.document_type)
+            md_path = content_dir / "_revision_record.md"
+            ensure_revision_record(
+                md_path=md_path,
+                template_path=paths.template_docx,
+                document_type=request.document_type,
+                source_path=paths.source_docx,
+                allow_empty=True,
+            )
+        except Exception:
+            pass
+
         # 8. 结构校验 (4.5)
         _check_cancel()
         _record(result, STAGE_VALIDATE_STRUCTURE, "started")
@@ -278,13 +295,9 @@ def import_first_time(
         if roundtrip_report.has_block or (
             request.require_exact_roundtrip and roundtrip_report.issues
         ):
-            summary = roundtrip_report.summary_text()
-            if not roundtrip_report.has_block:
-                summary = "开启严格往返要求，存在非关键差异：{0}".format(summary)
-            raise RoundtripCheckError(
-                "往返差异门禁未通过：{0}".format(summary),
-                suggested_action="重建 Word 与源 Word 存在差异，导入已中止；请检查源文档后重试。",
-                details={"summary": summary},
+            raise RoundtripCheckError.from_report(
+                roundtrip_report,
+                require_exact=request.require_exact_roundtrip,
             )
         _remove_trial_output(trial_output)
         _record(result, STAGE_ROUNDTRIP_CHECK, "succeeded", metrics={
@@ -316,6 +329,7 @@ def import_first_time(
     except Exception as exc:
         err = _map_exception(exc)
         result.error_code = err.code
+        result.suggested_action = err.suggested_action
         status = "cancelled" if isinstance(err, CancelledError) else "failed"
         _record(result, _current_stage(result), status,
                 detail=err.user_message, error_code=err.code)
@@ -404,11 +418,21 @@ def _build_manifest(
             heading_styles = {
                 level: sid for sid, level in template_meta.heading_styles.items()
             }
+    doc_ver = str(request.document_version or "").strip()
+    if not doc_ver:
+        from doc_tool.application.content.revision_record import document_version_from_record
+        rec_ver = document_version_from_record(paths.content_dir(doc_type) / "_revision_record.md")
+        if rec_ver:
+            doc_ver = rec_ver
+        elif doc_type == "general":
+            doc_ver = ""
+        else:
+            doc_ver = "1.0"
     manifest = ProjectManifest(
         documentType=doc_type,
-        documentNo=request.document_no,
-        documentName=request.document_name,
-        documentVersion=request.document_version,
+        documentNo=str(request.document_no or ""),
+        documentName=str(request.document_name or ""),
+        documentVersion=doc_ver,
         sourceSha256=sha256,
         refreshTimeoutSeconds=request.refresh_timeout_seconds,
         headingStyles=heading_styles,
@@ -561,7 +585,7 @@ def _seed_reimport_base(paths: ProjectPaths, doc_type: str) -> None:
     content_root = paths.content_dir(doc_type)
     files = {}
     for path in content_root.rglob("*.md"):
-        if not path.is_file():
+        if not path.is_file() or _is_revision_record(path.name):
             continue
         rel = path.relative_to(content_root).as_posix()
         files[rel] = hashlib.sha1(path.read_bytes()).hexdigest()
@@ -640,7 +664,10 @@ def _write_diagnostic_log(
             }
             for e in result.events
         ],
-        "details": {k: str(v) for k, v in err.details.items()},
+        "details": {
+            k: (v if isinstance(v, (int, float, bool, list, dict)) else str(v))
+            for k, v in (err.details or {}).items()
+        },
     }
     log_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return log_path

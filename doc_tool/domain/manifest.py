@@ -131,11 +131,11 @@ class ProjectManifest:
                 "schemaVersion 和刷新超时必须是整数。",
                 details={"errorType": type(exc).__name__},
             ) from exc
-        self.documentNo = str(self.documentNo)
-        self.documentName = str(self.documentName)
+        self.documentNo = str(self.documentNo or "")
+        self.documentName = str(self.documentName or "")
         # 版本号统一去掉 V 前缀：封面「版本号」、页眉「版次」与输出文件名都
         # 按纯数字写法（模板与历史产物即如此），作者写 V3.8 也不会漏进产物。
-        self.documentVersion = normalize_document_version(self.documentVersion)
+        self.documentVersion = normalize_document_version(self.documentVersion or "")
         if self.documentType not in DOCUMENT_TYPES and can_write_schema(self.schemaVersion):
             raise ProjectManifestError(
                 "未知的文档类型：{0}。".format(self.documentType),
@@ -251,7 +251,16 @@ class ProjectManifest:
     @classmethod
     def load(cls, project_root: Union[str, Path]) -> "ProjectManifest":
         """从项目根读取 ``project.yml`` 并校验模式版本。"""
-        paths = ProjectPaths(project_root)
+        if not project_root or not str(project_root).strip():
+            raise ProjectManifestError(
+                "项目路径不能为空。",
+                suggested_action="请提供有效的项目根目录路径。",
+                details={"path": "(empty)"},
+            )
+        root = Path(project_root).resolve()
+        if root.is_file() or root.name.lower() in ("project.yml", "project.yaml"):
+            root = root.parent
+        paths = ProjectPaths(root)
         manifest_path = paths.manifest_file
         if not manifest_path.exists():
             raise ProjectManifestError(
@@ -302,25 +311,33 @@ class ProjectManifest:
                 details={"field": "paths/refresh/headingStyles"},
             )
         try:
+            doc_type_raw = str(data.get("documentType", "general") or "general").strip().lower()
+            doc_no_raw = str(data.get("documentNo", "") or "").strip()
+            doc_name_raw = str(data.get("documentName", "") or "").strip()
+            if "documentVersion" in data and data["documentVersion"] is not None:
+                doc_ver_raw = str(data["documentVersion"]).strip()
+            else:
+                doc_ver_raw = "1.0" 
             manifest = cls(
-                documentType=str(data["documentType"]),
-                documentNo=str(data["documentNo"]),
-                documentName=str(data["documentName"]),
-                documentVersion=str(data["documentVersion"]),
-                sourceSha256=str(data.get("sourceSha256", "")),
-                projectId=str(data.get("projectId", str(uuid.uuid4()))),
+                documentType=doc_type_raw,
+                documentNo=doc_no_raw,
+                documentName=doc_name_raw,
+                documentVersion=doc_ver_raw,
+                sourceSha256=str(data.get("sourceSha256", "") or ""),
+                projectId=str(data.get("projectId", "") or str(uuid.uuid4())),
                 schemaVersion=schema_version,
-                paths={str(key): str(value) for key, value in paths_data.items()},
-                createdWithVersion=str(data.get("createdWithVersion", APP_VERSION)),
+                paths={str(key): str(value) for key, value in paths_data.items() if value is not None},
+                createdWithVersion=str(data.get("createdWithVersion", APP_VERSION) or APP_VERSION),
                 lastSuccessfulBuildVersion=data.get("lastSuccessfulBuildVersion"),
                 publishNotes=str(data.get("publishNotes", "") or ""),
                 headingStyles={
                     _parse_heading_level(level): str(style_id)
                     for level, style_id in heading_styles_data.items()
+                    if style_id is not None
                 },
                 bodyStyle=str(data.get("bodyStyle", "") or ""),
                 refreshTimeoutSeconds=int(
-                    refresh_data.get("timeoutSeconds", DEFAULT_REFRESH_TIMEOUT_SECONDS)
+                    refresh_data.get("timeoutSeconds", DEFAULT_REFRESH_TIMEOUT_SECONDS) or DEFAULT_REFRESH_TIMEOUT_SECONDS
                 ),
                 createdAt=data.get("createdAt"),
                 updatedAt=data.get("updatedAt"),

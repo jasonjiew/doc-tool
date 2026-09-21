@@ -143,8 +143,10 @@ def ensure_revision_record(
     md_path: Path,
     template_path: Path,
     document_type: str,
+    source_path: Optional[Path] = None,
+    allow_empty: bool = False,
 ) -> bool:
-    """为未迁移的旧项目从模板初始化修订记录 Markdown 文件。
+    """为未迁移的旧项目或新导入项目从模板/源文档初始化修订记录 Markdown 文件。
 
     修订记录是项目元数据，不属于章节正文，因此只在目标文件缺失时创建，
     不覆盖用户已有内容。模板解析复用内核脚本，保证 Markdown 初始表格与
@@ -152,7 +154,7 @@ def ensure_revision_record(
     """
     md_path = Path(md_path)
     template_path = Path(template_path)
-    if md_path.exists() or not template_path.is_file():
+    if md_path.exists():
         return False
     try:
         from doc_tool.adapters.kernel import ensure_kernel_importable
@@ -160,9 +162,15 @@ def ensure_revision_record(
         ensure_kernel_importable()
         from extract_revision_record import extract_revision_rows, rows_to_markdown
 
-        rows = extract_revision_rows(str(template_path))
-        if not rows:
+        rows: List[List[str]] = []
+        if source_path is not None and Path(source_path).is_file():
+            rows = extract_revision_rows(str(source_path))
+        if not rows and template_path.is_file():
+            rows = extract_revision_rows(str(template_path))
+
+        if not rows and not allow_empty:
             return False
+
         atomic_write(md_path, rows_to_markdown(rows, document_type))
         return md_path.is_file()
     except Exception:  # noqa: BLE001
@@ -233,11 +241,42 @@ def has_revision_table(md_path: Path) -> bool:
 
 
 def last_revision_version(md_path: Path) -> Optional[str]:
-    """修订记录表最后一条数据行的版本列；无表或只有表头返回 None。"""
+    """修订记录表最后一条数据行的版本列；无表或只有表头返回 None。
+
+    从最后一行向前查找，自动跳过尾部的审批/签名/备注等非版本行。
+    支持非首列版本号（如首列为“序号”列）。
+    """
     rows = _revision_table_rows(md_path)
     if rows is None or len(rows) < 2:
         return None
-    return rows[-1][0] if rows[-1] else None
+    header = rows[0]
+    v_col = None
+    for idx, cell in enumerate(header):
+        c_text = cell.strip().lower()
+        if any(k in c_text for k in ("版本", "版次", "rev", "ver", "version")):
+            if not any(sk in c_text for sk in ("说明", "摘要", "内容", "记录")):
+                v_col = idx
+                break
+    if v_col is None:
+        return None
+
+    for row in reversed(rows[1:]):
+        if not row:
+            continue
+        candidate = row[v_col].strip() if v_col < len(row) else ""
+        if not candidate:
+            continue
+        # 排除明确包含审批/说明关键词的行
+        if any(k in candidate for k in (
+            "编制", "审核", "批准", "签批", "校对", "核对", "会签", "签字",
+            "部门", "说明", "备注", "注：", "注:", "密级", "受控"
+        )):
+            continue
+        # 排除包含"人"、"者"且完全不含数字的审批行（如"张三"、"审核人"）
+        if not any(ch.isdigit() for ch in candidate) and any(k in candidate for k in ("人", "者", "员")):
+            continue
+        return candidate
+    return None
 
 
 def document_version_from_record(md_path: Path) -> Optional[str]:

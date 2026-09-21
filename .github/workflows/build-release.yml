@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APP_VERSION: '2.5.1'
+  APP_VERSION: '2.5.2'
   COVERAGE_MIN: '60'
   PYTHONUTF8: '1'
   PYTHONDONTWRITEBYTECODE: '1'

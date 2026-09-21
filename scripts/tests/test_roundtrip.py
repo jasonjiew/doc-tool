@@ -113,6 +113,13 @@ def _list_item(text, ilvl="0", num_id="1"):
     ).format(text, ilvl, num_id)
 
 
+def _hyperlink_paragraph(text, anchor="bm1"):
+    """超链接段落（含 w:hyperlink，body_events 识别为 X 事件）。"""
+    return (
+        '<w:p><w:hyperlink w:anchor="{1}"><w:r><w:t>{0}</w:t></w:r></w:hyperlink></w:p>'
+    ).format(text, anchor)
+
+
 def build_package(path, body_children, image_bytes=None):
     """写入一个最小化 DOCX（含 body_events 所需的全部部件）。"""
     rels = (
@@ -227,6 +234,113 @@ class RoundtripDiffTests(unittest.TestCase):
         report = self._diff(source, rebuilt)
         self.assertTrue(report.has_block)
         self.assertIn("正文段落丢失或文本变化", report.block_issues[0].message)
+
+    def test_bullet_list_prefixes_rebuilt_as_list_are_warn(self):
+        # 支持无序列表符号前缀（- , * , • , + ），经重建后内容保留降为 WARN 放行。
+        bullets = ["- 项目一", "• 项目二", "* 项目三", "+ 项目四"]
+        for bullet in bullets:
+            expected_text = bullet[2:]
+            source = [_paragraph("1", "第一章"), _plain(bullet)]
+            rebuilt = [_paragraph("1", "第一章"), _list_item(expected_text)]
+            report = self._diff(source, rebuilt)
+            self.assertFalse(report.has_block, f"Prefix '{bullet[:2]}' should be WARN, not BLOCK")
+            self.assertEqual(len(report.warn_issues), 1)
+            self.assertIn("自动编号列表重建", report.warn_issues[0].message)
+
+    def test_negative_number_not_stripped_and_mismatch_is_block(self):
+        # 负数（如 -5 摄氏度）开头的段落因无后导空格不得剥离负号，与重建内容不符时必须 BLOCK。
+        source = [_paragraph("1", "第一章"), _plain("-5 摄氏度")]
+        rebuilt = [_paragraph("1", "第一章"), _list_item("5 摄氏度")]
+        report = self._diff(source, rebuilt)
+        self.assertTrue(report.has_block)
+        self.assertIn("正文段落丢失或文本变化", report.block_issues[0].message)
+
+    def test_hyperlink_paragraph_degraded_to_plain_is_warn(self):
+        # X 事件（超链接段落）退化为 P 事件（普通段落），但文本一致时降为 WARN 放行。
+        source = [_paragraph("1", "第一章"), _hyperlink_paragraph("访问官方文档")]
+        rebuilt = [_paragraph("1", "第一章"), _plain("访问官方文档")]
+        report = self._diff(source, rebuilt)
+        self.assertFalse(report.has_block)
+        self.assertEqual(len(report.warn_issues), 1)
+        self.assertIn("表示差异", report.warn_issues[0].message)
+
+    def test_list_item_text_tampering_is_block(self):
+        # 回归测试：同为 L 事件但正文被篡改时，必须判定为 BLOCK（旧实现错误按 left_kind==right_kind 放行为 WARN）。
+        source = [_paragraph("1", "第一章"), _list_item("原始规程条款")]
+        rebuilt = [_paragraph("1", "第一章"), _list_item("被篡改的规程条款")]
+        report = self._diff(source, rebuilt)
+        self.assertTrue(report.has_block)
+        self.assertIn("正文段落丢失或文本变化", report.block_issues[0].message)
+
+    def test_hyperlink_paragraph_text_tampering_is_block(self):
+        # 回归测试：同为 X 事件但正文被篡改时，必须判定为 BLOCK（旧实现错误按 left_kind==right_kind 放行为 WARN）。
+        source = [_paragraph("1", "第一章"), _hyperlink_paragraph("原始超链接文本")]
+        rebuilt = [_paragraph("1", "第一章"), _hyperlink_paragraph("被篡改的超链接文本")]
+        report = self._diff(source, rebuilt)
+        self.assertTrue(report.has_block)
+        self.assertIn("正文段落丢失或文本变化", report.block_issues[0].message)
+
+    def test_list_item_ilvl_diff_same_text_is_warn(self):
+        # 同为 L 事件且文本相同，仅层级不同，属于表示差异应为 WARN。
+        source = [_paragraph("1", "第一章"), _list_item("相同条款", ilvl="0")]
+        rebuilt = [_paragraph("1", "第一章"), _list_item("相同条款", ilvl="1")]
+        report = self._diff(source, rebuilt)
+        self.assertFalse(report.has_block)
+        self.assertEqual(len(report.warn_issues), 1)
+        self.assertIn("表示差异", report.warn_issues[0].message)
+
+    def test_chinese_numbering_without_space_is_warn(self):
+        # 中文顿号编号（1、项目背景）与全角句点（1．项目背景）无空格写法重建为列表项放行
+        cases = ["1、项目背景", "1、 项目背景", "1．项目背景", "1. 项目背景", "1.项目背景"]
+        for prefix_text in cases:
+            source = [_paragraph("1", "第一章"), _plain(prefix_text)]
+            rebuilt = [_paragraph("1", "第一章"), _list_item("项目背景")]
+            report = self._diff(source, rebuilt)
+            self.assertFalse(
+                report.has_block,
+                f"Prefix '{prefix_text}' should strip to '项目背景' and WARN, not BLOCK"
+            )
+            self.assertEqual(len(report.warn_issues), 1)
+            self.assertIn("自动编号列表重建", report.warn_issues[0].message)
+
+    def test_decimal_and_multilevel_not_stripped_and_tamper_is_block(self):
+        # 小数（1.5 摄氏度）与多级标题（1.2.3 节）开头的段落不得误剥离数字部分
+        source = [_paragraph("1", "第一章"), _plain("1.5 摄氏度")]
+        rebuilt = [_paragraph("1", "第一章"), _list_item("5 摄氏度")]
+        report = self._diff(source, rebuilt)
+        self.assertTrue(report.has_block)
+
+        source2 = [_paragraph("1", "第一章"), _plain("1.2.3 节")]
+        rebuilt2 = [_paragraph("1", "第一章"), _list_item("2.3 节")]
+        report2 = self._diff(source2, rebuilt2)
+        self.assertTrue(report2.has_block)
+
+    def test_roundtrip_issue_to_dict_includes_source_and_rebuilt(self):
+        # 差异条目包含结构化 source 与 rebuilt 字段
+        source = [_paragraph("1", "第一章"), _plain("原始正文条款")]
+        rebuilt = [_paragraph("1", "第一章"), _plain("篡改后条款")]
+        report = self._diff(source, rebuilt)
+        self.assertTrue(report.has_block)
+        issue_dict = report.block_issues[0].to_dict()
+        self.assertEqual(issue_dict["severity"], "BLOCK")
+        self.assertEqual(issue_dict["position"], "#1")
+        self.assertIn("source", issue_dict)
+        self.assertIn("rebuilt", issue_dict)
+        self.assertIn("原始正文条款", issue_dict["source"])
+        self.assertIn("篡改后条款", issue_dict["rebuilt"])
+
+    def test_classify_error_bounds_and_unknown_kind_fail_closed(self):
+        # 边界与未知类型：越界索引安全处理，未知元素类型 fail-closed 为 BLOCK
+        from doc_tool.adapters.roundtrip import _classify_error, SEVERITY_BLOCK
+        from validate_docx import Event
+        ev_a = Event("Z", "未知A", "body[0]")
+        ev_b = Event("Z", "未知B", "body[0]")
+        issue_oob = _classify_error("#99 基线内容/位置不一致: a vs b", [ev_a], [ev_b])
+        self.assertEqual(issue_oob.severity, SEVERITY_BLOCK)
+
+        issue_unknown = _classify_error("#0 基线内容/位置不一致: a vs b", [ev_a], [ev_b])
+        self.assertEqual(issue_unknown.severity, SEVERITY_BLOCK)
+        self.assertIn("元素类型变化", issue_unknown.message)
 
     def test_summary_and_markdown_render(self):
         source = [_paragraph("1", "第一章"), _plain("正文")]

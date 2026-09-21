@@ -30,6 +30,14 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+_REVISION_RECORD_NAMES = ("_revision_record.md", "_revision_record.markdown")
+
+
+def _is_revision_record(rel_path: str) -> bool:
+    name = Path(rel_path).name
+    return name in _REVISION_RECORD_NAMES or name.startswith(".")
+
+
 def _text_hash(path: Path) -> str:
     """章节内容哈希（sha1，与内容快照基线 ``content_baseline.json`` 同口径）。
 
@@ -69,11 +77,13 @@ def compare_chapters(current_root: Path, incoming_root: Path, base_hashes: Optio
     base_hashes = base_hashes or {}
     current = {
         path.relative_to(current_root).as_posix(): _text_hash(path)
-        for path in Path(current_root).rglob("*.md") if path.is_file()
+        for path in Path(current_root).rglob("*.md")
+        if path.is_file() and not _is_revision_record(path.name)
     }
     incoming = {
         path.relative_to(incoming_root).as_posix(): _text_hash(path)
-        for path in Path(incoming_root).rglob("*.md") if path.is_file()
+        for path in Path(incoming_root).rglob("*.md")
+        if path.is_file() and not _is_revision_record(path.name)
     }
     changes: List[ChapterChange] = []
     for rel_path in sorted(set(current) | set(incoming)):
@@ -125,7 +135,7 @@ class ReimportService:
         """
         try:
             payload = json.loads((self.paths.state_dir / "reimport_base.json").read_text(encoding="utf-8"))
-            files = dict(payload.get("files", {}))
+            files = {rel: h for rel, h in dict(payload.get("files", {})).items() if not _is_revision_record(rel)}
             if files:
                 return files
         except (OSError, ValueError, TypeError):
@@ -236,7 +246,8 @@ class ReimportService:
         TraceabilityService(index, self.paths.state_dir).rebuild()
         hashes = {
             path.relative_to(writer.content_root).as_posix(): _text_hash(path)
-            for path in writer.content_root.rglob("*.md") if path.is_file()
+            for path in writer.content_root.rglob("*.md")
+            if path.is_file() and not _is_revision_record(path.name)
         }
         atomic_write(self.paths.state_dir / "reimport_base.json", json.dumps({"files": hashes}, ensure_ascii=False, indent=2))
 
@@ -357,6 +368,8 @@ class ReimportService:
             changes = compare_chapters(writer.content_root, incoming, self._base_hashes())
             conflicts = [item.rel_path for item in changes if item.conflict]
             for item in changes:
+                if _is_revision_record(item.rel_path):
+                    continue
                 use_new = choices.get(item.rel_path, item.use_new)
                 if item.status == "unchanged" or not use_new:
                     continue

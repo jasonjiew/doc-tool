@@ -834,6 +834,72 @@ class RoundtripGateTests(unittest.TestCase):
         self.assertEqual(roundtrip["status"], "failed")
         self.assertIn("BLOCK", roundtrip["detail"])
 
+    def test_diagnostic_log_contains_rich_roundtrip_issues_and_preview(self):
+        src, target, result = self._import(_blocking_report())
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E2004")
+        # 检查事件 detail 中包含前导摘要及关键差异详情
+        failed_event = [e for e in result.events if e.status == "failed"][-1]
+        self.assertIn("往返差异门禁未通过", failed_event.detail)
+        self.assertIn("差异详情", failed_event.detail)
+        self.assertIn("[BLOCK #1]", failed_event.detail)
+        self.assertIn("正文段落丢失：源 P=正文", failed_event.detail)
+
+        # 检查诊断日志 JSON details 包含结构化条目与可读差异
+        self.assertIsNotNone(result.diagnostic_log)
+        import json
+        log_data = json.loads(result.diagnostic_log.read_text(encoding="utf-8"))
+        details = log_data.get("details", {})
+        self.assertIn("summary", details)
+        self.assertEqual(details.get("blockCount"), 1)
+        self.assertEqual(details.get("warnCount"), 0)
+        self.assertIn("criticalDifferences", details)
+        self.assertIn("[BLOCK #1]", details["criticalDifferences"])
+        self.assertIsInstance(details.get("issues"), list)
+        self.assertEqual(len(details["issues"]), 1)
+        issue0 = details["issues"][0]
+        self.assertEqual(issue0.get("severity"), "BLOCK")
+        self.assertEqual(issue0.get("position"), "#1")
+        self.assertIn("正文段落丢失", issue0.get("message", ""))
+        self.assertIn("source", issue0)
+        self.assertIn("rebuilt", issue0)
+        self.assertIsNotNone(result.suggested_action)
+        self.assertIn("重建 Word 与源 Word 存在关键差异", result.suggested_action)
+
+    def test_import_command_formats_rich_failure_message_and_action(self):
+        from unittest import mock
+        from doc_tool.application.cli_commands import import_command
+        from doc_tool.cli_serializers import serialize_human
+        from argparse import Namespace
+
+        src = os.path.join(self._tmp, "cmd_gate.docx")
+        write_synthetic_docx(src)
+        args = Namespace(
+            docx=src,
+            name="命令门禁",
+            target_dir=self._tmp,
+            document_type="general",
+            document_no="",
+            document_name="命令门禁",
+            document_version="1.0",
+        )
+        with mock.patch(
+            "doc_tool.application.import_project._run_roundtrip_check",
+            return_value=_blocking_report(),
+        ):
+            cmd_result = import_command(args)
+        self.assertFalse(cmd_result.success)
+        item = cmd_result.results[0]
+        self.assertEqual(item.error_code, "E2004")
+        self.assertIn("重建 Word 与源 Word 存在关键差异", item.suggested_action)
+        self.assertIn("往返差异门禁未通过", item.data["message"])
+        self.assertIn("[BLOCK #1]", item.data["message"])
+        human = serialize_human(cmd_result)
+        self.assertIn("失败", human)
+        self.assertIn("E2004", human)
+        self.assertIn("建议：重建 Word 与源 Word 存在关键差异", human)
+        self.assertIn("[BLOCK #1]", human)
+
     def test_success_persists_fidelity_and_roundtrip_reports(self):
         src, target, result = self._import(_clean_report(), with_comment=True)
         self.assertTrue(result.success)

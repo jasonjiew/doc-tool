@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 class DocToolError(Exception):
@@ -37,7 +37,7 @@ class DocToolError(Exception):
         user_message: Optional[str] = None,
         *,
         suggested_action: Optional[str] = None,
-        details: Optional[Dict[str, str]] = None,
+        details: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.user_message = user_message or self.user_message
         self.suggested_action = suggested_action or self.suggested_action
@@ -111,6 +111,108 @@ class RoundtripCheckError(DocToolError):
     code = "E2004"
     user_message = "往返差异门禁未通过。"
     suggested_action = "重建 Word 与源 Word 存在关键内容差异，导入已中止且未留下半成品项目；请检查源文档或重建规则后重试。"
+
+    def __init__(
+        self,
+        user_message: Optional[str] = None,
+        *,
+        suggested_action: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        report: Optional[Any] = None,
+    ) -> None:
+        self.report = report
+        super().__init__(
+            user_message,
+            suggested_action=suggested_action,
+            details=details,
+        )
+
+    @classmethod
+    def from_report(
+        cls,
+        report: Any,
+        *,
+        require_exact: bool = False,
+        max_preview_issues: int = 5,
+    ) -> "RoundtripCheckError":
+        summary = report.summary_text()
+        if not getattr(report, "has_block", False) and require_exact:
+            summary = "开启严格往返要求，存在非关键差异：{0}".format(summary)
+
+        if hasattr(report, "format_issues") and callable(report.format_issues):
+            diff_lines = report.format_issues(
+                max_count=max_preview_issues,
+                only_block=getattr(report, "has_block", False),
+            )
+        else:
+            target_issues = (
+                report.block_issues
+                if getattr(report, "has_block", False)
+                else getattr(report, "issues", ())
+            )
+            bullet = chr(8226)
+            diff_lines = [
+                "{0} [{1} {2}] {3}".format(
+                    bullet,
+                    getattr(issue, "severity", "DIFF"),
+                    getattr(issue, "position", ""),
+                    getattr(issue, "message", str(issue)),
+                )
+                for issue in target_issues[:max_preview_issues]
+            ]
+            if len(target_issues) > max_preview_issues:
+                diff_lines.append(
+                    "{0} ... 另有 {1} 项差异未展示".format(
+                        bullet, len(target_issues) - max_preview_issues
+                    )
+                )
+
+        msg_parts = ["往返差异门禁未通过：{0}".format(summary)]
+        if diff_lines:
+            msg_parts.append("差异详情：")
+            msg_parts.extend(diff_lines)
+        user_message = chr(10).join(msg_parts)
+
+        issue_list = []
+        for issue in getattr(report, "issues", ()):
+            if isinstance(issue, dict):
+                issue_list.append(dict(issue))
+            elif hasattr(issue, "to_dict") and callable(issue.to_dict):
+                issue_list.append(issue.to_dict())
+            else:
+                d = {
+                    "severity": getattr(issue, "severity", "UNKNOWN"),
+                    "position": getattr(issue, "position", ""),
+                    "message": getattr(issue, "message", str(issue)),
+                }
+                src = getattr(issue, "source_desc", None)
+                reb = getattr(issue, "rebuilt_desc", None)
+                if src:
+                    d["source"] = src
+                if reb:
+                    d["rebuilt"] = reb
+                issue_list.append(d)
+
+        details = {
+            "summary": summary,
+            "sourceElements": getattr(report, "source_count", 0),
+            "rebuiltElements": getattr(report, "rebuilt_count", 0),
+            "blockCount": len(getattr(report, "block_issues", ())),
+            "warnCount": len(getattr(report, "warn_issues", ())),
+            "criticalDifferences": chr(10).join(diff_lines),
+            "issues": issue_list,
+        }
+        suggested_action = (
+            "重建 Word 与源 Word 存在关键差异，导入已中止；请参考差异详情检查源文档。"
+            if getattr(report, "has_block", False)
+            else "开启了严格往返要求，文档存在表示性差异；如需放行请关闭严格往返要求。"
+        )
+        return cls(
+            user_message,
+            suggested_action=suggested_action,
+            details=details,
+            report=report,
+        )
 
 
 # --- Word 刷新（E3xxx） ---
