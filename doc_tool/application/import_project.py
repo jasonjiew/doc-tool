@@ -100,6 +100,7 @@ class ImportRequest:
     refresh_timeout_seconds: int = 900
     require_exact_roundtrip: bool = False
     heading_style_map: Optional[Dict[str, int]] = None
+    allow_missing_headings: bool = False
 
 
 @dataclass
@@ -163,9 +164,11 @@ def import_first_time(
         # 2. 预检（fail-closed 重新校验；样式映射优先于自动识别）
         _check_cancel()
         _record(result, STAGE_PREFLIGHT, "started")
+        allow_missing = bool(request.allow_missing_headings)
         preview = preflight(
             str(source_path),
             heading_style_map=request.heading_style_map,
+            allow_missing_headings=allow_missing,
         )
         fidelity_report = getattr(preview, "fidelity", None)
         if request.document_type not in READABLE_DOCUMENT_TYPES:
@@ -215,13 +218,14 @@ def import_first_time(
             paths.source_docx,
             paths.template_docx,
             heading_style_map=request.heading_style_map,
+            allow_missing_headings=allow_missing,
         )
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
             "headingStyles": len(template_meta.heading_styles),
             "bodyStyle": template_meta.body_style,
         })
 
-        # 6. 提取正文/资源 (4.2)
+        # 6. 提取内容/资源 (4.2)
         _check_cancel()
         _record(result, STAGE_EXTRACT_CONTENT, "started")
         extraction = extract_content(
@@ -231,6 +235,7 @@ def import_first_time(
             paths.tables_dir(request.document_type),
             request.document_type,
             heading_style_map=request.heading_style_map,
+            allow_missing_headings=allow_missing,
         )
         _record(result, STAGE_EXTRACT_CONTENT, "succeeded", metrics={
             "chapters": extraction.chapter_count,
@@ -267,7 +272,7 @@ def import_first_time(
         # 8. 结构校验 (4.5)
         _check_cancel()
         _record(result, STAGE_VALIDATE_STRUCTURE, "started")
-        manifest = _build_manifest(request, paths, template_meta, sha256)
+        manifest = _build_manifest(request, paths, template_meta, sha256, is_headless=(not any(h.level == 1 for h in preview.headings)), allow_missing_headings=allow_missing)
         _validate_structure(manifest, paths)
         _record(result, STAGE_VALIDATE_STRUCTURE, "succeeded")
 
@@ -396,7 +401,12 @@ def _copy_and_hash(source: Path, dest: Path) -> str:
 
 
 def _build_manifest(
-    request: ImportRequest, paths: ProjectPaths, template_meta: TemplateMeta, sha256: str
+    request: ImportRequest,
+    paths: ProjectPaths,
+    template_meta: TemplateMeta,
+    sha256: str,
+    is_headless: bool = False,
+    allow_missing_headings: bool = False,
 ) -> ProjectManifest:
     doc_type = request.document_type
     if request.heading_style_map:
@@ -437,6 +447,8 @@ def _build_manifest(
         refreshTimeoutSeconds=request.refresh_timeout_seconds,
         headingStyles=heading_styles,
         bodyStyle=template_meta.body_style,
+        is_headless=is_headless,
+        allow_missing_headings=allow_missing_headings,
     )
     manifest.paths = {
         "sourceDocx": paths.to_relative(paths.source_docx),
@@ -550,7 +562,7 @@ def _run_roundtrip_check(
     elif manifest_heading_styles:
         heading_styles = {int(level): str(sid) for level, sid in manifest_heading_styles.items()}
     try:
-        return roundtrip_diff(source_docx, trial_output, heading_styles=heading_styles)
+        return roundtrip_diff(source_docx, trial_output, heading_styles=heading_styles, allow_missing_headings=bool(request.allow_missing_headings))
     except Exception as exc:
         raise RoundtripCheckError(
             "往返对比失败：{0}".format(exc),

@@ -33,6 +33,7 @@ from lxml import etree
 
 from doc_tool.domain.ooxml import (
     heading_style_usage,
+    infer_heading_level_from_style_id,
     parse_heading_styles,
     parse_xml_safe,
     read_docx_package,
@@ -116,6 +117,7 @@ def generate_template(
     source_docx: Union[str, Path],
     target_template: Union[str, Path],
     heading_style_map: Optional[Dict[str, int]] = None,
+    allow_missing_headings: bool = False,
 ) -> TemplateMeta:
     """从源 DOCX 生成项目模板（任务 4.1）。
 
@@ -160,7 +162,7 @@ def generate_template(
         user_heading_map = dict(heading_style_map)
         heading_style_map = dict(heading_style_map)
     if not heading_style_map:
-        raise ValueError("源文档 styles.xml 未定义任何 Heading 样式，无法生成模板。")
+        heading_style_map = {'Heading{0}'.format(i): i for i in range(1, 7)}
     body_style = _find_body_style(styles_xml)
 
     # 构建时实际写入的 styleId（级别 -> styleId）：按源文档的真实使用情况
@@ -170,11 +172,42 @@ def generate_template(
     if user_heading_map:
         for style_id, level in user_heading_map.items():
             decisions[int(level)] = style_id
+    used_styles = set(decisions.values())
+    for lvl in range(1, 7):
+        if lvl not in decisions:
+            cand = 'Heading{0}'.format(lvl)
+            if cand not in used_styles:
+                decisions[lvl] = cand
+                used_styles.add(cand)
+            else:
+                for i in range(1, 10):
+                    alt = 'Heading{0}'.format(i)
+                    if alt not in used_styles:
+                        decisions[lvl] = alt
+                        used_styles.add(alt)
+                        break
 
     children = list(body)
     start_idx = _find_first_heading1(children, heading_style_map)
     if start_idx is None:
-        raise ValueError("源文档未找到第一个 Heading 1，无法确定正文起点。")
+        if allow_missing_headings:
+            start_idx = _find_first_heading(children, heading_style_map)
+            if start_idx is not None and not user_heading_map:
+                first_lvl = _para_level(children[start_idx], heading_style_map)
+                if first_lvl and first_lvl > 1:
+                    offset = first_lvl - 1
+                    decisions = {
+                        max(1, lvl - offset): sid
+                        for lvl, sid in decisions.items()
+                        if lvl >= first_lvl
+                    }
+                    for lvl in range(1, 7):
+                        if lvl not in decisions:
+                            decisions[lvl] = 'Heading{0}'.format(lvl)
+            if start_idx is None:
+                start_idx = _find_first_content(children)
+        else:
+            raise ValueError("源文档未找到第一个 Heading 1，无法确定正文起点。")
 
     # 删除正文元素（保留 sectPr）
     removed = 0
@@ -216,33 +249,76 @@ def _find_body_style(styles_xml: bytes) -> str:
     if not styles_xml:
         return ""
     sroot = parse_xml_safe(styles_xml, "word/styles.xml")
+    default_style = ""
     for style in sroot.iter(_qn("style")):
-        style_id = style.get(_qn("styleId"))
-        name_elem = style.find(_qn("name"))
-        if name_elem is None or not style_id:
+        if style.get(_qn("type")) != "paragraph":
             continue
-        name_val = (name_elem.get(_qn("val")) or "").strip()
-        if name_val.lower() == "normal" or name_val == "正文":
+        style_id = style.get(_qn("styleId")) or ""
+        if not style_id:
+            continue
+        if style.get(_qn("default")) == "1":
+            default_style = style_id
+        name_elem = style.find(_qn("name"))
+        name_val = (name_elem.get(_qn("val")) or "").strip() if name_elem is not None else ""
+        if name_val.lower() in ("normal", "正文") or style_id.lower() in ("normal", "正文"):
             return style_id
-    return ""
+    return default_style
+
+
+def _para_level(el, heading_style_map: Dict[str, int], offset: int = 0) -> Optional[int]:
+    st = _para_style(el)
+    lvl = heading_style_map.get(st) if st else None
+    if lvl is None and st:
+        lvl = infer_heading_level_from_style_id(st)
+    if lvl is None:
+        pPr = el.find(_qn('pPr'))
+        if pPr is not None:
+            otl = pPr.find(_qn('outlineLvl'))
+            if otl is not None:
+                try:
+                    val = int(otl.get(_qn('val'), '-1'))
+                    if 0 <= val <= 5:
+                        lvl = val + 1
+                except (ValueError, TypeError):
+                    pass
+    if lvl is not None and offset > 0:
+        lvl = max(1, lvl - offset)
+    return lvl
 
 
 def _find_first_heading1(
     children: List, heading_style_map: Dict[str, int]
 ) -> Optional[int]:
-    """定位第一个 Heading 1 元素在 body 子元素中的索引。"""
     for i, el in enumerate(children):
-        if etree.QName(el).localname != "p":
+        if etree.QName(el).localname != 'p':
             continue
-        pPr = el.find(_qn("pPr"))
-        if pPr is None:
-            continue
-        pStyle = pPr.find(_qn("pStyle"))
-        if pStyle is None:
-            continue
-        if heading_style_map.get(pStyle.get(_qn("val"))) == 1:
-            return i
+        if _para_level(el, heading_style_map) == 1:
+            if _para_text(el).strip() or _para_has_image(el):
+                return i
     return None
+
+
+def _find_first_heading(
+    children: List, heading_style_map: Dict[str, int]
+) -> Optional[int]:
+    for i, el in enumerate(children):
+        if etree.QName(el).localname != 'p':
+            continue
+        if _para_level(el, heading_style_map) is not None:
+            if _para_text(el).strip() or _para_has_image(el):
+                return i
+    return None
+
+
+def _find_first_content(children: List) -> int:
+    for i, el in enumerate(children):
+        local = etree.QName(el).localname
+        if local == "tbl":
+            return i
+        if local == "p":
+            if _para_text(el).strip() or _para_has_image(el):
+                return i
+    return 0
 
 
 # --- 4.2 正文/资源提取 ---
@@ -270,6 +346,7 @@ def extract_content(
     tables_dir: Union[str, Path],
     document_type: str,
     heading_style_map: Optional[Dict[str, int]] = None,
+    allow_missing_headings: bool = False,
 ) -> ExtractionResult:
     """从源 DOCX 提取正文 Markdown、图片与复杂表格（任务 4.2）。
 
@@ -315,9 +392,19 @@ def extract_content(
     rel_map = _parse_rel_map(rels_xml)
 
     children = list(body)
+    offset = 0
     start_idx = _find_first_heading1(children, heading_style_map)
     if start_idx is None:
-        raise ValueError("源文档未找到第一个 Heading 1，无法提取正文。")
+        if allow_missing_headings:
+            start_idx = _find_first_heading(children, heading_style_map)
+            if start_idx is not None:
+                first_lvl = _para_level(children[start_idx], heading_style_map)
+                if first_lvl and first_lvl > 1:
+                    offset = first_lvl - 1
+            if start_idx is None:
+                start_idx = _find_first_content(children)
+        else:
+            raise ValueError("源文档未找到第一个 Heading 1，无法确定正文起点。")
 
     img_map: List[Dict] = []
     tbl_map: List[Dict] = []
@@ -336,13 +423,15 @@ def extract_content(
         if tag == "p":
             st = _para_style(el)
             txt = _para_text(el)
-            lvl = heading_style_map.get(st) if st else None
+            lvl = _para_level(el, heading_style_map, offset=offset)
             has_img = _para_has_image(el)
 
             if lvl == 1:
+                if not txt and not has_img:
+                    continue
                 if cur_file is not None and cur_lines is not None:
                     _write_chapter(cur_file, cur_lines)
-                cur_chapter = re.sub(r"\r\n|\r|\n", " ", txt)
+                cur_chapter = re.sub(r"\r\n|\r|\n", " ", txt) or "正文"
                 fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
                 cur_file = content_dir / fname
                 cur_lines = []
@@ -356,11 +445,21 @@ def extract_content(
                     )
                 continue
             if cur_file is None:
-                continue  # 正文起点之前，跳过
+                if txt or has_img:
+                    cur_chapter = "正文"
+                    fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
+                    cur_file = content_dir / fname
+                    cur_lines = ["# " + cur_chapter, ""]
+                    chapter_order.append({"chapter": cur_chapter, "file": fname})
+                else:
+                    continue
 
             if lvl and 2 <= lvl <= 6:
-                cur_lines.append("#" * lvl + " " + re.sub(r"\r\n|\r|\n", "<br>", txt))
-                cur_lines.append("")
+                if not txt and not has_img:
+                    continue
+                if txt:
+                    cur_lines.append("#" * lvl + " " + re.sub(r"\r\n|\r|\n", "<br>", txt))
+                    cur_lines.append("")
                 if has_img:
                     img_counter, img_map = _emit_images(
                         el, rel_map, media_files, images_dir,
@@ -383,6 +482,12 @@ def extract_content(
                 _emit_paragraph(el, txt, cur_lines)
                 cur_lines.append("")
         elif tag == "tbl":
+            if cur_file is None:
+                cur_chapter = "正文"
+                fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
+                cur_file = content_dir / fname
+                cur_lines = ["# " + cur_chapter, ""]
+                chapter_order.append({"chapter": cur_chapter, "file": fname})
             tbl_counter, tbl_map, cur_lines = _emit_table(
                 el, tables_dir, tbl_counter, tbl_map,
                 cur_chapter, document_type, cur_lines,
@@ -453,7 +558,7 @@ def _para_text(p) -> str:
 
 
 def _para_has_image(p) -> bool:
-    return p.find(".//" + _qn("drawing")) is not None or p.find(".//" + _qn("pict")) is not None
+    return bool(_para_image_info(p))
 
 
 def _para_image_info(p) -> List[Dict]:
@@ -473,8 +578,16 @@ def _para_image_info(p) -> List[Dict]:
                     break
                 node = node.getparent()
         if ext is not None:
-            info["cx"] = int(ext.get("cx"))
-            info["cy"] = int(ext.get("cy"))
+            cx_val = ext.get("cx")
+            cy_val = ext.get("cy")
+            try:
+                info["cx"] = int(cx_val) if cx_val is not None else None
+            except (ValueError, TypeError):
+                info["cx"] = None
+            try:
+                info["cy"] = int(cy_val) if cy_val is not None else None
+            except (ValueError, TypeError):
+                info["cy"] = None
         infos.append(info)
     # 旧版 Word/VML 图片：<v:imagedata r:id="..."/>。
     for node in p.iter():
@@ -492,24 +605,33 @@ def _emit_images(
 ):
     image_infos = _para_image_info(el)
     if not image_infos:
-        raise ValueError("检测到图片节点，但没有可提取的图片关系。")
+        return img_counter, img_map
     for info in image_infos:
-        img_counter += 1
         relation = rel_map.get(info["rid"])
         if relation is None:
-            raise ValueError("图片关系不存在：{0}".format(info["rid"]))
+            continue
         target = relation.get("target", "")
         if relation.get("targetMode", "").lower() == "external" or target.lstrip().lower().startswith(
             ("http://", "https://", "file:", "ftp://")
         ):
-            raise ValueError("不支持外部链接图片：{0}".format(info["rid"]))
-        media_key = (
-            target.lstrip("/")
-            if target.startswith("/")
-            else posixpath.normpath("word/" + target.replace("\\", "/"))
-        )
+            cur_lines.append("![图片]({0})".format(target))
+            cur_lines.append("")
+            continue
+        norm_t = target.replace(chr(92), "/")
+        if norm_t.startswith("/"):
+            media_key = posixpath.normpath(norm_t).lstrip("/")
+        elif norm_t.startswith("word/"):
+            media_key = posixpath.normpath(norm_t)
+        else:
+            media_key = posixpath.normpath(posixpath.join("word", norm_t)).lstrip("/")
         if media_key not in media_files:
-            raise ValueError("图片关系目标不存在：{0}".format(info["rid"]))
+            if "word/" + media_key in media_files:
+                media_key = "word/" + media_key
+            elif media_key.startswith("word/") and media_key[5:] in media_files:
+                media_key = media_key[5:]
+            else:
+                continue
+        img_counter += 1
         media_data = media_files[media_key]
         ext = os.path.splitext(media_key)[1].lstrip(".") or "png"
         img_name = "img_{0:04d}.{1}".format(img_counter, ext)
@@ -540,14 +662,23 @@ def _emit_paragraph(el, txt, cur_lines) -> None:
         txt and txt[0] in "\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043\uf0d8\uF0B2\uF0A0"
     )
     if is_bullet:
+        ilvl = 0
+        if numPr is not None:
+            ilvl_el = numPr.find(_qn("ilvl"))
+            if ilvl_el is not None:
+                try:
+                    ilvl = int(ilvl_el.get(_qn("val"), "0"))
+                except (ValueError, TypeError):
+                    ilvl = 0
+        indent = "  " * ilvl
         txt_clean = re.sub(
             r"^[\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043\uf0d8\uF0B2\uF0A0]+[\s\u3000]*",
             "", txt)
         m_num = re.match(r"^(\d{1,3})[.、．]\s*", txt_clean)
         if m_num:
-            cur_lines.append("{0}. {1}".format(m_num.group(1), txt_clean[m_num.end():]))
+            cur_lines.append("{0}{1}. {2}".format(indent, m_num.group(1), txt_clean[m_num.end():]))
         else:
-            cur_lines.append("- " + txt_clean)
+            cur_lines.append(indent + "- " + txt_clean)
     else:
         pf = _para_fmt_marker(el)
         if pf:
@@ -626,31 +757,28 @@ def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type
                 "fmt": {k: v for k, v in fm.items() if v not in (None, [], "")},
                 "chapter": cur_chapter or "",
             })
-        else:
-            cur_lines.append("<!-- TABLE:{0} -->".format(tbl_counter))
-            cur_lines.append("")
-    else:
-        xml_name = "tbl_{0:04d}.xml".format(tbl_counter)
-        (tables_dir / xml_name).write_bytes(
-            etree.tostring(el, encoding="UTF-8", xml_declaration=True))
-        cur_lines.append("<!-- TABLE:{0}:{1} -->".format(tbl_counter, xml_name))
-        cur_lines.append("")
-        tbl_map.append({
-            "source_index": tbl_counter,
-            "kind": "xml",
-            "file": document_type + "/tables/" + xml_name,
-            "chapter": cur_chapter or "",
-        })
+            return tbl_counter, tbl_map, cur_lines
+
+    # 复杂表格或无法转为 Markdown 的表格（如空表格），作为 XML 表格存储
+    xml_name = "tbl_{0:04d}.xml".format(tbl_counter)
+    (tables_dir / xml_name).write_bytes(
+        etree.tostring(el, encoding="UTF-8", xml_declaration=True))
+    cur_lines.append("<!-- TABLE:{0}:{1} -->".format(tbl_counter, xml_name))
+    cur_lines.append("")
+    tbl_map.append({
+        "source_index": tbl_counter,
+        "kind": "xml",
+        "file": document_type + "/tables/" + xml_name,
+        "chapter": cur_chapter or "",
+    })
     return tbl_counter, tbl_map, cur_lines
 
 
 def _table_is_simple(tbl) -> bool:
-    if tbl.find(".//" + _qn("gridSpan")) is not None:
-        return False
-    if tbl.find(".//" + _qn("vMerge")) is not None:
-        return False
-    if tbl.find(".//" + _qn("drawing")) is not None or tbl.find(".//" + _qn("pict")) is not None:
-        return False
+    for node in tbl.iter():
+        ln = etree.QName(node).localname
+        if ln in ("gridSpan", "vMerge", "drawing", "pict", "imagedata"):
+            return False
     if tbl.find(".//" + _qn("tbl")) is not None:
         return False
     return True
@@ -674,7 +802,9 @@ def _table_to_md(tbl) -> Optional[str]:
     rows = [r + [""] * (ncols - len(r)) for r in rows]
 
     def esc(s: str) -> str:
-        return s.replace("|", "\\|").replace("\n", "<br>")
+        s = s.replace("\\", "\\\\")
+        s = s.replace("|", "\\|")
+        return re.sub(r"\r\n|\r|\n", "<br>", s)
 
     lines: List[str] = []
     lines.append("| " + " | ".join(esc(c) for c in rows[0]) + " |")
@@ -720,7 +850,10 @@ def _table_meta(el) -> Tuple[Optional[str], List[int], str, int]:
     if grid is not None:
         for gc in grid.findall(_qn("gridCol")):
             v = gc.get(_qn("w"))
-            widths.append(int(v) if v else 0)
+            try:
+                widths.append(int(v) if v else 0)
+            except (ValueError, TypeError):
+                widths.append(0)
     return style, widths, tw_type or "dxa", tw_w
 
 
@@ -888,7 +1021,18 @@ def _parse_file(path: Path) -> List[_Node]:
         if m:
             depth = len(m.group(1))
             title = m.group(2).strip()
-            if depth <= 3:
+            is_valid_tree_split = False
+            if depth == 1:
+                is_valid_tree_split = True
+            elif depth == 2:
+                is_valid_tree_split = bool(stack) and stack[0].depth == 1
+            elif depth == 3:
+                cand_stack = list(stack)
+                while cand_stack and depth <= cand_stack[-1].depth:
+                    cand_stack.pop()
+                is_valid_tree_split = bool(cand_stack) and cand_stack[-1].depth == 2
+
+            if is_valid_tree_split:
                 node = _Node(depth, title, idx)
                 while stack and depth <= stack[-1].depth:
                     stack.pop()
@@ -900,11 +1044,18 @@ def _parse_file(path: Path) -> List[_Node]:
             else:
                 if stack:
                     stack[-1].content.append(raw)
+                elif roots:
+                    roots[0].content.append(raw)
         else:
             if stack:
                 stack[-1].content.append(raw)
-            elif s and roots:
+            elif roots:
                 roots[0].content.append(raw)
+    if not roots and any(l.strip() for l in lines):
+        title = _safe_name(path.stem) or "正文"
+        root_node = _Node(1, title, 0)
+        root_node.content = lines
+        roots.append(root_node)
     return roots
 
 

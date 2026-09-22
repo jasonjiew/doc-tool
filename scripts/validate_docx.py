@@ -173,8 +173,9 @@ class DocxPackage:
         # 样式；两路并集按段落实际 pStyle 反查，互不干扰。
         self.heading_styles = self._heading_style_map()
         if heading_styles:
-            for level, style_id in heading_styles.items():
-                self.heading_styles.setdefault(str(style_id), int(level))
+            for level in sorted(heading_styles.keys(), key=lambda k: int(k), reverse=True):
+                style_id = heading_styles[level]
+                self.heading_styles[str(style_id)] = int(level)
         self.relationship_map = {relationship.get("Id"): relationship for relationship in self.relationships}
 
     def _heading_style_map(self) -> Dict[str, int]:
@@ -187,7 +188,21 @@ class DocxPackage:
     def paragraph_level(self, paragraph) -> Optional[int]:
         properties = paragraph.find(qn("pPr"))
         style = properties.find(qn("pStyle")) if properties is not None else None
-        return self.heading_styles.get(style.get(qn("val"))) if style is not None else None
+        st = style.get(qn("val")) if style is not None else ""
+        lvl = self.heading_styles.get(st) if st else None
+        if lvl is None and st:
+            from doc_tool.domain.ooxml import infer_heading_level_from_style_id
+            lvl = infer_heading_level_from_style_id(st)
+        if lvl is None and properties is not None:
+            otl = properties.find(qn("outlineLvl"))
+            if otl is not None:
+                try:
+                    val = int(otl.get(qn("val"), "-1"))
+                    if 0 <= val <= 5:
+                        lvl = val + 1
+                except (ValueError, TypeError):
+                    pass
+        return lvl
 
     def image_hashes(self, element) -> Tuple[str, ...]:
         hashes: List[str] = []
@@ -200,21 +215,59 @@ class DocxPackage:
             target = resolve_relationship_target("word/document.xml", relationship.get("Target", ""))
             data = self.items.get(target)
             hashes.append(hashlib.sha256(data).hexdigest() if data is not None else "MISSING_PART:" + target)
+        for node in element.iter():
+            if etree.QName(node).localname == "imagedata":
+                rid = node.get(R_NS + "id")
+                if rid:
+                    relationship = self.relationship_map.get(rid)
+                    if relationship is None:
+                        hashes.append("MISSING_REL:" + str(rid))
+                        continue
+                    target = resolve_relationship_target("word/document.xml", relationship.get("Target", ""))
+                    data = self.items.get(target)
+                    hashes.append(hashlib.sha256(data).hexdigest() if data is not None else "MISSING_PART:" + target)
         return tuple(hashes)
 
-    def body_events(self) -> List[Event]:
+    def body_events(self, allow_missing_headings: bool = False) -> List[Event]:
         body = self.document.find(qn("body"))
         if body is None:
             raise AutomationError("word/document.xml 缺少 w:body")
         events: List[Event] = []
-        started = False
+        def _is_effective_heading(el, target_lvl=None):
+            if etree.QName(el).localname != "p":
+                return False
+            lvl = self.paragraph_level(el)
+            if lvl is None:
+                return False
+            if target_lvl is not None and lvl != target_lvl:
+                return False
+            norm_txt = normalize_business_text(paragraph_text(el))
+            return bool(norm_txt) or bool(self.image_hashes(el))
+
+        has_h1 = any(_is_effective_heading(el, target_lvl=1) for el in body)
+        has_any_heading = any(_is_effective_heading(el) for el in body)
+        if not has_any_heading:
+            started = True
+        else:
+            started = False
+        offset = 0
+        if allow_missing_headings and not has_h1 and has_any_heading:
+            for el in body:
+                if _is_effective_heading(el):
+                    lvl = self.paragraph_level(el)
+                    if lvl and lvl > 1:
+                        offset = lvl - 1
+                    break
         for index, element in enumerate(body):
             local_name = etree.QName(element).localname
             if local_name == "p":
                 level = self.paragraph_level(element)
                 text = paragraph_text(element)
-                if level == 1:
-                    started = True
+                if not started:
+                    norm_text = normalize_business_text(text)
+                    has_content = bool(norm_text) or bool(self.image_hashes(element))
+                    if (level == 1 or (allow_missing_headings and level is not None)) and has_content:
+                        started = True
                 if not started:
                     continue
                 image_hashes = self.image_hashes(element)
@@ -226,34 +279,40 @@ class DocxPackage:
                 footnotes = tuple(
                     node.get(qn("id")) or "" for node in element.iter(qn("footnoteReference"))
                 )
+                norm_text = normalize_business_text(text)
                 if level:
-                    events.append(Event("H", (level, normalize_business_text(text)), "body[{0}]".format(index)))
-                elif image_hashes:
-                    events.append(Event("I", image_hashes, "body[{0}]".format(index)))
+                    eff_lvl = max(1, level - offset) if offset else level
+                    if norm_text:
+                        events.append(Event("H", (eff_lvl, norm_text), "body[{0}]".format(index)))
                 elif num_pr is not None:
-                    level = num_pr.find(qn("ilvl"))
-                    num_id = num_pr.find(qn("numId"))
-                    events.append(
-                        Event(
-                            "L",
-                            (
-                                normalize_business_text(text),
-                                level.get(qn("val")) if level is not None else "0",
-                                num_id.get(qn("val")) if num_id is not None else "",
-                            ),
-                            "body[{0}]".format(index),
+                    if norm_text:
+                        ilvl = num_pr.find(qn("ilvl"))
+                        num_id = num_pr.find(qn("numId"))
+                        events.append(
+                            Event(
+                                "L",
+                                (
+                                    norm_text,
+                                    ilvl.get(qn("val")) if ilvl is not None else "0",
+                                    num_id.get(qn("val")) if num_id is not None else "",
+                                ),
+                                "body[{0}]".format(index),
+                            )
                         )
-                    )
                 elif hyperlinks or footnotes:
-                    events.append(
-                        Event(
-                            "X",
-                            normalize_business_text(text),
-                            "body[{0}]".format(index),
+                    if norm_text:
+                        events.append(
+                            Event(
+                                "X",
+                                norm_text,
+                                "body[{0}]".format(index),
+                            )
                         )
-                    )
-                elif text:
-                    events.append(Event("P", normalize_business_text(text), "body[{0}]".format(index)))
+                elif norm_text:
+                    events.append(Event("P", norm_text, "body[{0}]".format(index)))
+
+                if image_hashes:
+                    events.append(Event("I", image_hashes, "body[{0}]".format(index)))
             elif local_name == "tbl" and started:
                 events.append(
                     Event(
@@ -469,8 +528,12 @@ def expected_content_events(
     config: Dict, available_bookmarks: Optional[Iterable[str]] = None
 ) -> List[Event]:
     events: List[Event] = []
+    is_headless = bool(config.get("is_headless", False))
     for entry, markdown_path in iter_chapter_entries(config):
-        events.append(Event("H", (entry.depth, normalize_business_text(entry.title)), entry.path))
+        if is_headless and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            events.append(Event("H", (entry.depth, normalize_business_text(entry.title)), entry.path))
         if markdown_path:
             events.extend(expected_markdown_events(markdown_path, config, available_bookmarks=available_bookmarks))
     return events
@@ -1044,8 +1107,9 @@ def validate(
         for node in output.document.iter(qn("bookmarkStart"))
         if node.get(qn("name"))
     }
+    allow_missing = bool(config.get("is_headless", False) or config.get("allow_missing_headings", False))
     expected = expected_content_events(config, available_bookmarks=available_bms)
-    actual = output.body_events()
+    actual = output.body_events(allow_missing_headings=allow_missing)
     event_errors = compare_expected_events(expected, actual, strict_complex_xml=not require_refreshed)
 
     relationship_errors = output.relationship_errors()
@@ -1179,17 +1243,18 @@ def validate(
             report.row_check(name="迁移基线已配置", ok=False, detail="config.baseline.file 缺失")
         else:
             source = DocxPackage(baseline_path, heading_styles=config["headingStyles"])
-            baseline_errors = compare_baseline_events(source.body_events(), actual)
+            source_events = source.body_events(allow_missing_headings=allow_missing)
+            baseline_errors = compare_baseline_events(source_events, actual)
             blocking_baseline = [
                 e for e in baseline_errors
-                if is_baseline_error_blocking(e, source.body_events(), actual)
+                if is_baseline_error_blocking(e, source_events, actual)
             ]
             report.row_check(
                 name="原 Word 与重建 Word 业务元素顺序/文本严格一致",
                 ok=not blocking_baseline,
                 detail="；".join((blocking_baseline or baseline_errors)[:5]),
             )
-            source_headings = [event.value for event in source.body_events() if event.kind == "H"]
+            source_headings = [event.value for event in source_events if event.kind == "H"]
             headings_match = len(source_headings) == len(headings_actual) and all(
                 sh[0] == ah[0] and _is_event_text_equivalent(sh[1], ah[1])
                 for sh, ah in zip(source_headings, headings_actual)

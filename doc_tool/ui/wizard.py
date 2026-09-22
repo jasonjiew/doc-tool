@@ -88,7 +88,7 @@ def format_preview_summary(preview) -> str:
             sample = "（{0}）".format("、".join(finding.samples)) if finding.samples else ""
             lines.append("  [{0}] {1}: {2}{3}".format(tag, finding.label, finding.count, sample))
         if fidelity.has_block:
-            lines.append("  ⛔ 存在阻断特性：默认阻止导入，可在确认风险后勾选「仍然导入」。")
+            lines.append("  ⛔ 存在阻断特性：请在下方勾选「我已了解上述阻断特性可能导致内容损失，仍然导入」后点击「下一步」。")
     return "\n".join(lines)
 
 
@@ -572,6 +572,7 @@ class _PreflightPage(QWizardPage):
         self._confirm_block = QCheckBox(
             "我已了解上述阻断特性可能导致内容损失，仍然导入", self
         )
+        self._confirm_block.setStyleSheet("color: #a12622; font-weight: bold; padding: 4px 0;")
         self._confirm_block.hide()
         self._confirm_block.toggled.connect(lambda _checked: self.completeChanged.emit())
         layout.addWidget(self._confirm_block)
@@ -1746,6 +1747,7 @@ class ImportWizard(QWizard):
             document_version=self._doc_version,
             require_exact_roundtrip=bool(self._require_exact_roundtrip),
             heading_style_map=heading_map,
+            allow_missing_headings=True,
         )
         self._import_started = True
         started = self._runner.start(

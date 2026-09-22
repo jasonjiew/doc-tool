@@ -35,6 +35,7 @@ from doc_tool.domain.errors import (
 )
 from doc_tool.domain.ooxml import (
     OOXMLSecurityError,
+    infer_heading_level_from_style_id,
     parse_heading_styles,
     parse_xml_safe,
     read_docx_package,
@@ -177,6 +178,31 @@ def preflight(
                 heading_style_map = dict(heading_style_map)
             headings = _build_heading_tree(parts, heading_style_map)
 
+            # 若文档中没有 Level 1 标题，但存在 Level 2~6 标题，在允许宽松扫描时
+            # 自动将顶层标题层级平移归一化到 Level 1，使章节能正确闭合并构建
+            if headings and not any(h.level == 1 for h in headings):
+                if allow_missing_headings:
+                    min_lvl = min(h.level for h in headings)
+                    if min_lvl > 1:
+                        offset = min_lvl - 1
+                        headings = [
+                            HeadingInfo(
+                                level=max(1, h.level - offset),
+                                style_id=h.style_id,
+                                text=h.text,
+                                body_index=h.body_index,
+                            )
+                            for h in headings
+                        ]
+                        heading_style_map = {
+                            sid: max(1, lvl - offset)
+                            for sid, lvl in heading_style_map.items()
+                            if lvl >= min_lvl
+                        }
+                        for h in headings:
+                            if h.style_id:
+                                heading_style_map.setdefault(h.style_id, h.level)
+
             # --- 3.4 层级校验（fail-closed；样式映射/宽松扫描时由调用方负责） ---
             if not allow_missing_headings:
                 _validate_heading_hierarchy(headings)
@@ -240,9 +266,14 @@ def preflight(
 def _check_extension(file_name: str) -> None:
     """校验文件扩展名为 ``.docx``（不区分大小写）。"""
     if not file_name.lower().endswith(".docx"):
+        suggested = (
+            "请使用 Microsoft Word 打开该文件并另存为「Word 文档 (*.docx)」格式后重新导入。"
+            if file_name.lower().endswith(".doc")
+            else "请选择扩展名为 .docx 的 Word 文档。"
+        )
         raise InvalidDocxError(
             "文件扩展名不是 .docx：{0}".format(file_name),
-            suggested_action="请选择扩展名为 .docx 的 Word 文档。",
+            suggested_action=suggested,
             details={"fileName": file_name},
         )
 
@@ -548,18 +579,36 @@ def _build_heading_tree(
         if etree.QName(elem).localname != "p":
             continue
         pPr = elem.find(_qn("pPr"))
-        if pPr is None:
-            continue
-        pStyle = pPr.find(_qn("pStyle"))
-        if pStyle is None:
-            continue
-        style_id = pStyle.get(_qn("val"))
-        if not style_id:
-            continue
-        level = heading_style_map.get(style_id)
+        style_id = ""
+        level = None
+        if pPr is not None:
+            pStyle = pPr.find(_qn("pStyle"))
+            if pStyle is not None:
+                style_id = pStyle.get(_qn("val")) or ""
+                level = heading_style_map.get(style_id)
+                if level is None and style_id:
+                    level = infer_heading_level_from_style_id(style_id)
+            if level is None:
+                otl = pPr.find(_qn("outlineLvl"))
+                if otl is not None:
+                    try:
+                        val = int(otl.get(_qn("val"), "-1"))
+                        if 0 <= val <= 5:
+                            level = val + 1
+                            if not style_id:
+                                style_id = "Heading{0}".format(level)
+                    except (ValueError, TypeError):
+                        pass
         if level is None:
             continue
         text = _para_text(elem)
+        has_img = bool(
+            elem.find(".//" + _qn("drawing")) is not None
+            or elem.find(".//" + _qn("pict")) is not None
+            or any(etree.QName(n).localname == "imagedata" for n in elem.iter())
+        )
+        if not text.strip() and not has_img:
+            continue
         headings.append(
             HeadingInfo(
                 level=level,

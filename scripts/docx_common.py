@@ -732,7 +732,7 @@ def _normalize_event_text(s: str) -> str:
     for ch in ("\u3000", "\u00a0", "\u2002", "\u2003", "\u2009"):
         t = t.replace(ch, " ")
     # Markdown 常见转义字符还原
-    t = t.replace(r"\|", "|").replace(r"\*", "*").replace(r"\_", "_").replace(r"\[", "[").replace(r"\]", "]")
+    t = t.replace(r"\|", "|").replace(r"\*", "*").replace(r"\_", "_").replace(r"\[", "[").replace(r"\]", "]").replace("`", "")
     # 剥离项目符号
     t = re.sub(r"^[\uF0B7\uF0A7\uF0D8\u2022\u25CF\u25A0\u25AA\u00B7\u2023\u2043]\s*", "", t)
     # 逐行去除首尾空格并丢弃空行

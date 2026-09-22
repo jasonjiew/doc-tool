@@ -107,69 +107,138 @@ def append_text(run, text: str) -> None:
 
 
 def parse_inline_runs(text: str) -> List[Tuple[str, str]]:
-    """把基础 Markdown 行内标记拆成 ``(文本, 样式)``，未闭合标记按原文。"""
+    """将包含行内样式（粗体、斜体、代码）的文本切分为 (text, style) 元组列表。
+    
+    规则：
+    1. 不破坏代码块内部格式
+    2. 支持 **加粗**、*斜体*、`代码`
+    3. 修复 CommonMark 兼容：公式乘号、路径分隔符、脱敏多星号掩码不得误触发格式化
+    """
     if text.strip().startswith("```"):
         return [(text, "")]
     tokens: List[Tuple[str, str]] = []
     cursor = 0
     plain_start = 0
     while cursor < len(text):
+        if text[cursor] == "*":
+            # 连续 4 个及以上星号（如 ****, ****** 等）为脱敏掩码或分隔线，一律作为普通纯文本
+            s_end = cursor
+            while s_end < len(text) and text[s_end] == "*":
+                s_end += 1
+            if s_end - cursor >= 4:
+                cursor = s_end
+                continue
+
         marker = None
         style = ""
         width = 0
         if text.startswith("`", cursor):
             marker, style, width = "`", "code", 1
+        elif text.startswith("***", cursor):
+            marker, style, width = "***", "bold_italic", 3
         elif text.startswith("**", cursor):
             marker, style, width = "**", "bold", 2
         elif text.startswith("*", cursor):
             marker, style, width = "*", "italic", 1
+        elif text.startswith("~~", cursor):
+            marker, style, width = "~~", "strike", 2
         if marker is None:
             cursor += 1
             continue
 
+        prev_ch = text[cursor - 1] if cursor > 0 else ""
+        next_ch = text[cursor + width] if cursor + width < len(text) else ""
+
         # 保护公式乘号、通配符、独立星号不被误判为斜体：
         if marker == "*":
-            # 1. * 紧邻空格或换行 -> 不能作为开始定界符 (CommonMark 规范)
-            if cursor + width >= len(text) or text[cursor + width].isspace():
+            if next_ch == "*":
                 cursor += 1
                 continue
-            # 2. * 紧跟数字 (如 *0.5, *10) 或位于操作数之间 (如 2*3, 长度*0.5) -> 算术乘号，不得作为斜体定界符
-            prev_ch = text[cursor - 1] if cursor > 0 else ""
-            next_ch = text[cursor + width]
+            # * 紧邻空格或换行 -> 不能作为开始定界符 (CommonMark 规范)
+            if not next_ch or next_ch.isspace():
+                cursor += 1
+                continue
+            # * 紧跟数字 (如 *0.5, *10) 或位于操作数之间 (如 2*3, 长度*0.5) -> 算术乘号，不得作为斜体定界符
             is_mul = False
             if next_ch.isdigit():
                 is_mul = True
-            elif prev_ch and prev_ch != "*":
-                if (prev_ch.isalnum() or prev_ch in ")]）】") and (next_ch.isalnum() or next_ch in "([（【."):
-                    is_mul = True
-            if is_mul:
+            elif prev_ch.isdigit() and ((next_ch.isascii() and next_ch.isalpha()) or next_ch in "([（"):
+                is_mul = True
+            elif prev_ch and prev_ch in ")]）" and (next_ch.isdigit() or (next_ch.isascii() and next_ch.isalpha()) or next_ch in "([（"):
+                is_mul = True
+            if is_mul or next_ch == ".":
                 cursor += 1
                 continue
-            # 3. 通配符 *.ext
-            if next_ch == ".":
+
+        # 保护通配符、脱敏星号掩码不被误判为粗体：
+        if marker in ("**", "***"):
+            # ** 紧邻空格或换行 -> 不能作为开始定界符 (CommonMark 规范)
+            if not next_ch or next_ch.isspace():
+                cursor += 1
+                continue
+            # 通配符模式：路径分隔符或通配符扩展名 (如 /** 或 **/ 或 \** 或 **\ 或 **.ext 或 ***.ext)
+            if prev_ch in ("/", chr(92)) or next_ch in ("/", chr(92), "."):
+                cursor += 1
+                continue
+            if next_ch == "*" and cursor + width + 1 < len(text) and text[cursor + width + 1] in (".", "/", chr(92)):
                 cursor += 1
                 continue
 
         closing = text.find(marker, cursor + width)
+        # 空跨度（如 **** 或 ``）不能作为加粗/代码跨度
         if (
             closing < 0
-            or "\n" in text[cursor + width:closing]
+            or closing == cursor + width
+            or chr(10) in text[cursor + width:closing]
             or "<br" in text[cursor + width:closing].lower()
         ):
             cursor += width
             continue
 
+        span = text[cursor + width:closing]
+        if not span or all(c == "*" for c in span):
+            cursor += width
+            continue
+
+        # 检查闭合处的星号连续长度：若闭合处连续星号 >= 4，则说明是掩码，不得闭合
+        if marker in ("*", "**", "***"):
+            c_start = closing
+            while c_start > 0 and text[c_start - 1] == "*":
+                c_start -= 1
+            c_end = closing
+            while c_end < len(text) and text[c_end] == "*":
+                c_end += 1
+            if c_end - c_start >= 4:
+                cursor += width
+                continue
+
         # 针对斜体 * 的闭合定界符防误判保护：
         if marker == "*":
-            # 闭合 * 紧跟在空格后面 -> 不能作为闭合定界符
-            if text[closing - 1].isspace():
+            # 闭合 * 紧跟在空格后面或紧随星号 -> 不能作为闭合定界符
+            if text[closing - 1].isspace() or (closing + 1 < len(text) and text[closing + 1] == "*"):
                 cursor += width
                 continue
             # 斜体跨度不宜过长或跨越多句标点
-            span = text[cursor + width:closing]
-            if len(span) > 60 or any(p in span for p in ("。", "；", "！", "？", ";", "，", "：", ":")):
+            if len(span) > 100 or span.count("。") > 1:
                 cursor += width
                 continue
+
+        # 针对粗体 ** 的闭合定界符防误判保护：
+        if marker in ("**", "***"):
+            # 闭合 ** 紧跟在空格后面 -> 不能作为闭合定界符
+            if text[closing - 1].isspace():
+                cursor += width
+                continue
+            prev_close = text[closing - 1] if closing > 0 else ""
+            next_close = text[closing + width] if closing + width < len(text) else ""
+            # 通配符/路径保护：闭合定界符前后不能是路径分隔符或通配符扩展名
+            if prev_close in ("/", chr(92)) or next_close in ("/", chr(92), "."):
+                cursor += width
+                continue
+            if prev_close == "*":
+                cursor += width
+                continue
+            
 
         if cursor > plain_start:
             tokens.append((text[plain_start:cursor], ""))
@@ -254,6 +323,11 @@ def _append_styled_run(
             etree.SubElement(rpr, qn("b"))
         elif style == "italic":
             etree.SubElement(rpr, qn("i"))
+        elif style == "bold_italic":
+            etree.SubElement(rpr, qn("b"))
+            etree.SubElement(rpr, qn("i"))
+        elif style == "strike":
+            etree.SubElement(rpr, qn("strike"))
         elif style == "code":
             fonts = etree.SubElement(rpr, qn("rFonts"))
             for attribute in ("ascii", "hAnsi", "eastAsia"):
@@ -973,9 +1047,16 @@ def parse_list_line(line: str):
 def make_heading(
     style_map: Dict[int, str], text: str, level: int, *, num_id: Optional[int] = None, list_level: int = 0, expressions=None, bookmark_key: str = ""
 ):
-    if level not in style_map:
-        raise AutomationError("缺少 Heading {0} 的 Word 样式映射".format(level))
-    paragraph = make_paragraph(style_map[level], text, expressions=expressions, num_id=num_id, list_level=list_level)
+    style_id = style_map.get(level)
+    if not style_id:
+        available = [k for k in style_map if isinstance(k, int) and k <= level]
+        if available:
+            style_id = style_map[max(available)]
+        elif style_map:
+            style_id = style_map[min(style_map.keys())]
+        else:
+            style_id = "Heading{0}".format(level)
+    paragraph = make_paragraph(style_id, text, expressions=expressions, num_id=num_id, list_level=list_level)
     if expressions is not None and bookmark_key:
         expressions.wrap_bookmark(paragraph, bookmark_key)
     return paragraph
@@ -1001,7 +1082,12 @@ def make_table_from_md(
     extra = extra or {}
     column_count = max(len(row) for row in rows)
     rows = [row + [""] * (column_count - len(row)) for row in rows]
-    widths = list(col_widths[:column_count]) if col_widths and len(col_widths) >= column_count else [2400] * column_count
+    if col_widths:
+        widths = [max(int(w), 200) for w in col_widths[:column_count]]
+        if len(widths) < column_count:
+            widths.extend([2400] * (column_count - len(widths)))
+    else:
+        widths = [2400] * column_count
 
     table = etree.Element(qn("tbl"))
     table_properties = etree.SubElement(table, qn("tblPr"))
@@ -2511,9 +2597,12 @@ def build(
     images = 0
     tables = 0
     for entry, markdown_path in chapter_entries:
-        insert_element(
-            section_properties,
-            make_heading(
+        if config.get("is_headless") and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            insert_element(
+                section_properties,
+                make_heading(
                 config["headingStyles"],
                 entry.title,
                 entry.depth,
@@ -2523,7 +2612,7 @@ def build(
                 bookmark_key=os.path.abspath(markdown_path) if markdown_path else os.path.abspath(entry.path),
             ),
         )
-        inserted += 1
+            inserted += 1
         if markdown_path:
             count, image_count, table_count = process_markdown(
                 markdown_path,

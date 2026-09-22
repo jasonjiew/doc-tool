@@ -312,8 +312,9 @@ HEADING_LEVEL_MAX = 6
 # 样式名 -> 级别。英文内置名（"heading 1"）先于本地化名（"标题1"）匹配：
 # 两者可能同时存在，内置名是「这是真正的 Word Heading」更可靠的信号。
 _HEADING_NAME_PATTERNS = (
-    (re.compile(r"(?i)heading\s*(\d+)"), True),
-    (re.compile(r"标题\s*(\d+)"), False),
+    (re.compile(r"(?i)heading[_\s-]*(\d+)"), True),
+    (re.compile(r"(?<!副)标题[_\s-]*(\d+)"), True),
+    (re.compile(r"(?i)^h([1-6])$"), False),
 )
 
 
@@ -355,6 +356,27 @@ def _style_outline_level(style) -> Optional[int]:
         return None
 
 
+def infer_heading_level_from_style_id(style_id: str) -> Optional[int]:
+    """从 styleId 或样式名启发式推断标题级别（1~6），缺省/无法识别时返回 None。"""
+    if not style_id:
+        return None
+    s = style_id.strip()
+    for pattern, _ in _HEADING_NAME_PATTERNS:
+        match = pattern.match(s)
+        if match:
+            level = int(match.group(1))
+            if HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX:
+                return level
+    cn_map = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6}
+    m_cn = re.match(r'^(?:第\s*)?(?:(?<!副)标题\s*([一二三四五六1-6])|([一二三四五六1-6])\s*级(?:\s*(?:标题|正文标题|目录))?)$', s)
+    if m_cn:
+        v = m_cn.group(1) or m_cn.group(2)
+        level = cn_map.get(v, int(v) if v.isdigit() else 0)
+        if HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX:
+            return level
+    return None
+
+
 def heading_style_candidates(styles_root) -> List[HeadingStyleCandidate]:
     """列出已解析 ``w:styles`` 根元素中全部 Heading 段落样式候选（按出现顺序）。"""
     if styles_root is None:
@@ -371,11 +393,24 @@ def heading_style_candidates(styles_root) -> List[HeadingStyleCandidate]:
         level = 0
         builtin_name = False
         for pattern, is_builtin in _HEADING_NAME_PATTERNS:
-            match = pattern.match(name)
+            match = pattern.match(name) or pattern.match(style_id)
             if match:
                 level = int(match.group(1))
                 builtin_name = is_builtin
                 break
+        if not (HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX):
+            cn_map = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6}
+            m_cn = (
+                re.match(r'^(?:第\s*)?(?:(?<!副)标题\s*([一二三四五六1-6])|([一二三四五六1-6])\s*级(?:\s*(?:标题|正文标题|目录))?)$', name.strip())
+                or re.match(r'^(?:第\s*)?(?:(?<!副)标题\s*([一二三四五六1-6])|([一二三四五六1-6])\s*级(?:\s*(?:标题|正文标题|目录))?)$', style_id.strip())
+            )
+            if m_cn:
+                v = m_cn.group(1) or m_cn.group(2)
+                level = cn_map.get(v, int(v) if v.isdigit() else 0)
+        if not (HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX):
+            otl = _style_outline_level(style)
+            if otl is not None and 0 <= otl <= 5:
+                level = otl + 1
         if not HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX:
             continue
         based_on_elem = style.find(_qn("basedOn"))
@@ -480,6 +515,7 @@ def parse_heading_styles(styles_xml: bytes) -> Dict[str, int]:
 
 # 兼容性别名：旧调用方按 ``OOXMLSecurityError`` 或 ``is_*`` 辅助使用。
 __all__ = [
+    "infer_heading_level_from_style_id",
     "OOXMLSecurityError",
     "PARSE_LIMITS",
     "DocxPackage",

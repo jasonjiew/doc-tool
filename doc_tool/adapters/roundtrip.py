@@ -131,6 +131,7 @@ def roundtrip_diff(
     source_docx: Union[str, Path],
     rebuilt_docx: Union[str, Path],
     heading_styles: Optional[Dict[int, str]] = None,
+    allow_missing_headings: bool = False,
 ) -> RoundtripReport:
     """对源 Word 与重建 Word 执行业务元素往返对比。
 
@@ -154,8 +155,8 @@ def roundtrip_diff(
 
     source = DocxPackage(str(source_docx), heading_styles=heading_styles)
     rebuilt = DocxPackage(str(rebuilt_docx), heading_styles=heading_styles)
-    source_events = source.body_events()
-    rebuilt_events = rebuilt.body_events()
+    source_events = source.body_events(allow_missing_headings=allow_missing_headings)
+    rebuilt_events = rebuilt.body_events(allow_missing_headings=allow_missing_headings)
     errors = compare_baseline_events(source_events, rebuilt_events)
     issues: List[RoundtripIssue] = []
     for error in errors:

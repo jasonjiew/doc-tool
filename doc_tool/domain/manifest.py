@@ -122,6 +122,8 @@ class ProjectManifest:
     # 由导入服务根据源文档类型从默认配置写入，构建时由适配层消费。
     headingStyles: Dict[int, str] = field(default_factory=dict)
     bodyStyle: str = ""
+    is_headless: bool = False
+    allow_missing_headings: bool = False
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
 
@@ -196,6 +198,8 @@ class ProjectManifest:
             "documentNo": self.documentNo,
             "documentName": self.documentName,
             "documentVersion": self.documentVersion,
+            "isHeadless": self.is_headless,
+            "allowMissingHeadings": self.allow_missing_headings,
             "paths": dict(self.paths),
             "sourceSha256": self.sourceSha256,
             "createdWithVersion": self.createdWithVersion,
@@ -329,6 +333,8 @@ class ProjectManifest:
             else:
                 doc_ver_raw = "1.0" 
             manifest = cls(
+            is_headless=bool(data.get("isHeadless", data.get("is_headless", False))),
+            allow_missing_headings=bool(data.get("allowMissingHeadings", data.get("allow_missing_headings", False))),
                 documentType=doc_type_raw,
                 documentNo=doc_no_raw,
                 documentName=doc_name_raw,

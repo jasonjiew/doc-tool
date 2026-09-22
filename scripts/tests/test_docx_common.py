@@ -68,6 +68,49 @@ class MarkdownContractTests(unittest.TestCase):
     def test_unclosed_inline_marker_stays_literal(self):
         self.assertEqual(parse_inline_runs("未闭合 **粗体"), [("未闭合 **粗体", "")])
 
+    def test_bold_wildcard_and_multistar_stay_literal(self):
+        # 通配符模式（如 ***.edf、**.tmp、/**/ 等）不应被误判为粗体
+        text = "路径为 DATALOG/***.edf；结果集为 /***.tmp。"
+        self.assertEqual(parse_inline_runs(text), [(text, "")])
+        glob_text = "path1: dir/**/a and path2: dir/**/b"
+        self.assertEqual(parse_inline_runs(glob_text), [(glob_text, "")])
+        # 粗体标记紧跟空格不得作为定界符
+        self.assertEqual(parse_inline_runs("** 不粗体 **"), [("** 不粗体 **", "")])
+
+    def test_bold_with_punctuation_and_multisentence(self):
+        # 包含句号、分号等标点的粗体跨度应正常保留为粗体样式
+        text = "**注意：请确认配置；否则操作失败。**"
+        self.assertEqual(parse_inline_runs(text), [("注意：请确认配置；否则操作失败。", "bold")])
+        multi = "**第 1 步：备份数据。第 2 步：执行升级。**"
+        self.assertEqual(parse_inline_runs(multi), [("第 1 步：备份数据。第 2 步：执行升级。", "bold")])
+
+    def test_inline_bold_italic_three_asterisks(self):
+        # ***加粗斜体*** 解析为 bold_italic 样式文本
+        text = "***加粗斜体***"
+        self.assertEqual(parse_inline_runs(text), [("加粗斜体", "bold_italic")])
+        text_mixed = "前***加粗斜体***后"
+        self.assertEqual(parse_inline_runs(text_mixed), [("前", ""), ("加粗斜体", "bold_italic"), ("后", "")])
+
+    def test_inline_italic_in_chinese_sentence(self):
+        # 中文字符之间的星号不应误判为乘号，首尾标点及全角括号也应正确支持
+        text = "中文*斜体*测试"
+        self.assertEqual(parse_inline_runs(text), [("中文", ""), ("斜体", "italic"), ("测试", "")])
+        text_combo = "前**粗体**中*斜体*后"
+        self.assertEqual(parse_inline_runs(text_combo), [("前", ""), ("粗体", "bold"), ("中", ""), ("斜体", "italic"), ("后", "")])
+        text_paren = "（注意）*斜体文本*"
+        self.assertEqual(parse_inline_runs(text_paren), [("（注意）", ""), ("斜体文本", "italic")])
+        text_formula = "2*3 和 (a+b)*(c+d)"
+        self.assertEqual(parse_inline_runs(text_formula), [(text_formula, "")])
+
+    def test_inline_italic_with_punctuation(self):
+        # 斜体跨度内包含常见标点符号应正常支持
+        text = "*带有逗号，的斜体*"
+        self.assertEqual(parse_inline_runs(text), [("带有逗号，的斜体", "italic")])
+        text2 = "*带有一个句号。的斜体*"
+        self.assertEqual(parse_inline_runs(text2), [("带有一个句号。的斜体", "italic")])
+        text_multi_period = "*带有两个句号。另一个句号。*"
+        self.assertEqual(parse_inline_runs(text_multi_period), [(text_multi_period, "")])
+
     def test_list_parser_requires_whitespace_and_tracks_indent(self):
         self.assertEqual(parse_list_line("  - 子项"), ("bullet", 1, 1, "子项"))
         self.assertEqual(parse_list_line("3. 起始"), ("decimal", 0, 3, "起始"))

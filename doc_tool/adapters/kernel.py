@@ -81,6 +81,7 @@ def _effective_heading_styles(
         parse_xml_safe,
         read_docx_package,
         resolve_heading_styles,
+        infer_heading_level_from_style_id,
     )
 
     try:
@@ -135,8 +136,8 @@ def _effective_heading_styles(
         if style_to_level.get(configured_style) == level:
             effective[level] = configured_style
             continue
-        if configured_style in paragraph_ids:
-            # 配置的 styleId 是模板中的真实段落样式：保留，不擅自替换。
+        if configured_style in paragraph_ids or infer_heading_level_from_style_id(configured_style) is not None:
+            # 声明的 styleId 在模板中存在或为有效标题样式，保留
             effective[level] = configured_style
             continue
         replacement = discovered.get(level)
@@ -251,6 +252,8 @@ def config_from_project(
             "output": str(output_path),
         },
         "headingStyles": heading_styles,
+        "is_headless": getattr(manifest, "is_headless", False),
+        "allow_missing_headings": getattr(manifest, "allow_missing_headings", False) or getattr(manifest, "is_headless", False),
         "bodyStyle": manifest.bodyStyle,
         "_base": str(paths.root),
         "_config_path": str(paths.manifest_file),
