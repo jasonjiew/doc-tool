@@ -101,6 +101,7 @@ class ImportRequest:
     require_exact_roundtrip: bool = False
     heading_style_map: Optional[Dict[str, int]] = None
     allow_missing_headings: bool = False
+    ignore_roundtrip_block: bool = False
 
 
 @dataclass
@@ -161,12 +162,15 @@ def import_first_time(
         _record(result, STAGE_VALIDATE_TARGET, "succeeded",
                 detail="目标目录可用", metrics={"target": target.name})
 
+        from doc_tool.adapters.word_convert import ensure_docx_source
+        actual_source, orig_doc = ensure_docx_source(source_path)
+
         # 2. 预检（fail-closed 重新校验；样式映射优先于自动识别）
         _check_cancel()
         _record(result, STAGE_PREFLIGHT, "started")
         allow_missing = bool(request.allow_missing_headings)
         preview = preflight(
-            str(source_path),
+            str(actual_source),
             heading_style_map=request.heading_style_map,
             allow_missing_headings=allow_missing,
         )
@@ -207,8 +211,13 @@ def import_first_time(
         # 4. 只读复制源文档 + SHA-256 (4.4)
         _check_cancel()
         _record(result, STAGE_COPY_SOURCE, "started")
-        sha256 = _copy_and_hash(source_path, paths.source_docx)
+        sha256 = _copy_and_hash(actual_source, paths.source_docx)
         result.source_sha256 = sha256
+        if orig_doc is not None:
+            try:
+                shutil.copy2(str(orig_doc), str(paths.original_dir / orig_doc.name))
+            except Exception:
+                pass
         _record(result, STAGE_COPY_SOURCE, "succeeded", metrics={"sha256": sha256[:12] + "..."})
 
         # 5. 生成模板 (4.1)
@@ -297,9 +306,11 @@ def import_first_time(
         roundtrip_report = _run_roundtrip_check(
             request, paths.source_docx, trial_output, manifest.headingStyles
         )
-        if roundtrip_report.has_block or (
-            request.require_exact_roundtrip and roundtrip_report.issues
-        ):
+        should_block = (
+            (request.require_exact_roundtrip and roundtrip_report.issues)
+            or (roundtrip_report.has_block and not request.ignore_roundtrip_block)
+        )
+        if should_block:
             raise RoundtripCheckError.from_report(
                 roundtrip_report,
                 require_exact=request.require_exact_roundtrip,

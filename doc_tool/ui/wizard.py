@@ -158,13 +158,13 @@ class _DropZone(QFrame):
                 )
             )
         else:
-            self._title.setText("将 Word 文档 (.docx) 拖放到此处，或点击选择文件")
+            self._title.setText("将 Word 文档 (.docx / .doc) 拖放到此处，或点击选择文件")
             self.setStyleSheet("")
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
-                if url.isLocalFile() and url.toLocalFile().lower().endswith(".docx"):
+                if url.isLocalFile() and url.toLocalFile().lower().endswith((".docx", ".doc")):
                     event.acceptProposedAction()
                     self.set_drag_over(True)
                     return
@@ -173,7 +173,7 @@ class _DropZone(QFrame):
     def dragMoveEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
-                if url.isLocalFile() and url.toLocalFile().lower().endswith(".docx"):
+                if url.isLocalFile() and url.toLocalFile().lower().endswith((".docx", ".doc")):
                     event.acceptProposedAction()
                     return
         super().dragMoveEvent(event)
@@ -187,7 +187,7 @@ class _DropZone(QFrame):
         for url in event.mimeData().urls():
             if url.isLocalFile():
                 path = url.toLocalFile()
-                if path.lower().endswith(".docx"):
+                if path.lower().endswith((".docx", ".doc")):
                     event.acceptProposedAction()
                     self.file_dropped.emit(path)
                     return
@@ -204,7 +204,7 @@ class _SourcePage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 1：选择源 Word 文档")
+        self.setTitle("选择源 Word 文档")
         self.setSubTitle("导入已有 Word 文档，系统将自动识别目录大纲并拆解为 Markdown 章节。")
 
         self._source_path: Optional[str] = None
@@ -288,6 +288,14 @@ class _SourcePage(QWizardPage):
         self._smart_banner = QLabel("", self._diag_box)
         self._smart_banner.setWordWrap(True)
         diag_layout.addWidget(self._smart_banner)
+
+        self._quick_import_btn = QPushButton("🚀 立即一键导入并进入工作台 (推荐)", self._diag_box)
+        self._quick_import_btn.setProperty("btnRole", "primary")
+        self._quick_import_btn.setMinimumHeight(36)
+        self._quick_import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._quick_import_btn.hide()
+        self._quick_import_btn.clicked.connect(self._on_quick_import_clicked)
+        diag_layout.addWidget(self._quick_import_btn)
 
         self._tuning_check = QCheckBox("我需要手动微调段落与章节样式映射（高级选项）", self._diag_box)
         self._tuning_check.hide()
@@ -414,7 +422,7 @@ class _SourcePage(QWizardPage):
 
     def _browse(self) -> None:
         path = QFileDialog.getOpenFileName(
-            self, "选择源 Word 文档", "", "Word 文档 (*.docx);;所有文件 (*.*)"
+            self, "选择源 Word 文档", "", "Word 文档 (*.docx *.doc);;所有文件 (*.*)"
         )[0]
         if path:
             self._on_file_selected(path)
@@ -473,6 +481,7 @@ class _SourcePage(QWizardPage):
         self._capsule_fidelity.setText("🛡 保真度: 检测中…")
         self._smart_banner.setText("")
         self._tuning_check.hide()
+        self._quick_import_btn.hide()
         self._preflight_done = False
 
         wizard._start_preflight(on_done=self._on_silent_preflight_done)
@@ -511,7 +520,8 @@ class _SourcePage(QWizardPage):
 
         if preview.has_heading1 and not has_block:
             self._smart_banner.setStyleSheet("color: #176b3a; font-weight: bold;")
-            self._smart_banner.setText(f"✓ 已自动识别标准章节大纲（共 {h1_count} 个一级章，{total_headings} 个标题层级），无需手动配置样式。点击「下一步」将直接确认项目位置。")
+            self._smart_banner.setText(f"✓ 文档大纲就绪（已识别 {h1_count} 个一级章，共 {total_headings} 个标题）。点击「立即导入」直接构建进入工作台，也可点击「下一步」修改配置。")
+            self._quick_import_btn.show()
             self._tuning_check.show()
             self._tuning_check.setChecked(False)
             self._wants_tuning = False
@@ -534,6 +544,32 @@ class _SourcePage(QWizardPage):
         self._wants_tuning = checked
         if hasattr(self.wizard(), "_update_next_button_text"):
             self.wizard()._update_next_button_text()
+
+    def _on_quick_import_clicked(self) -> None:
+        wizard = self.wizard()
+        if not wizard:
+            return
+        if not wizard._doc_name:
+            fn = self._file_name_label.text().strip()
+            wizard._doc_name = (fn.rsplit(".", 1)[0] if "." in fn else fn) or "新建文档"
+        if not wizard._project_name:
+            wizard._project_name = re.sub(r'[<>:"/\\|?*]', '_', wizard._doc_name).strip(" .") or "doc_project"
+        if not wizard._target_parent:
+            wizard._target_parent = self._target_entry.text().strip() or self._get_default_dir()
+        target_path = Path(wizard._target_parent) / wizard._project_name
+        if target_path.exists():
+            base_name = re.sub(r"-v\d+$", "", wizard._project_name)
+            idx = 2
+            while (Path(wizard._target_parent) / f"{base_name}-v{idx}").exists():
+                idx += 1
+            wizard._project_name = f"{base_name}-v{idx}"
+            target_path = Path(wizard._target_parent) / wizard._project_name
+        wizard._target_root = str(target_path)
+        if hasattr(wizard, "_info_page"):
+            wizard._info_page._doc_name_entry.setText(wizard._doc_name)
+            wizard._info_page._project_name_entry.setText(wizard._project_name)
+            wizard._info_page._target_entry.setText(wizard._target_parent)
+        wizard.setCurrentId(4)
 
     def isComplete(self) -> bool:
         if not self._source_path:
@@ -654,7 +690,7 @@ class _StyleMappingPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 3/6：确认章节划分与样式映射")
+        self.setTitle("确认章节划分与样式映射")
         self.setSubTitle("把 Word 段落样式映射到章节层级；右侧大纲树将实时联动呈现拆解效果。")
         layout = QVBoxLayout(self)
 
@@ -884,7 +920,7 @@ class _ProjectInfoPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 4/6：项目信息与存储位置")
+        self.setTitle("项目信息与存储位置")
         self.setSubTitle("确认项目名称与保存目录。系统已自动智能填充安全名称与推荐路径。")
         self.setCommitPage(True)
         layout = QVBoxLayout(self)
@@ -1204,7 +1240,7 @@ class _ExecutingPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 5/6：正在执行流水线导入…")
+        self.setTitle("正在执行流水线导入…")
         self.setSubTitle("系统正在事务化构建项目结构，提取文本、表格与多媒体资源。")
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -1325,7 +1361,7 @@ class _ResultPage(QWizardPage):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("步骤 6/6：导入完成看板")
+        self.setTitle("导入完成看板")
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
@@ -1527,7 +1563,7 @@ class ImportWizard(QWizard):
     返回项目目录路径（成功）或 None（取消）。
     """
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, initial_file: Optional[str] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("新建项目向导")
         self.resize(760, 560)
@@ -1559,6 +1595,8 @@ class ImportWizard(QWizard):
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll_runner)
+        if initial_file and os.path.exists(initial_file):
+            QTimer.singleShot(60, lambda: self._source_page._on_file_selected(initial_file))
 
         # 六个标准页面
         self._source_page = _SourcePage(self)
@@ -1691,11 +1729,13 @@ class ImportWizard(QWizard):
 
         def run_preflight():
             from doc_tool.adapters.preflight import preflight
+            from doc_tool.adapters.word_convert import ensure_docx_source
             from doc_tool.domain.errors import DocToolError
 
             try:
+                actual_path, _ = ensure_docx_source(self._source_page.source_path())
                 preview = preflight(
-                    self._source_page.source_path(), allow_missing_headings=True
+                    str(actual_path), allow_missing_headings=True
                 )
             except DocToolError as exc:
                 return (
@@ -1737,7 +1777,11 @@ class ImportWizard(QWizard):
         target_root = str(
             Path(self._target_parent) / self._project_name
         )
-        heading_map = self._mapping_page.mapping() or None
+        heading_map = self._mapping_page.mapping() or (
+            dict(self._preview.heading_style_map)
+            if self._preview and getattr(self._preview, "heading_style_map", None)
+            else None
+        )
         request = ImportRequest(
             source_docx=Path(self._source_page.source_path()),
             target_project_root=Path(target_root),

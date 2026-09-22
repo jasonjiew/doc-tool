@@ -3640,6 +3640,26 @@ class WizardUXOptimizationTests(unittest.TestCase):
         self.assertTrue(back_btn.isEnabled(), "导入失败时必须允许点击上一步返回重试")
         self.assertEqual(next_btn.text(), "关闭")
 
+    def test_quick_import_clicked_resolves_collision_and_targets_executing_page(self):
+        """一键导入时若目标目录已存在，自动防冲突更名并直接切入流水线执行页。"""
+        import tempfile
+        import os
+        from types import SimpleNamespace
+
+        wizard = self._wizard()
+        wizard.restart()
+        wizard._source_page._file_name_label.setText("需求说明.docx")
+        with tempfile.TemporaryDirectory() as td:
+            exist1 = os.path.join(td, "需求说明")
+            os.makedirs(exist1, exist_ok=True)
+            wizard._target_parent = td
+            wizard._doc_name = "需求说明"
+            wizard._project_name = "需求说明"
+            wizard._source_page._on_quick_import_clicked()
+            self.assertEqual(wizard._project_name, "需求说明-v2")
+            self.assertEqual(wizard._target_root, os.path.join(td, "需求说明-v2"))
+            self.assertEqual(wizard.currentId(), 4)
+
     def test_style_mapping_sample_text_and_smooth_degrade(self):
         """样式映射表回显正文样例首句，并支持跨级跳跃自动平滑降级。"""
         from types import SimpleNamespace

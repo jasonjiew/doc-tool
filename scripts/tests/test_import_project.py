@@ -737,6 +737,37 @@ class ImportEndToEndTests(unittest.TestCase):
         self.assertFalse(os.path.exists(target), "失败时不应创建半成品项目目录")
 
 
+    def test_legacy_doc_format_converted_and_imported_successfully(self):
+        """测试旧版 .doc 格式经过 ensure_docx_source 自动转换为 .docx 并全流程导入。"""
+        from unittest import mock
+
+        real_docx = os.path.join(self._tmp, "real_converted.docx")
+        write_synthetic_docx(real_docx)
+        doc_src = os.path.join(self._tmp, "legacy_sample.doc")
+        with open(doc_src, "wb") as f:
+            f.write(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"dummy OLE2 binary bytes")
+        target = os.path.join(self._tmp, "旧版文档项目")
+        request = ImportRequest(
+            source_docx=Path(doc_src),
+            target_project_root=Path(target),
+            document_type="general",
+            document_no="",
+            document_name="旧版文档",
+            document_version="1.0",
+        )
+        with mock.patch(
+            "doc_tool.adapters.word_convert.ensure_docx_source",
+            return_value=(Path(real_docx), Path(doc_src)),
+        ):
+            result = import_first_time(request)
+        self.assertTrue(result.success, "转换后的 doc 文档导入应成功")
+        self.assertTrue(os.path.isdir(target))
+        self.assertTrue(os.path.isfile(os.path.join(target, "original", "source.docx")))
+        self.assertTrue(os.path.isfile(os.path.join(target, "original", "legacy_sample.doc")),
+                        "原 .doc 格式源文件应被妥善备份在 original 目录下")
+        self.assertTrue(os.path.isfile(os.path.join(target, "project.yml")))
+
+
 # --- 2.5/4.5 往返差异门禁 ---
 
 
@@ -772,7 +803,7 @@ class RoundtripGateTests(unittest.TestCase):
         import shutil
         shutil.rmtree(self._tmp, ignore_errors=True)
 
-    def _import(self, report, *, require_exact=False, with_comment=False):
+    def _import(self, report, *, require_exact=False, with_comment=False, ignore_roundtrip_block=False):
         src = os.path.join(self._tmp, "gate.docx")
         write_synthetic_docx(src, with_comment=with_comment)
         target = os.path.join(self._tmp, "门禁项目")
@@ -784,6 +815,7 @@ class RoundtripGateTests(unittest.TestCase):
             document_name="门禁",
             document_version="1.0",
             require_exact_roundtrip=require_exact,
+            ignore_roundtrip_block=ignore_roundtrip_block,
         )
         from unittest import mock
 
@@ -803,6 +835,13 @@ class RoundtripGateTests(unittest.TestCase):
         roundtrip_events = [e for e in result.events if e.stage == "roundtrip_check"]
         self.assertEqual(roundtrip_events[-1].status, "failed")
         self.assertIn("BLOCK", roundtrip_events[-1].detail)
+
+    def test_ignore_roundtrip_block_allows_block_report(self):
+        """当开启 ignore_roundtrip_block 时，即使存在 BLOCK 往返差异也能成功发布，并记录审计报告。"""
+        src, target, result = self._import(_blocking_report(), ignore_roundtrip_block=True)
+        self.assertTrue(result.success, "开启 ignore_roundtrip_block 时应放行")
+        self.assertTrue(os.path.isdir(target))
+        self.assertTrue(os.path.isfile(os.path.join(target, "logs", "roundtrip.md")))
 
     def test_warn_diff_allowed_by_default(self):
         src, target, result = self._import(_warn_report())

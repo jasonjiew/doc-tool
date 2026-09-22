@@ -595,5 +595,76 @@ class RenamedAndSpecialPathTests(unittest.TestCase):
         self.assertTrue(preview.has_heading1)
 
 
+
+class TolerantPreflightTests(unittest.TestCase):
+    """宽进严出：测试容错大纲跳级放行、无标题文档放行与魔数格式识别。"""
+
+    def setUp(self):
+        self._tmp = tempfile.mkdtemp(prefix="doc-preflight-tolerant-")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def test_heading_hierarchy_jump_allowed_in_tolerant_mode(self):
+        """严格模式下层级跳跃抛出 HeadingHierarchyError；宽松模式下放行供用户在向导中查看或映射。"""
+        paras = (
+            build_paragraph("1", "第1章 概述")
+            + build_paragraph("3", "1.1.1 跳级细节")
+        )
+        path = os.path.join(self._tmp, "jump_smooth.docx")
+        write_docx(path, paras)
+        with self.assertRaises(HeadingHierarchyError):
+            preflight(path, allow_missing_headings=False)
+        preview = preflight(path, allow_missing_headings=True)
+        self.assertTrue(preview.has_heading1)
+        self.assertEqual(preview.heading_level_counts.get(1), 1)
+        self.assertEqual(preview.heading_level_counts.get(3), 1)
+
+    def test_no_headings_passes_in_tolerant_mode_as_headless(self):
+        """无标准 Heading 样式时，在宽松模式下放行为无标题状态，确保不阻断且不污染正文段落。"""
+        paras = (
+            build_paragraph("Normal", "第一章 业务架构方案")
+            + build_paragraph("Normal", "1.1 核心服务模块")
+            + build_paragraph("Normal", "这是普通段落内容。")
+        )
+        path = os.path.join(self._tmp, "no_heading_heuristic.docx")
+        write_docx(path, paras, include_headings=False)
+        with self.assertRaises(MissingHeading1Error):
+            preflight(path, allow_missing_headings=False)
+        preview = preflight(path, allow_missing_headings=True)
+        self.assertFalse(preview.has_heading1)
+        self.assertEqual(len(preview.headings), 0)
+
+    def test_pure_narrative_doc_fallback_single_chapter(self):
+        """完全无任何标题特征的纯正文文档，在宽松模式下放行无标题 headless 状态。"""
+        paras = (
+            build_paragraph("Normal", "这是一篇完全没有章节编号的通知公告。")
+            + build_paragraph("Normal", "请大家注意查收。")
+        )
+        path = os.path.join(self._tmp, "narrative.docx")
+        write_docx(path, paras, include_headings=False)
+        with self.assertRaises(MissingHeading1Error):
+            preflight(path, allow_missing_headings=False)
+        preview = preflight(path, allow_missing_headings=True)
+        self.assertFalse(preview.has_heading1)
+        self.assertEqual(len(preview.headings), 0)
+
+    def test_is_doc_format_magic_detection(self):
+        """检测 OLE2 复合格式与 PK ZIP 格式的精确识别。"""
+        from doc_tool.adapters.word_convert import is_doc_format
+
+        ole_file = os.path.join(self._tmp, "test_ole.doc")
+        with open(ole_file, "wb") as f:
+            f.write(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"dummy")
+        self.assertTrue(is_doc_format(ole_file))
+
+        zip_fake_doc = os.path.join(self._tmp, "fake.doc")
+        with open(zip_fake_doc, "wb") as f:
+            f.write(b"PK\x03\x04" + b"dummy")
+        self.assertFalse(is_doc_format(zip_fake_doc))
+
+
 if __name__ == "__main__":
+
     unittest.main(verbosity=2)

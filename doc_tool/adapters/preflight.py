@@ -277,7 +277,6 @@ def _check_extension(file_name: str) -> None:
             details={"fileName": file_name},
         )
 
-
 def _map_security_error(exc: OOXMLSecurityError) -> DocToolError:
     """把统一安全入口的中性异常映射为 ``InvalidDocxError``（含稳定错误码）。"""
     if exc.reason == "dtd":
@@ -546,12 +545,16 @@ def validate_heading_mapping(path: Union[str, Path], heading_style_map: Dict[str
     if 1 not in heading_style_map.values():
         return "请至少把一个段落样式映射到级别 1（Heading 1）。"
     try:
-        with read_docx_package(path) as package:
+        from doc_tool.adapters.word_convert import ensure_docx_source
+        actual_path, _ = ensure_docx_source(path)
+        with read_docx_package(actual_path) as package:
             parts = package.read_xml_parts()
     except OOXMLSecurityError as exc:
-        # 源文件在向导预检后可能被删除/占用/损坏：映射校验必须返回稳定错误
-        # 文本而非把内部异常传播进向导页面（否则页面导航异常、错误不可读）。
         return "源文档无法读取：{0}".format(_map_security_error(exc).user_message)
+    except DocToolError as exc:
+        return "源文档无法读取：{0}".format(exc.user_message)
+    except Exception as exc:
+        return "源文档无法读取：{0}".format(exc)
     headings = _build_heading_tree(parts, heading_style_map)
     try:
         _validate_heading_hierarchy(headings)
@@ -632,6 +635,8 @@ def _para_text(p_elem) -> str:
         elif tag in ("br", "cr"):
             parts.append("\n")
     return "".join(parts).strip()
+
+
 
 
 # --- 3.4 层级校验（fail-closed） ---
@@ -717,10 +722,14 @@ def generate_preview_heading_tree(
         return [], "未包含级别 1（章标题）"
     try:
         if isinstance(path_or_parts, (str, Path)):
-            with read_docx_package(path_or_parts) as package:
+            from doc_tool.adapters.word_convert import ensure_docx_source
+            actual_path, _ = ensure_docx_source(path_or_parts)
+            with read_docx_package(actual_path) as package:
                 parts = package.read_xml_parts()
         else:
             parts = path_or_parts
+    except DocToolError as exc:
+        return [], f"读取文档失败: {exc.user_message}"
     except Exception as exc:
         return [], f"读取文档失败: {exc}"
 

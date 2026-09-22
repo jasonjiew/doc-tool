@@ -629,3 +629,75 @@ def convert_document(
     )
     outcome.elapsed_seconds = elapsed
     return outcome
+
+
+def is_doc_format(file_path: Union[str, Path]) -> bool:
+    """判断文件是否为旧版 Word 97-2003 二进制格式 (.doc 或 OLE2 复合格式)。"""
+    p = Path(file_path)
+    if not p.is_file():
+        return p.suffix.lower() == ".doc"
+    try:
+        with open(str(p), "rb") as f:
+            h = f.read(8)
+        if h.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            return True
+        if h.startswith(b"PK\x03\x04"):
+            return False
+    except Exception:
+        pass
+    return p.suffix.lower() == ".doc"
+
+
+def ensure_docx_source(
+    source_path: Union[str, Path],
+    temp_dir: Optional[Union[str, Path]] = None,
+) -> Tuple[Path, Optional[Path]]:
+    """若源文件为 .doc（或复合二进制格式），调用 Word 自动转换为 .docx，返回 (docx_path, original_doc_path)。
+    若已是标准 .docx，返回 (Path(source_path), None)。
+    """
+    src = Path(source_path)
+    if not is_doc_format(src):
+        return src, None
+
+    from doc_tool.domain.errors import InvalidDocxError
+    if not src.is_file():
+        raise InvalidDocxError(
+            "源文件不存在：{0}".format(src.name),
+            suggested_action="请检查文件路径是否正确后重试。",
+            details={"source": src.name},
+        )
+
+    from doc_tool.application.word_check import check_word_available
+    from doc_tool.domain.errors import InvalidDocxError
+
+    avail = check_word_available()
+    if not avail.available:
+        reasons = "；".join(avail.reasons) if avail.reasons else "未检测到可用的 Word.Application"
+        raise InvalidDocxError(
+            "检测到旧版 Word 97-2003 (.doc) 格式，自动转换为标准 .docx 需要本机具备 Microsoft Word（{0}）。".format(reasons),
+            suggested_action="请在本机安装 Microsoft Word 或在办公软件中将文档另存为「Word 文档 (*.docx)」格式后重新导入。",
+            details={"source": src.name, "reasons": avail.reasons},
+        )
+
+    if temp_dir is not None:
+        out_dir = Path(temp_dir)
+    else:
+        import tempfile
+        out_dir = Path(tempfile.gettempdir()) / "doc_tool_doc_converted"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    import hashlib
+    try:
+        content_hash = hashlib.sha256(src.read_bytes()).hexdigest()[:12]
+        target_docx = out_dir / "{0}_{1}_converted.docx".format(src.stem, content_hash)
+    except Exception:
+        target_docx = out_dir / "{0}_converted.docx".format(src.stem)
+
+    if not target_docx.exists():
+        outcome = convert_document(src, target_docx, mode=MODE_IMPORT_TO_DOCX)
+        if not outcome.ok:
+            raise InvalidDocxError(
+                "自动将 .doc 转换为 .docx 失败：{0}".format(outcome.detail or outcome.reason),
+                suggested_action="文件可能已损坏或受密码保护，请使用 Microsoft Word 打开该文件并另存为「Word 文档 (*.docx)」格式后重新导入。",
+                details={"source": src.name, "reason": outcome.reason, "detail": outcome.detail},
+            )
+    return target_docx, src
