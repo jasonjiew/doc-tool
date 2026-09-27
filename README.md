@@ -96,6 +96,10 @@ graph LR
 无需打开项目，支持在 **工具 → 文档互转…** 中拖拽批量转换：
 - **Word ↔ PDF**（高质量渲染，支持页码范围过滤）；
 - **Markdown / HTML → Word**（内置专业排版样式：标题层级、边框、底纹、图片自动内嵌）；
+- **Markdown → Word（模板填充）**（选定自己的 Word 底模后按模板样式、封面、页眉离线装配出稿，
+  格式与模板保持一致；样式不规范时弹样式映射兜底，CLI 为 `convert --template`）；
+- **Markdown 模板填充向导**（多份 Markdown 按顺序合并为单个 Word 的专属入口，工具菜单直达；
+  支持拖放入列、底模记忆、完整文档底模自动清理旧正文、CLI 子命令 `template-fill`）；
 - **Word → Markdown**（纯离线转换，产出单文件 `.md` 与关联 `assets/` 资源）；
 - **XLSX ↔ CSV**、**TXT / Excel / CSV → PDF**、**RTF / ODT 导入**。
 

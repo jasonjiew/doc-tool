@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
@@ -271,11 +272,18 @@ PathLike = Union[str, Path]
 
 @dataclass(frozen=True)
 class ConversionPlan:
-    """一个待转换文件的方向与落点。"""
+    """一个待转换文件的方向与落点。
+
+    ``template_path``/``template_style_map`` 仅对 Markdown → Word 方向有意义：
+    给出底模时走「模板填充」（``template_fill`` 服务，按模板样式装配），
+    否则走既有 CSS 版式链路；其余方向一律忽略。
+    """
 
     source: Path
     target: Path
     kind: str
+    template_path: Optional[Path] = None
+    template_style_map: Optional[Dict[str, int]] = None
 
     @property
     def label(self) -> str:
@@ -502,6 +510,7 @@ def error_resolution_guide(error_code: Optional[str], detail: str = "") -> Tuple
         "E6006": ("表格文件异常", "请使用 Excel 打开并另存为标准 .xlsx 或 .csv 后重试。"),
         "E6007": ("字符编码无法识别", "请用文本编辑器打开并另存为 UTF-8 编码后重试。"),
         "E6008": ("页范围参数错误", "请按「起始页-结束页」（如 1-5）或单页（如 3）填写。"),
+        "E6009": ("模板填充失败", "请确认 Word 底模为可打开的 .docx，且 Markdown 标题层级连续、图片路径有效；详情中有具体原因。"),
         "E3001": ("未检测到 Microsoft Word", "Word 互转与组合方向需要本机安装并激活 Microsoft Word，或选用纯 Python 离线格式。"),
         "E1001": ("DOCX 文档格式损坏", "请确认文件扩展名为 .docx 且未被加密或损坏。"),
         "E7001": ("PDF 文档格式损坏", "请确认文件扩展名为 .pdf 且能正常打开；损坏文件请先修复后重试。"),
@@ -604,8 +613,14 @@ def build_plan(
     overwrite: bool = False,
     target_format: Optional[str] = None,
     validate_signature: bool = False,
+    template_path: Optional[PathLike] = None,
+    template_style_map: Optional[Dict[str, int]] = None,
 ) -> ConversionPlan:
-    """构造单个文件的转换计划，顺带做输入输出可用性预检。"""
+    """构造单个文件的转换计划，顺带做输入输出可用性预检。
+
+    ``template_path`` 仅在 Markdown → Word 方向生效（模板填充）；其他方向
+    显式给出底模视为参数误用，直接拒绝，避免静默忽略造成"以为套了模板"。
+    """
     source = Path(source)
     kind = detect_kind(source, target_format)
     if not source.is_file():
@@ -613,6 +628,22 @@ def build_plan(
             suggested_action="源文件不存在或不是文件：{0}".format(source),
             details={"source": source.name},
         )
+    template: Optional[Path] = None
+    if template_path is not None:
+        if kind != KIND_MARKDOWN_TO_DOCX:
+            raise UnsupportedConversionError(
+                suggested_action=(
+                    "底模（模板填充）仅对 Markdown → Word 方向生效；"
+                    "其他方向请去掉模板参数，走各自的转换链路。"
+                ),
+                details={"source": source.name},
+            )
+        template = Path(template_path)
+        if not template.is_file() or template.suffix.lower() != ".docx":
+            raise UnsupportedConversionError(
+                suggested_action="底模必须是一个存在的 .docx 文件：{0}".format(template),
+                details={"source": source.name},
+            )
     if validate_signature:
         is_valid, err_msg = validate_source_signature(source)
         if not is_valid:
@@ -644,7 +675,13 @@ def build_plan(
                 suggested_action="资源目录已存在，勾选「覆盖同名文件」或改用其他输出目录。",
                 details={"target": str(assets)},
             )
-    return ConversionPlan(source=source, target=target, kind=kind)
+    return ConversionPlan(
+        source=source,
+        target=target,
+        kind=kind,
+        template_path=template,
+        template_style_map=template_style_map if template is not None else None,
+    )
 
 
 def expand_sources(inputs: Iterable[PathLike]) -> List[Path]:
@@ -768,6 +805,58 @@ def _markdown_to_docx_via_word(
             converter, html_path, plan.target, WORD_MODE_BY_KIND[plan.kind],
             timeout_seconds, with_toc, None,
         )
+
+
+def _markdown_to_docx_via_template(
+    plan: ConversionPlan, timeout_seconds: float, with_toc: bool
+) -> OfflineOutcome:
+    """Markdown → Word（模板填充）：离线按用户底模装配，不需要本机 Word。
+
+    ``with_toc`` 在模板填充语义下表示「出稿后用本机 Word 刷新目录/域」；
+    无 Word 时降级为打开时刷新告警，不阻断。
+    """
+    from doc_tool.application.template_fill import TemplateFillError, fill_markdown_with_template
+
+    started = time.monotonic()
+    try:
+        result = fill_markdown_with_template(
+            [plan.source],
+            plan.template_path,
+            plan.target,
+            heading_style_map=plan.template_style_map,
+            refresh_fields=with_toc,
+            refresh_timeout_seconds=timeout_seconds or 300.0,
+        )
+    except TemplateFillError as exc:
+        return OfflineOutcome(
+            ok=False,
+            reason="template_fill_failed",
+            error_code=exc.code,
+            detail=exc.user_message + " " + exc.suggested_action,
+        )
+    detail = "模板填充完成：{0} 个章节".format(result.chapters)
+    if result.images:
+        detail += "、图片 {0} 张".format(result.images)
+    if result.headless_intro:
+        detail += "（文档以无标题正文开头）"
+    if result.refresh_state == "ok":
+        detail += "；目录域已用 Word 刷新"
+    if result.warnings:
+        detail += "；告警 {0} 条".format(len(result.warnings))
+    return OfflineOutcome(
+        ok=True,
+        detail=detail,
+        elapsed_seconds=time.monotonic() - started,
+    )
+
+
+def _markdown_to_docx_entry(
+    plan: ConversionPlan, timeout: float, converter, writer, with_toc: bool, page_range,
+):
+    """Markdown → Word 的统一入口：给了底模走模板填充（离线），否则走 HTML+Word。"""
+    if plan.template_path is not None:
+        return _markdown_to_docx_via_template(plan, timeout, with_toc)
+    return _markdown_to_docx_via_word(plan, timeout, converter, with_toc)
 
 
 def _markdown_to_html(plan: ConversionPlan) -> OfflineOutcome:
@@ -935,8 +1024,7 @@ def _import_to_text(
 # Word 组合方向：本模块先生成中间文件，再交 Word 或离线后端完成。
 # 统一签名 (plan, timeout, converter, markdown_writer, with_toc, page_range)。
 _WORD_COMPOSITES = {
-    "md_via_html": lambda plan, timeout, converter, writer, with_toc, page_range:
-        _markdown_to_docx_via_word(plan, timeout, converter, with_toc),
+    "md_via_html": _markdown_to_docx_entry,
     "table_to_pdf": _table_to_pdf_via_word,
     "text_to_pdf": _text_to_pdf_via_word,
     "import_to_markdown": _import_to_markdown,
@@ -1036,6 +1124,8 @@ def convert_paths(
     markdown_writer: Optional[Callable[[Path, Path], object]] = None,
     on_progress: Optional[Callable[[int, int, ConversionRecord], None]] = None,
     cancel_token=None,
+    template_path: Optional[PathLike] = None,
+    template_style_map: Optional[Dict[str, int]] = None,
 ) -> ConvertBatchResult:
     """批量互转，按方向注册表路由到 Word COM 或纯 Python 后端。
 
@@ -1048,6 +1138,8 @@ def convert_paths(
       存在该方向的源族生效，否则回落源族缺省方向。
     - ``page_range``：「1-5」/「3」，仅对 PDF 导出方向生效；非法值整批按 E6008 失败。
     - ``timeout_seconds`` 留空表示按每个文件的方向取默认值。
+    - ``template_path``/``template_style_map``：Word 底模（模板填充），仅对
+      Markdown → Word 的行生效，其余方向自动忽略。
 
     单个文件失败不中断整批：每个文件各自记录结果与错误码，便于一次投递整摞
     文档后只重试失败项。
@@ -1111,7 +1203,14 @@ def convert_paths(
                 item_tf = target_format
             kind = detect_kind(path, item_tf)
             target = target_for(path, kind, output_dir)
-            plan = build_plan(path, output_dir, overwrite, item_tf)
+            # 底模只对 Markdown → Word 的行有意义：其余行忽略而不是报错，
+            # 混合批次里「选了模板的 md 转 Word + 其他文件照常转换」才是预期。
+            row_template = template_path if kind == KIND_MARKDOWN_TO_DOCX else None
+            plan = build_plan(
+                path, output_dir, overwrite, item_tf,
+                template_path=row_template,
+                template_style_map=template_style_map,
+            )
             # 同批次里两个源不能落到同一个输出：a.doc 与 a.docx 都指向 a.pdf 时，
             # 后一个会静默覆盖前一个的产物。
             try:

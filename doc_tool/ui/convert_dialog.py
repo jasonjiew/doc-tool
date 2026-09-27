@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
 
 from doc_tool.application.convert import (
     KIND_LABELS,
+    MARKDOWN_SUFFIXES,
     SUPPORTED_SUFFIXES,
     TARGET_DOCX,
     TARGET_FORMATS,
@@ -76,6 +77,11 @@ from doc_tool.domain.errors import (
     TextEncodingError,
     UnsupportedConversionError,
 )
+from doc_tool.application.template_fill import (
+    TemplateStyles,
+    parse_template_styles,
+)
+from doc_tool.ui.template_style_map_dialog import TemplateStyleMapDialog
 from doc_tool.ui.task_bridge import (
     ERR_WATCHDOG_TIMEOUT,
     POLL_INTERVAL_MS,
@@ -385,12 +391,39 @@ class ConvertDialog(QDialog):
         options.addWidget(self._overwrite)
         layout.addLayout(options)
 
+        # 4b. 模板填充（Word 底模，可选）：Markdown → Word 按模板样式装配。
+        template_row = QHBoxLayout()
+        template_row.setSpacing(8)
+        template_row.addWidget(QLabel("Word 底模（可选）：", self))
+        self._template_edit = QLineEdit(self)
+        self._template_edit.setClearButtonEnabled(True)
+        self._template_edit.setPlaceholderText(
+            "选择 .docx 底模后，Markdown → Word 按模板的样式/封面/页眉出稿（离线，无需 Word）"
+        )
+        self._template_edit.textChanged.connect(self._on_template_changed)
+        template_row.addWidget(self._template_edit, 1)
+        self._template_browse_btn = QPushButton("选择底模…", self)
+        self._template_browse_btn.setProperty("btnRole", "secondary")
+        self._template_browse_btn.clicked.connect(self._on_choose_template)
+        template_row.addWidget(self._template_browse_btn)
+        self._style_map_btn = QPushButton("样式映射…", self)
+        self._style_map_btn.setProperty("btnRole", "secondary")
+        self._style_map_btn.setEnabled(False)
+        self._style_map_btn.setToolTip("查看/手动指定底模样式与标题级别的对应关系（仅本次转换生效）")
+        self._style_map_btn.clicked.connect(self._on_open_style_map)
+        template_row.addWidget(self._style_map_btn)
+        layout.addLayout(template_row)
+        self._template_style_map: Optional[Dict[str, int]] = None
+        self._parsed_template_styles: Optional[TemplateStyles] = None
+        self._parsed_template_source: Optional[str] = None
+
         # 5. 高级参数行（Word 目录、PDF 页范围、超时控制）
         extras = QHBoxLayout()
         extras.setSpacing(8)
         self._with_toc = QCheckBox("Word 产物文首生成目录（1~3 级）", self)
         self._with_toc.setToolTip(
-            "仅对「转为 Word」的文件生效：用内置标题样式生成目录并自动刷新页码。"
+            "仅对「转为 Word」的文件生效：用内置标题样式生成目录并自动刷新页码。\n"
+            "选定「Word 底模」后，该选项表示出稿后用本机 Word 刷新模板里的目录/域。"
         )
         extras.addWidget(self._with_toc)
         extras.addStretch(1)
@@ -614,6 +647,7 @@ class ConvertDialog(QDialog):
         self._drop_zone.set_compact_mode(bool(self._sources))
         self._refresh_count_status()
         self._log_markdown_summaries()
+        self._apply_template_row_labels()
         self._run_button.setEnabled(bool(self._sources))
         self._run_button.setText("开始转换")
         if skipped:
@@ -782,6 +816,9 @@ class ConvertDialog(QDialog):
         self._with_toc.setEnabled(enabled)
         self._pages_edit.setEnabled(enabled)
         self._timeout.setEnabled(enabled)
+        self._template_edit.setEnabled(enabled)
+        self._template_browse_btn.setEnabled(enabled)
+        self._style_map_btn.setEnabled(enabled and bool(self._template_edit.text().strip()))
         for combo in self._row_combos.values():
             combo.setEnabled(enabled)
 
@@ -899,6 +936,155 @@ class ConvertDialog(QDialog):
         if folder:
             self._output_edit.setText(folder)
 
+    # --- 模板填充（Word 底模） ---
+
+    def _on_choose_template(self) -> None:
+        picked, _ = QFileDialog.getOpenFileName(
+            self, "选择 Word 底模（模板填充）", "", "Word 文档 (*.docx)"
+        )
+        if picked:
+            self._template_edit.setText(picked)
+
+    def _template_path(self) -> Optional[Path]:
+        text = self._template_edit.text().strip()
+        return Path(text) if text else None
+
+    def _apply_template_row_labels(self) -> None:
+        """选定底模后给 Markdown→Word 行的格式下拉加「（模板填充）」标识，一眼看清走向。"""
+        has_template = bool(self._template_edit.text().strip())
+        for path_str, combo in self._row_combos.items():
+            index = combo.findData(TARGET_DOCX)
+            if index < 0:
+                continue
+            if Path(path_str).suffix.lower() in MARKDOWN_SUFFIXES:
+                combo.setItemText(
+                    index, "转为 Word 文档（模板填充）" if has_template else "转为 Word 文档"
+                )
+
+    def _on_template_changed(self, text: str) -> None:
+        """底模变更：立即解析样式并回显结论，让用户在转换前就知道映射情况。"""
+        self._style_map_btn.setEnabled(bool(text.strip()))
+        self._template_style_map = None
+        self._parsed_template_styles = None
+        self._parsed_template_source = None
+        self._apply_template_row_labels()
+        template = self._template_path()
+        if template is None:
+            return
+        if not template.is_file() or template.suffix.lower() != ".docx":
+            self._details.appendPlainText(
+                "⚠️ 底模无效（必须是一个存在的 .docx 文件）：{0}".format(template.name)
+            )
+            return
+        try:
+            styles = parse_template_styles(template)
+        except Exception as exc:  # 模板损坏/加密等：留到转换时以 E6009 落地
+            self._details.appendPlainText("⚠️ 底模无法解析：{0}".format(exc))
+            return
+        self._parsed_template_styles = styles
+        self._parsed_template_source = str(template)
+        # 只记录不回填：互转的底模是逐次可选；记录供「模板填充向导」预填。
+        from doc_tool.application.template_fill import save_last_template
+
+        save_last_template(str(template))
+        if styles.raw_heading_styles:
+            levels = "、".join(
+                "{0} 级→{1}".format(level, style_id)
+                for level, style_id in sorted(styles.raw_heading_styles.items())
+            )
+            self._details.appendPlainText(
+                "✓ 底模样式解析成功：标题 {0}；正文样式：{1}。".format(
+                    levels, styles.body_style or "（默认正文）"
+                )
+            )
+        else:
+            self._details.appendPlainText(
+                "⚠️ 底模未识别到标题样式：开始转换时会先弹出「样式映射」，"
+                "也可点击「样式映射…」手动指定。"
+            )
+
+    def _md_to_docx_sources(self, sources: List[Path]) -> List[Path]:
+        """本次运行中真正走「Markdown → Word」的源（含行级目标格式判定）。"""
+        result: List[Path] = []
+        for path in sources:
+            if path.suffix.lower() not in MARKDOWN_SUFFIXES:
+                continue
+            combo = self._row_combos.get(str(path))
+            tf = combo.currentData() if combo else self._target_format()
+            if tf == TARGET_DOCX:
+                result.append(path)
+        return result
+
+    def _on_open_style_map(self) -> None:
+        """打开样式映射对话框；确认后把映射用于本次模板填充。"""
+        template = self._template_path()
+        if template is None:
+            return
+        if (
+            self._parsed_template_styles is None
+            or self._parsed_template_source != str(template)
+        ):
+            try:
+                styles = parse_template_styles(template)
+            except Exception as exc:
+                QMessageBox.warning(self, "样式映射", "底模无法解析：{0}".format(exc))
+                return
+            self._parsed_template_styles = styles
+            self._parsed_template_source = str(template)
+        styles = self._parsed_template_styles
+        if not styles.paragraph_styles:
+            QMessageBox.information(
+                self, "样式映射", "该模板没有可映射的段落样式。"
+            )
+            return
+        preset = dict(self._template_style_map or {})
+        if not preset:
+            preset = {
+                style_id: level
+                for level, style_id in styles.raw_heading_styles.items()
+            }
+        dialog = TemplateStyleMapDialog(styles.paragraph_styles, preset, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._template_style_map = dialog.mapping()
+            if self._template_style_map:
+                self._details.appendPlainText(
+                    "✓ 已设置标题样式映射（{0} 个样式），仅对本次转换生效。".format(
+                        len(self._template_style_map)
+                    )
+                )
+
+    def _ensure_template_ready_for_run(self, active_sources: List[Path]) -> bool:
+        """开始转换前的底模检查；需要手动映射而用户取消时返回 False（中止本次运行）。"""
+        template = self._template_path()
+        if template is None:
+            return True
+        if not self._md_to_docx_sources(active_sources):
+            return True  # 没有 Markdown → Word 的行：底模不参与本次转换
+        styles = self._parsed_template_styles
+        if styles is None:
+            try:
+                styles = parse_template_styles(template)
+                self._parsed_template_styles = styles
+            except Exception as exc:
+                QMessageBox.warning(
+                    self,
+                    "模板填充",
+                    "底模无法解析，本次转换将按原链路尝试或失败：\n{0}".format(exc),
+                )
+                return True
+        if not styles.raw_heading_styles and not self._template_style_map:
+            QMessageBox.information(
+                self,
+                "模板填充",
+                "该底模未识别出标题样式，需要先完成「样式映射」才能按模板填充。",
+            )
+            self._on_open_style_map()
+            if not self._template_style_map:
+                self._details.appendPlainText("✗ 未完成样式映射，已取消本次转换。")
+                return False
+        return True
+
+
     def _set_item(self, row: int, column: int, text: str, tone: Optional[str] = None) -> None:
         item = QTableWidgetItem(text)
         item.setToolTip(text)
@@ -973,6 +1159,11 @@ class ConvertDialog(QDialog):
         else:
             effective_target = target_format_map
 
+        # 模板填充前置检查：底模解析失败早停；无自动标题样式时强制先完成映射
+        if not self._ensure_template_ready_for_run(active_sources):
+            return
+
+        template_path = self._template_path()
         self._current_run_sources = active_sources
         per_file = requested or max(self._estimate_timeout(path) for path in active_sources)
         started = self._runner.start(
@@ -987,6 +1178,8 @@ class ConvertDialog(QDialog):
                     "page_range": pages_text,
                     "timeout_seconds": timeout,
                     "on_progress": self._emit_progress,
+                    "template_path": template_path,
+                    "template_style_map": self._template_style_map,
                 },
                 timeout_seconds=per_file * (len(active_sources) + 1) + 60,
             ),

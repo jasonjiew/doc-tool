@@ -333,6 +333,15 @@ class PageRangeError(DocToolError):
     suggested_action = "页范围格式如「1-5」或「3」，起始页不能大于结束页；留空表示全部页面。"
 
 
+class TemplateFillError(DocToolError):
+    code = "E6009"
+    user_message = "模板填充失败。"
+    suggested_action = (
+        "请确认 Word 底模为可正常打开的 .docx，且 Markdown 内容满足构建约束"
+        "（标题层级连续、图片路径有效）；错误详情中会给出具体位置。"
+    )
+
+
 
 # --- PDF 工具箱（E7xxx） ---
 

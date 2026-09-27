@@ -127,6 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     convert_p.add_argument("--overwrite", action="store_true", help="覆盖同名输出文件")
     convert_p.add_argument(
+        "--template", default="",
+        help="Word 底模（.docx）：Markdown → Word 时按模板样式、封面与页眉装配"
+             "（模板填充，离线出稿）；仅对 Markdown 源生效，不填走内置 CSS 版式",
+    )
+    convert_p.add_argument(
         "--timeout", type=int, default=0,
         help="单个文件超时秒数；0 = 按方向自动（导出 300，PDF 重排 900）",
     )
@@ -140,17 +145,55 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_pdf_tool_arguments(pdf_p)
     _add_output(pdf_p)
+
+    tf_p = sub.add_parser(
+        "template-fill",
+        help="模板填充：Word 底模 + 多个 Markdown 按顺序合并为单个 Word（离线出稿）",
+    )
+    tf_p.add_argument(
+        "sources", nargs="+",
+        help="Markdown 文件（.md/.markdown），按给定顺序合并为同一文档的连续章节",
+    )
+    tf_p.add_argument("--template", required=True, help="Word 底模（.docx）")
+    tf_p.add_argument("--output", required=True, help="输出 DOCX 路径（已存在时覆盖）")
+    tf_p.add_argument(
+        "--map", dest="style_maps", action="append", default=[],
+        help="标题样式映射，格式 样式ID=级别（可重复），如 --map 章标题=1；"
+             "底模样式可自动识别时无需提供",
+    )
+    tf_p.add_argument(
+        "--refresh-fields", action="store_true",
+        help="出稿后用本机 Word 刷新目录/域（需 Word；无 Word 时保留打开刷新标记）",
+    )
+    tf_p.add_argument(
+        "--clean-body", action="store_true",
+        help="底模为现成文档时，从第一个标题 1 起清理旧正文（封面/页眉/样式保留）",
+    )
     return parser
 
 
 def _convert_command(args) -> int:
     """文档互转：不依赖项目上下文，方向由注册表（扩展名 + --to）判定。"""
-    from doc_tool.application.convert import convert_paths, expand_sources
+    from pathlib import Path
+
+    from doc_tool.application.convert import (
+        MARKDOWN_SUFFIXES, convert_paths, expand_sources,
+    )
 
     sources = expand_sources(args.sources)
     if not sources:
         print(
             "没有可转换的文件（支持 .docx/.doc/.pdf/.md/.html/.txt/.xlsx/.csv/.rtf/.odt）。",
+            file=sys.stderr,
+        )
+        return 2
+
+    template_path = (getattr(args, "template", "") or "").strip() or None
+    if template_path and not any(
+        Path(source).suffix.lower() in MARKDOWN_SUFFIXES for source in sources
+    ):
+        print(
+            "--template 仅对 Markdown 源生效：本次输入中没有 Markdown 文件。",
             file=sys.stderr,
         )
         return 2
@@ -177,6 +220,7 @@ def _convert_command(args) -> int:
         page_range=args.pages or None,
         timeout_seconds=float(args.timeout) if args.timeout else None,
         on_progress=_progress,
+        template_path=template_path,
     )
     if getattr(args, "output", "human") == "json":
         import json
@@ -261,6 +305,70 @@ def _pdf_command(args) -> int:
     return 0 if result.success else 1
 
 
+def _template_fill_command(args) -> int:
+    """模板填充：底模 + 多个 Markdown 按顺序合并为单个 Word（离线）。"""
+    from pathlib import Path
+
+    from doc_tool.application.template_fill import (
+        TemplateFillError,
+        fill_markdown_with_template,
+    )
+
+    sources = [Path(item) for item in args.sources]
+    for source in sources:
+        if not source.is_file():
+            print("Markdown 文件不存在：{0}".format(source), file=sys.stderr)
+            return 2
+        if source.suffix.lower() not in (".md", ".markdown"):
+            print(
+                "源必须是 Markdown 文件（.md/.markdown）：{0}".format(source.name),
+                file=sys.stderr,
+            )
+            return 2
+
+    style_map = {}
+    for item in getattr(args, "style_maps", None) or []:
+        key, _, value = item.partition("=")
+        try:
+            style_map[key.strip()] = int(value.strip())
+        except ValueError:
+            print(
+                "样式映射格式无效：{0!r}（应为 样式ID=级别，如 章标题=1）".format(item),
+                file=sys.stderr,
+            )
+            return 2
+
+    def _warning(message: str) -> None:
+        print("[warn] {0}".format(message), file=sys.stderr, flush=True)
+
+    try:
+        result = fill_markdown_with_template(
+            sources,
+            args.template,
+            args.output,
+            heading_style_map=style_map or None,
+            refresh_fields=bool(args.refresh_fields),
+            clean_body_from_first_heading=bool(args.clean_body),
+            on_warning=_warning,
+        )
+    except TemplateFillError as exc:
+        print(
+            "[FAIL] 模板填充失败（{0}）：{1} {2}".format(
+                exc.code, exc.user_message, exc.suggested_action
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    summary = "模板填充完成：{0} 个章节".format(result.chapters)
+    if result.images:
+        summary += "、图片 {0} 张".format(result.images)
+    print("{0} → {1}".format(summary, result.output))
+    for warning in result.warnings:
+        print("[warn] {0}".format(warning))
+    return 0
+
+
 def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
     if args.version or args.command == "info":
         from doc_tool import get_build_info
@@ -332,6 +440,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.command == "convert":
         # 互转不依赖项目，也不走质量命令的序列化通道。
         return _convert_command(args)
+    if args.command == "template-fill":
+        return _template_fill_command(args)
     if args.command == "pdf":
         return _pdf_command(args)
 

@@ -486,6 +486,9 @@ class MainWindow(QMainWindow):
         # lambda 包装：triggered 自带 checked 参数，避免混入 _on_convert_documents 的 paths 形参。
         self._convert_action.triggered.connect(lambda: self._on_convert_documents())
         tools_menu.addAction(self._convert_action)
+        self._template_fill_action = QAction("Markdown 模板填充（底模出稿）…", self)
+        self._template_fill_action.triggered.connect(lambda: self._on_template_fill())
+        tools_menu.addAction(self._template_fill_action)
         self._pdf_toolbox_action = QAction("PDF 工具箱（合并 / 拆分 / 水印 / 加密）…", self)
         self._pdf_toolbox_action.triggered.connect(lambda: self._on_pdf_toolbox())
         tools_menu.addAction(self._pdf_toolbox_action)
@@ -757,6 +760,13 @@ class MainWindow(QMainWindow):
                 title="文档互转（Word / PDF / Markdown 等）…",
                 category="工具",
                 callback=lambda: self._on_convert_documents(),
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="Markdown 模板填充（底模出稿）…",
+                category="工具",
+                callback=lambda: self._on_template_fill(),
             )
         )
         items.append(
@@ -2369,6 +2379,19 @@ class MainWindow(QMainWindow):
                     dialog._format_combo.setCurrentIndex(idx)
             if paths:
                 dialog._ingest_paths(list(paths))
+            dialog.exec()
+        finally:
+            if hasattr(dialog, "deleteLater"):
+                dialog.deleteLater()
+
+    def _on_template_fill(self, paths: Optional[list] = None) -> None:
+        """模板填充向导：底模 + 多个 Markdown 按顺序合并为单个 Word（无需项目）。"""
+        from doc_tool.ui.template_fill_dialog import TemplateFillDialog
+
+        dialog = TemplateFillDialog(
+            parent=self, busy_check=lambda: self.runner.is_running, paths=paths
+        )
+        try:
             dialog.exec()
         finally:
             if hasattr(dialog, "deleteLater"):
