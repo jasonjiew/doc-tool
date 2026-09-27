@@ -29,8 +29,8 @@ _force_utf8_stdio()
 GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
 PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
 PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
-VERSION = "2.5.2"
-TAG_NAME = "v2.5.2"
+VERSION = "2.6.0"
+TAG_NAME = "v2.6.0"
 PACKAGE_NAME = "DocTool"
 
 
@@ -248,7 +248,7 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 亮点更新（2.5.2）
+## 亮点更新（2.6.0）
 
 - **代码全量审计与缺陷修复**：
   - 修复 `roundtrip` 错误分类及手动前缀过滤逻辑；
