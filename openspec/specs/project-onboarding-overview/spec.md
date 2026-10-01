@@ -1,0 +1,42 @@
+# project-onboarding-overview Specification
+
+## Purpose
+TBD - created by archiving change product-v28-team-standardization. Update Purpose after archive.
+## Requirements
+### Requirement: 三种建项入口
+系统 SHALL 提供从规范包起步、接管已有 Word、将 Markdown 建为项目的路径，成功后生成可持续维护的章节树、资源和 project.yml；原模板填充即时出稿路径继续可用。
+
+#### Scenario: Markdown 建为项目
+- **WHEN** 用户选择多份 Markdown、顺序和底模
+- **THEN** 系统复制正文与合法资源、生成章节和清单，后续可编辑/评审/正式构建，原输入不被改写
+
+#### Scenario: Word 建项发现保真问题
+- **WHEN** 用户选择复杂 Word 文档
+- **THEN** 复用预检/自动映射与保真检查，默认创建可编辑项目并集中说明保留/降级范围，严格模式另测，不将降级宣称为完全保真
+
+### Requirement: 任务导向项目概览
+系统 SHALL 展示当前文档版本、检查是否过期、改动章节、阻断问题、待评审数量、最新交付和下一步入口；数据共用已有服务，后台读取不阻塞编辑。
+
+#### Scenario: 内容改动后打开概览
+- **WHEN** 项目内容在最新检查后改变
+- **THEN** 概览标记检查过期，并可直接进入重新检查和相关章节
+
+#### Scenario: 项目需要评审
+- **WHEN** 有待修改或待复核意见
+- **THEN** 概览显示对应数量并可定位意见，不能把待复核计为已通过
+
+### Requirement: 团队配置可编辑可共享
+系统 SHALL 提供基本、规范/样式、变量、规则和门禁设置，规则与术语存储在版本控制中的项目文件；规范缺省与项目整体覆盖策略必须明确，旧本地规则迁移有备份。
+
+#### Scenario: 修改项目规则
+- **WHEN** 用户保存合法规则或术语修改
+- **THEN** 配置原子写入可共享文件，检查使用新配置，旧报告显示过期
+
+#### Scenario: 非法配置或只读项目
+- **WHEN** 设置参数非法或项目不可写
+- **THEN** 前者指出字段错误且保留原配置，后者允许查看但服务层与界面均禁止保存
+
+#### Scenario: 运行时可选规则配置损坏
+- **WHEN** 规则/术语文件不能解析但内置或上次有效配置可用
+- **THEN** 使用有效配置继续编辑/检查/出稿，保留原文件并集中提示实际回退，不阻止普通使用
+

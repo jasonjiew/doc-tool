@@ -49,6 +49,12 @@ EXCLUDED_PREFIXES = (
     "docs/diagnostics/",
     "方案评审/",
     "openspec/changes/",
+    # [sensitive-path] 通用规范包内的底模为**公司模板**（含品牌/文档号/产品名），
+    # 与 templates/ 同类，不准入公共仓库；包的声明文件仍会导出。
+    "standards/generic-design/template.docx",
+    "standards/generic-requirement/template.docx",
+    "standards/generic-test/template.docx",
+
     ".claude/",
     ".codex/",
 )

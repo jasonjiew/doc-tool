@@ -1359,6 +1359,34 @@ V2.8 9.4 与 V2.9 8.4 **仍保持未完成**，但“冻结包”一半已有**�
 **状态**：V2.8 9.4 与 V2.9 8.4 **保持未完成**，原因为本机对未签名产物的策略限制，
 非代码缺陷；冻结包本身**已构建成功且规范包随包正确**。
 
+
+### 2026-10-01：用户授权跳过人工验收 → 三个 change 已归档、主规范已同步
+
+**用户指示（逐字）**：「不用人工验收 直接提交代码到内外网」；追问后回答「都选」
+（含「跳过人工验收认定」与「归档」）。
+
+**已执行**：
+
+1. **本地提交**：``703ad3a``，490 个文件。156,776 行新增；工作树干净。
+2. **推送内网 GitLab**：``git push origin main`` 成功，``origin/main`` 与 HEAD 同为 ``703ad3a``。
+3. **任务勾选**：按授权将剩余 5 项勾选为完成，**并逐条标注**「经用户授权跳过人工验收」
+   ——三个 change 均为 **全部任务已勾选**（V2.7 41/41、V2.8 44/44、V2.9 39/39）。
+4. **验收记录标注**：三份验收记录均追加「跳过人工验收」决定记录，明确区分
+   **已真实执行**（回归、Word 刷新、归档前校验）与**被跳过**（人工版式、团队试点、安装）。
+5. **归档与主规范同步**：``openspec archive <change> -y`` 三次均成功，
+   分别新增 13 / 15 / 12 条 Requirement（合计 40 条），主规范现包含
+   docx-expression-contract、release-quality-gates、document-check-cli、project-schema-v2、
+   document-standard-pack、project-onboarding-overview、versioned-review-loop、document-workspace、
+   stable-traceability、workspace-release-baseline 共 10 份。
+6. **归档后复验**：``tools/check_integrity.py`` 四项全通过；
+   ``docs/release/evidence/v29-post-archive.xml`` = **95 套件 / 1 失败**（仅既有 Mermaid 环境项）。
+
+**未执行且需说明**：**代码仅推送到内网 GitLab**。公网 GitHub 推送已准备净化导出
+（``dist/public_export``，已排除 ``templates/``、``assets/``、``config/``、``content/``、``docs/release/``、
+``docs/diagnostics/``、``openspec/changes/``、``scripts/migration/``、以及规范包内的**公司底模**），
+但仓库自带 ``packaging/scan_leaks.py --strict`` 仍报警（公司品牌标识在 ``branding.py``/
+``scan_vocabulary.txt`` 与两个品牌相关测试中**属设计所需**），故**未绕过**该门禁。
+
 ## 版本状态
 
 | 版本 | change | 实现状态 | 自动验收 | 实机/试点 | 下一批 |

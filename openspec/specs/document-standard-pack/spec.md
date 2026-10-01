@@ -1,0 +1,38 @@
+# document-standard-pack Specification
+
+## Purpose
+TBD - created by archiving change product-v28-team-standardization. Update Purpose after archive.
+## Requirements
+### Requirement: 声明式规范包
+系统 SHALL 支持含 packId、version、documentKind、文件 hashes、Word 底模、章节骨架、变量、术语、规则与输出策略的 schema 1 规范包；包 MUST 不执行代码，导入必须验证目录/ZIP 路径、文件数量与资源限制。
+
+#### Scenario: 导入有效规范包
+- **WHEN** 用户选择合法规范包目录或 ZIP
+- **THEN** 系统显示类别、版本、模板与章节摘要，校验通过后可以创建项目
+
+#### Scenario: 可选配置或底模缺失
+- **WHEN** 包中规则/术语配置损坏或模板/骨架缺失，但有对应内置默认能力
+- **THEN** 使用上次有效/内置配置或通用底模继续建项，集中报告实际替代，不逐项要求确认
+
+#### Scenario: 越界或执行文件
+- **WHEN** 包包含越界路径、外部链接或未支持的可执行扩展
+- **THEN** 停止该危险包安装并定位问题，允许用内置通用包继续建项，不在项目外写入或执行脚本
+
+### Requirement: 项目固定规范版本
+系统 MUST 将规范包和所需资源复制到项目内，记录 id/version/hash，构建不能依赖用户电脑的绝对底模路径；升级必须展示差异且不自动覆盖正文。
+
+#### Scenario: 项目跨机器复制
+- **WHEN** 项目整体复制到另一台支持环境的机器
+- **THEN** 底模、规则、变量和资源仍可解析并构建
+
+#### Scenario: 新规范版本
+- **WHEN** 同 packId 出现新版本
+- **THEN** 旧项目继续使用原版本，用户选择升级后显示底模/规则/骨架差异并生成备份，已编辑正文不被静默替换
+
+### Requirement: 公共文档规范示例
+系统 SHALL 提供可公开分发的需求、设计、测试规范包和填写提示；文档类别由 documentKind 表示，公共项目的 documentType 保持 general，旧专属类型兼容。
+
+#### Scenario: 从测试规范创建项目
+- **WHEN** 用户选择测试文档规范包
+- **THEN** 生成 general 引擎类型、test 文档类别及对应章节/规则，无公司生产内容或硬编码私有接口
+

@@ -1,0 +1,34 @@
+# document-workspace Specification
+
+## Purpose
+TBD - created by archiving change product-v29-change-traceability. Update Purpose after archive.
+## Requirements
+### Requirement: 外层多文档工作区
+系统 SHALL 支持 workspace.yml schema 1，记录工作区身份、名称、集合版本、文档角色/项目身份/相对路径和关系位置；独立项目仍可脱离工作区打开。
+
+#### Scenario: 三文档工作区
+- **WHEN** 用户把需求、设计、测试项目加入工作区
+- **THEN** 可在概览切换到各现有编辑工作区，各文档版本独立且项目可单独打开
+
+#### Scenario: 多份相同角色
+- **WHEN** 用户加入多个合法设计项目
+- **THEN** 允许相同角色，重复 projectId/路径运行时去重并提示来源，不阻止其他合法文档使用
+
+### Requirement: 工作区路径与身份兼容
+系统 MUST 校验引用项目位于工作区根内部且 schema 可读；外部项目只能复制导入并生成新 projectId，复制后的关系引用必须映射身份。
+
+#### Scenario: 越界引用或缺失项目
+- **WHEN** 工作区引用越界路径、外部符号链接或缺失项目
+- **THEN** 跳过该成员并报告，不读取/写入外部目标，其他成员继续编辑和导出部分集合；严格策略可要求完整成员
+
+#### Scenario: 工作区整体复制
+- **WHEN** 工作区目录被完整复制到另一机器
+- **THEN** 相对文档路径、规范包和关系仍可解析，无固定绝对路径依赖
+
+### Requirement: 集合版本独立
+系统 SHALL 独立管理集合/文档/应用版本，无主需求也可管理/导出当前文档且覆盖率 N/A；只有显式严格研发集合策略才要求主需求文档。
+
+#### Scenario: 发布包含不同文档版本
+- **WHEN** 同一集合包含需求 1.2、设计 1.4 和测试 1.1
+- **THEN** 集合记录各文档实际版本，不能自动把三份修订表改成集合版本
+

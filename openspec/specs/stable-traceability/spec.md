@@ -1,0 +1,56 @@
+# stable-traceability Specification
+
+## Purpose
+TBD - created by archiving change product-v29-change-traceability. Update Purpose after archive.
+## Requirements
+### Requirement: 稳定条目身份
+系统 MUST 以 (projectId,itemId UUID) 识别条目，支持显式 DOC-ITEM 标记、条目种类与可读别名；章节编号与路径不能作为稳定身份，复制条目生成新 UUID。
+
+#### Scenario: 重排与移动
+- **WHEN** 条目编号或路径改变但语义内容未变
+- **THEN** 身份与关系保持，变更影响不会仅因位置改变触发
+
+#### Scenario: 复制条目或重复 ID
+- **WHEN** 用户通过条目动作复制内容或手工复制同一 ID
+- **THEN** 前者分配新 ID；后者列出歧义并从可信覆盖率中排除，不自动改身份，普通出稿继续并提示，严格追踪策略才限制正式登记
+
+### Requirement: 显式关系与迁移确认
+系统 SHALL 通过版本控制中的 relations.yml 保存 satisfies/verifies/depends_on 多对多关系，校验端点/重复边/循环；旧编号识别仅能生成用户可选择的迁移建议，不能自动制造关系。
+
+#### Scenario: 不同文档相同章节号
+- **WHEN** 需求和设计中都出现 3.1
+- **THEN** 系统不会凭编号建立满足关系，用户明确选择端点后才保存
+
+#### Scenario: 悬空或循环
+- **WHEN** 端点删除或 depends_on 形成循环
+- **THEN** 保留可审查记录并报告问题，影响计算终止而不死循环
+
+### Requirement: 覆盖率分母与证据可见
+系统 SHALL 展示明确纳入的需求数、有效设计覆盖、直接/间接测试覆盖、已关联与已复核计数以及未关联/孤立列表；零需求覆盖率 MUST 为 N/A，待复核不得冒充已复核。
+
+#### Scenario: 一需求多个设计和测试
+- **WHEN** 一个明确需求有多个有效满足与验证关系
+- **THEN** 需求分母只计一次，并可查看直接或经设计的测试证据，GUI/CLI/导出一致
+
+#### Scenario: 空需求集合
+- **WHEN** 工作区没有已纳入的需求条目
+- **THEN** 显示 N/A 及空分母，不能显示 100% 覆盖
+
+### Requirement: 影响与复核关联版本
+系统 MUST 对条目正文/相关资源语义 hash 变更或删除计算直接与传递影响，显示关系路径和依据；用户复核记录两端当前 hash，后续变更使复核失效，不自动修改下游正文。
+
+#### Scenario: 上游变更后复核
+- **WHEN** 需求修改并影响设计和测试
+- **THEN** 相关项进入待复核，用户确认后记录当前证据；该需求再次修改时重新待复核
+
+#### Scenario: 模板或规则变更
+- **WHEN** 文档规范包、变量或规则改变
+- **THEN** 生成文档交付影响，不把所有需求条目误判为语义变更
+
+### Requirement: 追踪入口与机器输出
+系统 SHALL 提供矩阵/影响 UI 及 trace/impact CLI，支持 JSON、CSV 或 Markdown 约定格式，均使用同一图模型、状态和稳定顺序。
+
+#### Scenario: 导出矩阵并定位
+- **WHEN** 用户导出关系矩阵或点击未关联条目
+- **THEN** 输出保留项目/条目来源，UI 定位对应正文，状态和 CLI 输出一致
+
