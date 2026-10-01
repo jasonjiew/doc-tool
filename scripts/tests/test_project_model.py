@@ -64,12 +64,15 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(info["projectSchemaVersion"], str(PROJECT_SCHEMA_VERSION))
 
     def test_schema_compatibility(self):
+        """V2.8：schema v2 为当前可写版本，v1 继续可读可写，更高版本只读。"""
         self.assertTrue(is_supported_schema(1))
+        self.assertTrue(is_supported_schema(2))
         self.assertFalse(is_supported_schema(99))
         self.assertTrue(can_write_schema(1))
-        self.assertFalse(can_write_schema(2))
+        self.assertTrue(can_write_schema(2))
+        self.assertFalse(can_write_schema(3))
         # 更高版本可只读打开（向前兼容）
-        self.assertTrue(can_read_schema(2))
+        self.assertTrue(can_read_schema(3))
 
 
 class ProjectPathsTests(unittest.TestCase):
@@ -190,11 +193,14 @@ class ProjectManifestTests(unittest.TestCase):
         self.assertEqual(backup_data["documentVersion"], "3.8")
 
     def test_higher_schema_loads_readonly(self):
-        """更高模式版本应只读打开，不抛异常（spec：不兼容项目只读显示）。"""
+        """更高模式版本应只读打开，不抛异常（spec：不兼容项目只读显示）。
+
+        V2.8 起可写最高为 schema 2，因此只读场景用 3 演示。
+        """
         import yaml
 
         data = {
-            "schemaVersion": 2,
+            "schemaVersion": 3,
             "documentType": "requirement",
             "documentNo": "X",
             "documentName": "Y",
@@ -203,13 +209,13 @@ class ProjectManifestTests(unittest.TestCase):
         }
         (self.root / "project.yml").write_text(yaml.safe_dump(data), encoding="utf-8")
         loaded = ProjectManifest.load(self.root)
-        self.assertEqual(loaded.schemaVersion, 2)
+        self.assertEqual(loaded.schemaVersion, 3)
         self.assertFalse(loaded.is_writable())
         with self.assertRaises(IncompatibleSchemaError):
             loaded.save(self.root)
 
     def test_higher_schema_unknown_document_type_still_loads_readonly(self):
-        manifest = _make_manifest(schemaVersion=2, documentType="future-type")
+        manifest = _make_manifest(schemaVersion=3, documentType="future-type")
         self.assertEqual(manifest.documentType, "future-type")
         self.assertFalse(manifest.is_writable())
         with self.assertRaises(IncompatibleSchemaError):

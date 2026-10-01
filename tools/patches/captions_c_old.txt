@@ -1,0 +1,2 @@
+    def get(self, ident: str) -> Optional[CaptionEntry]:
+        return self.entries.get(ident)

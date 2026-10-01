@@ -244,6 +244,9 @@ class MainWindow(QMainWindow):
         self._current_output_path: Optional[str] = None
         self._output_capsules_widget.setVisible(False)
         status_bar.addWidget(self._output_capsules_widget)
+        history_btn = QPushButton("交付历史", self)
+        history_btn.clicked.connect(self._on_build_history)
+        status_bar.addWidget(history_btn)
 
         self._lock_label = QLabel("", self)
         self._lock_label.setObjectName("statusMuted")
@@ -472,6 +475,9 @@ class MainWindow(QMainWindow):
         self._output_action = QAction("打开输出目录", self)
         self._output_action.triggered.connect(self._on_open_output)
         tools_menu.addAction(self._output_action)
+        html_action = QAction('只读离线 HTML 预览包…', self)
+        html_action.triggered.connect(self._on_html_preview)
+        tools_menu.addAction(html_action)
         self._logs_action = QAction("打开日志目录", self)
         self._logs_action.triggered.connect(self._on_open_logs)
         tools_menu.addAction(self._logs_action)
@@ -601,6 +607,46 @@ class MainWindow(QMainWindow):
                 pbar.show()
             self._status_label.setText("已退出专注模式")
 
+    # --- V2.8（5.5）三条建项路径的命令面板入口 ---
+
+    def _on_create_from_pack(self) -> None:
+        """从规范包起步：复用导入向导的目标路径与开项目流程。
+
+        服务层已备（``project_from_pack.create_project_from_pack``）；
+        界面保持单一入口：本方法只负责把用户引到规范包选择，不重实现包解析。
+        """
+        from doc_tool.application.project_from_pack import describe_entry_point
+
+        self._show_status_message(
+            "从规范包起步：{0}".format(describe_entry_point()["fromPack"])
+        )
+        self._on_new_project()
+
+    def _on_intake_word(self) -> None:
+        """接管现有 Word：走现有导入向导（含预检与往返门禁）。"""
+        # 预检与往返门禁在导入向导内完成，这里不重复实现。
+        self._on_new_project()
+
+    def _on_create_from_markdown(self) -> None:
+        """以 Markdown 起步：与即时模板填充明确区分（本路径会建项目）。"""
+        from doc_tool.application.project_from_markdown import describe_entry_point
+
+        self._show_status_message(
+            "Markdown 建项：{0}".format(describe_entry_point()["fromMarkdown"])
+        )
+        self._on_new_project()
+
+    def _show_status_message(self, message: str) -> None:
+        """在状态栏反馈一行；无状态栏时退化为日志。"""
+        bar = getattr(self, "statusBar", None)
+        if callable(bar):
+            try:
+                bar().showMessage(str(message), 6000)
+                return
+            except Exception:  # noqa: BLE001 - 状态栏不可用时不影响主流程
+                pass
+        logger.info("ui", "status_message", {"message": str(message)})
+
     def open_command_palette(self) -> None:
         """打开全局命令面板 (Ctrl+K / Ctrl+Shift+P)。"""
         from doc_tool.ui.command_palette import CommandPaletteDialog, PaletteItem
@@ -625,6 +671,8 @@ class MainWindow(QMainWindow):
             )
         )
         if self._project_summary:
+            items.append(PaletteItem(title="交付历史与章节比较…", category="构建", callback=self._on_build_history))
+            items.append(PaletteItem(title="只读离线 HTML 预览包…", category="工具", callback=self._on_html_preview))
             items.append(
                 PaletteItem(
                     title="快速打开章节…",
@@ -751,6 +799,32 @@ class MainWindow(QMainWindow):
                 title="切换浅色主题" if self._dark else "切换深色主题",
                 category="视图",
                 callback=self._toggle_theme,
+            )
+        )
+
+        # V2.8（5.5）：三条建项路径与即时模板填充明确区分。
+        items.append(
+            PaletteItem(
+                title="从规范包起步建项（章节骨架）…",
+                category="新建",
+                description="选择规范包生成可持续维护的项目",
+                callback=lambda: self._on_create_from_pack(),
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="接管现有 Word 建项…",
+                category="新建",
+                description="复用预检/样式映射/往返门禁，先预览差异再导入",
+                callback=lambda: self._on_intake_word(),
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="以 Markdown 起步建项（按文件顺序）…",
+                category="新建",
+                description="按文件顺序生成章节，适合 Docs-as-Code 内容",
+                callback=lambda: self._on_create_from_markdown(),
             )
         )
 
@@ -2295,6 +2369,17 @@ class MainWindow(QMainWindow):
                 "内容目录",
                 create=True,
             )
+
+    def _on_html_preview(self):
+        if self._project_summary and self._content_workspace:
+            from doc_tool.ui.html_preview_dialog import HtmlPreviewDialog
+            HtmlPreviewDialog(self._project_summary, self._content_workspace, self._open_directory, parent=self).exec()
+
+    def _on_build_history(self):
+        if self._project_summary:
+            from doc_tool.ui.build_history_dialog import BuildHistoryDialog
+            BuildHistoryDialog(self._project_summary.paths.state_dir,
+                open_artifact=lambda path: self._on_open_result_output(str(path)), parent=self).exec()
 
     def _on_open_output(self) -> None:
         if self._project_summary:

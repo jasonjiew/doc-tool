@@ -1,0 +1,7 @@
+scripts/build_docx.py	tools/patches/imports_old.txt	tools/patches/imports_new.txt
+scripts/build_docx.py	tools/patches/table_sig_old.txt	tools/patches/table_sig_new.txt
+scripts/build_docx.py	tools/patches/table_width_old.txt	tools/patches/table_width_new.txt
+scripts/build_docx.py	tools/patches/insert_anchor_old.txt	tools/patches/helpers_new.txt
+scripts/build_docx.py	tools/patches/process_md_anchor.txt	tools/patches/process_new3.txt
+scripts/build_docx.py	tools/patches/process_old.txt	tools/patches/process_new.txt
+scripts/build_docx.py	tools/patches/build_loop_old.txt	tools/patches/build_loop_new.txt

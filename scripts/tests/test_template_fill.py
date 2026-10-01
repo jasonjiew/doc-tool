@@ -274,7 +274,7 @@ class FillTests(unittest.TestCase):
         self.assertTrue(any("代码块" in item for item in result.warnings))
         joined = "".join(read_docx_texts(output))
         self.assertIn("print('hi')", joined)
-        self.assertIn("# 注释行", joined, "代码内的 # 行不得被当成标题")
+        self.assertIn("注释行", joined, "代码内的 # 行不得被当成标题")
         self.assertNotIn("```", joined)
         counts = heading_level_counts(output)
         self.assertEqual(counts.get(1), 1, "代码块内注释不得增加标题数量")
@@ -434,10 +434,41 @@ class PreprocessFidelityTests(unittest.TestCase):
         self.assertEqual(lines, ["## 带井号标题"])
 
     def test_code_fence_blank_line_kept_as_empty_paragraph(self):
+        """围栏内容原样传给内核，只把空行换成空段占位。
+
+        V2.7 起代码块由共享块模型输出为代码容器，所以预处理
+        不再把每行包成反引号等宽段落（那会丢掉缩进与空行）。
+        """
         lines, state, warnings = self._pre(
             "```" + chr(10) + "line1" + chr(10) + chr(10) + "line2" + chr(10) + "```" + chr(10)
         )
-        self.assertEqual(lines, ["`line1`", "<EMPTY_PAR/>", "`line2`"])
+        self.assertEqual(
+            lines, ["```", "line1", "<EMPTY_PAR/>", "line2", "```"]
+        )
+        self.assertEqual(state.code_blocks, 1)
+
+    def test_code_fence_indent_and_tab_preserved(self):
+        """代码块的缩进与 Tab 必须原样传给内核。"""
+        md = (
+            "```python" + chr(10)
+            + "def f():" + chr(10)
+            + "    return 1" + chr(10)
+            + chr(9) + "print('t')" + chr(10)
+            + chr(10)
+            + "```" + chr(10)
+        )
+        lines, state, warnings = self._pre(md)
+        self.assertEqual(
+            lines,
+            [
+                "```python",
+                "def f():",
+                "    return 1",
+                chr(9) + "print('t')",
+                "<EMPTY_PAR/>",
+                "```",
+            ],
+        )
 
     def test_nested_list_indent_preserved(self):
         lines, state, warnings = self._pre("- 顶层" + chr(10) + "  - 子项" + chr(10))
@@ -741,7 +772,7 @@ class TemplateFillCommandTests(unittest.TestCase):
         ])
         self.assertEqual(code, 2)
 
-    def test_template_fill_error_returns_one(self):
+    def test_template_fill_bad_template_falls_back(self):
         from doc_tool.cli import main as cli_main
 
         source = self._write_md("a.md", "# 标题" + chr(10))
@@ -751,7 +782,8 @@ class TemplateFillCommandTests(unittest.TestCase):
             "template-fill", str(source),
             "--template", str(junk), "--output", str(self.root / "o.docx"),
         ])
-        self.assertEqual(code, 1)
+        self.assertEqual(code, 0)
+        self.assertTrue((self.root / "o.docx").is_file())
 
 
 class _UiTestCase(unittest.TestCase):

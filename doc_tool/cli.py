@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import sys
+from pathlib import Path
 from typing import Optional, Sequence
 
 
@@ -59,6 +61,31 @@ def build_parser() -> argparse.ArgumentParser:
     validate = sub.add_parser("validate", help="校验一个或多个项目")
     _add_projects(validate)
     _add_output(validate, ("sarif", "junit"))
+
+    # V2.7 27-G：统一检查入口。默认只做源检查，warning 不阻断。
+    check_p = sub.add_parser("check", help="统一检查（源检查/可选构建与终审）")
+    check_p.add_argument("--project", required=True, help="项目目录")
+    check_p.add_argument("--output", choices=("text", "json", "sarif"), default="text")
+    check_p.add_argument("--fail-on", choices=("error", "warning"), default="error")
+    check_p.add_argument("--build", action="store_true", help="同时做一次诊断构建并审查产物")
+    check_p.add_argument("--strict", action="store_true", help="显式严格交付：把约定规则提升为阻断")
+    check_p.add_argument("--jobs", type=int, default=1, help="保留参数：当前检查为单项目串行")
+
+    # V2.9 29-D：显式图矩阵与可解释覆盖率。
+    trace_p = sub.add_parser("trace", help="需求—设计—测试矩阵与覆盖率")
+    trace_p.add_argument("--project", help="单项目目录")
+    trace_p.add_argument("--workspace", help="工作区目录（与 --project 二选一）")
+    trace_p.add_argument("--format", choices=("markdown", "json", "csv"), default="markdown")
+    trace_p.add_argument("--fail-on-uncovered", action="store_true", help="存在未覆盖需求时退出 1")
+
+    # V2.9 29-E：变更影响与复核状态。
+    impact_p = sub.add_parser("impact", help="变更影响与待复核")
+    impact_p.add_argument("--project", help="单项目目录")
+    impact_p.add_argument("--workspace", help="工作区目录（与 --project 二选一）")
+    impact_p.add_argument("--baseline", help="可选：基线快照目录用于比对方案")
+    impact_p.add_argument("--item", action="append", default=[], help="受控变更的条目 projectId/itemId，可重复")
+    impact_p.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    impact_p.add_argument("--fail-on-pending", action="store_true", help="存在待复核时退出 1")
 
     lint = sub.add_parser("lint", help="检查一个或多个项目")
     _add_projects(lint)
@@ -155,7 +182,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Markdown 文件（.md/.markdown），按给定顺序合并为同一文档的连续章节",
     )
     tf_p.add_argument("--template", required=True, help="Word 底模（.docx）")
-    tf_p.add_argument("--output", required=True, help="输出 DOCX 路径（已存在时覆盖）")
+    tf_p.add_argument("--output", required=True, help="输出 DOCX 路径（冲突时默认换名）")
+    tf_p.add_argument("--dry-run", action="store_true", help="只读预检，不装配 DOCX")
+    tf_p.add_argument("--report-format", choices=['text', 'json'], default='text')
+    tf_p.add_argument("--strict", action="store_true", help="显式严格检查：降级提醒阻止生成")
     tf_p.add_argument(
         "--map", dest="style_maps", action="append", default=[],
         help="标题样式映射，格式 样式ID=级别（可重复），如 --map 章标题=1；"
@@ -316,9 +346,6 @@ def _template_fill_command(args) -> int:
 
     sources = [Path(item) for item in args.sources]
     for source in sources:
-        if not source.is_file():
-            print("Markdown 文件不存在：{0}".format(source), file=sys.stderr)
-            return 2
         if source.suffix.lower() not in (".md", ".markdown"):
             print(
                 "源必须是 Markdown 文件（.md/.markdown）：{0}".format(source.name),
@@ -342,7 +369,13 @@ def _template_fill_command(args) -> int:
         print("[warn] {0}".format(message), file=sys.stderr, flush=True)
 
     try:
-        result = fill_markdown_with_template(
+        from doc_tool.application.template_fill_plan import plan_template_fill, execute_template_fill
+        plan = plan_template_fill(sources, args.template, args.output, mapping=style_map,
+                                  strict=getattr(args, 'strict', False))
+        if getattr(args, 'dry_run', False):
+            print(plan.report(getattr(args, 'report_format', 'text')))
+            return 0 if plan.viable else 1
+        result = execute_template_fill(
             sources,
             args.template,
             args.output,
@@ -350,6 +383,7 @@ def _template_fill_command(args) -> int:
             refresh_fields=bool(args.refresh_fields),
             clean_body_from_first_heading=bool(args.clean_body),
             on_warning=_warning,
+            strict=getattr(args, 'strict', False),
         )
     except TemplateFillError as exc:
         print(
@@ -367,6 +401,274 @@ def _template_fill_command(args) -> int:
     for warning in result.warnings:
         print("[warn] {0}".format(warning))
     return 0
+
+
+def _impact_command(args) -> int:
+    """变更影响：输出直接/传递影响与待复核状态。
+
+    退出码：0=正常；1=存在待复核且显式要求；2=参数或执行失败。
+    **不会修改任何下游正文**。
+    """
+    from doc_tool.application.content.impact import (
+        ReviewRecordStore,
+        compute_impact,
+    )
+
+    if bool(args.project) == bool(args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace。", file=sys.stderr)
+        return 2
+    root = Path(args.project or args.workspace)
+    if not root.is_dir():
+        print("[FAIL] 路径不存在：{0}".format(root), file=sys.stderr)
+        return 2
+    try:
+        graph, _documents = _collect_graph(Path(root), workspace=bool(args.workspace))
+        changed = {}
+        for token in args.item or []:
+            project_id, _, item_id = str(token).partition("/")
+            if not project_id or not item_id:
+                print("[FAIL] --item 应为 projectId/itemId：{0}".format(token), file=sys.stderr)
+                return 2
+            changed[(project_id, item_id)] = "显式声明的受控变更"
+        if not changed:
+            changed = _detect_changes(Path(root), args.baseline)
+        report = compute_impact(changed, graph)
+        store = ReviewRecordStore(Path(root) / ".state")
+        pending = store.pending()
+        report.warnings.extend(
+            "待复核关系 {0}：{1}".format(item.relation_id, item.status)
+            for item in pending[:20]
+        )
+    except Exception as exc:  # noqa: BLE001 - 执行失败退出 2
+        print("[FAIL] 影响计算失败：{0}".format(exc), file=sys.stderr)
+        return 2
+    print(report.export(args.format))
+    if args.fail_on_pending and pending:
+        print("[FAIL] 存在 {0} 条待复核关系。".format(len(pending)), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _collect_graph(root: Path, *, workspace: bool):
+    """收集关系图与文档快照（单项目或工作区）。"""
+    from doc_tool.application.content.relations import RELATIONS_NAME, RelationGraph, load_relations
+
+    graph = RelationGraph()
+    documents = []
+    if workspace:
+        from doc_tool.application.workspace import load_workspace
+
+        space = load_workspace(root)
+        for member in space.valid_members:
+            project_root = space.member_project_root(member)
+            if project_root is None:
+                continue
+            documents.extend(_project_documents(project_root))
+            path = project_root / RELATIONS_NAME
+            if path.is_file():
+                loaded = load_relations(path)
+                graph.relations.extend(loaded.relations)
+                graph.issues.extend(loaded.issues)
+    else:
+        documents.extend(_project_documents(root))
+    path = root / RELATIONS_NAME
+    if path.is_file():
+        loaded = load_relations(path)
+        graph.relations.extend(loaded.relations)
+        graph.issues.extend(loaded.issues)
+    return graph, documents
+
+
+def _detect_changes(root: Path, baseline: str) -> dict:
+    """无显式 --item 时：从基线快照与当前内容比对推出变更。
+
+    缺少可用基线时**不推断**，返回空并由调用方提醒。
+    """
+    if not baseline:
+        return {}
+    from doc_tool.application.content.impact import ItemSnapshot, diff_snapshots
+
+    base_dir = Path(baseline)
+    if not base_dir.is_dir():
+        return {}
+    documents = _project_documents(root)
+    before = {}
+    after = {}
+    for rel_path, text in documents:
+        snapshot = _snapshot_from_text(rel_path, text)
+        if snapshot is None:
+            continue
+        key, item = snapshot
+        after[key] = item
+        base_file = base_dir / rel_path
+        if base_file.is_file():
+            base_snapshot = _snapshot_from_text(rel_path, base_file.read_text(encoding="utf-8"))
+            if base_snapshot is not None:
+                before[base_snapshot[0]] = base_snapshot[1]
+    changed, _spec = diff_snapshots(before, after)
+    return changed
+
+
+def _snapshot_from_text(rel_path: str, text: str):
+    """从 Markdown 文本提取一条条目快照（字段级，不依赖编号）。"""
+    import re as _re
+
+    from doc_tool.application.content.impact import ItemSnapshot
+    from doc_tool.application.content.traceable_items import parse_marker
+
+    match = _re.search(r"<!--\s*DOC-ITEM:([^>]*?)-->", str(text or ""))
+    if match is None:
+        return None
+    ref, _error = parse_marker(match.group(0))
+    if ref is None:
+        return None
+    title = ""
+    for line in str(text or "").splitlines():
+        heading = _re.match(r"^\s{0,3}#{1,6}\s+(.*)$", line)
+        if heading:
+            title = heading.group(1).strip()
+            break
+    body = "\n".join(
+        line for line in str(text or "").splitlines() if not _re.search(r"DOC-ITEM", line)
+    )
+    return ref.key, ItemSnapshot(key=ref.key, title=title, body=body)
+
+
+def _trace_command(args) -> int:
+    """显式图矩阵：stdout 只输出单一文档（markdown/json/csv）。
+
+    退出码：0=正常；1=存在未覆盖需求且显式要求；2=参数或执行失败。
+    """
+    from doc_tool.application.content.trace_matrix import build_coverage, export_report
+
+    if bool(args.project) == bool(args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace。", file=sys.stderr)
+        return 2
+    root = Path(args.project or args.workspace)
+    if not root.is_dir():
+        print("[FAIL] 路径不存在：{0}".format(root), file=sys.stderr)
+        return 2
+    try:
+        coverage = _collect_coverage(Path(root), workspace=bool(args.workspace))
+    except Exception as exc:  # noqa: BLE001 - 执行失败必须退出 2
+        print("[FAIL] 矩阵计算失败：{0}".format(exc), file=sys.stderr)
+        return 2
+    print(export_report(coverage, args.format))
+    if args.fail_on_uncovered and coverage.uncovered:
+        print(
+            "[FAIL] 存在 {0} 条未覆盖需求。".format(len(coverage.uncovered)),
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def _collect_coverage(root: Path, *, workspace: bool):
+    """从单项目或工作区收集条目与关系后计算覆盖率。"""
+    from doc_tool.application.content.relations import RELATIONS_NAME, load_relations
+    from doc_tool.application.content.trace_matrix import build_coverage
+    from doc_tool.application.content.traceable_items import build_item_index
+
+    documents = []
+    relation_paths = []
+    if workspace:
+        from doc_tool.application.workspace import load_workspace
+
+        space = load_workspace(root)
+        for member in space.valid_members:
+            project_root = space.member_project_root(member)
+            if project_root is None:
+                continue
+            relation_paths.append(project_root / RELATIONS_NAME)
+            documents.extend(_project_documents(project_root))
+        relation_paths.append(root / RELATIONS_NAME)
+    else:
+        relation_paths.append(root / RELATIONS_NAME)
+        documents.extend(_project_documents(root))
+
+    graph = None
+    for path in relation_paths:
+        if not path.is_file():
+            continue
+        loaded = load_relations(path)
+        if graph is None:
+            graph = loaded
+        else:
+            graph.relations.extend(loaded.relations)
+            graph.issues.extend(loaded.issues)
+    if graph is None:
+        from doc_tool.application.content.relations import RelationGraph
+
+        graph = RelationGraph()
+    index = build_item_index(documents)
+    return build_coverage(list(index.items.values()), graph)
+
+
+def _project_documents(project_root: Path):
+    """读取项目内的全部 Markdown（按相对路径）。"""
+    from doc_tool.domain.manifest import ProjectManifest
+
+    manifest = ProjectManifest.load(project_root)
+    paths = manifest.resolve_paths(project_root)
+    documents = []
+    if paths.content_root.is_dir():
+        for path in sorted(paths.content_root.rglob("*.md")):
+            if path.is_file():
+                documents.append(
+                    (path.relative_to(paths.content_root).as_posix(), path.read_text(encoding="utf-8"))
+                )
+    return documents
+
+
+def _check_command(args) -> int:
+    """统一检查命令：stdout 只输出单一结构化文档，日志走 stderr。
+
+    退出码：0=未达阀值；1=达到检查阀值；2=参数或执行失败。
+    运行失败不得伪装成检查通过。
+    """
+    from doc_tool.application.check import run_check, serialize_check_text
+    from doc_tool.application.issues import issue_type_for_stage  # noqa: F401  (保持词汇一致性引用)
+    from doc_tool.cli_serializers import serialize_sarif
+
+    project = Path(args.project)
+    if not project.is_dir():
+        print(
+            "[FAIL] 项目路径不存在: {0}".format(args.project),
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        report = run_check(
+            project,
+            fail_on=args.fail_on,
+            strict=bool(args.strict),
+            build=bool(args.build),
+        )
+    except Exception as exc:  # noqa: BLE001 - 运行失败必须以 2 退出
+        print("[FAIL] 检查执行失败：{0}".format(exc), file=sys.stderr)
+        return 2
+
+    if args.output == "json":
+        print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    elif args.output == "sarif":
+        print(serialize_sarif_for_check(report))
+    else:
+        print(serialize_check_text(report))
+    return report.exit_code
+
+
+def serialize_sarif_for_check(report) -> str:
+    """把统一检查报告转成 SARIF（复用现有序列化器的规则 ID 与位置约定）。"""
+    from doc_tool.application.cli_commands import CommandResult, ProjectCommandResult
+    from doc_tool.cli_serializers import serialize_sarif
+
+    item = ProjectCommandResult(
+        project=report.project_id,
+        success=report.exit_code == 0,
+        error_code="" if report.exit_code == 0 else "E2002",
+        issues=report.sorted_issues(),
+    )
+    return serialize_sarif(CommandResult("check", [item]))
 
 
 def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
@@ -437,6 +739,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "impact":
+        return _impact_command(args)
+    if args.command == "trace":
+        return _trace_command(args)
+    if args.command == "check":
+        return _check_command(args)
     if args.command == "convert":
         # 互转不依赖项目，也不走质量命令的序列化通道。
         return _convert_command(args)

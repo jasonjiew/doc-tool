@@ -1,0 +1,85 @@
+def _expected_text(value: str, registry) -> str:
+    """预期可见文本：与构建侧共享同一份交叉引用解析（编号/占位一致）。"""
+    from doc_tool.domain.captions import resolve_inline_references
+
+    return markdown_visible_text(resolve_inline_references(value, registry))
+
+
+def expected_markdown_events(
+    path: str, config: Dict, available_bookmarks: Optional[Iterable[str]] = None
+) -> List[Event]:
+    """从 Markdown 推导预期事件序列。
+
+    使用 ``doc_tool.domain.blocks`` 的共享块解析（与构建内核同源），
+    因此代码块、题注、横向节与分页在预期侧与实际侧语义一致。
+    """
+    document = _parse_blocks_for_validation(path)
+    return expected_events_for_document(
+        document, config, registry=None, available_bookmarks=available_bookmarks
+    )
+
+
+def _parse_blocks_for_validation(path: str):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeError) as exc:
+        raise AutomationError("Markdown 无法读取 {0}: {1}".format(path, exc))
+    return parse_blocks(text, path)
+
+
+def expected_events_for_document(
+    document,
+    config: Dict,
+    registry=None,
+    available_bookmarks: Optional[Iterable[str]] = None,
+) -> List[Event]:
+    """把共享块解析结果转成预期事件序列。"""
+    path = document.path
+    events: List[Event] = []
+    for block in document.blocks:
+        source = "{0}:{1}".format(path, block.location.start_line)
+        if block.kind == KIND_COMPLEX_TABLE:
+            if not block.filename:
+                raise AutomationError("{0} 复杂表格标记缺少 XML 文件名".format(source))
+            table_path = resolve_resource(config["paths"]["table_root"], block.filename, "复杂表格")
+            element = _expected_table_xml(table_path, available_bookmarks=available_bookmarks)
+            events.append(Event("C", normalize_matrix(table_matrix(element)), source, canonical_xml(element)))
+            continue
+        if block.kind == KIND_IMAGE:
+            image_path = resolve_resource(config["paths"]["asset_root"], block.relative_path, "图片")
+            with open(image_path, "rb") as image_file:
+                image_hash = hashlib.sha256(image_file.read()).hexdigest()
+            events.append(Event("I", (image_hash,), source))
+            continue
+        if block.kind == KIND_TABLE:
+            events.append(
+                Event("T", normalize_matrix(tuple(tuple(row) for row in block.rows)), source)
+            )
+            continue
+        if block.kind == KIND_CODE:
+            from doc_tool.kernel_shared.docx_blocks import split_code_text
+
+            events.append(
+                Event(
+                    "T",
+                    normalize_matrix(((("\n".join(split_code_text(block.text))),),)),
+                    source,
+                )
+            )
+            continue
+        if block.kind == KIND_HEADING:
+            events.append(Event("H", (block.level, _expected_text(block.text, registry)), source))
+            continue
+        if block.kind == KIND_LIST_ITEM:
+            level = str(min(8, block.level))
+            marker = "*" if block.list_kind == "bullet" else "#"
+            events.append(Event("L", (_expected_text(block.text, registry), level, marker), source))
+            continue
+        if block.kind in (KIND_FOOTNOTE_DEF, KIND_SECTION, KIND_PAGEBREAK, KIND_EMPTY_PARAGRAPH):
+            continue
+        paragraph_kind = (
+            "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", block.text) else "P"
+        )
+        events.append(Event(paragraph_kind, _expected_text(block.text, registry), source))
+    return events

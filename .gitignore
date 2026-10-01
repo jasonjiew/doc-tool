@@ -9,6 +9,7 @@ logs/
 *.docx
 !templates/*.docx
 !doc_tool/resources/templates/*.docx
+!doc_tool/resources/generic-template.docx
 !scripts/tests/fixtures/**/*.docx
 
 # --- Python 构建产物 ---
@@ -36,6 +37,9 @@ env/
 *.pem
 *.pfx
 *.key
+*.pfx.bak
+pfx-password.txt
+pfx-password.txt.*
 secrets.yaml
 # 代码签名证书产物（自签名测试证书/私钥备份，禁止入库）
 scripts/cert-out/
@@ -92,3 +96,7 @@ step2_prompt.txt
 git_sync_task.py
 invoke_args.json
 *调研提示词*.md
+
+# 本地诊断/隔离产物（不入仓库）
+*.broken
+.tmp-*/

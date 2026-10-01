@@ -1,0 +1,141 @@
+def _render_heading_block(block, insert_before, config, numbering, expressions) -> None:
+    """标题块：沿用 V2.6 的书签与编号语义。"""
+    insert_element(
+        insert_before,
+        make_heading(
+            config["headingStyles"],
+            block.text,
+            block.level,
+            num_id=_heading_num_id(numbering),
+            list_level=max(0, block.level - 1),
+            expressions=expressions,
+            bookmark_key=os.path.abspath(block.path) + "#" + block.text,
+        ),
+    )
+
+
+def _render_code_block(block, insert_before, max_width) -> None:
+    """代码块：单格浅底容器，保留缩进、Tab、空行与反引号，允许跨页分页。"""
+    container = shared.make_code_container(
+        shared.split_code_text(block.text), max_width=max_width
+    )
+    insert_element(insert_before, container)
+
+
+def _render_image_block(
+    block,
+    insert_before,
+    items,
+    image_manager,
+    config,
+    max_image_width,
+    next_object_id,
+    registry=None,
+    asset_base: str = "",
+) -> Tuple[int, int]:
+    """图片块：复用既有图片关系/尺寸逻辑，题注走共享注册表。"""
+    asset_root = asset_base or config["paths"]["asset_root"]
+    image_path = resolve_resource(asset_root, block.relative_path, "图片")
+    try:
+        with open(image_path, "rb") as handle:
+            data = handle.read()
+        with Image.open(image_path) as image:
+            image.verify()
+    except Exception as exc:
+        raise AutomationError("图片损坏或无法读取 {0}: {1}".format(image_path, exc))
+    extension = os.path.splitext(image_path)[1].lower().lstrip(".")
+    rid, media_part, reused = image_manager.add_or_reuse(data, extension)
+    if not reused:
+        ensure_content_type(items, extension)
+    reference = ImageReference(block.alt, block.relative_path, block.width_px, block.height_px)
+    width, height = image_size_emu(image_path, reference, max_image_width)
+    paragraph = make_image_paragraph(
+        rid, posixpath.basename(media_part), block.alt, width, height, next_object_id()
+    )
+    insert_element(insert_before, paragraph)
+    inserted = 1
+    captioned = 0
+    entry = registry.get(block.ident) if (registry is not None and block.ident) else None
+    if entry is not None:
+        insert_element(insert_before, _caption_paragraph(entry, registry, config))
+        inserted += 1
+        captioned = 1
+    return inserted, captioned
+
+
+def _render_table_block(
+    block, insert_before, config, registry=None, available_width: Optional[int] = None
+) -> int:
+    """普通表格：复用元数据与集团内核参数，按所在节版心限宽。"""
+    meta = block.meta or (None, None, "dxa", None, None, {})
+    style_id, col_widths, width_type, table_width, row_height, extra = meta
+    table = make_table_from_md(
+        block.rows,
+        style_id,
+        col_widths,
+        width_type,
+        table_width,
+        row_height,
+        _table_extra_from_meta(extra),
+        available_width=available_width,
+    )
+    insert_element(insert_before, table)
+    inserted = 1
+    entry = registry.get(block.ident) if (registry is not None and block.ident) else None
+    if entry is not None:
+        insert_element(insert_before, _caption_paragraph(entry, registry, config))
+        inserted += 1
+    return inserted
+
+
+def _render_complex_table_block(block, insert_before, items, relationships, config) -> int:
+    """复杂表格：复用原始 XML 与既有关系校验，不改写原表。"""
+    filename = block.filename
+    if not filename:
+        raise _markdown_error(
+            block.location.path,
+            block.location.start_line,
+            "复杂表格标记缺少 XML 文件名",
+            "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
+            "complex_table_syntax",
+        )
+    table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
+    try:
+        with open(table_path, "rb") as table_file:
+            table_element = _parse_xml_safe(table_file.read(), filename)
+    except Exception as exc:
+        raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
+    if table_element.tag != qn("tbl"):
+        raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(table_path))
+    relationship_map = {
+        relationship.get("Id"): relationship for relationship in relationships
+    }
+    for rid in _relationship_ids(table_element):
+        relationship = relationship_map.get(rid)
+        if relationship is None:
+            raise AutomationError("复杂表格关系不存在: {0} -> {1}".format(table_path, rid))
+        if relationship.get("TargetMode") != "External":
+            target = _resolve_relationship_target(
+                "word/document.xml", relationship.get("Target", "")
+            )
+            if target not in items:
+                raise AutomationError(
+                    "复杂表格关系目标不存在: {0} -> {1}".format(rid, target)
+                )
+    insert_element(insert_before, table_element)
+    return 1
+
+
+def _caption_paragraph(entry, registry, config):
+    """题注段落：标识唯一化后的全文编号 + 可读静态值（不生成失效域）。"""
+    number = entry.number
+    if registry is not None:
+        number = registry.sequential_number(entry)
+    return shared.make_caption_paragraph(
+        prefix="图" if entry.kind == KIND_FIGURE else "表",
+        label=entry.label,
+        number=number,
+        style_id=config.get("captionStyle") or None,
+        bookmark_name=entry.bookmark,
+        bookmark_id=0,
+    )

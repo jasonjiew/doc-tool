@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="0" time="20.469"><testsuite name="doc-tool" tests="3" failures="0" time="20.469"><testcase name="test_public_export.py" classname="scripts.tests" time="5.219"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 4.215s
+
+OK
+</system-out></testcase><testcase name="test_packaging.py" classname="scripts.tests" time="5.000"><system-out>test_strict_allowlist_rejects_unknown_file (__main__.PackageAllowlistTests.test_strict_allowlist_rejects_unknown_file) ... ok
+test_build_script_exposes_portable_switch (__main__.PortablePackageTests.test_build_script_exposes_portable_switch) ... ok
+test_ci_publishes_portable_package (__main__.PortablePackageTests.test_ci_publishes_portable_package)
+tag 流水线除安装器外还产出便携包，并挂进 Release 资产。 ... ok
+test_ci_zips_portable_after_app_signing (__main__.PortablePackageTests.test_ci_zips_portable_after_app_signing)
+便携包必须在应用签名之后打，否则包里是未签名 exe（照样被拦）。 ... ok
+test_dist_staging_script_shared (__main__.PortablePackageTests.test_dist_staging_script_shared)
+stage_dist.ps1 除低了启动/诊断脚本的复处漂移与基线过期。 ... ok
+test_gui_entry_has_self_heal_fallback (__main__.PortablePackageTests.test_gui_entry_has_self_heal_fallback)
+GUI 入口冻结态下 PySide6 导入失败走 self_heal 自愈，其余启动异常可见化。 ... ok
+test_installer_ships_diagnose_cmd (__main__.PortablePackageTests.test_installer_ships_diagnose_cmd)
+安装器随带诊断脚本，成员双击运行后回传 DocTool-diagnose.txt。 ... ok
+test_launcher_is_ascii_only (__main__.PortablePackageTests.test_launcher_is_ascii_only)
+cmd.exe 按系统 ANSI 代码页解析批处理，非 ASCII 字节会破坏解析。 ... ok
+test_launcher_is_tracked_in_repo (__main__.PortablePackageTests.test_launcher_is_tracked_in_repo) ... ok
+test_launcher_reports_start_failure (__main__.PortablePackageTests.test_launcher_reports_start_failure)
+1.4.5：preflight 启动并监视应用，快速失败时启动器给出可见报错。 ... ok
+test_launcher_starts_in_place_without_temp_copy (__main__.PortablePackageTests.test_launcher_starts_in_place_without_temp_copy)
+1.4.4：原地启动已签名 exe，不再复制到 %TEMP%（透明加密客户端会加密 .pyd）。 ... ok
+test_preflight_script_is_ascii_only (__main__.PortablePackageTests.test_preflight_script_is_ascii_only)
+preflight.ps1 与启动器一样必须 ASCII-only（PS 5.1 无 BOM 按 ANSI 解析）。 ... ok
+test_calc_sha256 (__main__.PublishReleaseTests.test_calc_sha256) ... ok
+test_create_or_update_release_creates_when_not_exists (__main__.PublishReleaseTests.test_create_or_update_release_creates_when_not_exists) ... 正在创建 Release v2.6.1...
+ok
+test_create_or_update_release_updates_when_exists (__main__.PublishReleaseTests.test_create_or_update_release_updates_when_exists) ... Release v2.6.1 已存在，正在更新...
+ok
+test_get_gitlab_base_missing_raises (__main__.PublishReleaseTests.test_get_gitlab_base_missing_raises) ... ok
+test_get_gitlab_base_valid (__main__.PublishReleaseTests.test_get_gitlab_base_valid) ... ok
+test_get_package_files_missing_package_raises (__main__.PublishReleaseTests.test_get_package_files_missing_package_raises) ... ok
+test_get_package_files_success (__main__.PublishReleaseTests.test_get_package_files_success) ... ok
+test_get_project_id_invalid_type_raises (__main__.PublishReleaseTests.test_get_project_id_invalid_type_raises) ... ok
+test_get_project_id_missing_raises (__main__.PublishReleaseTests.test_get_project_id_missing_raises) ... ok
+test_get_project_id_valid (__main__.PublishReleaseTests.test_get_project_id_valid) ... ok
+test_get_project_path_missing_raises (__main__.PublishReleaseTests.test_get_project_path_missing_raises) ... ok
+test_get_project_path_valid (__main__.PublishReleaseTests.test_get_project_path_valid) ... ok
+test_get_token_from_argv (__main__.PublishReleaseTests.test_get_token_from_argv) ... ok
+test_get_token_from_env (__main__.PublishReleaseTests.test_get_token_from_env) ... ok
+test_get_token_missing_raises_runtime_error (__main__.PublishReleaseTests.test_get_token_missing_raises_runtime_error) ... ok
+test_upload_file_puts_to_correct_url (__main__.PublishReleaseTests.test_upload_file_puts_to_correct_url) ... 正在上传 package.zip (0.0 MB)...
+ok
+test_frozen_build_installs_runtime_and_build_requirements (__main__.ReleasePipelineTests.test_frozen_build_installs_runtime_and_build_requirements) ... ok
+test_hash_is_generated_after_all_signing_steps (__main__.ReleasePipelineTests.test_hash_is_generated_after_all_signing_steps) ... ok
+test_install_level_smoke_runs_before_installer_signing (__main__.ReleasePipelineTests.test_install_level_smoke_runs_before_installer_signing) ... ok
+test_public_source_export_wired_into_ci (__main__.ReleasePipelineTests.test_public_source_export_wired_into_ci)
+任务 9.4：净化源码导出+扫描已接入公共 CI。 ... ok
+test_release_gate_blocks_public_until_decisions_resolved (__main__.ReleasePipelineTests.test_release_gate_blocks_public_until_decisions_resolved)
+任务 9.3：未决发布决策阻断公共正式发布，允许内部测试产物。 ... ok
+test_release_requires_clean_tree_and_uses_generated_notes (__main__.ReleasePipelineTests.test_release_requires_clean_tree_and_uses_generated_notes) ... ok
+test_default_project_yml_loadable (__main__.ResourceRootTests.test_default_project_yml_loadable)
+默认项目清单在开发态可被 yaml 加载。 ... ok
+test_dev_mode_resource_path (__main__.ResourceRootTests.test_dev_mode_resource_path)
+resource_path() 正确拼接子路径。 ... ok
+test_dev_mode_returns_resources_dir (__main__.ResourceRootTests.test_dev_mode_returns_resources_dir)
+开发态：resource_root() 返回 doc_tool/resources/ 目录。 ... ok
+test_frozen_mode_resource_path (__main__.ResourceRootTests.test_frozen_mode_resource_path)
+冻结态：resource_path() 在 _MEIPASS 下定位资源。 ... ok
+test_frozen_mode_returns_meipass_resources (__main__.ResourceRootTests.test_frozen_mode_returns_meipass_resources)
+冻结态：模拟 sys._MEIPASS，resource_root() 返回 _MEIPASS/doc_tool/resources。 ... ok
+test_can_read_higher_schema (__main__.SchemaCompatibilityTests.test_can_read_higher_schema)
+当前应用可只读打开更高模式版本（向前兼容展示）。 ... ok
+test_can_write_current_schema (__main__.SchemaCompatibilityTests.test_can_write_current_schema)
+当前应用可写当前模式版本。 ... ok
+test_reject_read_unknown_lower_schema (__main__.SchemaCompatibilityTests.test_reject_read_unknown_lower_schema)
+未知的历史低版本不可读（无降级迁移）。 ... ok
+test_reject_write_higher_schema (__main__.SchemaCompatibilityTests.test_reject_write_higher_schema)
+旧应用拒绝写入更高模式版本（避免破坏性降级）。 ... ok
+test_signing_skips_missing_config_and_rejects_repo_private_key (__main__.SigningConfigurationTests.test_signing_skips_missing_config_and_rejects_repo_private_key) ... ok
+
+----------------------------------------------------------------------
+Ran 44 tests in 3.856s
+
+OK
+  上传完成: package.zip
+</system-out></testcase><testcase name="test_template_fill_plan.py" classname="scripts.tests" time="10.250"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 8.753s
+
+OK
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-4rsq1y0b\assembled.docx
+[general] 插入元素=1, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-j9cv8gwx\assembled.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

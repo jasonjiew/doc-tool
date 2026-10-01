@@ -1,0 +1,64 @@
+process_markdown
+    path: str,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+) -> Tuple[int, int, int]:
+    with open(path, encoding="utf-8") as handle:
+        lines = handle.read().split("\n")
+    inserted = 0
+    image_count = 0
+    table_count = 0
+    pending_format: Optional[str] = None
+    relationship_map = {relationship.get("Id"): relationship for relationship in relationships}
+    index = 0
+    active_list = None
+    while index < len(lines):
+        line = lines[index].rstrip()
+        stripped = line.strip()
+        list_info = parse_list_line(line)
+        if list_info is None:
+            active_list = None
+
+        if re.match(r"^\[\^[^\]]+\]:\s*", stripped):
+            index += 1
+            continue
+
+        complex_table = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
+        if complex_table:
+            filename = complex_table.group(2)
+            if not filename:
+                raise _markdown_error(
+                    path,
+                    index + 1,
+                    "复杂表格标记缺少 XML 文件名",
+                    "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
+                    "complex_table_syntax",
+                )
+            table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
+            try:
+                with open(table_path, "rb") as table_file:
+                    table_element = _parse_xml_safe(table_file.read(), filename)
+            except Exception as exc:
+                raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
+            if table_element.tag != qn("tbl"):
+                raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(table_path))
+            for rid in _relationship_ids(table_element):
+                relationship = relationship_map.get(rid)
+                if relationship is None:
+                    raise AutomationError("复杂表格关系不存在: {0} -> {1}".format(table_path, rid))
+                if relationship.get("TargetMode") != "External":
+                    target = _resolve_relationship_target("word/document.xml", relationship.get("Target", ""))
+                    if target not in items:
+                        raise AutomationError("复杂表格关系目标不存在: {0} -> {1}".format(rid, target))
+            insert_element(insert_before, table_element)
+            inserted += 1
+            table_count += 1
+            index += 1
+            continue

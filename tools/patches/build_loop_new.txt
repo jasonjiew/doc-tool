@@ -1,0 +1,79 @@
+    # V2.7：先解析全部章节，建立跨章题注注册表（编号与引用全局一致），
+    # 再逐章装配。
+    parsed_documents = []
+    for _entry, markdown_path in chapter_entries:
+        if not markdown_path:
+            continue
+        try:
+            with open(markdown_path, encoding="utf-8") as handle:
+                markdown_text = handle.read()
+        except (OSError, UnicodeError) as exc:
+            raise AutomationError(
+                "Markdown 无法读取 {0}: {1}".format(markdown_path, exc)
+            )
+        parsed_documents.append(parse_blocks(markdown_text, markdown_path))
+    registry = build_registry(parsed_documents)
+    for document in parsed_documents:
+        for warning in document.warnings:
+            text = warning.as_text()
+            if text not in expressions.warnings:
+                expressions.warnings.append(text)
+
+    primary_sect_pr = _template_primary_section(body)
+    landscape_prototype = _template_landscape_prototype(body, primary_sect_pr)
+    bodies_by_path = {document.path: document for document in parsed_documents}
+    if parsed_documents:
+        caption_style = resolve_caption_style(
+            _parse_xml_safe(items["word/styles.xml"], "word/styles.xml"),
+            str(config.get("captionStyle") or ""),
+        )
+        if caption_style:
+            config["captionStyle"] = caption_style
+
+    inserted = 0
+    images = 0
+    tables = 0
+    for entry, markdown_path in chapter_entries:
+        if config.get("is_headless") and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            insert_element(
+                section_properties,
+                make_heading(
+                    config["headingStyles"],
+                    entry.title,
+                    entry.depth,
+                    num_id=_heading_num_id(numbering),
+                    list_level=entry.depth - 1,
+                    expressions=expressions,
+                    bookmark_key=(
+                        os.path.abspath(markdown_path)
+                        if markdown_path
+                        else os.path.abspath(entry.path)
+                    ),
+                ),
+            )
+            inserted += 1
+        if not markdown_path:
+            continue
+        document = bodies_by_path.get(markdown_path)
+        if document is None:
+            document = parse_blocks_file(markdown_path)
+        count, image_count, table_count = process_parsed_document(
+            document,
+            section_properties,
+            items,
+            relationship_root,
+            image_manager,
+            config,
+            max_image_width,
+            next_object_id,
+            numbering,
+            expressions,
+            registry=registry,
+            primary_sect_pr=primary_sect_pr,
+            landscape_prototype=landscape_prototype,
+        )
+        inserted += count
+        images += image_count
+        tables += table_count

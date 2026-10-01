@@ -1,0 +1,10 @@
+    def sequential_number(self, entry: CaptionEntry) -> int:
+        """同一标识重复出现时按出现顺序递增编号（输出层唯一化，不改源码）。"""
+        seen = self._sequential.get(entry.ident, 0) + 1
+        self._sequential[entry.ident] = seen
+        if entry.duplicate and seen > 1:
+            return entry.number + seen - 1
+        return entry.number
+
+    def get(self, ident: str) -> Optional[CaptionEntry]:
+        return self.entries.get(ident)

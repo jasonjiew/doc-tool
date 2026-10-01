@@ -1,0 +1,24 @@
+[1/1] v26-smoke-source.md → v26-smoke-source.docx 失败
+{
+  "records": [
+    {
+      "source": "tmp\\v26-smoke-source.md",
+      "target": "tmp\\v26-convert-probe\\v26-smoke-source.docx",
+      "kind": "markdown_to_docx",
+      "label": "Markdown → Word",
+      "ok": false,
+      "reason": "template_fill_failed",
+      "detail": "Word 模板无法解析：文件不是有效的 ZIP 包或不存在（路径=tmp\\v26-dist\\DocTool\\_internal\\doc_tool\\resources\\generic-template.docx，前16字节=b'\\xe0\\xa8\\x91\\xe7\\xd8\\xf2\\x05\\xac\\x00\\x02\\x00\\x00\\x00\\x10\\x00\\x00'）：File is not a zip file 请确认 Word 底模为可正常打开的 .docx，且 Markdown 内容满足构建约束（标题层级连续、图片路径有效）；错误详情中会给出具体位置。",
+      "errorCode": "E6009",
+      "elapsedSeconds": 0.0,
+      "note": ""
+    }
+  ],
+  "cancelled": false,
+  "total": 1,
+  "succeeded": 0,
+  "failed": 1,
+  "success": false,
+  "errorCode": "E6009",
+  "summary": "成功 0 个，失败 1 个。 涉及错误码：E6009。"
+}

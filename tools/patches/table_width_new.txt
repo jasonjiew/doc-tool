@@ -1,0 +1,6 @@
+    else:
+        widths = [2400] * column_count
+    if available_width:
+        widths = shared.fit_table_widths(widths, column_count, int(available_width))
+
+    table = etree.Element(qn("tbl"))

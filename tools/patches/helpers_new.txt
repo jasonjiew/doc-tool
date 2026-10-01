@@ -1,0 +1,101 @@
+def _template_primary_section(body) -> Optional[etree._Element]:
+    """返回模板正文的主节属性（用于纵向节与节属性复制）。"""
+    if body is None:
+        return None
+    section = body.find(qn("sectPr"))
+    if section is not None:
+        return section
+    for child in body:
+        if child.tag == qn("p"):
+            ppr = child.find(qn("pPr"))
+            if ppr is not None:
+                candidate = ppr.find(qn("sectPr"))
+                if candidate is not None:
+                    return candidate
+    return None
+
+
+def _template_landscape_prototype(body, fallback_sect_pr):
+    """模板里已有横向节时以它为原型，否则按主节推导横向属性。"""
+    if body is not None:
+        for section in body.iter(qn("sectPr")):
+            if section is fallback_sect_pr:
+                continue
+            if shared.section_properties_orientation(section) == shared.ORIENT_LANDSCAPE:
+                return section
+    if fallback_sect_pr is None:
+        return None
+    return shared.clone_section_properties(fallback_sect_pr, shared.ORIENT_LANDSCAPE)
+
+
+def landscape_split(blocks, primary_sect_pr, landscape_prototype):
+    """把块序列按显式横向节标记切分成若干节。
+
+    返回 ``[(orientation, sect_pr, [blocks]), ...]``。标记与切分由共享块解析器
+    给出：未闭合节已在解析末尾补隐式关闭、嵌套重复开启被忽略，因此这里只需
+    按序切分即可。
+    """
+    sections = []
+    current = []
+    orientation = shared.section_properties_orientation(primary_sect_pr)
+    for block in blocks:
+        if block.kind == KIND_SECTION and block.marker == "landscape":
+            if current:
+                sections.append((orientation, None, current))
+            current = []
+            orientation = shared.ORIENT_LANDSCAPE
+            continue
+        if block.kind == KIND_SECTION and block.marker == "end":
+            sections.append((orientation, None, current))
+            current = []
+            orientation = shared.section_properties_orientation(primary_sect_pr)
+            continue
+        current.append(block)
+    if current or not sections:
+        sections.append((orientation, None, current))
+
+    resolved = []
+    for index, (item_orientation, _unused, chunk) in enumerate(sections):
+        last = index == len(sections) - 1
+        if last:
+            # 最后一节直接沿用模板主节属性（构建末尾作为 body 的末尾节）。
+            sect_pr = primary_sect_pr
+            if item_orientation == shared.ORIENT_LANDSCAPE and primary_sect_pr is not None:
+                sect_pr = landscape_prototype or shared.clone_section_properties(
+                    primary_sect_pr, shared.ORIENT_LANDSCAPE
+                )
+        elif item_orientation == shared.ORIENT_LANDSCAPE:
+            sect_pr = landscape_prototype or shared.clone_section_properties(
+                primary_sect_pr, shared.ORIENT_LANDSCAPE
+            )
+        else:
+            base = primary_sect_pr if primary_sect_pr is not None else etree.Element(qn("sectPr"))
+            sect_pr = shared.clone_section_properties(base, shared.ORIENT_PORTRAIT)
+        resolved.append((item_orientation, sect_pr, chunk))
+    return resolved
+
+
+def _section_break_paragraph(sect_pr) -> etree._Element:
+    """构造带 ``w:sectPr`` 的节分隔段落（节属性挂在段落的 pPr 下）。"""
+    paragraph = etree.Element(qn("p"))
+    ppr = etree.SubElement(paragraph, qn("pPr"))
+    ppr.append(etree.fromstring(etree.tostring(sect_pr)))
+    return paragraph
+
+
+def _table_extra_from_meta(extra) -> Dict[str, str]:
+    """把表格元数据的额外参数转成 ``make_table_from_md`` 需要的字符串字典。
+
+    警告字段（``_columnWarning`` 等）由共享解析返回、不是模板参数，必须剥离，
+    否则会被当成表格属性写入 OOXML。
+    """
+    if not extra:
+        return {}
+    return {
+        str(key): str(value)
+        for key, value in extra.items()
+        if not str(key).startswith("_")
+    }
+<<<SEP>>>
+
+def insert_element(insert_before, element) -> None:

@@ -1,0 +1,5 @@
+scripts/validate_docx.py	tools/patches/val_content_old.txt	tools/patches/val_content_new.txt
+doc_tool/domain/captions.py	tools/patches/captions_e_old.txt	tools/patches/captions_e_new.txt
+scripts/build_docx.py	tools/patches/caption_num_old.txt	tools/patches/caption_num_new.txt
+scripts/build_docx.py	tools/patches/caption_call1_old.txt	tools/patches/caption_call1_new.txt
+scripts/build_docx.py	tools/patches/caption_call2_old.txt	tools/patches/caption_call2_new.txt

@@ -1,0 +1,11 @@
+schemaVersion: 1
+packId: generic-test
+version: 1.0.0
+documentKind: general
+description: 通用测试说明书规范包（可公开分发）
+files:
+  skeleton/1 概述.md: ea49aae870d38800886c351999e324ad9bc09c81709775184bef785ad9be7ec2
+  skeleton/2 测试用例.md: cfa7740e8bfa24e7b390ad14af6359ea82aaf90d6336e3ed2fa1cc06d5d5b311
+  variables.yml: a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1
+  terms.yml: 5bc3d5845e547758ff1e86de09d6e646071cf64646d6cec57b3373595275e895
+  rules.yml: 776f9aae1abdc1b0e517d0c43e93da9bf9ed891bc0e3c1d4fae01e7ec52e6e38

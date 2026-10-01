@@ -35,6 +35,7 @@ VOCAB_FILE = HERE / "scan_vocabulary.txt"
 
 # 允许的 DOCX 文件（净化模板和测试夹具；内部仓库公司模板在导出时被排除）
 ALLOWED_DOCX_PATTERNS = [
+    r"(?:_internal[/\\])?doc_tool[/\\]resources[/\\]generic-template\.docx$",
     r".*templates[/\\].*-template\.docx$",
     r".*scripts[/\\]tests[/\\]fixtures[/\\].*\.docx$",
     # PyInstaller 收集的 python-docx 自带空白模板（_internal/docx/templates/default.docx）
@@ -48,7 +49,19 @@ FORBIDDEN_DIRS = {"projects", "output", "logs", ".venv", "venv", "env"}
 FORBIDDEN_EXTENSIONS = {".env", ".pem", ".pfx", ".key"}
 
 # 禁止的文件名
-FORBIDDEN_FILES = {".env", ".env.local", "secrets.yaml", "credentials.json"}
+FORBIDDEN_FILES = {".env", ".env.local", "secrets.yaml", "credentials.json", "pfx-password.txt"}
+
+
+def is_sensitive_file(rel_path: str) -> bool:
+    """共享源码导出/扫描边界，包括私钥备份和旧签名目录。"""
+    normalized = rel_path.replace("\\", "/").lower()
+    path = Path(normalized)
+    return (
+        normalized.startswith("scripts/cert-out/")
+        or path.name in FORBIDDEN_FILES
+        or any(suffix in FORBIDDEN_EXTENSIONS for suffix in path.suffixes)
+        or path.name.startswith("pfx-password.txt.")
+    )
 
 
 # --- 扫描词表加载与文本扫描 ---
@@ -228,10 +241,8 @@ def scan_forbidden_files(root: Path) -> List[str]:
         name = path.name.lower()
         ext = path.suffix.lower()
         rel = str(path.relative_to(root))
-        if name in FORBIDDEN_FILES:
+        if is_sensitive_file(rel):
             leaks.append("敏感文件: {0}".format(rel))
-        elif ext in FORBIDDEN_EXTENSIONS:
-            leaks.append("密钥文件: {0}".format(rel))
     return leaks
 
 
@@ -325,7 +336,7 @@ def scan_repo_for_secrets(root: Path) -> List[str]:
             continue
         name = path.name.lower()
         ext = path.suffix.lower()
-        if name in FORBIDDEN_FILES or ext in FORBIDDEN_EXTENSIONS:
+        if is_sensitive_file(rel):
             leaks.append("仓库敏感文件（已跟踪）: {0}".format(rel))
         if ext == ".docx":
             allowed = any(re.match(p, rel, re.IGNORECASE) for p in ALLOWED_DOCX_PATTERNS)

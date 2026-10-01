@@ -1,0 +1,12 @@
+def process_markdown(
+    path: str,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+) -> Tuple[int, int, int]:

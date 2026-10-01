@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="0" time="4.016"><testsuite name="doc-tool" tests="1" failures="0" time="4.016"><testcase name="test_frozen_smoke.py" classname="scripts.tests" time="4.016"><system-out>test_frozen_cli_info_and_help (__main__.FrozenAppRuntimeTests.test_frozen_cli_info_and_help)
+冻结 CLI 可运行既有 info 与新增机器可读命令帮助。 ... ok
+test_frozen_kernel_importable (__main__.FrozenAppRuntimeTests.test_frozen_kernel_importable)
+冻结态 kernel.ensure_kernel_importable() 能定位 scripts/ 目录。 ... ok
+test_frozen_resource_root (__main__.FrozenAppRuntimeTests.test_frozen_resource_root)
+冻结态 resource_root() 指向 _internal/doc_tool/resources。 ... ok
+test_frozen_third_party_importable (__main__.FrozenAppRuntimeTests.test_frozen_third_party_importable)
+冻结态第三方库可导入。 ... ok
+test_exe_exists (__main__.FrozenAppStructureTests.test_exe_exists)
+DocTool.exe 存在。 ... ok
+test_internal_dir_exists (__main__.FrozenAppStructureTests.test_internal_dir_exists)
+_internal 目录存在。 ... ok
+test_license_packed (__main__.FrozenAppStructureTests.test_license_packed)
+第三方许可文件已打包。 ... ok
+test_resources_packed (__main__.FrozenAppStructureTests.test_resources_packed)
+默认项目清单已打包到 _internal/doc_tool/resources/。 ... ok
+test_scripts_packed (__main__.FrozenAppStructureTests.test_scripts_packed)
+内核脚本已打包到 _internal/scripts/。 ... ok
+test_templates_and_config_not_packed (__main__.FrozenAppStructureTests.test_templates_and_config_not_packed)
+公司模板与文档配置不被隐式打包（任务 8.2：绝不隐式打包）。 ... ok
+test_third_party_libs_packed (__main__.FrozenAppStructureTests.test_third_party_libs_packed)
+第三方库目录已打包。 ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 3.416s
+
+OK
+</system-out></testcase></testsuite></testsuites>

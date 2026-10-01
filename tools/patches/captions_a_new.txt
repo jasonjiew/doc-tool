@@ -1,0 +1,3 @@
+from doc_tool.kernel_shared.docx_blocks import bookmark_name_for
+
+KIND_FIGURE = "fig"

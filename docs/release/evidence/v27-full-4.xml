@@ -1,0 +1,1532 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="56" failures="1" time="485.408"><testsuite name="doc-tool" tests="56" failures="1" time="485.408"><testcase name="test_docx_common.py" classname="scripts.tests" time="1.697"><system-out>test_cross_file_and_section_anchor_resolution_not_swallowed (__main__.HyperlinkOOXMLStructureAndJumpTests.test_cross_file_and_section_anchor_resolution_not_swallowed)
+测试锚点链接（如 #3.4、#第3章、#蓝牙配对）不会被当前文件起始书签错误吞噬。 ... ok
+test_dynamic_hyperlink_style_id_from_styles_xml (__main__.HyperlinkOOXMLStructureAndJumpTests.test_dynamic_hyperlink_style_id_from_styles_xml) ... ok
+test_find_bookmark_for_section_disambiguation (__main__.HyperlinkOOXMLStructureAndJumpTests.test_find_bookmark_for_section_disambiguation)
+测试 find_bookmark_for_section 不会把带标题的多级小节（如 '1.1 目的'、'3.4 同步'）误识别为第1章或第3章。 ... ok
+test_hyperlink_ooxml_structure_and_style (__main__.HyperlinkOOXMLStructureAndJumpTests.test_hyperlink_ooxml_structure_and_style) ... ok
+test_jump_to_current_chapter_and_section_fallbacks (__main__.HyperlinkOOXMLStructureAndJumpTests.test_jump_to_current_chapter_and_section_fallbacks) ... ok
+test_markdown_visible_text_italics_with_space (__main__.HyperlinkOOXMLStructureAndJumpTests.test_markdown_visible_text_italics_with_space)
+测试 Markdown 行内斜体含空格时与 build_docx 生成的可见文本一致。 ... ok
+test_output_filename_deduplication (__main__.HyperlinkOOXMLStructureAndJumpTests.test_output_filename_deduplication)
+测试升级版本时避免重复拼接版本号括号（如 (1.6)(1.7).docx）。 ... ok
+test_parent_chapter_bookmark_resolution_for_subsections (__main__.HyperlinkOOXMLStructureAndJumpTests.test_parent_chapter_bookmark_resolution_for_subsections)
+测试多级目录下子文件通过 '#本章' 或 '本章节' 精确跳转到所属第1级父章节。 ... ok
+test_punctuation_and_range_normalization (__main__.HyperlinkOOXMLStructureAndJumpTests.test_punctuation_and_range_normalization)
+测试全角半角标点、数值区间波浪号与正负号等语义等价。 ... ok
+test_revision_summary_cell_hyperlink_structure (__main__.HyperlinkOOXMLStructureAndJumpTests.test_revision_summary_cell_hyperlink_structure) ... ok
+test_rpr_child_element_order_canonical_ooxml (__main__.HyperlinkOOXMLStructureAndJumpTests.test_rpr_child_element_order_canonical_ooxml)
+测试超链接与格式化文本的 rPr 子元素严格遵循 OOXML CT_RPr 顺序：rStyle -&gt; rFonts/b/i -&gt; color -&gt; u。 ... ok
+test_strip_manual_prefix_letters_and_roman (__main__.HyperlinkOOXMLStructureAndJumpTests.test_strip_manual_prefix_letters_and_roman)
+测试字母序号与罗马数字列表前缀识别剥离。 ... ok
+test_bold_wildcard_and_multistar_stay_literal (__main__.MarkdownContractTests.test_bold_wildcard_and_multistar_stay_literal) ... ok
+test_bold_with_punctuation_and_multisentence (__main__.MarkdownContractTests.test_bold_with_punctuation_and_multisentence) ... ok
+test_br_becomes_real_word_break (__main__.MarkdownContractTests.test_br_becomes_real_word_break) ... ok
+test_external_and_internal_hyperlinks (__main__.MarkdownContractTests.test_external_and_internal_hyperlinks) ... ok
+test_footnote_reference_and_part_generation (__main__.MarkdownContractTests.test_footnote_reference_and_part_generation) ... ok
+test_image_dimensions_are_optional (__main__.MarkdownContractTests.test_image_dimensions_are_optional) ... ok
+test_inline_bold_italic_and_code_runs (__main__.MarkdownContractTests.test_inline_bold_italic_and_code_runs) ... ok
+test_inline_bold_italic_three_asterisks (__main__.MarkdownContractTests.test_inline_bold_italic_three_asterisks) ... ok
+test_inline_italic_in_chinese_sentence (__main__.MarkdownContractTests.test_inline_italic_in_chinese_sentence) ... ok
+test_inline_italic_with_punctuation (__main__.MarkdownContractTests.test_inline_italic_with_punctuation) ... ok
+test_internal_link_resolves_root_relative_and_by_name (__main__.MarkdownContractTests.test_internal_link_resolves_root_relative_and_by_name) ... ok
+test_list_parser_requires_whitespace_and_tracks_indent (__main__.MarkdownContractTests.test_list_parser_requires_whitespace_and_tracks_indent) ... ok
+test_minimal_build_emits_expression_parts_deterministically (__main__.MarkdownContractTests.test_minimal_build_emits_expression_parts_deterministically) ... ok
+test_numbering_manager_creates_true_multilevel_list (__main__.MarkdownContractTests.test_numbering_manager_creates_true_multilevel_list) ... ok
+test_stable_bookmark_name_is_deterministic (__main__.MarkdownContractTests.test_stable_bookmark_name_is_deterministic) ... ok
+test_table_escaped_pipe_backslash_and_break (__main__.MarkdownContractTests.test_table_escaped_pipe_backslash_and_break) ... ok
+test_unclosed_inline_marker_stays_literal (__main__.MarkdownContractTests.test_unclosed_inline_marker_stays_literal) ... ok
+test_custom_available_bookmarks_iterable (__main__.NeutralizeDanglingHyperlinksTests.test_custom_available_bookmarks_iterable) ... ok
+test_dangling_hyperlink_preserves_tail_text (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_preserves_tail_text) ... ok
+test_dangling_hyperlink_unlinked_when_bookmark_missing (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_unlinked_when_bookmark_missing) ... ok
+test_dangling_hyperlink_with_direct_text (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_with_direct_text) ... ok
+test_empty_hyperlink_without_target_unlinked (__main__.NeutralizeDanglingHyperlinksTests.test_empty_hyperlink_without_target_unlinked) ... ok
+test_expression_errors_ignores_external_hyperlink_anchor (__main__.NeutralizeDanglingHyperlinksTests.test_expression_errors_ignores_external_hyperlink_anchor) ... ok
+test_expression_manager_avoids_template_bookmark_id_collision (__main__.NeutralizeDanglingHyperlinksTests.test_expression_manager_avoids_template_bookmark_id_collision) ... ok
+test_expression_manager_scans_all_parts_for_bookmark_ids (__main__.NeutralizeDanglingHyperlinksTests.test_expression_manager_scans_all_parts_for_bookmark_ids) ... ok
+test_external_hyperlink_with_rid_and_anchor_preserved (__main__.NeutralizeDanglingHyperlinksTests.test_external_hyperlink_with_rid_and_anchor_preserved) ... ok
+test_external_hyperlink_with_rid_preserved (__main__.NeutralizeDanglingHyperlinksTests.test_external_hyperlink_with_rid_preserved) ... ok
+test_header_footer_signatures_preserves_order_mixed_fields (__main__.NeutralizeDanglingHyperlinksTests.test_header_footer_signatures_preserves_order_mixed_fields) ... ok
+test_markdown_visible_text_preserves_multiplication_across_breaks (__main__.NeutralizeDanglingHyperlinksTests.test_markdown_visible_text_preserves_multiplication_across_breaks) ... ok
+test_valid_hyperlink_preserved_when_bookmark_exists (__main__.NeutralizeDanglingHyperlinksTests.test_valid_hyperlink_preserved_when_bookmark_exists) ... ok
+test_end_run_in_next_paragraph (__main__.NeutralizeHyperlinkFieldsTests.test_end_run_in_next_paragraph) ... ok
+test_field_runs_wrapped_in_hyperlink_element (__main__.NeutralizeHyperlinkFieldsTests.test_field_runs_wrapped_in_hyperlink_element) ... ok
+test_fldsimple_hyperlink_unlinked (__main__.NeutralizeHyperlinkFieldsTests.test_fldsimple_hyperlink_unlinked) ... ok
+test_native_hyperlink_without_field_untouched (__main__.NeutralizeHyperlinkFieldsTests.test_native_hyperlink_without_field_untouched) ... ok
+test_nested_pageref_inside_toc_not_touched (__main__.NeutralizeHyperlinkFieldsTests.test_nested_pageref_inside_toc_not_touched) ... ok
+test_non_hyperlink_field_untouched (__main__.NeutralizeHyperlinkFieldsTests.test_non_hyperlink_field_untouched) ... ok
+test_simple_hyperlink_field_unlinked (__main__.NeutralizeHyperlinkFieldsTests.test_simple_hyperlink_field_unlinked) ... ok
+test_index_is_parent_body_before_child (__main__.TreeContractTests.test_index_is_parent_body_before_child) ... ok
+test_missing_image_is_fatal (__main__.TreeContractTests.test_missing_image_is_fatal) ... ok
+test_numbering_gap_fails_with_exact_suggestion (__main__.TreeContractTests.test_numbering_gap_fails_with_exact_suggestion) ... ok
+
+----------------------------------------------------------------------
+Ran 52 tests in 0.477s
+
+OK
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpsuqdlqxh\one.docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpsuqdlqxh\two.docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\tmpsuqdlqxh\analysis\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_ooxml_security.py" classname="scripts.tests" time="1.572"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.879s
+
+OK
+</system-out></testcase><testcase name="test_validator_negative.py" classname="scripts.tests" time="43.032"><system-out>[PASS] V01 正确需求文档: validator exit=0, expected=accept
+[PASS] V02 正确详细设计文档: validator exit=0, expected=accept
+[PASS] V03 空正文: validator exit=1, expected=reject
+[PASS] V04 删除 H3: validator exit=1, expected=reject
+[PASS] V05 交换标题顺序: validator exit=1, expected=reject
+[PASS] V06 修改正文文本: validator exit=1, expected=reject
+[PASS] V07 父正文移动到子标题后: validator exit=1, expected=reject
+[PASS] V08 修改普通表格单元格: validator exit=1, expected=reject
+[PASS] V09 删除复杂表格: validator exit=1, expected=reject
+[PASS] V10 图片 relationship 目标缺失: validator exit=1, expected=reject
+[PASS] V11 document.xml 非法 updateFields: validator exit=1, expected=reject
+[PASS] V12 重复媒体文件: validator exit=1, expected=reject
+[SUCCESS] Validator 正向/负向回归全部符合预期。
+</system-out></testcase><testcase name="test_iteration_scenarios.py" classname="scripts.tests" time="21.650"><system-out>[PASS] A 新增章节+H4+表格+自然尺寸图片+诊断构建
+[PASS] B 修改 Markdown 仅改变目标正文
+[PASS] C 删除章节后正文/编号/TOC 恢复
+[PASS] D 非连续编号失败并给出 3.1.14 建议
+[PASS] E 图片缺失失败且输出保持原子性
+[PASS] F _index 父正文顺序
+[PASS] G &lt;br&gt; 写为真实 w:br
+</system-out></testcase><testcase name="test_project_model.py" classname="scripts.tests" time="1.586"><system-out>test_create_and_save_then_load (__main__.ProjectManifestTests.test_create_and_save_then_load) ... ok
+test_document_version_drops_v_prefix (__main__.ProjectManifestTests.test_document_version_drops_v_prefix)
+封面「版本号」、页眉「版次」与文件名统一为纯数字：V3.8 → 3.8。 ... ok
+test_general_document_allows_optional_number_and_version (__main__.ProjectManifestTests.test_general_document_allows_optional_number_and_version) ... ok
+test_general_document_type_is_writable (__main__.ProjectManifestTests.test_general_document_type_is_writable) ... ok
+test_higher_schema_loads_readonly (__main__.ProjectManifestTests.test_higher_schema_loads_readonly)
+更高模式版本应只读打开，不抛异常（spec：不兼容项目只读显示）。 ... ok
+test_higher_schema_unknown_document_type_still_loads_readonly (__main__.ProjectManifestTests.test_higher_schema_unknown_document_type_still_loads_readonly) ... ok
+test_is_writable_for_current_schema (__main__.ProjectManifestTests.test_is_writable_for_current_schema) ... ok
+test_load_rejects_missing_schema (__main__.ProjectManifestTests.test_load_rejects_missing_schema) ... ok
+test_load_wraps_invalid_field_type (__main__.ProjectManifestTests.test_load_wraps_invalid_field_type) ... ok
+test_load_wraps_invalid_utf8 (__main__.ProjectManifestTests.test_load_wraps_invalid_utf8) ... ok
+test_normalize_document_version_only_strips_leading_letter (__main__.ProjectManifestTests.test_normalize_document_version_only_strips_leading_letter) ... ok
+test_output_filename_replaces_windows_forbidden_characters (__main__.ProjectManifestTests.test_output_filename_replaces_windows_forbidden_characters) ... ok
+test_paths_validated_on_resolve (__main__.ProjectManifestTests.test_paths_validated_on_resolve) ... ok
+test_rejects_overlong_output_filename (__main__.ProjectManifestTests.test_rejects_overlong_output_filename) ... ok
+test_rejects_short_refresh_timeout (__main__.ProjectManifestTests.test_rejects_short_refresh_timeout) ... ok
+test_rejects_unknown_document_type (__main__.ProjectManifestTests.test_rejects_unknown_document_type) ... ok
+test_save_creates_backup_on_overwrite (__main__.ProjectManifestTests.test_save_creates_backup_on_overwrite) ... ok
+test_chinese_space_bracket_ampersand_paths (__main__.ProjectPathsTests.test_chinese_space_bracket_ampersand_paths)
+中文、空格、括号、&amp; 等合法 Windows 路径字符。 ... ok
+test_ensure_directories_creates_structure (__main__.ProjectPathsTests.test_ensure_directories_creates_structure) ... ok
+test_is_inside_rejects_outside (__main__.ProjectPathsTests.test_is_inside_rejects_outside) ... ok
+test_resolve_rejects_absolute_path (__main__.ProjectPathsTests.test_resolve_rejects_absolute_path) ... ok
+test_resolve_rejects_parent_traversal (__main__.ProjectPathsTests.test_resolve_rejects_parent_traversal) ... ok
+test_resolve_relative_path (__main__.ProjectPathsTests.test_resolve_relative_path) ... ok
+test_standard_paths_under_root (__main__.ProjectPathsTests.test_standard_paths_under_root) ... ok
+test_to_relative_roundtrip (__main__.ProjectPathsTests.test_to_relative_roundtrip) ... ok
+test_build_info_contains_required_fields (__main__.VersionTests.test_build_info_contains_required_fields) ... ok
+test_schema_compatibility (__main__.VersionTests.test_schema_compatibility) ... ok
+test_chinese_project_path_portability (__main__.WorkspacePortabilityTests.test_chinese_project_path_portability)
+中文项目路径在复制后仍可正常解析。 ... ok
+test_project_copied_to_another_path_opens (__main__.WorkspacePortabilityTests.test_project_copied_to_another_path_opens) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.547s
+
+OK
+</system-out></testcase><testcase name="test_import_preflight.py" classname="scripts.tests" time="1.885"><system-out>test_heading_hierarchy_jump_rejected (__main__.HeadingStyleTests.test_heading_hierarchy_jump_rejected)
+标题层级跳跃（H1 后直接 H3）被拒绝。 ... ok
+test_no_heading_styles_rejected (__main__.HeadingStyleTests.test_no_heading_styles_rejected)
+无 Heading 样式定义的文档被 fail-closed 拒绝。 ... ok
+test_valid_heading_tree_parsed (__main__.HeadingStyleTests.test_valid_heading_tree_parsed)
+有效的 H1/H2/H3 树被正确解析。 ... ok
+test_corrupted_xml_rejected (__main__.PackageValidationTests.test_corrupted_xml_rejected)
+XML 良构性损坏被拒绝。 ... ok
+test_corrupted_zip_rejected (__main__.PackageValidationTests.test_corrupted_zip_rejected)
+非 ZIP 文件被拒绝。 ... ok
+test_encrypted_docx_rejected (__main__.PackageValidationTests.test_encrypted_docx_rejected)
+加密 DOCX 被拒绝。 ... ok
+test_non_docx_extension_rejected (__main__.PackageValidationTests.test_non_docx_extension_rejected)
+非 .docx 扩展名被拒绝。 ... ok
+test_xml_doctype_and_entity_are_rejected (__main__.PackageValidationTests.test_xml_doctype_and_entity_are_rejected) ... ok
+test_zip_uncompressed_size_limit_rejected_before_read (__main__.PackageValidationTests.test_zip_uncompressed_size_limit_rejected_before_read) ... ok
+test_business_keyword_does_not_change_project_type (__main__.PreviewModelTests.test_business_keyword_does_not_change_project_type)
+标题/正文含「需求」「详细设计」关键字仍通过预检且不产生类型建议（任务 4.3）。 ... ok
+test_design_keyword_document_passes_preflight (__main__.PreviewModelTests.test_design_keyword_document_passes_preflight)
+含「详细设计」关键字的大文档仍可通过预检（公共版统一为通用项目）。 ... ok
+test_generic_document_preflight_no_suggestion (__main__.PreviewModelTests.test_generic_document_preflight_no_suggestion)
+无需求/设计特征的文档预检成功，且不产生类型建议。 ... ok
+test_preview_contains_counts_and_first_last_headings (__main__.PreviewModelTests.test_preview_contains_counts_and_first_last_headings)
+预览模型包含标题计数、首尾标题、图片/表格数量。 ... ok
+test_table_count_in_preview (__main__.PreviewModelTests.test_table_count_in_preview)
+预览模型正确统计表格数量。 ... ok
+test_body_references_missing_rid_rejected (__main__.RelationshipTests.test_body_references_missing_rid_rejected)
+正文引用的 rId 不在关系表中被拒绝。 ... ok
+test_broken_relationship_target_rejected (__main__.RelationshipTests.test_broken_relationship_target_rejected)
+关系目标不存在于包内被拒绝。 ... ok
+test_external_image_uri_without_target_mode_rejected (__main__.RelationshipTests.test_external_image_uri_without_target_mode_rejected)
+缺失 TargetMode 的 file URI 图片仍按外链图片拒绝。 ... ok
+test_hyperlink_missing_rid_rejected (__main__.RelationshipTests.test_hyperlink_missing_rid_rejected)
+正文 w:hyperlink 引用不存在的 rId 被检出。 ... ok
+test_internal_bookmark_anchor_not_misreported (__main__.RelationshipTests.test_internal_bookmark_anchor_not_misreported)
+书签锚点超链接（TargetMode=Internal）不当作缺失部件误报。 ... ok
+test_valid_image_reference_accepted (__main__.RelationshipTests.test_valid_image_reference_accepted)
+正文引用的图片关系目标存在时通过。 ... ok
+test_vml_imagedata_missing_rid_rejected (__main__.RelationshipTests.test_vml_imagedata_missing_rid_rejected)
+旧版 VML 图片 v:imagedata 引用不存在的 rId 被检出。 ... ok
+test_chinese_long_path_accepted (__main__.RenamedAndSpecialPathTests.test_chinese_long_path_accepted)
+中文长路径下的 DOCX 通过预检。 ... ok
+test_renamed_docx_accepted (__main__.RenamedAndSpecialPathTests.test_renamed_docx_accepted)
+文件名与历史基线不同的合法 DOCX 仍通过预检。 ... ok
+test_space_bracket_ampersand_path_accepted (__main__.RenamedAndSpecialPathTests.test_space_bracket_ampersand_path_accepted)
+含空格、括号、&amp; 的路径下 DOCX 通过预检。 ... ok
+test_heading_hierarchy_jump_allowed_in_tolerant_mode (__main__.TolerantPreflightTests.test_heading_hierarchy_jump_allowed_in_tolerant_mode)
+严格模式下层级跳跃抛出 HeadingHierarchyError；宽松模式下放行供用户在向导中查看或映射。 ... ok
+test_is_doc_format_magic_detection (__main__.TolerantPreflightTests.test_is_doc_format_magic_detection)
+检测 OLE2 复合格式与 PK ZIP 格式的精确识别。 ... ok
+test_no_headings_passes_in_tolerant_mode_as_headless (__main__.TolerantPreflightTests.test_no_headings_passes_in_tolerant_mode_as_headless)
+无标准 Heading 样式时，在宽松模式下放行为无标题状态，确保不阻断且不污染正文段落。 ... ok
+test_pure_narrative_doc_fallback_single_chapter (__main__.TolerantPreflightTests.test_pure_narrative_doc_fallback_single_chapter)
+完全无任何标题特征的纯正文文档，在宽松模式下放行无标题 headless 状态。 ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.204s
+
+OK
+</system-out></testcase><testcase name="test_fidelity.py" classname="scripts.tests" time="1.477"><system-out>test_preflight_clean_doc_has_no_block (__main__.FidelityPreflightIntegrationTests.test_preflight_clean_doc_has_no_block) ... ok
+test_preflight_exposes_fidelity_report (__main__.FidelityPreflightIntegrationTests.test_preflight_exposes_fidelity_report) ... ok
+test_chart_part_blocked (__main__.FidelityScanTests.test_chart_part_blocked) ... ok
+test_comment_part_backstop_when_no_range_start (__main__.FidelityScanTests.test_comment_part_backstop_when_no_range_start) ... ok
+test_each_feature_count_and_severity (__main__.FidelityScanTests.test_each_feature_count_and_severity) ... ok
+test_empty_document_no_findings (__main__.FidelityScanTests.test_empty_document_no_findings) ... ok
+test_external_link_image_not_misdetected (__main__.FidelityScanTests.test_external_link_image_not_misdetected) ... ok
+test_hyperlink_in_header_sampled_by_part (__main__.FidelityScanTests.test_hyperlink_in_header_sampled_by_part) ... ok
+test_multi_line_revision_counted_once (__main__.FidelityScanTests.test_multi_line_revision_counted_once) ... ok
+test_samples_capped_at_five (__main__.FidelityScanTests.test_samples_capped_at_five) ... ok
+test_summary_and_markdown_render (__main__.FidelityScanTests.test_summary_and_markdown_render) ... ok
+test_warn_only_does_not_block (__main__.FidelityScanTests.test_warn_only_does_not_block) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.039s
+
+OK
+</system-out></testcase><testcase name="test_project_build.py" classname="scripts.tests" time="5.437"><system-out>test_build_outputs_are_byte_identical (__main__.LegacyProjectConsistencyTests.test_build_outputs_are_byte_identical)
+同一模板/内容/资源下，新旧入口构建的 DOCX 字节哈希一致。 ... ok
+test_config_from_project_matches_legacy (__main__.LegacyProjectConsistencyTests.test_config_from_project_matches_legacy)
+config_from_project 产出的路径与 load_config 一致。 ... ok
+test_corrupt_template_raises_automation_error (__main__.LegacyProjectConsistencyTests.test_corrupt_template_raises_automation_error)
+模板不是合法 DOCX 时映射为 AutomationError（统一入口中性异常）。 ... ok
+test_project_validate_matches_legacy (__main__.LegacyProjectConsistencyTests.test_project_validate_matches_legacy)
+新旧入口的校验结果一致（同时通过或同时失败）。 ... ok
+test_validate_events_are_identical (__main__.LegacyProjectConsistencyTests.test_validate_events_are_identical)
+新旧入口的校验事件流（Heading/正文/表格）一致。 ... ok
+test_build_failure_returns_error_code (__main__.PipelineServiceTests.test_build_failure_returns_error_code)
+构建失败时返回结构化错误码。 ... ok
+test_skip_word_refresh_pipeline_returns_structured_events (__main__.PipelineServiceTests.test_skip_word_refresh_pipeline_returns_structured_events)
+跳过 Word 刷新的管线返回结构化阶段事件（构建与刷新前校验必须成功）。 ... ok
+test_extra_rows_follow_last_template_row_formatting (__main__.RevisionRecordBuildTests.test_extra_rows_follow_last_template_row_formatting)
+Markdown 行数超过模板数据行时，多出来的行沿用模板最后一行排版。 ... ok
+test_markdown_rows_reach_output_document (__main__.RevisionRecordBuildTests.test_markdown_rows_reach_output_document)
+Markdown 表格的数据行原样落到产物修订表（含 ``\|`` 转义还原）。 ... ok
+test_missing_markdown_keeps_template_rows (__main__.RevisionRecordBuildTests.test_missing_markdown_keeps_template_rows)
+没有 ``_revision_record.md`` 时保留模板原表，不清空、不报错。 ... ok
+test_multiline_summary_becomes_line_breaks (__main__.RevisionRecordBuildTests.test_multiline_summary_becomes_line_breaks)
+摘要里的 ``&lt;br&gt;`` 转成 ``w:br`` 换行，而不是塞进单个 ``w:t``。 ... ok
+test_pipeline_syncs_document_version_from_last_row (__main__.RevisionRecordBuildTests.test_pipeline_syncs_document_version_from_last_row)
+管线按修订记录末行版本号定产物版本号，且从不改写该文件。 ... ok
+test_rebuilt_rows_keep_template_row_formatting (__main__.RevisionRecordBuildTests.test_rebuilt_rows_keep_template_row_formatting)
+重建的数据行沿用模板数据行排版（行高/网格偏移/边框/宽度单位/对齐）。 ... ok
+test_template_rows_are_replaced_not_appended (__main__.RevisionRecordBuildTests.test_template_rows_are_replaced_not_appended)
+模板自带的数据行被 Markdown 全量替换，不与新行并存。 ... ok
+test_absolute_path_rejected (__main__.SpecialPathRegressionTests.test_absolute_path_rejected)
+绝对路径作为项目内资源被拒绝。 ... ok
+test_build_with_chinese_space_bracket_ampersand_path (__main__.SpecialPathRegressionTests.test_build_with_chinese_space_bracket_ampersand_path)
+在含中文、空格、括号、&amp; 的项目路径下构建成功。 ... ok
+test_config_from_project_rejects_escape_in_manifest (__main__.SpecialPathRegressionTests.test_config_from_project_rejects_escape_in_manifest)
+清单中 templateDocx 越界时 resolve_paths 抛出 PathEscapeError。 ... ok
+test_manifest_roundtrip_with_special_path (__main__.SpecialPathRegressionTests.test_manifest_roundtrip_with_special_path)
+清单在特殊路径下保存/加载后路径仍正确。 ... ok
+test_path_escape_rejected_in_resource (__main__.SpecialPathRegressionTests.test_path_escape_rejected_in_resource)
+资源路径越界（..）被 ProjectPaths 拒绝。 ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 3.714s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-rg6frvlw\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-rg6frvlw\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-djgwsmv3\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-djgwsmv3\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-djgwsmv3\legacy-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-djgwsmv3\project-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-501aenxy\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-501aenxy\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipeline-a3fqbx78\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipeline-a3fqbx78\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 31 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-e8elptz5\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-5tezg5ni\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-0h3lsz5i\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-8qaubcb_\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-tuu6dv7k\output\.tmp-GX-TEST-001 项目化构建测试(1.1).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-revision-build-tuu6dv7k\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-x8g8p7a_\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-15cnzbu0\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-lq7xo2vf\测试 项目(1.0) &amp; 验证\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-lq7xo2vf\测试 项目(1.0) &amp; 验证\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_import_project.py" classname="scripts.tests" time="3.848"><system-out>test_complex_table_extracted_as_xml (__main__.ExtractionRegressionTests.test_complex_table_extracted_as_xml)
+复杂表格（gridSpan）提取为 XML 资源。 ... ok
+test_event_order_preserved (__main__.ExtractionRegressionTests.test_event_order_preserved)
+正文/图片/表格按源文档顺序提取，事件顺序保持一致。 ... ok
+test_image_extracted_with_dimensions (__main__.ExtractionRegressionTests.test_image_extracted_with_dimensions)
+图片提取并保留尺寸标注。 ... ok
+test_paragraph_with_soft_break_extracted_as_br_and_roundtrips (__main__.ExtractionRegressionTests.test_paragraph_with_soft_break_extracted_as_br_and_roundtrips)
+段落内含软换行（&lt;w:br/&gt;）提取为 &lt;br&gt;，且完整导入能通过往返门禁。 ... ok
+test_parent_body_writes_index_md_before_children (__main__.ExtractionRegressionTests.test_parent_body_writes_index_md_before_children)
+父章节自身正文写入 _index.md 且目录树在子章节之前。 ... ok
+test_simple_table_extracted_as_markdown (__main__.ExtractionRegressionTests.test_simple_table_extracted_as_markdown)
+普通表格提取为 Markdown 表格（带 TBL 头）。 ... ok
+test_atomic_publish_no_partial_project_on_failure (__main__.ImportEndToEndTests.test_atomic_publish_no_partial_project_on_failure)
+任务 4.5：失败时不会留下半成品项目目录。 ... ok
+test_cancelled_import_does_not_publish_project (__main__.ImportEndToEndTests.test_cancelled_import_does_not_publish_project) ... ok
+test_derived_heading1_style_does_not_win_collision (__main__.ImportEndToEndTests.test_derived_heading1_style_does_not_win_collision)
+派生自定义「标题1」不得顶掉内置 heading 1（真实设计模板缺陷）。 ... ok
+test_failure_isolation_cleans_staging_and_logs (__main__.ImportEndToEndTests.test_failure_isolation_cleans_staging_and_logs)
+任务 4.7：试构建失败后暂存隔离清理并写诊断日志，源文档与正式项目不受影响。 ... ok
+test_general_docx_full_import (__main__.ImportEndToEndTests.test_general_docx_full_import)
+通用大文档完整首次导入：预检-&gt;提取-&gt;拆分-&gt;结构校验-&gt;试构建-&gt;原子发布。 ... ok
+test_general_docx_without_company_cover_full_import (__main__.ImportEndToEndTests.test_general_docx_without_company_cover_full_import)
+通用大文档不要求星河封面、文档编号或版本。 ... ok
+test_legacy_doc_format_converted_and_imported_successfully (__main__.ImportEndToEndTests.test_legacy_doc_format_converted_and_imported_successfully)
+测试旧版 .doc 格式经过 ensure_docx_source 自动转换为 .docx 并全流程导入。 ... ok
+test_legacy_document_type_import_rejected (__main__.ImportEndToEndTests.test_legacy_document_type_import_rejected)
+任务 4.4：公共版拒绝新建 requirement/design 项目且不创建目录。 ... ok
+test_manifest_heading_styles_float_key_rejected (__main__.ImportEndToEndTests.test_manifest_heading_styles_float_key_rejected)
+headingStyles 的浮点键（1.5）必须被拒绝，而非静默截断成级别 1。 ... ok
+test_manifest_portability (__main__.ImportEndToEndTests.test_manifest_portability)
+清单使用相对路径且记录源哈希，复制到另一路径仍可加载。 ... ok
+test_renamed_docx_import (__main__.ImportEndToEndTests.test_renamed_docx_import)
+改名 DOCX（文件名与基线不同）仍能完整导入。 ... ok
+test_source_docx_not_modified (__main__.ImportEndToEndTests.test_source_docx_not_modified)
+任务 4.4：成功导入后源 DOCX 字节不变。 ... ok
+test_target_exists_rejected (__main__.ImportEndToEndTests.test_target_exists_rejected)
+任务 4.6：目标项目已存在时预写入拒绝，不修改已有项目。 ... ok
+test_block_diff_blocks_publish_and_cleans_staging (__main__.RoundtripGateTests.test_block_diff_blocks_publish_and_cleans_staging) ... ok
+test_diagnostic_log_contains_fidelity_and_roundtrip_summary (__main__.RoundtripGateTests.test_diagnostic_log_contains_fidelity_and_roundtrip_summary) ... ok
+test_diagnostic_log_contains_rich_roundtrip_issues_and_preview (__main__.RoundtripGateTests.test_diagnostic_log_contains_rich_roundtrip_issues_and_preview) ... ok
+test_ignore_roundtrip_block_allows_block_report (__main__.RoundtripGateTests.test_ignore_roundtrip_block_allows_block_report)
+当开启 ignore_roundtrip_block 时，即使存在 BLOCK 往返差异也能成功发布，并记录审计报告。 ... ok
+test_import_command_formats_rich_failure_message_and_action (__main__.RoundtripGateTests.test_import_command_formats_rich_failure_message_and_action) ... ok
+test_require_exact_roundtrip_blocks_warn (__main__.RoundtripGateTests.test_require_exact_roundtrip_blocks_warn) ... ok
+test_success_persists_fidelity_and_roundtrip_reports (__main__.RoundtripGateTests.test_success_persists_fidelity_and_roundtrip_reports) ... ok
+test_warn_diff_allowed_by_default (__main__.RoundtripGateTests.test_warn_diff_allowed_by_default) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 2.352s
+
+OK
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-reg-qpimyeu2\.sb_proj.import-staging-49912-jc4rus2y\output\.trial-build.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-eahd7a9w\.冲突样式项目.import-staging-49912-58pq18hc\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-6ly_n7el\.测试项目.import-staging-49912-7gsr7e2u\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\.通用大文档项目.import-staging-49912-vfrfxs92\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\通用大文档项目\output\运维手册.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\通用大文档项目\output\运维手册.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-wj1b4xg0\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-6t_z50n9\.旧版文档项目.import-staging-49912-1sn913vi\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-m06puqyy\.测试项目.import-staging-49912-4kfbt1j3\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-6ohbbss9\.改名项目.import-staging-49912-f46w79gh\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-6ie65l0_\.测试项目.import-staging-49912-6u8p4kad\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-ac5nzlf5\.已有项目A.import-staging-49912-93tdj57r\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-hk5m988h\.门禁项目.import-staging-49912-2523314r\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-3q4f31j5\.门禁项目.import-staging-49912-_iiq6gyn\output\.trial-build.docx
+[general] 插入元素=15, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-tll9w2m3\.门禁项目.import-staging-49912-ltyv1gqk\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-0dls_cct\.门禁项目.import-staging-49912-nvknzhhm\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-bpga7l1w\.命令门禁.import-staging-49912-8dmbytmm\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-l4altpro\.门禁项目.import-staging-49912-tw_oer53\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-vhxzajjj\.门禁项目.import-staging-49912-8lf2m7mj\output\.trial-build.docx
+[general] 插入元素=15, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-uk4q_pj1\.门禁项目.import-staging-49912-tfozyd9v\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+</system-out></testcase><testcase name="test_roundtrip.py" classname="scripts.tests" time="1.837"><system-out>test_orphan_abstract_num_excluded_and_both_serializations_recognized (__main__.NumberingSignatureTests.test_orphan_abstract_num_excluded_and_both_serializations_recognized) ... ok
+test_bullet_list_prefixes_rebuilt_as_list_are_warn (__main__.RoundtripDiffTests.test_bullet_list_prefixes_rebuilt_as_list_are_warn) ... ok
+test_chinese_numbering_without_space_is_warn (__main__.RoundtripDiffTests.test_chinese_numbering_without_space_is_warn) ... ok
+test_classify_error_bounds_and_unknown_kind_fail_closed (__main__.RoundtripDiffTests.test_classify_error_bounds_and_unknown_kind_fail_closed) ... ok
+test_decimal_and_multilevel_not_stripped_and_tamper_is_block (__main__.RoundtripDiffTests.test_decimal_and_multilevel_not_stripped_and_tamper_is_block) ... ok
+test_empty_paragraph_with_numpr_not_emitted_as_event (__main__.RoundtripDiffTests.test_empty_paragraph_with_numpr_not_emitted_as_event) ... ok
+test_heading_level_change_is_block (__main__.RoundtripDiffTests.test_heading_level_change_is_block) ... ok
+test_heading_only_doc_without_h1_is_block_by_count (__main__.RoundtripDiffTests.test_heading_only_doc_without_h1_is_block_by_count) ... ok
+test_heading_text_change_is_block (__main__.RoundtripDiffTests.test_heading_text_change_is_block) ... ok
+test_hyperlink_paragraph_degraded_to_plain_is_warn (__main__.RoundtripDiffTests.test_hyperlink_paragraph_degraded_to_plain_is_warn) ... ok
+test_hyperlink_paragraph_text_tampering_is_block (__main__.RoundtripDiffTests.test_hyperlink_paragraph_text_tampering_is_block) ... ok
+test_identical_documents_pass (__main__.RoundtripDiffTests.test_identical_documents_pass) ... ok
+test_image_hash_change_is_block (__main__.RoundtripDiffTests.test_image_hash_change_is_block) ... ok
+test_list_item_ilvl_diff_same_text_is_warn (__main__.RoundtripDiffTests.test_list_item_ilvl_diff_same_text_is_warn) ... ok
+test_list_item_text_tampering_is_block (__main__.RoundtripDiffTests.test_list_item_text_tampering_is_block) ... ok
+test_literal_number_paragraph_text_mismatch_is_block (__main__.RoundtripDiffTests.test_literal_number_paragraph_text_mismatch_is_block) ... ok
+test_literal_numbered_paragraph_rebuilt_as_list_is_warn (__main__.RoundtripDiffTests.test_literal_numbered_paragraph_rebuilt_as_list_is_warn) ... ok
+test_missing_paragraph_is_block (__main__.RoundtripDiffTests.test_missing_paragraph_is_block) ... ok
+test_negative_number_not_stripped_and_mismatch_is_block (__main__.RoundtripDiffTests.test_negative_number_not_stripped_and_mismatch_is_block) ... ok
+test_paragraph_text_change_is_block (__main__.RoundtripDiffTests.test_paragraph_text_change_is_block) ... ok
+test_paragraph_with_both_text_and_image_emits_both_events (__main__.RoundtripDiffTests.test_paragraph_with_both_text_and_image_emits_both_events) ... ok
+test_paragraph_with_hyperlink_and_image_no_text_emits_only_image_event (__main__.RoundtripDiffTests.test_paragraph_with_hyperlink_and_image_no_text_emits_only_image_event) ... ok
+test_roundtrip_issue_to_dict_includes_source_and_rebuilt (__main__.RoundtripDiffTests.test_roundtrip_issue_to_dict_includes_source_and_rebuilt) ... ok
+test_summary_and_markdown_render (__main__.RoundtripDiffTests.test_summary_and_markdown_render) ... ok
+test_table_text_difference_is_warn (__main__.RoundtripDiffTests.test_table_text_difference_is_warn) ... ok
+test_cached_and_expected_align_for_digit_ending_title (__main__.TocLabelKeyTests.test_cached_and_expected_align_for_digit_ending_title) ... ok
+test_cached_strips_page_number (__main__.TocLabelKeyTests.test_cached_strips_page_number) ... ok
+test_expected_keeps_trailing_title_digits (__main__.TocLabelKeyTests.test_expected_keeps_trailing_title_digits) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.630s
+
+OK
+</system-out></testcase><testcase name="test_style_mapping.py" classname="scripts.tests" time="2.020"><system-out>test_census_lists_custom_heading_styles_with_usage (__main__.CensusTests.test_census_lists_custom_heading_styles_with_usage) ... ok
+test_standard_heading_not_marked_suspected (__main__.CensusTests.test_standard_heading_not_marked_suspected) ... ok
+test_build_and_validate_use_mapping (__main__.MappingDrivenImportTests.test_build_and_validate_use_mapping) ... ok
+test_import_with_invalid_mapping_fails (__main__.MappingDrivenImportTests.test_import_with_invalid_mapping_fails) ... ok
+test_import_with_mapping_succeeds_and_writes_manifest (__main__.MappingDrivenImportTests.test_import_with_mapping_succeeds_and_writes_manifest) ... ok
+test_import_without_mapping_fails (__main__.MappingDrivenImportTests.test_import_without_mapping_fails) ... ok
+test_mapping_persistence_readback (__main__.MappingDrivenImportTests.test_mapping_persistence_readback)
+映射写入 project.yml 后可回读并继续驱动构建（持久化回读）。 ... ok
+test_preflight_lenient_returns_preview_with_census (__main__.PreflightMappingTests.test_preflight_lenient_returns_preview_with_census) ... ok
+test_preflight_with_mapping_succeeds (__main__.PreflightMappingTests.test_preflight_with_mapping_succeeds) ... ok
+test_preflight_without_mapping_rejects_missing_h1 (__main__.PreflightMappingTests.test_preflight_without_mapping_rejects_missing_h1) ... ok
+test_validate_mapping_hierarchy_jump_rejected (__main__.PreflightMappingTests.test_validate_mapping_hierarchy_jump_rejected) ... ok
+test_validate_mapping_missing_h1_rejected (__main__.PreflightMappingTests.test_validate_mapping_missing_h1_rejected) ... ok
+test_validate_mapping_unused_h1_rejected (__main__.PreflightMappingTests.test_validate_mapping_unused_h1_rejected) ... ok
+test_validate_mapping_valid_passes (__main__.PreflightMappingTests.test_validate_mapping_valid_passes) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.639s
+
+OK
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\map-import-srxz129n\.映射项目.import-staging-39832-fye4ogcu\output\.trial-build.docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\map-import-srxz129n\映射项目\output\自定义样式文档.docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\map-import-srxz129n\映射项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\map-import-42pdq6tg\.映射项目.import-staging-39832-43igm_ug\output\.trial-build.docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\map-import-5imlx1m2\.映射项目.import-staging-39832-l7obftgn\output\.trial-build.docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_authoring_services.py" classname="scripts.tests" time="8.213"><system-out>................................................................................
+----------------------------------------------------------------------
+Ran 80 tests in 7.505s
+
+OK
+</system-out></testcase><testcase name="test_issues.py" classname="scripts.tests" time="0.963"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 0.053s
+
+OK
+</system-out></testcase><testcase name="test_format_check_search.py" classname="scripts.tests" time="2.368"><system-out>...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.290s
+
+OK
+</system-out></testcase><testcase name="test_markdown_structure.py" classname="scripts.tests" time="1.365"><system-out>test_error_presentation_prefers_concrete_detail (__main__.FailurePresentationTests.test_error_presentation_prefers_concrete_detail) ... ok
+test_exception_locations_are_relative_to_content_root (__main__.FailurePresentationTests.test_exception_locations_are_relative_to_content_root) ... ok
+test_exception_locations_fall_back_to_file_name_outside_root (__main__.FailurePresentationTests.test_exception_locations_fall_back_to_file_name_outside_root) ... ok
+test_format_stage_locations_renders_lines_for_result_card (__main__.FailurePresentationTests.test_format_stage_locations_renders_lines_for_result_card) ... ok
+test_pipeline_failure_expands_into_one_issue_per_location (__main__.FailurePresentationTests.test_pipeline_failure_expands_into_one_issue_per_location) ... ok
+test_pipeline_failure_without_locations_keeps_single_record (__main__.FailurePresentationTests.test_pipeline_failure_without_locations_keeps_single_record) ... ok
+test_plain_exception_yields_no_locations (__main__.FailurePresentationTests.test_plain_exception_yields_no_locations) ... ok
+test_single_location_summary_has_no_count_prefix (__main__.FailurePresentationTests.test_single_location_summary_has_no_count_prefix) ... ok
+test_summary_leads_with_first_location_and_total_count (__main__.FailurePresentationTests.test_summary_leads_with_first_location_and_total_count) ... ok
+test_check_bare_mermaid_structure_with_preceding_comment (__main__.MarkdownStructureLintRuleTests.test_check_bare_mermaid_structure_with_preceding_comment)
+裸 Mermaid 块前带注释时，行号精确指向错误代码行且 blocking=True。 ... ok
+test_check_mermaid_structure_blocking_on_syntax_error (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_blocking_on_syntax_error)
+Mermaid 语法错误在构建前契约中被标记为 blocking=True。 ... ok
+test_check_mermaid_structure_detects_broken_fence (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_broken_fence)
+Mermaid 围栏反引号少于 3 个（如 ``mermaid）时应报告语法错误。 ... ok
+test_check_mermaid_structure_detects_mismatched_inline_backticks (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_mismatched_inline_backticks)
+双反引号开头但单反引号闭合的残缺标记应被正确判定为未闭合。 ... ok
+test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch)
+单反引号开头但双反引号/三反引号结尾，或波浪线不匹配时均应报告语法错误。 ... ok
+test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block)
+代码块内部引用残缺 mermaid 示例（如 ```markdown 块内）不应误报阻断错误。 ... ok
+test_check_mermaid_structure_ignores_inline_code_span (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_inline_code_span)
+行首包含行内代码如 `mermaid` 语法时，不应被误报为残缺围栏。 ... ok
+test_check_mermaid_structure_supports_case_insensitive_sequence_notes (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_case_insensitive_sequence_notes)
+Mermaid sequenceDiagram 支持小写 note over 语句 ... ok
+test_check_mermaid_structure_supports_chained_edges_with_labels (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_chained_edges_with_labels)
+Mermaid flowchart 支持带标签的链式连线 A --&gt;|label| B --&gt; C ... ok
+test_check_mermaid_structure_supports_dotted_text_edge (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_dotted_text_edge)
+Mermaid flowchart 支持虚线文字连线 A -. text .-&gt; B ... ok
+test_check_mermaid_structure_tolerates_bold_delimiters (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_tolerates_bold_delimiters)
+Mermaid 节点若括号被 Markdown 加粗符号包裹时容错支持 ... ok
+test_non_blocking_findings_stay_warning_even_when_rule_is_error (__main__.MarkdownStructureLintRuleTests.test_non_blocking_findings_stay_warning_even_when_rule_is_error) ... ok
+test_orphan_meta_is_reported_before_merging (__main__.MarkdownStructureLintRuleTests.test_orphan_meta_is_reported_before_merging) ... ok
+test_rule_is_enabled_by_default_for_every_document_type (__main__.MarkdownStructureLintRuleTests.test_rule_is_enabled_by_default_for_every_document_type) ... ok
+test_wellformed_document_is_clean (__main__.MarkdownStructureLintRuleTests.test_wellformed_document_is_clean) ... ok
+test_format_location_renders_path_line_message_hint (__main__.StructuredLocationTests.test_format_location_renders_path_line_message_hint) ... ok
+test_non_blocking_findings_do_not_fail_the_build (__main__.StructuredLocationTests.test_non_blocking_findings_do_not_fail_the_build) ... ok
+test_orphan_meta_fails_prebuild_with_path_line_and_hint (__main__.StructuredLocationTests.test_orphan_meta_fails_prebuild_with_path_line_and_hint) ... ok
+test_prebuild_reports_every_problem_in_one_pass (__main__.StructuredLocationTests.test_prebuild_reports_every_problem_in_one_pass) ... ok
+test_declared_column_count_mismatch_is_warning_with_actual_numbers (__main__.TableStructureContractTests.test_declared_column_count_mismatch_is_warning_with_actual_numbers) ... ok
+test_escaped_pipe_is_not_a_column_separator (__main__.TableStructureContractTests.test_escaped_pipe_is_not_a_column_separator) ... ok
+test_fewer_declared_widths_explains_widths_fall_back (__main__.TableStructureContractTests.test_fewer_declared_widths_explains_widths_fall_back) ... ok
+test_invalid_meta_syntax_is_blocking_and_carries_example (__main__.TableStructureContractTests.test_invalid_meta_syntax_is_blocking_and_carries_example) ... ok
+test_meta_followed_by_blank_line_is_blocking_with_gap_hint (__main__.TableStructureContractTests.test_meta_followed_by_blank_line_is_blocking_with_gap_hint) ... ok
+test_meta_parsing_is_shared_with_kernel (__main__.TableStructureContractTests.test_meta_parsing_is_shared_with_kernel) ... ok
+test_meta_with_no_table_at_all_hints_removing_meta (__main__.TableStructureContractTests.test_meta_with_no_table_at_all_hints_removing_meta) ... ok
+test_missing_separator_and_ragged_rows_are_warnings (__main__.TableStructureContractTests.test_missing_separator_and_ragged_rows_are_warnings) ... ok
+test_split_row_still_raises_automation_error_for_kernel (__main__.TableStructureContractTests.test_split_row_still_raises_automation_error_for_kernel) ... ok
+test_wellformed_table_reports_nothing (__main__.TableStructureContractTests.test_wellformed_table_reports_nothing) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.127s
+
+OK
+</system-out></testcase><testcase name="test_cli_machine.py" classname="scripts.tests" time="2.510"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 0.809s
+
+OK
+</system-out></testcase><testcase name="test_quality_gates.py" classname="scripts.tests" time="1.705"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.415s
+
+OK
+</system-out></testcase><testcase name="test_quality_traceability.py" classname="scripts.tests" time="2.838"><system-out>....QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+..................s.............
+----------------------------------------------------------------------
+Ran 36 tests in 1.593s
+
+OK (skipped=1)
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="28.865"><failure message="exit code 1" type="TestFailure">................................F...................................................................WebPreviewBrowser failed to load HTML preview template
+...QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+...................................................................
+======================================================================
+FAIL: test_mermaid_dialog_templates_and_interactive_validation (__main__.EditorAuthoringWorkbenchTests.test_mermaid_dialog_templates_and_interactive_validation)
+Mermaid 工作台：支持模板下拉填入、语法错误双击定位与多图表类型校验。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 2722, in test_mermaid_dialog_templates_and_interactive_validation
+    self.assertTrue("渲染成功" in dlg.status.text() or "语法有效" in dlg.status.text())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 170 tests in 27.370s
+
+FAILED (failures=1)
+</failure><system-out>................................F...................................................................WebPreviewBrowser failed to load HTML preview template
+...QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+...................................................................
+======================================================================
+FAIL: test_mermaid_dialog_templates_and_interactive_validation (__main__.EditorAuthoringWorkbenchTests.test_mermaid_dialog_templates_and_interactive_validation)
+Mermaid 工作台：支持模板下拉填入、语法错误双击定位与多图表类型校验。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 2722, in test_mermaid_dialog_templates_and_interactive_validation
+    self.assertTrue("渲染成功" in dlg.status.text() or "语法有效" in dlg.status.text())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 170 tests in 27.370s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="8.762"><system-out>...................QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 8.046s
+
+OK
+</system-out></testcase><testcase name="test_safety_recovery.py" classname="scripts.tests" time="8.809"><system-out>.....................................................
+----------------------------------------------------------------------
+Ran 53 tests in 7.724s
+
+OK
+</system-out></testcase><testcase name="test_local_history.py" classname="scripts.tests" time="14.954"><system-out>....................s..
+----------------------------------------------------------------------
+Ran 23 tests in 13.142s
+
+OK (skipped=1)
+</system-out></testcase><testcase name="test_recovery_entries.py" classname="scripts.tests" time="2.175"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.785s
+
+OK
+</system-out></testcase><testcase name="test_v26_ui_workflows.py" classname="scripts.tests" time="3.871"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 2.585s
+
+OK
+</system-out></testcase><testcase name="test_readonly_html.py" classname="scripts.tests" time="2.093"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.352s
+
+OK
+</system-out></testcase><testcase name="test_asset_batch.py" classname="scripts.tests" time="2.773"><system-out>...
+----------------------------------------------------------------------
+Ran 3 tests in 0.675s
+
+OK
+</system-out></testcase><testcase name="test_snippet_library.py" classname="scripts.tests" time="1.967"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 0.536s
+
+OK
+</system-out></testcase><testcase name="test_authoring_outline.py" classname="scripts.tests" time="1.579"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 0.666s
+
+OK
+A26-8: 505000 characters, outline/statistics 0.118s
+</system-out></testcase><testcase name="test_template_fill_plan.py" classname="scripts.tests" time="11.187"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 9.401s
+
+OK
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-r00gssrh\assembled.docx
+[general] 插入元素=1, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-3eehhzhx\assembled.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_template_fill_presets.py" classname="scripts.tests" time="1.664"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.072s
+
+OK
+</system-out></testcase><testcase name="test_delivery_history_ui.py" classname="scripts.tests" time="1.908"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.588s
+
+OK
+</system-out></testcase><testcase name="test_vcs_changes.py" classname="scripts.tests" time="58.607"><system-out>test_local_mode_keeps_bak_creation (__main__.BackupPolicyTests.test_local_mode_keeps_bak_creation)
+backup_enabled=True（默认/本地项目）→ 仍生成 .md.bak。 ... ok
+test_local_mode_rollback_restores_from_bak (__main__.BackupPolicyTests.test_local_mode_rollback_restores_from_bak)
+本地模式回滚仍用 .bak 恢复内容（原行为不变）。 ... ok
+test_set_backup_enabled_toggle (__main__.BackupPolicyTests.test_set_backup_enabled_toggle)
+运行中切换开关立即生效。 ... ok
+test_vcs_mode_create_then_edit_rollback_delete_only (__main__.BackupPolicyTests.test_vcs_mode_create_then_edit_rollback_delete_only)
+VCS 模式新建文件再编辑：回滚删除该文件（create 条目生效）。 ... ok
+test_vcs_mode_disables_bak_creation (__main__.BackupPolicyTests.test_vcs_mode_disables_bak_creation)
+backup_enabled=False（VCS 管理）→ 写入不产生 .md.bak。 ... ok
+test_vcs_mode_rollback_uses_local_history_without_backup (__main__.BackupPolicyTests.test_vcs_mode_rollback_uses_local_history_without_backup)
+VCS 模式无 .bak：新记录通过本地历史恢复写前内容。 ... ok
+test_change_item_non_restorable_marker (__main__.FallbackAndPrecedenceTests.test_change_item_non_restorable_marker) ... ok
+test_changed_file_serialization_roundtrip (__main__.FallbackAndPrecedenceTests.test_changed_file_serialization_roundtrip) ... ok
+test_git_precedes_svn (__main__.FallbackAndPrecedenceTests.test_git_precedes_svn)
+项目同时位于 git 仓库与假 svn 工作副本时，Git 优先。 ... ok
+test_no_vcs_returns_local (__main__.FallbackAndPrecedenceTests.test_no_vcs_returns_local) ... ok
+test_branches_cache_and_invalidation (__main__.GitBranchAndWorkflowTests.test_branches_cache_and_invalidation) ... ok
+test_commit_files_selective (__main__.GitBranchAndWorkflowTests.test_commit_files_selective) ... ok
+test_commit_files_with_both_reported_and_unreported_files (__main__.GitBranchAndWorkflowTests.test_commit_files_with_both_reported_and_unreported_files)
+同时包含 report 内与 report 缓存外文件时，两者均正确入库，不丢文件。 ... ok
+test_commit_files_with_nested_project_and_relative_paths (__main__.GitBranchAndWorkflowTests.test_commit_files_with_nested_project_and_relative_paths) ... ok
+test_create_and_checkout_branch (__main__.GitBranchAndWorkflowTests.test_create_and_checkout_branch) ... ok
+test_git_stash_and_pop (__main__.GitBranchAndWorkflowTests.test_git_stash_and_pop) ... ok
+test_git_stash_clean_and_empty_pop (__main__.GitBranchAndWorkflowTests.test_git_stash_clean_and_empty_pop) ... ok
+test_git_stash_include_untracked (__main__.GitBranchAndWorkflowTests.test_git_stash_include_untracked) ... ok
+test_git_stash_pop_conflict (__main__.GitBranchAndWorkflowTests.test_git_stash_pop_conflict) ... ok
+test_list_git_branches_and_current (__main__.GitBranchAndWorkflowTests.test_list_git_branches_and_current) ... ok
+test_list_git_branches_detached_head (__main__.GitBranchAndWorkflowTests.test_list_git_branches_detached_head) ... ok
+test_pull_git_chinese_locale_conflict_messages (__main__.GitBranchAndWorkflowTests.test_pull_git_chinese_locale_conflict_messages)
+中文 Git 环境下的未提交冲突与未跟踪冲突应被正确识别并提示暂存。 ... ok
+test_push_changes_detached_head_blocked (__main__.GitBranchAndWorkflowTests.test_push_changes_detached_head_blocked) ... ok
+test_push_changes_with_fake_runner (__main__.GitBranchAndWorkflowTests.test_push_changes_with_fake_runner) ... ok
+test_service_branches_and_switch_integration (__main__.GitBranchAndWorkflowTests.test_service_branches_and_switch_integration) ... ok
+test_switch_git_branch_existing (__main__.GitBranchAndWorkflowTests.test_switch_git_branch_existing) ... ok
+test_switch_git_branch_invalid_names (__main__.GitBranchAndWorkflowTests.test_switch_git_branch_invalid_names) ... ok
+test_asset_change_marks_chapter_modified_not_added (__main__.GitDetectionTests.test_asset_change_marks_chapter_modified_not_added)
+新增/删除被引用的资源：章节标 modified，绝不继承 added/deleted。 ... ok
+test_cache_invalidation_after_write (__main__.GitDetectionTests.test_cache_invalidation_after_write) ... ok
+test_chapter_own_status_wins_over_asset_reverse_lookup (__main__.GitDetectionTests.test_chapter_own_status_wins_over_asset_reverse_lookup)
+章节自身的真实状态优先于资源反查（不被反查结果覆盖或抹平）。 ... ok
+test_chapters_mapping_and_asset_reference (__main__.GitDetectionTests.test_chapters_mapping_and_asset_reference) ... ok
+test_chinese_and_space_paths (__main__.GitDetectionTests.test_chinese_and_space_paths) ... ok
+test_clean_tracked_project_stays_git (__main__.GitDetectionTests.test_clean_tracked_project_stays_git)
+已跟踪但无改动的项目仍是 git 模式（不能被未跟踪兜底误判）。 ... ok
+test_content_root_asset_also_maps_to_chapter (__main__.GitDetectionTests.test_content_root_asset_also_maps_to_chapter)
+content_root 内的资源（如 general/images/x.png）同样反查引用章节。 ... ok
+test_detects_modified_added_and_deleted (__main__.GitDetectionTests.test_detects_modified_added_and_deleted) ... ok
+test_git_command_failure_falls_back_to_local (__main__.GitDetectionTests.test_git_command_failure_falls_back_to_local) ... ok
+test_git_unavailable_falls_back_to_local (__main__.GitDetectionTests.test_git_unavailable_falls_back_to_local) ... ok
+test_gitignored_project_falls_back_to_local (__main__.GitDetectionTests.test_gitignored_project_falls_back_to_local)
+项目被 .gitignore 忽略：git 永远沉默 → 必须回退本地快照。 ... ok
+test_no_commit_repo_untracked_only (__main__.GitDetectionTests.test_no_commit_repo_untracked_only) ... ok
+test_project_at_repo_root (__main__.GitDetectionTests.test_project_at_repo_root) ... ok
+test_rename_detected_with_old_path (__main__.GitDetectionTests.test_rename_detected_with_old_path) ... ok
+test_staged_and_unstaged_flags (__main__.GitDetectionTests.test_staged_and_unstaged_flags) ... ok
+test_status_map_maps_to_content_and_project_yml (__main__.GitDetectionTests.test_status_map_maps_to_content_and_project_yml) ... ok
+test_two_projects_in_different_repos (__main__.GitDetectionTests.test_two_projects_in_different_repos) ... ok
+test_two_projects_one_repo_are_isolated_even_with_warm_cache (__main__.GitDetectionTests.test_two_projects_one_repo_are_isolated_even_with_warm_cache)
+窗口 A/B 打开同一仓库下两个项目：A 的 Git 变化绝不能出现在 B。 ... ok
+test_parse_git_name_status_z_rename (__main__.GitParserTests.test_parse_git_name_status_z_rename) ... ok
+test_parse_git_status_z_rename_new_first (__main__.GitParserTests.test_parse_git_status_z_rename_new_first) ... ok
+test_find_git_repo_root_walks_up_parents (__main__.GitRepoRootTests.test_find_git_repo_root_walks_up_parents) ... ok
+test_find_svn_wc_root_walks_up_parents (__main__.GitRepoRootTests.test_find_svn_wc_root_walks_up_parents) ... ok
+test_parse_svn_status_xml_items (__main__.SvnDetectionTests.test_parse_svn_status_xml_items) ... ok
+test_svn_command_failure_returns_local (__main__.SvnDetectionTests.test_svn_command_failure_returns_local) ... ok
+test_svn_detects_m_a_d_replaced_and_untracked (__main__.SvnDetectionTests.test_svn_detects_m_a_d_replaced_and_untracked) ... ok
+test_svn_missing_returns_local (__main__.SvnDetectionTests.test_svn_missing_returns_local) ... ok
+test_svn_status_map (__main__.SvnDetectionTests.test_svn_status_map) ... ok
+test_svn_two_projects_isolated (__main__.SvnDetectionTests.test_svn_two_projects_isolated) ... ok
+test_git_commit_all_command_failure_reports_error (__main__.VcsCommitPullTests.test_git_commit_all_command_failure_reports_error) ... ok
+test_git_commit_all_commits_project_changes (__main__.VcsCommitPullTests.test_git_commit_all_commits_project_changes) ... ok
+test_git_commit_all_empty_message (__main__.VcsCommitPullTests.test_git_commit_all_empty_message) ... ok
+test_git_commit_all_no_repo_root (__main__.VcsCommitPullTests.test_git_commit_all_no_repo_root) ... ok
+test_git_commit_all_scopes_to_project (__main__.VcsCommitPullTests.test_git_commit_all_scopes_to_project) ... ok
+test_pull_failure_reports_error (__main__.VcsCommitPullTests.test_pull_failure_reports_error) ... ok
+test_pull_git_autostash_conflicting (__main__.VcsCommitPullTests.test_pull_git_autostash_conflicting)
+本地未提交修改与远端发生冲突时，autostash 产生冲突并在 result.conflicts 中准确报告。 ... ok
+test_pull_git_autostash_when_dirty (__main__.VcsCommitPullTests.test_pull_git_autostash_when_dirty)
+本地存在未提交修改但与远端不冲突时，自动带 --autostash 拉取并无缝还原本地改动。 ... ok
+test_pull_git_conflict_reports_unmerged_files (__main__.VcsCommitPullTests.test_pull_git_conflict_reports_unmerged_files)
+git pull 合并冲突：ok=False 且列出未合并文件。 ... ok
+test_pull_git_invokes_git_pull (__main__.VcsCommitPullTests.test_pull_git_invokes_git_pull) ... ok
+test_pull_git_reports_changed_files (__main__.VcsCommitPullTests.test_pull_git_reports_changed_files)
+git pull 快进更新：报告带入的文件清单与数量。 ... ok
+test_pull_git_untracked_conflict_and_stash_recovery (__main__.VcsCommitPullTests.test_pull_git_untracked_conflict_and_stash_recovery)
+本地未跟踪文件与远端冲突时，给出明确未跟踪提示，并可通过 include_untracked 暂存后成功拉取。 ... ok
+test_pull_git_updates_worktree (__main__.VcsCommitPullTests.test_pull_git_updates_worktree)
+真实 git：origin 新增提交，工作仓库 pull 后文件出现。 ... ok
+test_pull_local_report_rejected (__main__.VcsCommitPullTests.test_pull_local_report_rejected) ... ok
+test_pull_svn_failure_reports_error (__main__.VcsCommitPullTests.test_pull_svn_failure_reports_error) ... ok
+test_pull_svn_invokes_svn_update (__main__.VcsCommitPullTests.test_pull_svn_invokes_svn_update) ... ok
+test_pull_svn_parses_changes_and_conflicts (__main__.VcsCommitPullTests.test_pull_svn_parses_changes_and_conflicts)
+svn update：解析 U/A 变更与 C 冲突并统计。 ... ok
+test_svn_commit_all_aborts_when_add_fails (__main__.VcsCommitPullTests.test_svn_commit_all_aborts_when_add_fails) ... ok
+test_svn_commit_all_empty_message (__main__.VcsCommitPullTests.test_svn_commit_all_empty_message) ... ok
+test_svn_commit_all_registers_and_commits (__main__.VcsCommitPullTests.test_svn_commit_all_registers_and_commits) ... ok
+test_git_rollback_all_does_not_touch_other_projects (__main__.VcsRollbackTests.test_git_rollback_all_does_not_touch_other_projects)
+回滚只影响当前项目：同一仓库另一项目的未提交改动保持不变。 ... ok
+test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked (__main__.VcsRollbackTests.test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked)
+delete_untracked=False（改动面板 VCS 模式）时，staged 新增文件 ... ok
+test_git_rollback_all_restores_tracked_and_removes_untracked (__main__.VcsRollbackTests.test_git_rollback_all_restores_tracked_and_removes_untracked) ... ok
+test_git_rollback_single_file_restores_target_file_only (__main__.VcsRollbackTests.test_git_rollback_single_file_restores_target_file_only) ... ok
+test_rollback_all_local_returns_message (__main__.VcsRollbackTests.test_rollback_all_local_returns_message) ... ok
+test_svn_rollback_all_deletes_versioned_added_when_untracked_removal_on (__main__.VcsRollbackTests.test_svn_rollback_all_deletes_versioned_added_when_untracked_removal_on)
+svn add 过的文件在 delete_untracked=True 时回滚必须删除：revert 只 ... ok
+test_svn_rollback_all_keeps_versioned_added_when_not_deleting_untracked (__main__.VcsRollbackTests.test_svn_rollback_all_keeps_versioned_added_when_not_deleting_untracked)
+delete_untracked=False（改动面板 VCS 模式）时 added 文件保留为未版本化， ... ok
+test_svn_rollback_all_with_injected_runner (__main__.VcsRollbackTests.test_svn_rollback_all_with_injected_runner)
+svn revert 命令参数正确 + 未版本化文件被删除。 ... ok
+
+----------------------------------------------------------------------
+Ran 83 tests in 57.142s
+
+OK
+</system-out></testcase><testcase name="test_revision_record.py" classname="scripts.tests" time="2.681"><system-out>test_autolink_latest_only_modifies_only_last_row (__main__.AutolinkRevisionRecordTest.test_autolink_latest_only_modifies_only_last_row)
+target_version='latest' 时，仅末尾最新一行被更新，即使前面存在同版本号行。 ... ok
+test_autolink_preserves_escaped_pipe_and_empty_cells (__main__.AutolinkRevisionRecordTest.test_autolink_preserves_escaped_pipe_and_empty_cells)
+修订记录摘要中含 \| 转义管道符时，列切分不被破坏，且末尾空列不被丢失。 ... ok
+test_autolink_revision_record_file_and_dry_run (__main__.AutolinkRevisionRecordTest.test_autolink_revision_record_file_and_dry_run) ... ok
+test_autolink_revision_record_text (__main__.AutolinkRevisionRecordTest.test_autolink_revision_record_text) ... ok
+test_autolink_revision_record_with_custom_header_and_version_normalization (__main__.AutolinkRevisionRecordTest.test_autolink_revision_record_with_custom_header_and_version_normalization)
+支持「版次」或非「版本」表头，且支持 V 前缀规范化匹配。 ... ok
+test_build_docx_chinese_chapter_number_matching (__main__.AutolinkRevisionRecordTest.test_build_docx_chinese_chapter_number_matching)
+支持中文大写章节号（如 第三章、第八章）匹配对应章节书签。 ... ok
+test_build_docx_links_only_section_number_in_summary (__main__.AutolinkRevisionRecordTest.test_build_docx_links_only_section_number_in_summary)
+正式生成修订表时，仅为章节号与小节序号添加内部超链接，其余文本保持普通纯文本。 ... ok
+test_build_docx_markdown_links_prioritize_section_over_file (__main__.AutolinkRevisionRecordTest.test_build_docx_markdown_links_prioritize_section_over_file)
+Markdown 链接优先按章节号查找锚点，严格仅为序号加超链接，避免链接到外部文件或污染文字。 ... ok
+test_build_docx_matches_bookmark_by_target_path (__main__.AutolinkRevisionRecordTest.test_build_docx_matches_bookmark_by_target_path) ... ok
+test_build_docx_matches_bookmark_with_anchor_fragment (__main__.AutolinkRevisionRecordTest.test_build_docx_matches_bookmark_with_anchor_fragment)
+Markdown 链接包含 #anchor 锚点片段时，Word 书签能正确解析匹配。 ... ok
+test_build_docx_renders_markdown_links_in_revision_table (__main__.AutolinkRevisionRecordTest.test_build_docx_renders_markdown_links_in_revision_table) ... ok
+test_build_docx_renders_markdown_links_without_expressions (__main__.AutolinkRevisionRecordTest.test_build_docx_renders_markdown_links_without_expressions)
+当 expressions 为 None 时，Markdown 链接也应被安全剥离语法渲染为纯文本，不泄露原始标记。 ... ok
+test_build_docx_revision_summary_real_world_rows (__main__.AutolinkRevisionRecordTest.test_build_docx_revision_summary_real_world_rows)
+针对真实生产文档修订摘要文本进行综合渲染测试，验证章节号匹配与内部书签跳转。 ... ok
+test_build_docx_revision_summary_with_real_expression_manager (__main__.AutolinkRevisionRecordTest.test_build_docx_revision_summary_with_real_expression_manager)
+使用真实的 ExpressionManager（注册包含完整标题的目录与文件条目）测试真实修订记录行， ... ok
+test_cli_autolink_execution (__main__.AutolinkRevisionRecordTest.test_cli_autolink_execution)
+CLI 命令 doc-tool autolink 执行验证（含 dry-run 与写盘）。 ... [成功] C:\Users\18098\AppData\Local\Temp\doc_tool_autolink_test_dacz2pyb\test_project
+   [预览]修订记录: 1 行已更新，新增 1 个文档超链接 -&gt; C:\Users\18098\AppData\Local\Temp\doc_tool_autolink_test_dacz2pyb\test_project\content\requirement\_revision_record.md
+ok
+test_directory_chapter_with_and_without_index_md_bookmarks (__main__.AutolinkRevisionRecordTest.test_directory_chapter_with_and_without_index_md_bookmarks)
+测试目录型章节不论是否有 _index.md 均能双向命中目录路径和文件路径。 ... ok
+test_end_to_end_docx_generation_with_revision_hyperlinks (__main__.AutolinkRevisionRecordTest.test_end_to_end_docx_generation_with_revision_hyperlinks)
+端到端真机测试：构建实际 DOCX 压缩包，校验 document.xml 中修订表所有的 w:anchor 100% 存在且均为纯序号。 ... ok
+test_find_bookmark_for_section_chinese_numerals_beyond_twenty (__main__.AutolinkRevisionRecordTest.test_find_bookmark_for_section_chinese_numerals_beyond_twenty)
+测试中文章节数字超过二十（如第二十一章、第三十章）与省略第字（如3章）能精准标准化匹配。 ... ok
+test_find_bookmark_for_section_directory_stem_with_dot (__main__.AutolinkRevisionRecordTest.test_find_bookmark_for_section_directory_stem_with_dot)
+目录名包含点号（如 3.4 呼吸机同步时区）时，find_bookmark_for_section 能精准匹配。 ... ok
+test_find_bookmark_for_section_directory_with_index_md (__main__.AutolinkRevisionRecordTest.test_find_bookmark_for_section_directory_with_index_md)
+测试包含 _index.md 的父目录章节能通过标题与全称匹配到稳定书签。 ... ok
+test_find_bookmark_for_section_variants_and_punctuation (__main__.AutolinkRevisionRecordTest.test_find_bookmark_for_section_variants_and_punctuation)
+测试书签查找支持括号变体、末尾标点、X.0 降级、繁体大写中文数字。 ... ok
+test_find_bookmark_prefix_fallback_for_deep_section (__main__.AutolinkRevisionRecordTest.test_find_bookmark_prefix_fallback_for_deep_section)
+深层未定义标题的编号（如 4.5.1.1.3）能安全降级定位至父级小节（4.5.1）。 ... ok
+test_link_revision_summary (__main__.AutolinkRevisionRecordTest.test_link_revision_summary) ... ok
+test_punctuation_and_slash_in_title (__main__.AutolinkRevisionRecordTest.test_punctuation_and_slash_in_title) ... ok
+test_safe_markdown_url (__main__.AutolinkRevisionRecordTest.test_safe_markdown_url) ... ok
+test_section_catalog_internal_headings_indexing (__main__.AutolinkRevisionRecordTest.test_section_catalog_internal_headings_indexing)
+测试 SectionCatalog 扫描 markdown 内部通过 ## 3.4.1 定义的小节标题。 ... ok
+test_section_catalog_resolution (__main__.AutolinkRevisionRecordTest.test_section_catalog_resolution) ... ok
+test_stop_words_protection (__main__.AutolinkRevisionRecordTest.test_stop_words_protection) ... ok
+test_subsection_prefix_fallback (__main__.AutolinkRevisionRecordTest.test_subsection_prefix_fallback) ... ok
+test_unspaced_section_names (__main__.AutolinkRevisionRecordTest.test_unspaced_section_names) ... ok
+test_added_only (__main__.BuildRevisionRecordTest.test_added_only) ... ok
+test_deleted_only (__main__.BuildRevisionRecordTest.test_deleted_only) ... ok
+test_empty_groups_omitted (__main__.BuildRevisionRecordTest.test_empty_groups_omitted) ... ok
+test_group_order_added_modified_deleted (__main__.BuildRevisionRecordTest.test_group_order_added_modified_deleted) ... ok
+test_modified_reports_location_only (__main__.BuildRevisionRecordTest.test_modified_reports_location_only)
+修改条目只报「章节-&gt;小节」，不再从差异反推「改了什么」。 ... ok
+test_non_markdown_skipped (__main__.BuildRevisionRecordTest.test_non_markdown_skipped) ... ok
+test_revision_record_file_skipped (__main__.BuildRevisionRecordTest.test_revision_record_file_skipped)
+_revision_record.md 是元数据，不能作为改动条目进入清单。 ... ok
+test_same_section_deduplicated (__main__.BuildRevisionRecordTest.test_same_section_deduplicated)
+同一小节多个条目（如 .md/.markdown 混排）只出现一次。 ... ok
+test_unknown_status_ignored (__main__.BuildRevisionRecordTest.test_unknown_status_ignored)
+未知状态（未来新增的状态值）不应挤进任何分组。 ... ok
+test_normalize_revision_version_rejects_table_breakout (__main__.NormalizeVersionTest.test_normalize_revision_version_rejects_table_breakout) ... ok
+test_empty_version_cell_falls_back (__main__.RevisionTableReadTest.test_empty_version_cell_falls_back) ... ok
+test_header_only_table_has_no_version (__main__.RevisionTableReadTest.test_header_only_table_has_no_version)
+只有表头：作者还没写过修订记录 → 沿用清单版本号。 ... ok
+test_last_row_version_wins (__main__.RevisionTableReadTest.test_last_row_version_wins) ... ok
+test_missing_file_and_no_table (__main__.RevisionTableReadTest.test_missing_file_and_no_table) ... ok
+test_parse_revision_markdown_keeps_first_data_row (__main__.RevisionTableReadTest.test_parse_revision_markdown_keeps_first_data_row)
+修复：parse_markdown_table 已跳过分隔行，rows[2:] 会丢掉 V1.0。 ... ok
+test_broken_paths_do_not_block_build (__main__.RevisionVersionSyncTest.test_broken_paths_do_not_block_build)
+读取整体失败（清单/路径异常）也只跳过同步，不抛给管线。 ... ok
+test_ensure_revision_record_bootstraps_missing_file_without_overwrite (__main__.RevisionVersionSyncTest.test_ensure_revision_record_bootstraps_missing_file_without_overwrite)
+旧项目首次合并时从模板提取；已有用户文件保持不变。 ... ok
+test_header_only_table_keeps_manifest_version (__main__.RevisionVersionSyncTest.test_header_only_table_keeps_manifest_version) ... ok
+test_last_row_version_becomes_document_version (__main__.RevisionVersionSyncTest.test_last_row_version_becomes_document_version) ... ok
+test_missing_record_keeps_manifest_version (__main__.RevisionVersionSyncTest.test_missing_record_keeps_manifest_version)
+无修订记录表（旧项目模板也没有）：沿用清单版本号，合并照常。 ... ok
+test_prepare_bootstraps_record_from_template (__main__.RevisionVersionSyncTest.test_prepare_bootstraps_record_from_template)
+旧项目缺文件时先按模板初始化，随后即可取到末行版本号。 ... ok
+test_same_version_is_noop (__main__.RevisionVersionSyncTest.test_same_version_is_noop)
+清单已是 3.8、修订记录末行写 V3.8：去 V 后相同，视为无操作。 ... ok
+test_successful_merge_baseline_refresh_uses_content_root (__main__.RevisionVersionSyncTest.test_successful_merge_baseline_refresh_uses_content_root) ... ok
+test_build_docx_renders_arabic_chapter_and_clean_number_links (__main__.SectionCatalogEnhanceTest.test_build_docx_renders_arabic_chapter_and_clean_number_links)
+Word 构建侧验证：单数字章节、带点、带括号变体均严格仅链接序号。 ... ok
+test_chinese_numeral_chapter_catalog (__main__.SectionCatalogEnhanceTest.test_chinese_numeral_chapter_catalog) ... ok
+test_deep_prefix_fallback_to_chapter (__main__.SectionCatalogEnhanceTest.test_deep_prefix_fallback_to_chapter) ... ok
+test_section_variant_and_arabic_numeral_linking (__main__.SectionCatalogEnhanceTest.test_section_variant_and_arabic_numeral_linking)
+测试 第3节、单数字章节（1 概述、[1 概述]）与纯数字序号超链接。 ... ok
+test_top_level_arabic_chapter_catalog (__main__.SectionCatalogEnhanceTest.test_top_level_arabic_chapter_catalog) ... ok
+test_x_dot_zero_fallback (__main__.SectionCatalogEnhanceTest.test_x_dot_zero_fallback) ... ok
+test_deep_nested_file (__main__.SectionLabelsTest.test_deep_nested_file) ... ok
+test_file_directly_under_chapter (__main__.SectionLabelsTest.test_file_directly_under_chapter) ... ok
+test_index_md_uses_folder (__main__.SectionLabelsTest.test_index_md_uses_folder) ... ok
+test_markdown_suffix (__main__.SectionLabelsTest.test_markdown_suffix) ... ok
+test_requirement_module_file (__main__.SectionLabelsTest.test_requirement_module_file) ... ok
+test_cell_text_ignores_field_instructions (__main__.TemplateExtractionLineBreakTest.test_cell_text_ignores_field_instructions)
+域指令（``w:instrText``）不是正文，不能混进摘要。 ... ok
+test_cell_text_keeps_paragraph_and_manual_breaks (__main__.TemplateExtractionLineBreakTest.test_cell_text_keeps_paragraph_and_manual_breaks) ... ok
+test_extracted_breaks_survive_kernel_parser (__main__.TemplateExtractionLineBreakTest.test_extracted_breaks_survive_kernel_parser)
+提取 → Markdown → 构建侧解析：换行与竖线都要原样回来。 ... ok
+test_rows_to_markdown_encodes_breaks_and_escapes (__main__.TemplateExtractionLineBreakTest.test_rows_to_markdown_encodes_breaks_and_escapes) ... ok
+
+----------------------------------------------------------------------
+Ran 68 tests in 1.490s
+
+OK
+[成功] C:\Users\18098\AppData\Local\Temp\doc_tool_autolink_test_dacz2pyb\test_project
+  修订记录: 1 行已更新，新增 1 个文档超链接 -&gt; C:\Users\18098\AppData\Local\Temp\doc_tool_autolink_test_dacz2pyb\test_project\content\requirement\_revision_record.md
+[audit_e2e_test] 修订记录: 写入 12 行
+[audit_e2e_test] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[audit_e2e_test] 生成完成: C:\Users\18098\AppData\Local\Temp\docx_audit_test_311gclko\output.docx
+[audit_e2e_test] 插入元素=30, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_multi_window.py" classname="scripts.tests" time="38.409"><system-out>test_asset_change_marks_only_referencing_window (__main__.MultiWindowIsolationTests.test_asset_change_marks_only_referencing_window) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_close_window_a_keeps_window_b_alive (__main__.MultiWindowIsolationTests.test_close_window_a_keeps_window_b_alive) ... ok
+test_dirty_editor_state_does_not_cross_windows (__main__.MultiWindowIsolationTests.test_dirty_editor_state_does_not_cross_windows)
+A 的编辑器脏状态不影响 B：B 没有 A 的文件标签，保存操作各写各的。 ... ok
+test_duplicate_project_open_activates_existing_window (__main__.MultiWindowIsolationTests.test_duplicate_project_open_activates_existing_window)
+同一项目重复打开：复用已有窗口，不产生第二个可写窗口。 ... WebPreviewBrowser failed to load HTML preview template
+This plugin does not support raise()
+This plugin does not support raise()
+ok
+test_git_project_and_no_vcs_project (__main__.MultiWindowIsolationTests.test_git_project_and_no_vcs_project) ... ok
+test_on_open_recent_opens_in_new_window (__main__.MultiWindowIsolationTests.test_on_open_recent_opens_in_new_window)
+最近项目点击：在新窗口打开，不在当前窗口切换项目。 ... This plugin does not support raise()
+This plugin does not support raise()
+ok
+test_open_project_in_new_window_creates_window (__main__.MultiWindowIsolationTests.test_open_project_in_new_window_creates_window)
+新项目在新窗口打开：注册表新增窗口并加载项目。 ... This plugin does not support raise()
+ok
+test_session_drafts_autosave_stores_are_per_project (__main__.MultiWindowIsolationTests.test_session_drafts_autosave_stores_are_per_project)
+draft/session/autosave 的 state_dir 按项目隔离。 ... ok
+test_two_projects_in_different_repos (__main__.MultiWindowIsolationTests.test_two_projects_in_different_repos) ... WebPreviewBrowser failed to load HTML preview template
+WebPreviewBrowser failed to load HTML preview template
+ok
+test_two_windows_two_projects_same_repo_fully_isolated (__main__.MultiWindowIsolationTests.test_two_windows_two_projects_same_repo_fully_isolated)
+同一 Git 仓库下两个项目：A 的改动不出现在 B（status/source/chapters）。 ... ok
+test_commit_all_changes_commits_project (__main__.VcsBackupPolicyTests.test_commit_all_changes_commits_project)
+改动面板「提交改动」在 git 项目：写入改动后提交，仓库干净。 ... ok
+test_commit_all_changes_local_project_rejected (__main__.VcsBackupPolicyTests.test_commit_all_changes_local_project_rejected)
+本地（无 VCS）项目「提交改动」返回说明，不产生提交。 ... ok
+test_commit_all_changes_scoped_to_project (__main__.VcsBackupPolicyTests.test_commit_all_changes_scoped_to_project)
+同一 git 仓库两个项目：提交 A 不影响 B 的改动。 ... ok
+test_git_project_write_creates_no_bak (__main__.VcsBackupPolicyTests.test_git_project_write_creates_no_bak) ... ok
+test_local_project_write_still_creates_bak (__main__.VcsBackupPolicyTests.test_local_project_write_still_creates_bak) ... ok
+test_local_rollback_all_uses_manifest (__main__.VcsBackupPolicyTests.test_local_rollback_all_uses_manifest)
+本地（无 VCS）项目「回滚全部」仍走 .bak 清单恢复。 ... ok
+test_rollback_all_restores_via_git_and_preserves_user_files (__main__.VcsBackupPolicyTests.test_rollback_all_restores_via_git_and_preserves_user_files)
+改动面板「回滚全部」在 git 项目：恢复被跟踪文件，删除本会话 ... ok
+test_closed_window_removed_from_registry (__main__.WindowRegistryTests.test_closed_window_removed_from_registry) ... ok
+test_register_unregister_and_count (__main__.WindowRegistryTests.test_register_unregister_and_count) ... ok
+test_strong_references_prevent_gc (__main__.WindowRegistryTests.test_strong_references_prevent_gc) ... ok
+test_window_for_project_resolve_normalization (__main__.WindowRegistryTests.test_window_for_project_resolve_normalization) ... ok
+test_shutdown_of_one_workspace_does_not_affect_other (__main__.WorkspaceStateIsolationTests.test_shutdown_of_one_workspace_does_not_affect_other) ... ok
+test_workspaces_do_not_share_index_or_status (__main__.WorkspaceStateIsolationTests.test_workspaces_do_not_share_index_or_status) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 35.643s
+
+OK
+</system-out></testcase><testcase name="test_lock_log_cancel.py" classname="scripts.tests" time="9.288"><system-out>test_cancel_at_boundary (__main__.CancellationTokenTests.test_cancel_at_boundary)
+取消在阶段边界生效。 ... ok
+test_critical_section_protects (__main__.CancellationTokenTests.test_critical_section_protects)
+临界区内 check_cancel 不抛出，退出后恢复。 ... ok
+test_nested_critical_sections (__main__.CancellationTokenTests.test_nested_critical_sections)
+嵌套临界区全部退出后才恢复取消检查。 ... ok
+test_reset (__main__.CancellationTokenTests.test_reset)
+reset 清除取消状态。 ... ok
+test_pipeline_acquires_and_releases_lock (__main__.PipelineLockAndCancelTests.test_pipeline_acquires_and_releases_lock)
+管线执行后锁被释放，可再次执行。 ... ok
+test_pipeline_cancellation_between_stages (__main__.PipelineLockAndCancelTests.test_pipeline_cancellation_between_stages)
+在构建阶段前取消，管线返回 cancelled 状态。 ... ok
+test_pipeline_failure_preserves_previous_output (__main__.PipelineLockAndCancelTests.test_pipeline_failure_preserves_previous_output)
+构建失败时不覆盖上次有效输出。 ... ok
+test_pipeline_rejects_concurrent_run (__main__.PipelineLockAndCancelTests.test_pipeline_rejects_concurrent_run)
+活动锁存在时管线拒绝执行并返回 E4001。 ... ok
+test_acquire_and_release_lock (__main__.ProjectLockTests.test_acquire_and_release_lock)
+获取锁后可释放，释放后可再次获取。 ... ok
+test_concurrent_acquire_rejected (__main__.ProjectLockTests.test_concurrent_acquire_rejected)
+活动锁存在时第二次获取被拒绝（E4001）。 ... ok
+test_force_clean_stale_lock (__main__.ProjectLockTests.test_force_clean_stale_lock)
+force_clean_stale_lock 仅清理陈旧锁，不清理活动锁。 ... ok
+test_release_only_own_lock (__main__.ProjectLockTests.test_release_only_own_lock)
+释放锁时仅删除自己持有的锁，不删除他人的。 ... ok
+test_simultaneous_processes_have_exactly_one_lock_owner (__main__.ProjectLockTests.test_simultaneous_processes_have_exactly_one_lock_owner) ... ok
+test_simultaneous_stale_lock_takeover_has_one_owner (__main__.ProjectLockTests.test_simultaneous_stale_lock_takeover_has_one_owner)
+两个进程同时接管陈旧锁时也只能产生一个锁持有者。 ... ok
+test_stale_lock_cleaned_on_acquire (__main__.ProjectLockTests.test_stale_lock_cleaned_on_acquire)
+陈旧锁（PID 已不存在）在获取时被自动清理。 ... ok
+test_log_error_records_exception_type (__main__.RuntimeLogTests.test_log_error_records_exception_type)
+error 级别记录异常类型和用户消息，不含堆栈。 ... ok
+test_log_no_body_content (__main__.RuntimeLogTests.test_log_no_body_content)
+日志绝不包含完整的 Markdown 正文内容（超长被截断）。 ... ok
+test_log_records_stage_and_metrics (__main__.RuntimeLogTests.test_log_records_stage_and_metrics)
+日志记录阶段、状态、版本和计数。 ... ok
+test_log_rotation (__main__.RuntimeLogTests.test_log_rotation)
+超过上限时日志轮转，保留历史文件。 ... ok
+test_log_sanitizes_hash_and_path (__main__.RuntimeLogTests.test_log_sanitizes_hash_and_path)
+哈希截断为指纹，路径仅保留文件名。 ... ok
+test_log_truncates_long_strings (__main__.RuntimeLogTests.test_log_truncates_long_strings)
+超长字符串被截断，防止意外记录正文。 ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 7.978s
+
+OK
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipe-lock-2knhi6pf\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipe-lock-2knhi6pf\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipe-lock-2knhi6pf\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipe-lock-2knhi6pf\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipe-lock-7l6pkbhr\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_word_release.py" classname="scripts.tests" time="7.231"><system-out>test_corrupt_state_returns_none (__main__.OutputStateTests.test_corrupt_state_returns_none)
+损坏的状态文件返回 None。 ... ok
+test_failure_state_records_error_code (__main__.OutputStateTests.test_failure_state_records_error_code)
+失败状态记录错误码。 ... ok
+test_formal_state_rejected_after_output_is_modified (__main__.OutputStateTests.test_formal_state_rejected_after_output_is_modified) ... ok
+test_missing_state_not_formal (__main__.OutputStateTests.test_missing_state_not_formal)
+状态文件不存在时 is_formal_success 返回 False。 ... ok
+test_state_file_naming (__main__.OutputStateTests.test_state_file_naming)
+状态文件名 = 输出文件名 + .state.json。 ... ok
+test_string_false_is_not_accepted_as_boolean (__main__.OutputStateTests.test_string_false_is_not_accepted_as_boolean) ... ok
+test_write_and_read_formal_state (__main__.OutputStateTests.test_write_and_read_formal_state)
+写入正式成功状态后可读回。 ... ok
+test_write_diagnostic_state (__main__.OutputStateTests.test_write_diagnostic_state)
+诊断构建状态 formal=False, diagnostic=True。 ... ok
+test_output_path_returns_formal_not_temp (__main__.PipelineAtomicPublishTests.test_output_path_returns_formal_not_temp)
+返回的 output_path 是正式路径，不是临时文件。 ... ok
+test_publish_stage_emitted_on_success (__main__.PipelineAtomicPublishTests.test_publish_stage_emitted_on_success)
+成功时事件流包含 publish 阶段。 ... ok
+test_repeated_pipeline_overwrites_formal_atomically (__main__.PipelineAtomicPublishTests.test_repeated_pipeline_overwrites_formal_atomically)
+重复执行管线时正式输出被原子覆盖，无残留临时文件。 ... ok
+test_state_restore_failure_keeps_previous_backups (__main__.PipelineAtomicPublishTests.test_state_restore_failure_keeps_previous_backups)
+发布回滚时状态文件恢复失败：上一版快照必须保留（不得被 finally 清理）， ... ok
+test_state_write_failure_rolls_back_docx_and_state (__main__.PipelineAtomicPublishTests.test_state_write_failure_rolls_back_docx_and_state)
+DOCX 替换后状态写入失败时恢复上一版完整发布。 ... ok
+test_successful_pipeline_persists_last_build_version (__main__.PipelineAtomicPublishTests.test_successful_pipeline_persists_last_build_version) ... ok
+test_atomic_publish_no_partial_output_on_failure (__main__.PipelineWordReleaseTests.test_atomic_publish_no_partial_output_on_failure)
+失败时正式输出目录中不残留临时文件。 ... ok
+test_build_failure_writes_failure_state (__main__.PipelineWordReleaseTests.test_build_failure_writes_failure_state)
+构建失败时写入失败状态文件。 ... ok
+test_diagnostic_build_publishes_but_marked_non_formal (__main__.PipelineWordReleaseTests.test_diagnostic_build_publishes_but_marked_non_formal)
+诊断构建（skip_word_refresh=True）发布成功但标记为非正式。 ... ok
+test_formal_pipeline_blocked_when_word_unavailable (__main__.PipelineWordReleaseTests.test_formal_pipeline_blocked_when_word_unavailable)
+正式模式在 Word 不可用时返回 E3001，不获取锁，不修改正式输出。 ... ok
+test_formal_success_writes_formal_state (__main__.PipelineWordReleaseTests.test_formal_success_writes_formal_state)
+正式成功（mock Word 可用 + 刷新成功 + 后校验通过）写入 formal=True。 ... ok
+test_post_validate_failure_preserves_previous_output (__main__.PipelineWordReleaseTests.test_post_validate_failure_preserves_previous_output)
+后校验失败时返回 E2002，保留旧正式输出。 ... ok
+test_word_refresh_failure_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_refresh_failure_preserves_previous_output)
+Word 刷新失败（refresh 返回 False）时保留旧正式输出。 ... ok
+test_word_refresh_generic_reason_maps_to_E3001 (__main__.PipelineWordReleaseTests.test_word_refresh_generic_reason_maps_to_E3001)
+refresh 返回 (False, "refresh_failed") 时仍映射 E3001（一般刷新失败）。 ... ok
+test_word_refresh_save_failed_reason_maps_to_E3003 (__main__.PipelineWordReleaseTests.test_word_refresh_save_failed_reason_maps_to_E3003)
+refresh 返回 (False, "save_failed") 时必须映射 E3003（保存失败）。 ... ok
+test_word_refresh_timeout_reason_maps_to_E3002 (__main__.PipelineWordReleaseTests.test_word_refresh_timeout_reason_maps_to_E3002)
+refresh 返回 (False, "timeout") 时必须映射 E3002（刷新超时）， ... ok
+test_word_save_exception_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_save_exception_preserves_previous_output)
+Word 保存异常时映射到错误码，保留旧正式输出。 ... ok
+test_word_timeout_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_timeout_preserves_previous_output)
+Word 超时（异常消息含超时）映射到 E3002，保留旧正式输出。 ... ok
+test_classify_failure_keys (__main__.RefreshReasonTests.test_classify_failure_keys) ... ok
+test_scan_reason_marker_and_default (__main__.RefreshReasonTests.test_scan_reason_marker_and_default) ... ok
+test_empty_user_profile_detected_as_non_interactive (__main__.WordCheckTests.test_empty_user_profile_detected_as_non_interactive)
+空 USERPROFILE 被识别为非交互式。 ... ok
+test_interactive_session_check_returns_bool (__main__.WordCheckTests.test_interactive_session_check_returns_bool)
+check_interactive_session 返回布尔值，不抛异常。 ... ok
+test_non_windows_interactive_session_false (__main__.WordCheckTests.test_non_windows_interactive_session_false)
+非 Windows 平台交互式会话检查返回 False。 ... ok
+test_pywin32_check_returns_bool (__main__.WordCheckTests.test_pywin32_check_returns_bool)
+check_pywin32 返回布尔值，不抛异常。 ... ok
+test_service_profile_detected_as_non_interactive (__main__.WordCheckTests.test_service_profile_detected_as_non_interactive)
+服务账号 profile 被识别为非交互式。 ... ok
+test_session_name_services_detected (__main__.WordCheckTests.test_session_name_services_detected)
+SESSIONNAME=Services 被识别为非交互式。 ... ok
+test_word_availability_report_structure (__main__.WordCheckTests.test_word_availability_report_structure)
+check_word_available 返回完整报告。 ... ok
+test_word_availability_to_dict_has_required_fields (__main__.WordCheckTests.test_word_availability_to_dict_has_required_fields)
+报告字典包含所有必需字段。 ... ok
+test_check_word_dispatchable_fallback_when_multiprocessing_fails (__main__.WordDispatchFallbackAndFrozenTests.test_check_word_dispatchable_fallback_when_multiprocessing_fails)
+multiprocessing 不可用时自动降级到 _dispatch_check_threaded。 ... ok
+test_extract_word_pid_handles_hwnd_attribute_error (__main__.WordDispatchFallbackAndFrozenTests.test_extract_word_pid_handles_hwnd_attribute_error)
+Word.Application 无 .Hwnd 属性时通过差集或 ActiveWindow 提取 PID。 ... ok
+test_supervise_uses_thread_when_frozen (__main__.WordDispatchFallbackAndFrozenTests.test_supervise_uses_thread_when_frozen)
+冻结环境下 supervise 自动路由到 _supervise_in_thread。 ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 5.720s
+
+OK
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-f5475f27\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-6pydvr5k\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-3ii70ucq\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-3ii70ucq\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-huo7ut_x\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-huo7ut_x\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-25m4y3p3\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-25m4y3p3\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-5qxryxgx\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-90zanswx\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-word-rel-90zanswx\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-y0buhc75\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-4u1eh5bp\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-cctcix7p\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-wmvzyran\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-zen66ixk\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-3h39kg4k\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-_03cratu\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-sfc_a5pa\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-0pxgmuu9\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_convert.py" classname="scripts.tests" time="105.805"><system-out>....................................................................................
+----------------------------------------------------------------------
+Ran 84 tests in 104.476s
+
+OK
+</system-out></testcase><testcase name="test_template_fill.py" classname="scripts.tests" time="7.094"><system-out>...[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp20r62xdh\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpl7mabtr_\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpl7mabtr_\dirty.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpl7mabtr_\clean.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmplaqzaxfj\out_c.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[1/1] 手册.md → 手册.docx 成功
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpdwlvk72z\out\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+OK 手册.md → 手册.docx
+    产物标题：1 级 1 个。
+成功 1 个，失败 0 个。
+[1/1] legacy.md → legacy.html 成功
+.OK legacy.md → legacy.html
+成功 1 个，失败 0 个。
+--template 仅对 Markdown 源生效：本次输入中没有 Markdown 文件。
+......................................[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpgmtyjznn\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpiu1w5ihs\b.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp521ndea_\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpe8rilxne\out\样品.docx
+[general] 插入元素=5, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpm0hm2k5e\out\样品.docx
+[general] 插入元素=9, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp34l5gb3t\out\样品.docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpzj3j6nj2\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpyquzayxk\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpbdu8337d\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp5ypgpw3p\out\样品.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp_l25t67s\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpqs4d5v4l\out\map.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-uxf9lllv\assembled.docx
+[general] 插入元素=1, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：1 个章节 → C:\Users\18098\AppData\Local\Temp\tmpna_wf30a\o.docx
+[warn] 底模不可用，已采用替代底模：D:\ai_develop_project_space\doc-tool\templates\requirement-template.docx
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-dmqr51ba\assembled.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：2 个章节 → C:\Users\18098\AppData\Local\Temp\tmphizfq_tq\out\合并.docx
+样式映射格式无效：'样式=级别'（应为 样式ID=级别，如 章标题=1）
+.源必须是 Markdown 文件（.md/.markdown）：a.docx
+.............
+----------------------------------------------------------------------
+Ran 59 tests in 5.599s
+
+OK
+</system-out></testcase><testcase name="test_pdf_toolbox.py" classname="scripts.tests" time="5.907"><system-out>..............invalid pdf header: b'not a'
+EOF marker not found
+..[1/1] 合并 PDF cli_1.pdf → cli_1_合并.pdf 成功
+......................
+----------------------------------------------------------------------
+Ran 38 tests in 3.312s
+
+OK
+{
+  "records": [
+    {
+      "tool": "merge",
+      "label": "合并 PDF",
+      "source": "C:\\Users\\18098\\AppData\\Local\\Temp\\tmptyd7z3pw\\cli_1.pdf",
+      "outputs": [
+        "C:\\Users\\18098\\AppData\\Local\\Temp\\tmptyd7z3pw\\cli_out\\cli_1_合并.pdf"
+      ],
+      "ok": true,
+      "status": "成功",
+      "reason": "ok",
+      "detail": "已将 2 个文件合并为 1 个文档，共 2 页",
+      "errorCode": null,
+      "elapsedSeconds": 0.01,
+      "note": ""
+    }
+  ],
+  "cancelled": false,
+  "total": 1,
+  "succeeded": 1,
+  "failed": 0,
+  "success": true,
+  "errorCode": null,
+  "summary": "成功 1 个，失败 0 个。"
+}
+</system-out></testcase><testcase name="test_packaging.py" classname="scripts.tests" time="5.744"><system-out>test_strict_allowlist_rejects_unknown_file (__main__.PackageAllowlistTests.test_strict_allowlist_rejects_unknown_file) ... ok
+test_build_script_exposes_portable_switch (__main__.PortablePackageTests.test_build_script_exposes_portable_switch) ... ok
+test_ci_publishes_portable_package (__main__.PortablePackageTests.test_ci_publishes_portable_package)
+tag 流水线除安装器外还产出便携包，并挂进 Release 资产。 ... ok
+test_ci_zips_portable_after_app_signing (__main__.PortablePackageTests.test_ci_zips_portable_after_app_signing)
+便携包必须在应用签名之后打，否则包里是未签名 exe（照样被拦）。 ... ok
+test_dist_staging_script_shared (__main__.PortablePackageTests.test_dist_staging_script_shared)
+stage_dist.ps1 除低了启动/诊断脚本的复处漂移与基线过期。 ... ok
+test_gui_entry_has_self_heal_fallback (__main__.PortablePackageTests.test_gui_entry_has_self_heal_fallback)
+GUI 入口冻结态下 PySide6 导入失败走 self_heal 自愈，其余启动异常可见化。 ... ok
+test_installer_ships_diagnose_cmd (__main__.PortablePackageTests.test_installer_ships_diagnose_cmd)
+安装器随带诊断脚本，成员双击运行后回传 DocTool-diagnose.txt。 ... ok
+test_launcher_is_ascii_only (__main__.PortablePackageTests.test_launcher_is_ascii_only)
+cmd.exe 按系统 ANSI 代码页解析批处理，非 ASCII 字节会破坏解析。 ... ok
+test_launcher_is_tracked_in_repo (__main__.PortablePackageTests.test_launcher_is_tracked_in_repo) ... ok
+test_launcher_reports_start_failure (__main__.PortablePackageTests.test_launcher_reports_start_failure)
+1.4.5：preflight 启动并监视应用，快速失败时启动器给出可见报错。 ... ok
+test_launcher_starts_in_place_without_temp_copy (__main__.PortablePackageTests.test_launcher_starts_in_place_without_temp_copy)
+1.4.4：原地启动已签名 exe，不再复制到 %TEMP%（透明加密客户端会加密 .pyd）。 ... ok
+test_preflight_script_is_ascii_only (__main__.PortablePackageTests.test_preflight_script_is_ascii_only)
+preflight.ps1 与启动器一样必须 ASCII-only（PS 5.1 无 BOM 按 ANSI 解析）。 ... ok
+test_calc_sha256 (__main__.PublishReleaseTests.test_calc_sha256) ... ok
+test_create_or_update_release_creates_when_not_exists (__main__.PublishReleaseTests.test_create_or_update_release_creates_when_not_exists) ... 正在创建 Release v2.6.1...
+ok
+test_create_or_update_release_updates_when_exists (__main__.PublishReleaseTests.test_create_or_update_release_updates_when_exists) ... Release v2.6.1 已存在，正在更新...
+ok
+test_get_gitlab_base_missing_raises (__main__.PublishReleaseTests.test_get_gitlab_base_missing_raises) ... ok
+test_get_gitlab_base_valid (__main__.PublishReleaseTests.test_get_gitlab_base_valid) ... ok
+test_get_package_files_missing_package_raises (__main__.PublishReleaseTests.test_get_package_files_missing_package_raises) ... ok
+test_get_package_files_success (__main__.PublishReleaseTests.test_get_package_files_success) ... ok
+test_get_project_id_invalid_type_raises (__main__.PublishReleaseTests.test_get_project_id_invalid_type_raises) ... ok
+test_get_project_id_missing_raises (__main__.PublishReleaseTests.test_get_project_id_missing_raises) ... ok
+test_get_project_id_valid (__main__.PublishReleaseTests.test_get_project_id_valid) ... ok
+test_get_project_path_missing_raises (__main__.PublishReleaseTests.test_get_project_path_missing_raises) ... ok
+test_get_project_path_valid (__main__.PublishReleaseTests.test_get_project_path_valid) ... ok
+test_get_token_from_argv (__main__.PublishReleaseTests.test_get_token_from_argv) ... ok
+test_get_token_from_env (__main__.PublishReleaseTests.test_get_token_from_env) ... ok
+test_get_token_missing_raises_runtime_error (__main__.PublishReleaseTests.test_get_token_missing_raises_runtime_error) ... ok
+test_upload_file_puts_to_correct_url (__main__.PublishReleaseTests.test_upload_file_puts_to_correct_url) ... 正在上传 package.zip (0.0 MB)...
+ok
+test_frozen_build_installs_runtime_and_build_requirements (__main__.ReleasePipelineTests.test_frozen_build_installs_runtime_and_build_requirements) ... ok
+test_hash_is_generated_after_all_signing_steps (__main__.ReleasePipelineTests.test_hash_is_generated_after_all_signing_steps) ... ok
+test_install_level_smoke_runs_before_installer_signing (__main__.ReleasePipelineTests.test_install_level_smoke_runs_before_installer_signing) ... ok
+test_public_source_export_wired_into_ci (__main__.ReleasePipelineTests.test_public_source_export_wired_into_ci)
+任务 9.4：净化源码导出+扫描已接入公共 CI。 ... ok
+test_release_gate_blocks_public_until_decisions_resolved (__main__.ReleasePipelineTests.test_release_gate_blocks_public_until_decisions_resolved)
+任务 9.3：未决发布决策阻断公共正式发布，允许内部测试产物。 ... ok
+test_release_requires_clean_tree_and_uses_generated_notes (__main__.ReleasePipelineTests.test_release_requires_clean_tree_and_uses_generated_notes) ... ok
+test_default_project_yml_loadable (__main__.ResourceRootTests.test_default_project_yml_loadable)
+默认项目清单在开发态可被 yaml 加载。 ... ok
+test_dev_mode_resource_path (__main__.ResourceRootTests.test_dev_mode_resource_path)
+resource_path() 正确拼接子路径。 ... ok
+test_dev_mode_returns_resources_dir (__main__.ResourceRootTests.test_dev_mode_returns_resources_dir)
+开发态：resource_root() 返回 doc_tool/resources/ 目录。 ... ok
+test_frozen_mode_resource_path (__main__.ResourceRootTests.test_frozen_mode_resource_path)
+冻结态：resource_path() 在 _MEIPASS 下定位资源。 ... ok
+test_frozen_mode_returns_meipass_resources (__main__.ResourceRootTests.test_frozen_mode_returns_meipass_resources)
+冻结态：模拟 sys._MEIPASS，resource_root() 返回 _MEIPASS/doc_tool/resources。 ... ok
+test_can_read_higher_schema (__main__.SchemaCompatibilityTests.test_can_read_higher_schema)
+当前应用可只读打开更高模式版本（向前兼容展示）。 ... ok
+test_can_write_current_schema (__main__.SchemaCompatibilityTests.test_can_write_current_schema)
+当前应用可写当前模式版本。 ... ok
+test_reject_read_unknown_lower_schema (__main__.SchemaCompatibilityTests.test_reject_read_unknown_lower_schema)
+未知的历史低版本不可读（无降级迁移）。 ... ok
+test_reject_write_higher_schema (__main__.SchemaCompatibilityTests.test_reject_write_higher_schema)
+旧应用拒绝写入更高模式版本（避免破坏性降级）。 ... ok
+test_signing_skips_missing_config_and_rejects_repo_private_key (__main__.SigningConfigurationTests.test_signing_skips_missing_config_and_rejects_repo_private_key) ... ok
+
+----------------------------------------------------------------------
+Ran 44 tests in 4.523s
+
+OK
+  上传完成: package.zip
+</system-out></testcase><testcase name="test_installer.py" classname="scripts.tests" time="1.183"><system-out>test_setup_exe_exists (__main__.InstallerArtifactTests.test_setup_exe_exists)
+当前版本的安装器 EXE 已生成。 ... skipped '安装器未构建，先运行 ISCC.exe'
+test_sha256_exists (__main__.InstallerArtifactTests.test_sha256_exists)
+SHA-256 哈希文件已生成。 ... skipped 'SHA-256 文件未生成'
+test_appid_stable (__main__.InstallerConfigTests.test_appid_stable)
+AppId 是稳定的 GUID，跨版本一致。 ... ok
+test_close_applications_on_upgrade (__main__.InstallerConfigTests.test_close_applications_on_upgrade)
+升级时自动关闭旧进程。 ... ok
+test_desktop_shortcut_optional (__main__.InstallerConfigTests.test_desktop_shortcut_optional)
+桌面快捷方式是可选的（unchecked）。 ... ok
+test_install_dir_localappdata (__main__.InstallerConfigTests.test_install_dir_localappdata)
+安装目录在 %LOCALAPPDATA%，不在 Program Files。 ... ok
+test_kill_app_on_uninstall (__main__.InstallerConfigTests.test_kill_app_on_uninstall)
+卸载前关闭应用进程。 ... ok
+test_output_filename_versioned (__main__.InstallerConfigTests.test_output_filename_versioned)
+输出文件名包含版本号。 ... ok
+test_start_menu_shortcut (__main__.InstallerConfigTests.test_start_menu_shortcut)
+开始菜单快捷方式存在。 ... ok
+test_uninstall_does_not_recursively_delete_unknown_app_files (__main__.InstallerConfigTests.test_uninstall_does_not_recursively_delete_unknown_app_files)
+卸载只移除安装器拥有文件，不递归删除整个安装目录。 ... ok
+test_use_previous_app_dir (__main__.InstallerConfigTests.test_use_previous_app_dir)
+升级时使用之前的安装目录。 ... ok
+test_user_install_no_admin (__main__.InstallerConfigTests.test_user_install_no_admin)
+按用户安装，不需要管理员权限。 ... ok
+test_appid_differs_from_legacy (__main__.PublicInternalCoexistTests.test_appid_differs_from_legacy)
+公共 AppId 与内部版不同，保证注册表识别独立。 ... ok
+test_executable_differs_from_legacy (__main__.PublicInternalCoexistTests.test_executable_differs_from_legacy)
+可执行文件名与内部版不同，保证进程/快捷方式独立。 ... ok
+test_install_dir_differs_from_legacy (__main__.PublicInternalCoexistTests.test_install_dir_differs_from_legacy)
+安装目录与内部版不同，保证独立卸载。 ... ok
+test_can_read_higher_schema_readonly (__main__.SchemaCompatibilityGuardTests.test_can_read_higher_schema_readonly)
+旧应用可只读打开更高模式版本。 ... ok
+test_reject_write_higher_schema (__main__.SchemaCompatibilityGuardTests.test_reject_write_higher_schema)
+旧应用拒绝写入更高模式版本。 ... ok
+test_user_projects_outside_install_dir (__main__.SchemaCompatibilityGuardTests.test_user_projects_outside_install_dir)
+用户项目默认不在安装目录下（设计约束验证）。 ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.038s
+
+OK (skipped=2)
+</system-out></testcase><testcase name="test_brand_consistency.py" classname="scripts.tests" time="2.963"><system-out>........usage: doc-tool build [-h] [--skip-word-refresh] --project PROJECT
+doc-tool build: error: the following arguments are required: --project
+usage: doc-tool build [-h] [--skip-word-refresh] --project PROJECT
+doc-tool build: error: the following arguments are required: --project
+usage: doc-tool build [-h] [--skip-word-refresh] --project PROJECT
+doc-tool build: error: the following arguments are required: --project
+....
+----------------------------------------------------------------------
+Ran 12 tests in 2.073s
+
+OK
+</system-out></testcase><testcase name="test_settings_migration.py" classname="scripts.tests" time="1.395"><system-out>......
+----------------------------------------------------------------------
+Ran 6 tests in 0.033s
+
+OK
+</system-out></testcase><testcase name="test_migration.py" classname="scripts.tests" time="3.160"><system-out>test_broken_template_blocks_migration (__main__.LegacyMigrationTests.test_broken_template_blocks_migration)
+损坏模板导致试构建失败应回滚，源不变。 ... ok
+test_design_migrates_to_general (__main__.LegacyMigrationTests.test_design_migrates_to_general) ... ok
+test_general_source_rejected (__main__.LegacyMigrationTests.test_general_source_rejected)
+general 项目不是旧版专用项目，拒绝迁移且不创建目标。 ... ok
+test_missing_resource_blocks_migration (__main__.LegacyMigrationTests.test_missing_resource_blocks_migration)
+迁移验证缺失资源引用应失败并回滚（源不变、无半成品）。 ... ok
+test_non_utf8_content_blocks_migration_cleanly (__main__.LegacyMigrationTests.test_non_utf8_content_blocks_migration_cleanly)
+迁移遇非 UTF-8 内容应结构化失败并清理暂存，而非抛出未处理异常。 ... ok
+test_requirement_migrates_to_general (__main__.LegacyMigrationTests.test_requirement_migrates_to_general) ... ok
+test_source_unchanged_after_migration (__main__.LegacyMigrationTests.test_source_unchanged_after_migration) ... ok
+test_target_exists_rejected (__main__.LegacyMigrationTests.test_target_exists_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 2.077s
+
+OK
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-migrate-fssijs2v\.dst-design.migrate-staging-27320-jcamxrxe\output\.trial-build.docx
+[general] 插入元素=6, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-migrate-x8zwfj7_\.dst-ok.migrate-staging-27320-9jmqt7e1\output\.trial-build.docx
+[general] 插入元素=6, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-migrate-x8zwfj7_\dst-ok\output\FIXTURE-001 迁移验证项目(1.0).docx
+[general] 插入元素=6, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-migrate-x8zwfj7_\dst-ok\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-migrate-xzw7zs9a\.dst.migrate-staging-27320-i3h8re4j\output\.trial-build.docx
+[general] 插入元素=6, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-migrate-kvvppdi3\.dst-keep.migrate-staging-27320-2s58i0sp\output\.trial-build.docx
+[general] 插入元素=6, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_self_heal.py" classname="scripts.tests" time="1.451"><system-out>test_ascii_paths (__main__.AsciiTests.test_ascii_paths) ... ok
+test_non_ascii_temp_falls_back_to_public (__main__.CandidateBaseTests.test_non_ascii_temp_falls_back_to_public) ... ok
+test_prefers_ascii_temp (__main__.CandidateBaseTests.test_prefers_ascii_temp) ... ok
+test_app_py_invokes_main_under_main_guard (__main__.EntryGuardTests.test_app_py_invokes_main_under_main_guard) ... ok
+test_frozen_branch_hooks_present (__main__.EntryGuardTests.test_frozen_branch_hooks_present) ... ok
+test_always_reports_and_returns_two (__main__.HandleBlockedImportTests.test_always_reports_and_returns_two)
+不再迁移：任何导入失败都直接写日志 + 弹框，退出码 2。 ... ok
+test_log_lines_contain_error_and_frozen_state (__main__.HandleBlockedImportTests.test_log_lines_contain_error_and_frozen_state) ... ok
+test_no_relocation_code_left (__main__.HandleBlockedImportTests.test_no_relocation_code_left)
+1.4.4 回归：自愈模块不再包含复制到 %TEMP% 的迁移逻辑。 ... ok
+test_reports_and_returns_two (__main__.ReportStartupFailureTests.test_reports_and_returns_two) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.009s
+
+OK
+</system-out></testcase><testcase name="test_public_export.py" classname="scripts.tests" time="5.025"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 3.979s
+
+OK
+</system-out></testcase><testcase name="test_review_docx.py" classname="scripts.tests" time="2.908"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 1.245s
+
+OK
+</system-out></testcase><testcase name="test_table_format.py" classname="scripts.tests" time="1.873"><system-out>.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.689s
+
+OK
+</system-out></testcase><testcase name="test_command_palette.py" classname="scripts.tests" time="1.918"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.162s
+
+OK
+</system-out></testcase><testcase name="test_validate_adaptation.py" classname="scripts.tests" time="2.267"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 0.334s
+
+OK
+</system-out></testcase><testcase name="test_branch_ui.py" classname="scripts.tests" time="2.617"><system-out>..............
+----------------------------------------------------------------------
+Ran 14 tests in 1.003s
+
+OK
+</system-out></testcase><testcase name="test_action_positioning.py" classname="scripts.tests" time="4.864"><system-out>......
+----------------------------------------------------------------------
+Ran 6 tests in 1.347s
+
+OK
+</system-out></testcase><testcase name="test_changes_refresh.py" classname="scripts.tests" time="3.630"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 2.184s
+
+OK
+</system-out></testcase><testcase name="test_expression_contract.py" classname="scripts.tests" time="2.649"><system-out>[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+..................
+----------------------------------------------------------------------
+Ran 20 tests in 1.346s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\logs\v27-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-tes1y9om\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+</system-out></testcase><testcase name="test_diagram_viewer_interaction.py" classname="scripts.tests" time="4.753"><system-out>...........
+----------------------------------------------------------------------
+Ran 11 tests in 1.561s
+
+OK
+</system-out></testcase><testcase name="test_operation_loading_overlay.py" classname="scripts.tests" time="5.374"><system-out>.............
+----------------------------------------------------------------------
+Ran 13 tests in 3.288s
+
+OK
+</system-out></testcase></testsuite></testsuites>

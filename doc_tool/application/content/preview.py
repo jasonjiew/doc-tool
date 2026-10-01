@@ -348,8 +348,22 @@ class PreviewBlock:
     image_size: Optional[str] = None
 
 
-def render_preview_blocks(md_text: str) -> List[PreviewBlock]:
-    """把 md 文本解析为渲染块列表。"""
+def render_preview_blocks(
+    md_text: str, registry=None
+) -> List[PreviewBlock]:
+    """把 md 文本解析为渲染块列表。
+
+    ``registry`` 可选：传入共享题注注册表（``doc_tool.domain.captions``）时，
+    正文中的 ``@fig-x`` / ``@tbl-x`` 按与出稿完全相同的规则解析为可读文本，
+    预览与 DOCX 的编号/占位一致；不传时保持原文（旧路径行为不变）。
+    """
+    resolve = None
+    if registry is not None:
+        from doc_tool.domain.captions import resolve_inline_references
+
+        def resolve(value: str) -> str:
+            return resolve_inline_references(value, registry)
+
     blocks: List[PreviewBlock] = []
     table_rows: List[List[str]] = []
     in_table = False
@@ -386,6 +400,8 @@ def render_preview_blocks(md_text: str) -> List[PreviewBlock]:
             continue
         if stripped.startswith("|"):
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            if registry is not None:
+                cells = [resolve(cell) for cell in cells]
             table_rows.append(cells)
             in_table = True
             continue
@@ -407,7 +423,12 @@ def render_preview_blocks(md_text: str) -> List[PreviewBlock]:
                 )
             )
             continue
-        blocks.append(PreviewBlock(kind="paragraph", text=stripped))
+        blocks.append(
+            PreviewBlock(
+                kind="paragraph",
+                text=resolve(stripped) if registry is not None else stripped,
+            )
+        )
 
     flush_table()
     return blocks
@@ -426,11 +447,26 @@ def normalize_markdown_for_preview(md_text: str) -> str:
     )
 
 
+def build_caption_registry(md_texts, paths=None):
+    """从若干份 Markdown 构造共享题注注册表（预览与出稿同源）。
+
+    ``md_texts`` 为 ``[(path, text), ...]``；路径只用于报告定位，不会被读写。
+    预览的编号与交叉引用必须与正式出稿一致，否则用户会看到
+    两套编号。
+    """
+    from doc_tool.domain.blocks import parse_blocks
+    from doc_tool.domain.captions import build_registry
+
+    documents = [parse_blocks(text, path) for path, text in md_texts]
+    return build_registry(documents)
+
+
 def render_markdown_html(
     md_text: str,
     *,
     use_cli: bool = False,
     dark: bool = False,
+    registry=None,
 ) -> str:
     """把项目 Markdown 转为 Qt 可稳定渲染的受控 HTML。
 
@@ -461,6 +497,11 @@ def render_markdown_html(
     code_start_line = 0
 
     def inline(text: str) -> str:
+        if registry is not None:
+            from doc_tool.domain.captions import resolve_inline_references
+
+            # 预览与出稿共用同一题注注册表：歧义/缺失保留可读占位。
+            text = resolve_inline_references(text, registry)
         escaped = html.escape(text, quote=True).replace("&lt;br&gt;", "<br/>")
 
         def image(match: re.Match) -> str:
@@ -469,6 +510,13 @@ def render_markdown_html(
 
         def link(match: re.Match) -> str:
             label, target = match.groups()
+            from urllib.parse import urlsplit
+            try:
+                scheme = urlsplit(html.unescape(target)).scheme.lower()
+            except ValueError:
+                return label
+            if scheme and scheme not in ('http', 'https', 'mailto'):
+                return label
             return '<a href="{0}">{1}</a>'.format(target, label)
 
         escaped = _IMAGE_INLINE_RE.sub(image, escaped)

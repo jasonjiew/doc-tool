@@ -1,0 +1,1 @@
+    def resolve(self, kind: str, token: str, location: SourceLocation) -> ReferenceResolution:

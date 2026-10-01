@@ -1,0 +1,13 @@
+def _caption_paragraph(entry, registry, config):
+    """题注段落：标识唯一化后的全文编号 + 可读静态值（不生成失效域）。"""
+    number = entry.number
+    if registry is not None:
+        number = registry.sequential_number(entry)
+    return shared.make_caption_paragraph(
+        prefix="图" if entry.kind == KIND_FIGURE else "表",
+        label=entry.label,
+        number=number,
+        style_id=config.get("captionStyle") or None,
+        bookmark_name=entry.bookmark,
+        bookmark_id=0,
+    )

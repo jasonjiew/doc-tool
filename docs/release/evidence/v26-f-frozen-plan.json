@@ -1,0 +1,40 @@
+{
+  "template": "",
+  "template_hash": "",
+  "output": "tmp\\v26-frozen-output.docx",
+  "inputs": [
+    {
+      "path": "tmp\\v26-smoke-source.md",
+      "sha256": "cc373d5502ca155ea8f9819df8371ab4a5e62e7676e437fb5ba798d4b77fd6f0",
+      "outline": [
+        [
+          1,
+          "Frozen sample",
+          1
+        ]
+      ],
+      "images": 1,
+      "tables": 0
+    }
+  ],
+  "skipped": [],
+  "issues": [
+    {
+      "path": "missing.docx",
+      "line": 0,
+      "severity": "error",
+      "message": "没有可解析底模",
+      "action": "选择可用 DOCX"
+    },
+    {
+      "path": "tmp\\v26-smoke-source.md",
+      "line": 3,
+      "severity": "warning",
+      "message": "图片缺失/越界：missing.png",
+      "action": "输出资源说明占位"
+    }
+  ],
+  "mapping": {},
+  "viable": false,
+  "status": "无可行方案/严格检查未通过"
+}

@@ -1,0 +1,35 @@
+def expected_content_events(
+    config: Dict, available_bookmarks: Optional[Iterable[str]] = None
+) -> List[Event]:
+    """按章节顺序推导预期事件；题注注册表与构建侧同源，保证编号一致。"""
+    from doc_tool.domain.captions import build_registry
+
+    entries = list(iter_chapter_entries(config))
+    documents = [
+        _parse_blocks_for_validation(markdown_path)
+        for _entry, markdown_path in entries
+        if markdown_path
+    ]
+    registry = build_registry(documents)
+    by_path = {document.path: document for document in documents}
+    events: List[Event] = []
+    is_headless = bool(config.get("is_headless", False))
+    for entry, markdown_path in entries:
+        if is_headless and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            events.append(Event("H", (entry.depth, normalize_business_text(entry.title)), entry.path))
+        if not markdown_path:
+            continue
+        document = by_path.get(markdown_path)
+        if document is None:
+            continue
+        events.extend(
+            expected_events_for_document(
+                document,
+                config,
+                registry=registry,
+                available_bookmarks=available_bookmarks,
+            )
+        )
+    return events

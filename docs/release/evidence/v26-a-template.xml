@@ -1,0 +1,137 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="1" time="75.313"><testsuite name="doc-tool" tests="3" failures="1" time="75.313"><testcase name="test_template_fill.py" classname="scripts.tests" time="9.454"><system-out>...[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpz27zht22\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpakk4b2f6\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpakk4b2f6\dirty.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpakk4b2f6\clean.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp6nvsa_w4\out_c.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[1/1] 手册.md → 手册.docx 成功
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp1ur171z2\out\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+OK 手册.md → 手册.docx
+    产物标题：1 级 1 个。
+成功 1 个，失败 0 个。
+[1/1] legacy.md → legacy.html 成功
+.OK legacy.md → legacy.html
+成功 1 个，失败 0 个。
+--template 仅对 Markdown 源生效：本次输入中没有 Markdown 文件。
+.....................................[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpxtk6afd7\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp8_7yj16b\b.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpnvt8b2o6\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmprfdy8dok\out\样品.docx
+[general] 插入元素=5, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp0_ykn7kf\out\样品.docx
+[general] 插入元素=9, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp75d0096z\out\样品.docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpt9l32jxm\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpy_0c2pip\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpt1z1ej3b\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp7pncbf5i\out\样品.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp_xzcq815\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpccfce79a\out\map.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[FAIL] 模板填充失败（E6009）：Word 模板无法解析：文件不是有效的 ZIP 包或不存在（路径=C:\Users\18098\AppData\Local\Temp\tmpvmj66fxt\junk.docx，前16字节=b'stub'）：File is not a zip file 请确认 Word 底模为可正常打开的 .docx，且 Markdown 内容满足构建约束（标题层级连续、图片路径有效）；错误详情中会给出具体位置。
+..[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpg9l104mf\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：2 个章节 → C:\Users\18098\AppData\Local\Temp\tmpg9l104mf\out\合并.docx
+样式映射格式无效：'样式=级别'（应为 样式ID=级别，如 章标题=1）
+.源必须是 Markdown 文件（.md/.markdown）：a.docx
+.............
+----------------------------------------------------------------------
+Ran 58 tests in 7.095s
+
+OK
+</system-out></testcase><testcase name="test_convert.py" classname="scripts.tests" time="57.953"><failure message="exit code 1" type="TestFailure">.................F....F...........F.........................sssss...................
+======================================================================
+FAIL: test_converts_to_single_file_with_assets (__main__.DocxToMarkdownTests.test_converts_to_single_file_with_assets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 343, in test_converts_to_single_file_with_assets
+    self.assertTrue(outcome.ok, outcome.detail)
+AssertionError: False is not true : AttributeError("module 'yaml' has no attribute 'safe_dump'")
+
+======================================================================
+FAIL: test_rtf_to_markdown_composite (__main__.ImportDirectionTests.test_rtf_to_markdown_composite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 1136, in test_rtf_to_markdown_composite
+    self.assertTrue(result.success, result.summary())
+AssertionError: False is not true : 成功 0 个，失败 1 个。 涉及错误码：E6003。
+
+======================================================================
+FAIL: test_docx_to_html_with_assets_and_no_leftover_md (__main__.MarkdownHtmlExportTests.test_docx_to_html_with_assets_and_no_leftover_md)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 1081, in test_docx_to_html_with_assets_and_no_leftover_md
+    self.assertTrue(result.success, result.summary())
+AssertionError: False is not true : 成功 0 个，失败 1 个。 涉及错误码：E6003。
+
+----------------------------------------------------------------------
+Ran 84 tests in 56.999s
+
+FAILED (failures=3, skipped=5)
+</failure><system-out>.................F....F...........F.........................sssss...................
+======================================================================
+FAIL: test_converts_to_single_file_with_assets (__main__.DocxToMarkdownTests.test_converts_to_single_file_with_assets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 343, in test_converts_to_single_file_with_assets
+    self.assertTrue(outcome.ok, outcome.detail)
+AssertionError: False is not true : AttributeError("module 'yaml' has no attribute 'safe_dump'")
+
+======================================================================
+FAIL: test_rtf_to_markdown_composite (__main__.ImportDirectionTests.test_rtf_to_markdown_composite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 1136, in test_rtf_to_markdown_composite
+    self.assertTrue(result.success, result.summary())
+AssertionError: False is not true : 成功 0 个，失败 1 个。 涉及错误码：E6003。
+
+======================================================================
+FAIL: test_docx_to_html_with_assets_and_no_leftover_md (__main__.MarkdownHtmlExportTests.test_docx_to_html_with_assets_and_no_leftover_md)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_convert.py", line 1081, in test_docx_to_html_with_assets_and_no_leftover_md
+    self.assertTrue(result.success, result.summary())
+AssertionError: False is not true : 成功 0 个，失败 1 个。 涉及错误码：E6003。
+
+----------------------------------------------------------------------
+Ran 84 tests in 56.999s
+
+FAILED (failures=3, skipped=5)
+</system-out></testcase><testcase name="test_convert_ux.py" classname="scripts.tests" time="7.906"><system-out>...................................
+----------------------------------------------------------------------
+Ran 35 tests in 6.220s
+
+OK
+</system-out></testcase></testsuite></testsuites>

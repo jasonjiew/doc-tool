@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -27,6 +28,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
+_scan_spec = importlib.util.spec_from_file_location("doc_tool_export_scan", HERE / "scan_leaks.py")
+_scan_module = importlib.util.module_from_spec(_scan_spec)
+_scan_spec.loader.exec_module(_scan_module)
+is_sensitive_file = _scan_module.is_sensitive_file
 
 # 被排除的路径前缀（相对仓库根）。与 packaging/scan_vocabulary.txt 的
 # [sensitive-path] 保持一致；docs/release/ 为内部发布记录，不入公共仓库；
@@ -39,6 +44,7 @@ EXCLUDED_PREFIXES = (
     "analysis/",
     "migration/legacy/",
     "scripts/migration/",
+    "scripts/cert-out/",
     "docs/release/",
     "docs/diagnostics/",
     "方案评审/",
@@ -85,6 +91,8 @@ def _tracked_files() -> list[str]:
 
 def _is_excluded(rel_path: str) -> bool:
     normalized = rel_path.replace("\\", "/")
+    if is_sensitive_file(normalized):
+        return True
     if any(normalized.startswith(prefix) for prefix in EXCLUDED_PREFIXES):
         return True
     # 仓库根旧品牌/专用构建入口按文件名排除（仅根目录层）。

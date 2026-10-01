@@ -1,0 +1,3 @@
+    row_height: Optional[int] = None,
+    extra: Optional[Dict[str, str]] = None,
+):

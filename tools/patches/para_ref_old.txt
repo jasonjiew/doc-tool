@@ -1,0 +1,12 @@
+def make_paragraph(
+    style_id: Optional[str],
+    text: str,
+    fmt: Optional[str] = None,
+    *,
+    num_id: Optional[int] = None,
+    list_level: int = 0,
+    expressions=None,
+    source_path: str = "",
+    line_no: int = 0,
+):
+    paragraph = etree.Element(qn("p"))

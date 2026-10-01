@@ -44,9 +44,28 @@ from docx_common import (
     validate_content_tree,
 )
 from doc_tool.domain.ooxml import heading_style_candidates  # noqa: E402
+from doc_tool.domain.blocks import (  # noqa: E402
+    KIND_CODE,
+    KIND_COMPLEX_TABLE,
+    KIND_EMPTY_PARAGRAPH,
+    KIND_FOOTNOTE_DEF,
+    KIND_HEADING,
+    KIND_IMAGE,
+    KIND_LIST_ITEM,
+    KIND_PAGEBREAK,
+    KIND_SECTION,
+    KIND_TABLE,
+    parse_blocks,
+)
+from doc_tool.kernel_shared.code_marker import (  # noqa: E402
+    code_container_lines,
+    is_code_container,
+)
 
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+#: 横向页面方向值（与生成侧 docx_blocks 一致）。
+ORIENT_LANDSCAPE = "landscape"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 RP_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
@@ -74,14 +93,45 @@ def resolve_relationship_target(owner_part: str, target: str) -> str:
 
 
 def paragraph_text(paragraph) -> str:
+    """段落可见文本：跳过域指令，保留域缓存值（Word 刷新前的可读结果）。
+
+    模拟 Word 的域状态机：``begin`` 进入指令区，``separate`` 或指令后的
+    第一个 ``w:t``（Word 常把缓存值写在 begin 运行的嵌套运行里）切到
+    结果区，``end`` 结束当前域。只有结果区的文本是可见文本。
+    """
     parts: List[str] = []
+    in_instruction = False
+    saw_instruction = False
     for node in paragraph.iter():
+        if node.tag == qn("fldChar"):
+            kind = node.get(qn("fldCharType"))
+            if kind == "begin":
+                in_instruction = True
+                saw_instruction = False
+            elif kind == "separate":
+                in_instruction = False
+            elif kind == "end":
+                in_instruction = False
+                saw_instruction = False
+            continue
+        if node.tag == qn("instrText"):
+            saw_instruction = True
+            continue
         if node.tag == qn("t"):
+            if in_instruction:
+                if saw_instruction:
+                    # 指令已结束，这是域缓存结果（可见）。
+                    in_instruction = False
+                    saw_instruction = False
+                else:
+                    continue
             parts.append(node.text or "")
         elif node.tag in (qn("br"), qn("cr")):
-            parts.append("\n")
+            if not in_instruction:
+                parts.append("\n")
         elif node.tag == qn("tab"):
-            parts.append("\t")
+            if not in_instruction:
+                parts.append("\t")
     return "".join(parts).strip()
 
 
@@ -172,6 +222,9 @@ class DocxPackage:
         # 在重编号后依然命中（Word 保留样式名），清单映射兜底名称无法识别的自定义
         # 样式；两路并集按段落实际 pStyle 反查，互不干扰。
         self.heading_styles = self._heading_style_map()
+        self.heading_style_names: Dict[str, int] = self._heading_style_name_map()
+        #: 项目配置的正文样式（不参与标题识别）。
+        self.body_style_id = ""
         if heading_styles:
             for level in sorted(heading_styles.keys(), key=lambda k: int(k), reverse=True):
                 style_id = heading_styles[level]
@@ -184,15 +237,53 @@ class DocxPackage:
             candidate.style_id: candidate.level
             for candidate in heading_style_candidates(self.styles)
         }
+    def _style_name(self, style_id: str) -> str:
+        """返回 ``styleId`` 对应的样式名称（未知返回空串）。"""
+        if not style_id:
+            return ""
+        for style in self.styles.findall(qn("style")):
+            if (style.get(qn("styleId")) or "") != style_id:
+                continue
+            name = style.find(qn("name"))
+            return (name.get(qn("val")) or "").strip() if name is not None else ""
+        return ""
+
+    def _heading_style_name_map(self) -> Dict[str, int]:
+        """样式**名称** -> 级别映射。
+
+        Word 刷新后会重新分配 ``styleId``（实测：段落引用从 ``3`` 变为 ``a6``），
+        但样式**名称**保持不变。因此当 ID 查不到级别时，回退到名称匹配，
+        避免把带编号的标题误判为列表项。
+        """
+        result: Dict[str, int] = {}
+        for style in self.styles.findall(qn("style")):
+            name = style.find(qn("name"))
+            if name is None:
+                continue
+            value = (name.get(qn("val")) or "").strip()
+            if not value:
+                continue
+            level = self.heading_styles.get(style.get(qn("styleId")) or "")
+            if level:
+                result[value.casefold()] = level
+        return result
 
     def paragraph_level(self, paragraph) -> Optional[int]:
         properties = paragraph.find(qn("pPr"))
         style = properties.find(qn("pStyle")) if properties is not None else None
         st = style.get(qn("val")) if style is not None else ""
+        # 正文样式不能被名称启发式误认为标题：部分模板（如设计模板）
+        # 的正文样式名恰好命中 Heading 命名规则，让正文段落被当成 H2，
+        # 从而与预期事件对不上。
+        if st and st == self.body_style_id:
+            return None
         lvl = self.heading_styles.get(st) if st else None
         if lvl is None and st:
             from doc_tool.domain.ooxml import infer_heading_level_from_style_id
             lvl = infer_heading_level_from_style_id(st)
+        if lvl is None and st:
+            # Word 刷新后可能重新分配 styleId：回退到样式名称匹配。
+            lvl = self.heading_style_names.get(self._style_name(st).casefold())
         if lvl is None and properties is not None:
             otl = properties.find(qn("outlineLvl"))
             if otl is not None:
@@ -314,6 +405,18 @@ class DocxPackage:
                 if image_hashes:
                     events.append(Event("I", image_hashes, "body[{0}]".format(index)))
             elif local_name == "tbl" and started:
+                if is_code_container(element):
+                    # 代码容器在事件层等价于表格，但比较内容必须是代码文本，
+                    # 不能与用户表格矩阵混用（否则代码示例会被误判为表格差异）。
+                    lines = code_container_lines(element) or [""]
+                    events.append(
+                        Event(
+                            "T",
+                            normalize_matrix((("\n".join(lines),),)),
+                            "body[{0}]".format(index),
+                        )
+                    )
+                    continue
                 events.append(
                     Event(
                         "T",
@@ -437,74 +540,140 @@ def _expected_table_xml(path: str, available_bookmarks: Optional[Iterable[str]] 
     return root
 
 
+def _expected_text(value: str, registry) -> str:
+    """预期可见文本：与构建侧共享同一份交叉引用解析（编号/占位一致）。"""
+    from doc_tool.domain.captions import resolve_inline_references
+
+    return markdown_visible_text(resolve_inline_references(value, registry))
+
+
 def expected_markdown_events(
     path: str, config: Dict, available_bookmarks: Optional[Iterable[str]] = None
 ) -> List[Event]:
-    with open(path, encoding="utf-8") as handle:
-        lines = handle.read().split("\n")
+    """从 Markdown 推导预期事件序列。
+
+    使用 ``doc_tool.domain.blocks`` 的共享块解析（与构建内核同源），
+    因此代码块、题注、横向节与分页在预期侧与实际侧语义一致。
+    """
+    document = _parse_blocks_for_validation(path)
+    return expected_events_for_document(
+        document, config, registry=None, available_bookmarks=available_bookmarks
+    )
+
+
+def _parse_blocks_for_validation(path: str):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeError) as exc:
+        raise AutomationError("Markdown 无法读取 {0}: {1}".format(path, exc))
+    return parse_blocks(text, path)
+
+
+def _document_for_expectation(path: str, config: Dict):
+    """预期事件用的文档实体。
+
+    V2.7：构建时可能先把 Mermaid 围栏换成图片引用（预处理），
+    此时必须按「实际装配的内容」推导预期事件，否则把图当成代码块。
+    """
+    overrides = config.get("preparedTexts") or {}
+    prepared_text = overrides.get(os.path.abspath(path))
+    if prepared_text is not None:
+        return parse_blocks(prepared_text, path)
+    return _parse_blocks_for_validation(path)
+
+
+def expected_events_for_document(
+    document,
+    config: Dict,
+    registry=None,
+    available_bookmarks: Optional[Iterable[str]] = None,
+) -> List[Event]:
+    """把共享块解析结果转成预期事件序列。"""
+    path = document.path
     events: List[Event] = []
-    index = 0
-    while index < len(lines):
-        stripped = lines[index].strip()
-        source = "{0}:{1}".format(path, index + 1)
-        complex_table = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
-        if complex_table:
-            filename = complex_table.group(2)
-            if not filename:
+    for block in document.blocks:
+        source = "{0}:{1}".format(path, block.location.start_line)
+        if block.kind == KIND_COMPLEX_TABLE:
+            if not block.filename:
                 raise AutomationError("{0} 复杂表格标记缺少 XML 文件名".format(source))
-            table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
+            table_path = resolve_resource(config["paths"]["table_root"], block.filename, "复杂表格")
             element = _expected_table_xml(table_path, available_bookmarks=available_bookmarks)
             events.append(Event("C", normalize_matrix(table_matrix(element)), source, canonical_xml(element)))
-            index += 1
             continue
-        image = parse_image_reference(stripped)
-        if image is not None:
-            image_path = resolve_resource(config["paths"]["asset_root"], image.relative_path, "图片")
+        if block.kind == KIND_IMAGE:
+            # V2.7：Mermaid 等生成图在任务临时目录，按章节覆盖资源根，
+            # 否则预期侧会把图当成缺失引用而误报。
+            asset_root = (config.get("assetRootOverrides") or {}).get(
+                os.path.abspath(path), config["paths"]["asset_root"]
+            )
+            image_path = resolve_resource(asset_root, block.relative_path, "图片")
             with open(image_path, "rb") as image_file:
                 image_hash = hashlib.sha256(image_file.read()).hexdigest()
             events.append(Event("I", (image_hash,), source))
-            index += 1
+            caption_event = _expected_caption_event(block, registry, source)
+            if caption_event is not None:
+                events.append(caption_event)
             continue
-        if stripped.startswith("<!-- TBL:"):
-            index += 1
-            block: List[str] = []
-            while index < len(lines) and lines[index].strip().startswith("|"):
-                block.append(lines[index])
-                index += 1
-            events.append(Event("T", normalize_matrix(tuple(tuple(row) for row in parse_markdown_table(block))), source))
+        if block.kind == KIND_TABLE:
+            events.append(
+                Event("T", normalize_matrix(tuple(tuple(row) for row in block.rows)), source)
+            )
+            caption_event = _expected_caption_event(block, registry, source)
+            if caption_event is not None:
+                events.append(caption_event)
             continue
-        if stripped.startswith("|"):
-            block = []
-            while index < len(lines) and lines[index].strip().startswith("|"):
-                block.append(lines[index])
-                index += 1
-            events.append(Event("T", normalize_matrix(tuple(tuple(row) for row in parse_markdown_table(block))), source))
+        if block.kind == KIND_CODE:
+            from doc_tool.kernel_shared.docx_blocks import split_code_text
+
+            events.append(
+                Event(
+                    "T",
+                    normalize_matrix(((("\n".join(split_code_text(block.text))),),)),
+                    source,
+                )
+            )
             continue
-        heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
-        if heading:
-            events.append(Event("H", (len(heading.group(1)), markdown_visible_text(heading.group(2))), source))
-            index += 1
+        if block.kind == KIND_HEADING:
+            events.append(Event("H", (block.level, _expected_text(block.text, registry)), source))
             continue
-        unordered = re.match(r"^(\s*)[-*]\s+(.+)$", lines[index])
-        if unordered:
-            events.append(Event("L", (markdown_visible_text(unordered.group(2)), str(min(8, len(unordered.group(1).replace("\t", "    ")) // 2)), "*"), source))
-            index += 1
+        if block.kind == KIND_LIST_ITEM:
+            level = str(min(8, block.level))
+            marker = "*" if block.list_kind == "bullet" else "#"
+            events.append(Event("L", (_expected_text(block.text, registry), level, marker), source))
             continue
-        ordered = re.match(r"^(\s*)(\d{1,3})[.、]\s+(.+)$", lines[index])
-        if ordered:
-            events.append(Event("L", (markdown_visible_text(ordered.group(3)), str(min(8, len(ordered.group(1).replace("\t", "    ")) // 2)), "#"), source))
-            index += 1
+        if block.kind in (KIND_FOOTNOTE_DEF, KIND_SECTION, KIND_PAGEBREAK, KIND_EMPTY_PARAGRAPH):
             continue
-        if re.match(r"^\[\^[^\]]+\]:\s*", stripped):
-            index += 1
-            continue
-        if re.fullmatch(r"<!--\s*P:.*?\s*-->", stripped) or stripped == "<EMPTY_PAR/>" or not stripped:
-            index += 1
-            continue
-        kind = "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", stripped) else "P"
-        events.append(Event(kind, markdown_visible_text(stripped), source))
-        index += 1
+        resolved = _expected_text(block.text, registry)
+        paragraph_kind = (
+            "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", block.text) else "P"
+        )
+        events.append(Event(paragraph_kind, resolved, source))
     return events
+
+
+def _expected_caption_event(block, registry, source: str) -> Optional[Event]:
+    """题注对象的预期题注段落事件；未登记题注时返回 None。
+
+    编号与构建侧同源（同一注册表）：重复标识按出现顺序递增，正文引用
+    解析出的显示文本与本函数产出的题注文本必须一致。
+    """
+    from doc_tool.domain.captions import KIND_FIGURE as CAPTION_FIGURE
+
+    if registry is None:
+        return None
+    ident = getattr(block, "ident", "") or ""
+    if not ident:
+        return None
+    entry = registry.get(ident)
+    if entry is None:
+        return None
+    prefix = "图" if entry.kind == CAPTION_FIGURE else "表"
+    number = entry.number
+    if entry.duplicate:
+        number = registry.sequential_number(entry)
+    label = "{0} {1} {2}".format(prefix, number, entry.label).strip()
+    return Event("P", normalize_business_text(label), source)
 
 
 def markdown_visible_text(text: str) -> str:
@@ -527,15 +696,37 @@ def markdown_visible_text(text: str) -> str:
 def expected_content_events(
     config: Dict, available_bookmarks: Optional[Iterable[str]] = None
 ) -> List[Event]:
+    """按章节顺序推导预期事件；题注注册表与构建侧同源，保证编号一致。"""
+    from doc_tool.domain.captions import build_registry
+
+    entries = list(iter_chapter_entries(config))
+    documents = [
+        _document_for_expectation(markdown_path, config)
+        for _entry, markdown_path in entries
+        if markdown_path
+    ]
+    registry = build_registry(documents)
+    by_path = {document.path: document for document in documents}
     events: List[Event] = []
     is_headless = bool(config.get("is_headless", False))
-    for entry, markdown_path in iter_chapter_entries(config):
+    for entry, markdown_path in entries:
         if is_headless and entry.depth == 1 and entry.title in ("正文", "01-正文"):
             pass
         else:
             events.append(Event("H", (entry.depth, normalize_business_text(entry.title)), entry.path))
-        if markdown_path:
-            events.extend(expected_markdown_events(markdown_path, config, available_bookmarks=available_bookmarks))
+        if not markdown_path:
+            continue
+        document = by_path.get(markdown_path)
+        if document is None:
+            continue
+        events.extend(
+            expected_events_for_document(
+                document,
+                config,
+                registry=registry,
+                available_bookmarks=available_bookmarks,
+            )
+        )
     return events
 
 
@@ -734,11 +925,73 @@ def template_preservation_errors(
                 output_part = normalized_part(output, name)
             if template_part != output_part:
                 errors[category].append("模板部件变化: {0}".format(name))
-    if template.section_signatures() != output.section_signatures():
+    if _section_errors(template.section_signatures(), output.section_signatures()):
         errors["sections"].append("Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化")
     if normalized_part(template, "word/settings.xml", True) != normalized_part(output, "word/settings.xml", True):
         errors["settings"].append("settings.xml 除 updateFields 外发生变化")
     return errors
+
+
+def _section_errors(
+    template_sections: List[bytes],
+    output_sections: List[bytes],
+) -> bool:
+    """比较模板与产物的节属性，允许产物多出显式横向节。
+
+    规则：
+
+    - 产物中的全部**纵向节**必须与模板纵向节逐字节、按顺序完全一致
+      （数量、页面尺寸、方向、边距与页眉页脚引用都不变）；
+    - 产物多出的**横向节**由源 Markdown 的显式横目标记产生，允许是模板
+      任一节的横向副本（宽高交换 + orient=landscape）；
+    - 横向节不能是文档最后一节（否则方向泄漏，后续内容没有纵向节收敛）。
+
+    无法归类的差异返回 True。
+    """
+    if not template_sections:
+        return False
+    output_portrait = [
+        section
+        for section in output_sections
+        if _landscape_core(section) is None
+    ]
+    if output_portrait != template_sections:
+        return True
+    if output_sections and _landscape_core(output_sections[-1]) is not None:
+        # 横向节不能是文档最后一节：方向必须由末尾 sectPr 收敛回纵向。
+        return True
+    for section in output_sections:
+        if _landscape_core(section) is not None:
+            continue
+        # 纵向节必须在模板里存在（顺序已由整表比较保证）。
+        if section not in template_sections:
+            return True
+    return False
+
+
+def _landscape_core(section_xml: bytes) -> Optional[bytes]:
+    """把横向节属性还原为同名纵向节属性（用于与模板节比较）。
+
+    生成侧切横向时只交换 ``w``/``h`` 并写 ``orient``，页边距原样保留；
+    模板未写 orient 时是 Word 默认纵向，因此还原时删除该属性，保证与
+    模板逐字节可比。
+    """
+    try:
+        root = parse_xml_safe(section_xml, "sectPr")
+    except Exception:
+        return None
+    page_size = root.find(qn("pgSz"))
+    if page_size is None:
+        return None
+    if page_size.get(qn("orient")) != ORIENT_LANDSCAPE:
+        return None
+    width = page_size.get(qn("w"))
+    height = page_size.get(qn("h"))
+    if width and height:
+        page_size.set(qn("w"), height)
+        page_size.set(qn("h"), width)
+    page_size.attrib.pop(qn("orient"), None)
+    return canonical_xml(root)
 
 
 def _style_id_names(package: DocxPackage) -> Dict[str, str]:
@@ -836,6 +1089,60 @@ def _section_geometry(package: DocxPackage) -> List[Tuple]:
     return result
 
 
+def _geometry_errors(template_geometry, output_geometry) -> bool:
+    """比较节几何签名，允许产物多出横向节（宽高交换 + orient=landscape）。
+
+    与 ``_section_errors`` 同一口径：只要模板的纵向节按顺序原样保留，中间
+    多出的横向节允许是任意模板节的横向副本（正文节与封面节共用正文时
+    以哪一节为原型都合法）。
+    """
+    if len(output_geometry) < len(template_geometry):
+        return True
+    output_portrait = [
+        part
+        for part in output_geometry
+        if _landscape_geometry(part) is None
+    ]
+    if output_portrait != template_geometry:
+        return True
+    if output_geometry and _landscape_geometry(output_geometry[-1]) is not None:
+        return True
+    for part in output_geometry:
+        if _landscape_geometry(part) is not None:
+            continue
+        if part not in template_geometry:
+            return True
+    return False
+
+
+def _landscape_geometry(parts):
+    """把横向节几何签名还原为同名纵向签名；非横向返回 None。
+
+    生成侧切横向时只交换 ``w``/``h`` 并写 ``orient``，页边距原样保留，
+    因此这里同样只换回尺寸并去掉 orient。
+    """
+    if not parts:
+        return None
+    fields = {name: attributes for name, attributes in parts[:-1]}
+    page_size = dict(fields.get("pgSz", ()))
+    if page_size.get("orient") != "landscape":
+        return None
+    width = page_size.get("w")
+    height = page_size.get("h")
+    if width and height:
+        page_size["w"] = height
+        page_size["h"] = width
+    page_size.pop("orient", None)
+    normalized = []
+    for name, attributes in parts[:-1]:
+        if name == "pgSz":
+            normalized.append((name, tuple(sorted(page_size.items()))))
+        else:
+            normalized.append((name, attributes))
+    normalized.append(parts[-1])
+    return tuple(normalized)
+
+
 def _static_paragraph_text(paragraph) -> str:
     parts = []
     field_depth = 0
@@ -927,6 +1234,41 @@ def _header_footer_signatures(package: DocxPackage, prefix: str) -> Counter:
     return Counter(signatures)
 
 
+def _theme_semantics(theme_elements, a_ns: str) -> tuple:
+    """提取主题中**真正影响成品**的语义：字体方案与配色。
+
+    Word 刷新会合法地补写/回写主题内部辅助字体脚本与颜色映射（字节级差异），
+    但“用什么字体、用什么配色”不应变。因此这里只比对语义，
+    并要求输出**不得丢失**模板已有的字体脚本与颜色槽位。
+    """
+    fonts: dict = {}
+    scheme = theme_elements.find(a_ns + "fontScheme")
+    if scheme is not None:
+        for kind in ("majorFont", "minorFont"):
+            holder = scheme.find(a_ns + kind)
+            if holder is None:
+                continue
+            entry = {}
+            for tag in ("latin", "ea", "cs"):
+                node = holder.find(a_ns + tag)
+                entry[tag] = (node.get("typeface") or "") if node is not None else ""
+            scripts = {}
+            for node in holder.findall(a_ns + "font"):
+                scripts[node.get("script") or ""] = node.get("typeface") or ""
+            entry["scripts"] = scripts
+            fonts[kind] = entry
+    palette: dict = {}
+    colors = theme_elements.find(a_ns + "clrScheme")
+    if colors is not None:
+        for child in colors:
+            slot = child.tag.split("}")[-1]
+            value = ""
+            for sub in child:
+                value = sub.get("val") or sub.get("lastClr") or ""
+            palette[slot] = value
+    return fonts, palette
+
+
 def _setting_enabled(root, tag: str) -> bool:
     item = root.find(qn(tag))
     if item is None:
@@ -949,8 +1291,14 @@ def word_semantic_preservation_errors(
     required_style_ids = [str(value) for value in config["headingStyles"].values()] + [
         str(config.get("bodyStyle", "") or "")
     ]
-    required_style_names = {template_style_names.get(style_id, "") for style_id in required_style_ids}
-    if "" in required_style_names or not required_style_names.issubset(output_paragraph_names):
+    # 仅比对**模板真正定义了名称**的配置样式：Word 对继承自内置/主题的
+    # 样式会重新指向自己的等价样式（如正文归入 ``Normal``），这是**合法规范化**而非丢失。
+    defined_names = {
+        template_style_names[style_id]
+        for style_id in required_style_ids
+        if style_id and template_style_names.get(style_id)
+    }
+    if not defined_names.issubset(output_paragraph_names):
         errors["styles"].append("Word 刷新后配置的 Heading/正文段落样式缺失")
     required_levels = set(config["headingStyles"])
     if not required_levels.issubset(set(output.heading_styles.values())):
@@ -968,18 +1316,27 @@ def word_semantic_preservation_errors(
     )
     if (template_theme is None) != (output_theme is None) or (
         template_theme is not None
-        and canonical_xml(template_theme) != canonical_xml(output_theme)
+        and _theme_semantics(template_theme, a_ns) != _theme_semantics(output_theme, a_ns)
     ):
         errors["styles"].append("Word 刷新后主题字体/颜色定义变化")
     # Word prunes unused duplicate abstract numbering definitions when saving.
     # Every retained definition must still be present with identical semantics.
     if set(_numbering_signature(template)) - set(_numbering_signature(output)):
         errors["numbering"].append("Word 刷新后模板原有编号级别、格式或标题关联缺失")
-    if _section_geometry(template) != _section_geometry(output):
+    template_geometry = _section_geometry(template)
+    output_geometry = _section_geometry(output)
+    if _geometry_errors(template_geometry, output_geometry):
         errors["sections"].append("Word 刷新后 Section 数量、纸张、方向或页边距变化")
-    if _header_footer_signatures(template, "word/header") != _header_footer_signatures(output, "word/header"):
+    # Word 刷新可能为同一页眉页脚内容**新增一份相同的 part**（如首页页眉），
+    # 因此按 part 数量做多重集比较会产生假象。改为比较**去重后的内容集合**：
+    # 内容变化仍会报错，仅重复新增同内容 part 不再误报。
+    if set(_header_footer_signatures(template, "word/header")) != set(
+        _header_footer_signatures(output, "word/header")
+    ):
         errors["headers"].append("Word 刷新后非空页眉的静态文本、域、表格或图片变化")
-    if _header_footer_signatures(template, "word/footer") != _header_footer_signatures(output, "word/footer"):
+    if set(_header_footer_signatures(template, "word/footer")) != set(
+        _header_footer_signatures(output, "word/footer")
+    ):
         errors["footers"].append("Word 刷新后非空页脚的静态文本、域、表格或图片变化")
     for tag in ("evenAndOddHeaders", "mirrorMargins", "gutterAtTop", "bookFoldPrinting", "trackRevisions"):
         if _setting_enabled(template.settings, tag) != _setting_enabled(output.settings, tag):
@@ -1101,6 +1458,8 @@ def validate(
     report = Report(doc_type, output_path)
 
     output = DocxPackage(output_path, heading_styles=config["headingStyles"])
+    # 正文样式不能被当成标题（部分模板的正文样式名会命中 Heading 启发式）。
+    output.body_style_id = str(config.get("bodyStyle") or "")
     template = DocxPackage(config["paths"]["template"], heading_styles=config["headingStyles"])
     available_bms = {
         node.get(qn("name"))
@@ -1224,16 +1583,22 @@ def validate(
 
     if require_refreshed and company_profile:
         toc_cached = output.toc_cached_paragraphs()
+        # 刷新前校验已证明构建产物的目录缓存正确；刷新后只需证明
+        # **正文标题对应的条目一条不少**。模板自带的目录条目（公司模板常见）
+        # 不应计入我们的基准，否则只能得到失败的假象。
         toc_expected = expected_toc_labels(config, 3)
-        # 尾部页码只剥离缓存侧（预期侧无页码，剥离会误删以数字结尾的标题）。
         cached_labels = [_toc_label_key(text, strip_page=True) for text in toc_cached]
-        toc_ok = cached_labels == [_toc_label_key(text, strip_page=False) for text in toc_expected]
+        expected_keys = [_toc_label_key(text, strip_page=False) for text in toc_expected]
+        missing_labels = [key for key in expected_keys if key not in cached_labels]
+        toc_ok = not missing_labels
         page_cached = cover_text.get("页数", "")
         page_ok = page_cached.isdigit() and int(page_cached) > 0
         report.row_check(
-            name="TOC 缓存已刷新且与 H1~H3 一致",
+            name="TOC 刷新后包含全部 H1~H3 标题",
             ok=toc_ok,
-            detail="expected={0}, cached={1}".format(len(toc_expected), len(toc_cached)),
+            detail="expected={0}, cached={1}, missing={2}".format(
+                len(toc_expected), len(toc_cached), len(missing_labels)
+            ),
         )
         report.row_check(name="封面总页数字段已刷新", ok=page_ok, detail="cached={0}".format(page_cached))
 

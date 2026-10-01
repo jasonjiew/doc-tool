@@ -1,0 +1,10 @@
+def paragraph_text(paragraph) -> str:
+    parts: List[str] = []
+    for node in paragraph.iter():
+        if node.tag == qn("t"):
+            parts.append(node.text or "")
+        elif node.tag in (qn("br"), qn("cr")):
+            parts.append("\n")
+        elif node.tag == qn("tab"):
+            parts.append("\t")
+    return "".join(parts).strip()

@@ -1,0 +1,17 @@
+def resolve_inline_references(text: str, registry: Optional[CaptionRegistry]) -> str:
+    """把正文中的 ``@fig-x`` / ``@tbl-x`` 解析为可读显示文本。
+
+    解析结论与构建侧完全一致（同一注册表、同一规则）：命中对象显示
+    「图 2 标题」，歧义或缺失保留可读占位文本，不猜测目标。未提供注册表
+    时保持源码原样，便于旧项目与不做校验的场景。
+    """
+    if registry is None or not text:
+        return text
+
+    def replace(match):
+        return registry.resolve_token(match.group("kind"), match.group("slug"))
+
+    return REFERENCE_RE.sub(replace, text)
+
+
+def build_registry(documents: Iterable[ParsedDocument]) -> CaptionRegistry:

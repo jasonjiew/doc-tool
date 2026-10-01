@@ -2,7 +2,7 @@
 """PyInstaller spec：将 Doc Tool 打包为 Windows onedir 应用（PySide6）。
 
 任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets/QtPdf，排除未用的
-QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积。
+QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积；V2.7 起编辑器预览只用内置结构预览，WebEngine 分支已停用，因此该排除同时是产品边界。
 
 构建命令：
     pyinstaller packaging/doc_tool.spec --noconfirm --clean
@@ -29,7 +29,8 @@ from PyInstaller.utils.hooks import (
 SPEC_DIR = Path(SPECPATH).resolve()
 REPO_ROOT = SPEC_DIR.parent
 
-APP_VERSION = "1.0.0"
+sys.path.insert(0, str(REPO_ROOT))
+from doc_tool.domain.version import APP_VERSION
 
 block_cipher = None
 
@@ -100,6 +101,9 @@ all_datas = (
         # doc_tool/resources/ 下的默认配置与图标
         (str(REPO_ROOT / "doc_tool" / "resources" / "default_project.yml"),
          "doc_tool/resources"),
+        (str(REPO_ROOT / "doc_tool" / "resources" / "generic-template.docx"),
+         "doc_tool/resources"),
+        (str(REPO_ROOT / "standards"), "doc_tool/resources/standards"),
         (str(REPO_ROOT / "doc_tool" / "resources" / "web_preview"),
          "doc_tool/resources/web_preview"),
     ]
@@ -167,6 +171,7 @@ a = Analysis(
         "multiprocessing",
         # 排除 openpyxl 可选依赖 numpy，保持分发包轻量且与 CI 依赖严格一致
         "numpy",
+        "pandas",  # 未使用的可选依赖，不收集其模板资源
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

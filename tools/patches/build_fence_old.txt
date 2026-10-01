@@ -1,0 +1,6 @@
+        with open(markdown_path, encoding="utf-8") as handle:
+            markdown_lines = handle.read().splitlines()
+        for line in markdown_lines:
+            heading = re.match(r"^#{1,9}\s+(.+)$", line.strip())
+            if heading:
+                h_text = re.sub(r"<br\s*/?>", "\n", heading.group(1).strip(), flags=re.IGNORECASE)

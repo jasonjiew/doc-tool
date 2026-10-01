@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="2" failures="0" time="10.500"><testsuite name="doc-tool" tests="2" failures="0" time="10.500"><testcase name="test_snippet_library.py" classname="scripts.tests" time="1.828"><system-out>..
+----------------------------------------------------------------------
+Ran 2 tests in 0.484s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="8.672"><system-out>...................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 7.968s
+
+OK
+</system-out></testcase></testsuite></testsuites>

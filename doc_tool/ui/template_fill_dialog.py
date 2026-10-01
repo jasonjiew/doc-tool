@@ -15,6 +15,8 @@ from typing import Dict, List, Optional
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
+    QInputDialog,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -30,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from doc_tool.application.convert import error_resolution_guide
+from doc_tool.domain.errors import DocToolError
 from doc_tool.application.template_fill import (
     TemplateStyles,
     fill_markdown_with_template,
@@ -69,6 +72,19 @@ class TemplateFillDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
+        from doc_tool.application.template_fill_presets import TemplateFillPresets
+        self._presets = TemplateFillPresets()
+        preset_row = QHBoxLayout()
+        self._recipe_combo = QComboBox()
+        self._recipe_combo.addItem("上次设置 / 未命名", None)
+        for recipe in self._presets.recipes:
+            self._recipe_combo.addItem(recipe.get('name', '未命名'), recipe)
+        preset_row.addWidget(self._recipe_combo, 1)
+        for title, callback in [('保存/编辑预设', self._save_recipe), ('删除预设', self._delete_recipe), ('最近任务/再次生成', self._show_jobs)]:
+            btn = QPushButton(title)
+            btn.clicked.connect(callback)
+            preset_row.addWidget(btn)
+        layout.addLayout(preset_row)
 
         # 1. 底模选择
         template_row = QHBoxLayout()
@@ -144,6 +160,8 @@ class TemplateFillDialog(QDialog):
         options_row.addStretch(1)
         self._refresh_fields = QCheckBox("出稿后用 Word 刷新目录/域（无 Word 时打开自动刷新）", self)
         options_row.addWidget(self._refresh_fields)
+        self._strict = QCheckBox('严格检查（降级时停止）', self)
+        options_row.addWidget(self._strict)
         layout.addLayout(options_row)
 
         # 4. 进度与详情
@@ -185,16 +203,110 @@ class TemplateFillDialog(QDialog):
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_INTERVAL_MS)
         self._timer.timeout.connect(self._poll)
+        self._plan_timer = QTimer(self)
+        self._plan_timer.setSingleShot(True)
+        self._plan_timer.setInterval(500)
+        self._plan_timer.timeout.connect(self._update_plan)
+        self._plan_label = QLabel('生成摘要：添加输入后自动更新。', self)
+        self._plan_label.setWordWrap(True)
+        layout.addWidget(self._plan_label)
+        for edit in (self._template_edit, self._output_edit, self._name_edit):
+            edit.textChanged.connect(lambda *_: self._plan_timer.start())
+        self._file_list.model().rowsInserted.connect(lambda *_: self._plan_timer.start())
+        self._file_list.model().rowsRemoved.connect(lambda *_: self._plan_timer.start())
+        self._strict.toggled.connect(lambda *_: self._plan_timer.start())
 
         # 记忆底模：预填上次使用的 .docx（失效时解析警告会提示）。
         last_template = load_last_template()
         if last_template:
             self._template_edit.setText(last_template)
+        self._recipe_combo.currentIndexChanged.connect(self._select_recipe)
+        for warning in self._presets.warnings:
+            self._details.appendPlainText(warning)
 
         if paths:
             self._add_files(paths)
 
     # --- 拖放 ---
+
+    def _settings(self):
+        return dict(template=str(self._template_path() or ''), mapping=self._style_map or {},
+                    clean=self._clean_body.isChecked(), refresh=self._refresh_fields.isChecked(), strict=self._strict.isChecked(),
+                    outputDir=self._output_edit.text(), outputName=self._name_edit.text())
+
+    def _save_recipe(self):
+        recipe = self._recipe_combo.currentData()
+        name, ok = QInputDialog.getText(self, '预设名称', '名称：', text=recipe.get('name', '') if recipe else '')
+        if not ok: return
+        try:
+            self._presets.save_recipe(name, self._settings(), recipe.get('recipeId') if recipe else None)
+            self._reload_recipes()
+        except (OSError, ValueError) as exc:
+            self._details.appendPlainText('预设保存失败：' + str(exc))
+
+    def _reload_recipes(self):
+        self._recipe_combo.blockSignals(True)
+        self._recipe_combo.clear()
+        self._recipe_combo.addItem('上次设置 / 未命名', None)
+        for recipe in self._presets.recipes:
+            self._recipe_combo.addItem(recipe.get('name', '未命名'), recipe)
+        self._recipe_combo.blockSignals(False)
+
+    def _delete_recipe(self):
+        recipe = self._recipe_combo.currentData()
+        if recipe:
+            try:
+                self._presets.delete_recipe(recipe['recipeId'])
+                self._reload_recipes()
+            except OSError as exc: self._details.appendPlainText(str(exc))
+
+    def _apply_settings(self, values):
+        self._template_edit.setText(values.get('template', ''))
+        try:
+            self._parsed_styles = parse_template_styles(values.get('template', ''))
+        except (OSError, ValueError, DocToolError): self._parsed_styles = None
+        if self._parsed_styles:
+            values = self._presets.resolve_recipe(values, self._parsed_styles)
+        self._style_map = values.get('mapping') or None
+        self._clean_body.setChecked(bool(values.get('clean')))
+        self._refresh_fields.setChecked(bool(values.get('refresh')))
+        self._strict.setChecked(bool(values.get('strict')))
+        self._output_edit.setText(values.get('outputDir', ''))
+        self._name_edit.setText(values.get('outputName', ''))
+
+    def _select_recipe(self, index):
+        recipe = self._recipe_combo.itemData(index)
+        if recipe: self._apply_settings(recipe)
+
+    def _show_jobs(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('最近 20 次填充任务（非项目正式历史）')
+        layout = QVBoxLayout(dialog)
+        items = QListWidget()
+        items.addItems([job['time'] + ' · ' + job['status'] for job in self._presets.jobs])
+        preview = QPlainTextEdit()
+        preview.setReadOnly(True)
+        def selected(row):
+            if row >= 0:
+                import json
+                preview.setPlainText(json.dumps(self._presets.jobs[row], ensure_ascii=False, indent=2))
+        items.currentRowChanged.connect(selected)
+        layout.addWidget(items)
+        layout.addWidget(preview)
+        retry = QPushButton('回填选中任务（之后点击开始生成）')
+        def refill():
+            row = items.currentRow()
+            if row < 0: return
+            job = self._presets.jobs[row]
+            self._apply_settings(job)
+            self._file_list.clear()
+            self._file_list.addItems([item['path'] for item in job['sources']])
+            self._refresh_run_state()
+            dialog.accept()
+        retry.clicked.connect(refill)
+        layout.addWidget(retry)
+        dialog.resize(760, 550)
+        dialog.exec()
 
     def dragEnterEvent(self, event) -> None:  # noqa: N802
         if event.mimeData().hasUrls() and not self._runner.is_running:
@@ -271,7 +383,7 @@ class TemplateFillDialog(QDialog):
             )
         else:
             self._details.appendPlainText(
-                "⚠️ 底模未识别到标题样式：开始生成前会先弹出「样式映射」。"
+                "⚠️ 底模未识别到标题样式：默认自动匹配，亦可手动设置映射。"
             )
         if styles.body_heading_count > 0:
             self._clean_body.setChecked(True)
@@ -383,6 +495,12 @@ class TemplateFillDialog(QDialog):
                 "neutral",
             )
 
+    def _update_plan(self):
+        if not self._md_paths() or self._runner.is_running: return
+        from doc_tool.application.template_fill_plan import plan_template_fill
+        plan = plan_template_fill(self._md_paths(), self._template_path() or '', self._resolve_output(), mapping=self._style_map, strict=self._strict.isChecked())
+        self._plan_label.setText(plan.report())
+
     def _on_choose_output(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "选择输出目录")
         if folder:
@@ -410,55 +528,35 @@ class TemplateFillDialog(QDialog):
         if not files:
             QMessageBox.information(self, "开始生成", "请先添加 Markdown 文件。")
             return
-        if template is None:
-            QMessageBox.information(self, "开始生成", "请先选择 Word 底模。")
+        from doc_tool.application.template_fill_plan import plan_template_fill, execute_template_fill
+        plan = plan_template_fill(files, template or '', self._resolve_output(), mapping=self._style_map, strict=self._strict.isChecked())
+        self._details.appendPlainText(plan.report())
+        if not plan.viable:
+            self._set_status('没有可行方案，请查看摘要。', 'failure')
             return
-        if not template.is_file() or template.suffix.lower() != ".docx":
-            QMessageBox.warning(self, "开始生成", "底模必须是一个存在的 .docx 文件。")
-            return
-
-        styles = self._parsed_styles
-        if styles is None or self._parsed_source != str(template):
-            try:
-                styles = parse_template_styles(template)
-                self._parsed_styles = styles
-                self._parsed_source = str(template)
-            except Exception as exc:
-                QMessageBox.warning(self, "开始生成", "底模无法解析：{0}".format(exc))
-                return
-        if not styles.raw_heading_styles and not self._style_map:
-            self._on_open_style_map()
-            if not self._style_map:
-                self._details.appendPlainText("✗ 未完成样式映射，已取消本次生成。")
-                return
-
+        template = Path(plan.template)
         output = self._resolve_output()
-        if output.exists():
-            reply = QMessageBox.question(
-                self,
-                "开始生成",
-                "产物文件已存在：\n{0}\n确认覆盖吗？".format(output),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
+        from doc_tool.application.template_fill_presets import fresh_output
+        output = fresh_output(output, files + [template])
         try:
             output.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             QMessageBox.warning(self, "开始生成", "无法创建输出目录：{0}".format(exc))
             return
 
+        self._job_sources, self._job_settings = files, self._settings()
+        self._job_state = 'failed'
         started = self._runner.start(
             TaskSpec(
                 name="template_fill",
-                target=fill_markdown_with_template,
+                target=execute_template_fill,
                 args=(files, template, output),
                 kwargs={
                     "heading_style_map": self._style_map,
                     "refresh_fields": self._refresh_fields.isChecked(),
                     "clean_body_from_first_heading": self._clean_body.isChecked(),
                     "on_warning": self._on_warning,
+                    "strict": self._strict.isChecked(),
                 },
                 timeout_seconds=600 + 60 * len(files),
             ),
@@ -481,6 +579,10 @@ class TemplateFillDialog(QDialog):
         return
 
     def _on_task_event(self, event) -> None:
+        if event.kind == 'stage':
+            self._set_status(event.stage + ' ' + (event.detail or ''), 'neutral')
+        if event.kind in ('cancelled', 'failed'):
+            self._job_state = event.kind
         if event.kind == "failed":
             code = getattr(event, "error_code", None)
             short_title, guide = error_resolution_guide(code, event.detail or "")
@@ -490,6 +592,11 @@ class TemplateFillDialog(QDialog):
             )
 
     def _on_done(self, result) -> None:
+        if hasattr(self, '_job_sources'):
+            status = (getattr(result, 'status', '待刷新' if result.refresh_state != 'ok' else '带提醒完成' if result.warnings else '完成') if result else self._job_state)
+            warning = self._presets.record_job(self._job_sources, self._job_settings, status=status,
+                output=result.output if result else '', warnings=result.warnings if result else ())
+            if warning: self._details.appendPlainText(warning)
         self._set_controls_enabled(True)
         self._cancel_btn.setEnabled(False)
         self._timer.stop()
@@ -555,6 +662,8 @@ class TemplateFillDialog(QDialog):
         self._refresh_fields.setEnabled(enabled)
         self._clean_body.setEnabled(enabled)
         self._file_list.setEnabled(enabled)
+        self._strict.setEnabled(enabled)
+        self._recipe_combo.setEnabled(enabled)
 
     def _set_status(self, text: str, tone: str = "neutral") -> None:
         self._status.setText(text)

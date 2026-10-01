@@ -1,0 +1,317 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="6" failures="1" time="87.734"><testsuite name="doc-tool" tests="6" failures="1" time="87.734"><testcase name="test_safety_recovery.py" classname="scripts.tests" time="15.750"><system-out>.....................................................
+----------------------------------------------------------------------
+Ran 53 tests in 14.783s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="5.843"><system-out>...................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 5.186s
+
+OK
+</system-out></testcase><testcase name="test_review_docx.py" classname="scripts.tests" time="2.157"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 1.251s
+
+OK
+</system-out></testcase><testcase name="test_vcs_changes.py" classname="scripts.tests" time="59.984"><system-out>test_local_mode_keeps_bak_creation (__main__.BackupPolicyTests.test_local_mode_keeps_bak_creation)
+backup_enabled=True（默认/本地项目）→ 仍生成 .md.bak。 ... ok
+test_local_mode_rollback_restores_from_bak (__main__.BackupPolicyTests.test_local_mode_rollback_restores_from_bak)
+本地模式回滚仍用 .bak 恢复内容（原行为不变）。 ... ok
+test_set_backup_enabled_toggle (__main__.BackupPolicyTests.test_set_backup_enabled_toggle)
+运行中切换开关立即生效。 ... ok
+test_vcs_mode_create_then_edit_rollback_delete_only (__main__.BackupPolicyTests.test_vcs_mode_create_then_edit_rollback_delete_only)
+VCS 模式新建文件再编辑：回滚删除该文件（create 条目生效）。 ... ok
+test_vcs_mode_disables_bak_creation (__main__.BackupPolicyTests.test_vcs_mode_disables_bak_creation)
+backup_enabled=False（VCS 管理）→ 写入不产生 .md.bak。 ... ok
+test_vcs_mode_rollback_reports_missing_backup (__main__.BackupPolicyTests.test_vcs_mode_rollback_reports_missing_backup)
+VCS 模式无 .bak：本地清单回滚给出明确失败提示而非静默成功。 ... ok
+test_change_item_non_restorable_marker (__main__.FallbackAndPrecedenceTests.test_change_item_non_restorable_marker) ... ok
+test_changed_file_serialization_roundtrip (__main__.FallbackAndPrecedenceTests.test_changed_file_serialization_roundtrip) ... ok
+test_git_precedes_svn (__main__.FallbackAndPrecedenceTests.test_git_precedes_svn)
+项目同时位于 git 仓库与假 svn 工作副本时，Git 优先。 ... ok
+test_no_vcs_returns_local (__main__.FallbackAndPrecedenceTests.test_no_vcs_returns_local) ... ok
+test_branches_cache_and_invalidation (__main__.GitBranchAndWorkflowTests.test_branches_cache_and_invalidation) ... ok
+test_commit_files_selective (__main__.GitBranchAndWorkflowTests.test_commit_files_selective) ... ok
+test_commit_files_with_both_reported_and_unreported_files (__main__.GitBranchAndWorkflowTests.test_commit_files_with_both_reported_and_unreported_files)
+同时包含 report 内与 report 缓存外文件时，两者均正确入库，不丢文件。 ... ok
+test_commit_files_with_nested_project_and_relative_paths (__main__.GitBranchAndWorkflowTests.test_commit_files_with_nested_project_and_relative_paths) ... ok
+test_create_and_checkout_branch (__main__.GitBranchAndWorkflowTests.test_create_and_checkout_branch) ... ok
+test_git_stash_and_pop (__main__.GitBranchAndWorkflowTests.test_git_stash_and_pop) ... ok
+test_git_stash_clean_and_empty_pop (__main__.GitBranchAndWorkflowTests.test_git_stash_clean_and_empty_pop) ... ok
+test_git_stash_include_untracked (__main__.GitBranchAndWorkflowTests.test_git_stash_include_untracked) ... ok
+test_git_stash_pop_conflict (__main__.GitBranchAndWorkflowTests.test_git_stash_pop_conflict) ... ok
+test_list_git_branches_and_current (__main__.GitBranchAndWorkflowTests.test_list_git_branches_and_current) ... ok
+test_list_git_branches_detached_head (__main__.GitBranchAndWorkflowTests.test_list_git_branches_detached_head) ... ok
+test_pull_git_chinese_locale_conflict_messages (__main__.GitBranchAndWorkflowTests.test_pull_git_chinese_locale_conflict_messages)
+中文 Git 环境下的未提交冲突与未跟踪冲突应被正确识别并提示暂存。 ... ok
+test_push_changes_detached_head_blocked (__main__.GitBranchAndWorkflowTests.test_push_changes_detached_head_blocked) ... ok
+test_push_changes_with_fake_runner (__main__.GitBranchAndWorkflowTests.test_push_changes_with_fake_runner) ... ok
+test_service_branches_and_switch_integration (__main__.GitBranchAndWorkflowTests.test_service_branches_and_switch_integration) ... ok
+test_switch_git_branch_existing (__main__.GitBranchAndWorkflowTests.test_switch_git_branch_existing) ... ok
+test_switch_git_branch_invalid_names (__main__.GitBranchAndWorkflowTests.test_switch_git_branch_invalid_names) ... ok
+test_asset_change_marks_chapter_modified_not_added (__main__.GitDetectionTests.test_asset_change_marks_chapter_modified_not_added)
+新增/删除被引用的资源：章节标 modified，绝不继承 added/deleted。 ... ok
+test_cache_invalidation_after_write (__main__.GitDetectionTests.test_cache_invalidation_after_write) ... ok
+test_chapter_own_status_wins_over_asset_reverse_lookup (__main__.GitDetectionTests.test_chapter_own_status_wins_over_asset_reverse_lookup)
+章节自身的真实状态优先于资源反查（不被反查结果覆盖或抹平）。 ... ok
+test_chapters_mapping_and_asset_reference (__main__.GitDetectionTests.test_chapters_mapping_and_asset_reference) ... ok
+test_chinese_and_space_paths (__main__.GitDetectionTests.test_chinese_and_space_paths) ... ok
+test_clean_tracked_project_stays_git (__main__.GitDetectionTests.test_clean_tracked_project_stays_git)
+已跟踪但无改动的项目仍是 git 模式（不能被未跟踪兜底误判）。 ... ok
+test_content_root_asset_also_maps_to_chapter (__main__.GitDetectionTests.test_content_root_asset_also_maps_to_chapter)
+content_root 内的资源（如 general/images/x.png）同样反查引用章节。 ... ok
+test_detects_modified_added_and_deleted (__main__.GitDetectionTests.test_detects_modified_added_and_deleted) ... ok
+test_git_command_failure_falls_back_to_local (__main__.GitDetectionTests.test_git_command_failure_falls_back_to_local) ... ok
+test_git_unavailable_falls_back_to_local (__main__.GitDetectionTests.test_git_unavailable_falls_back_to_local) ... ok
+test_gitignored_project_falls_back_to_local (__main__.GitDetectionTests.test_gitignored_project_falls_back_to_local)
+项目被 .gitignore 忽略：git 永远沉默 → 必须回退本地快照。 ... ok
+test_no_commit_repo_untracked_only (__main__.GitDetectionTests.test_no_commit_repo_untracked_only) ... ok
+test_project_at_repo_root (__main__.GitDetectionTests.test_project_at_repo_root) ... ok
+test_rename_detected_with_old_path (__main__.GitDetectionTests.test_rename_detected_with_old_path) ... ok
+test_staged_and_unstaged_flags (__main__.GitDetectionTests.test_staged_and_unstaged_flags) ... ok
+test_status_map_maps_to_content_and_project_yml (__main__.GitDetectionTests.test_status_map_maps_to_content_and_project_yml) ... ok
+test_two_projects_in_different_repos (__main__.GitDetectionTests.test_two_projects_in_different_repos) ... ok
+test_two_projects_one_repo_are_isolated_even_with_warm_cache (__main__.GitDetectionTests.test_two_projects_one_repo_are_isolated_even_with_warm_cache)
+窗口 A/B 打开同一仓库下两个项目：A 的 Git 变化绝不能出现在 B。 ... ok
+test_parse_git_name_status_z_rename (__main__.GitParserTests.test_parse_git_name_status_z_rename) ... ok
+test_parse_git_status_z_rename_new_first (__main__.GitParserTests.test_parse_git_status_z_rename_new_first) ... ok
+test_find_git_repo_root_walks_up_parents (__main__.GitRepoRootTests.test_find_git_repo_root_walks_up_parents) ... ok
+test_find_svn_wc_root_walks_up_parents (__main__.GitRepoRootTests.test_find_svn_wc_root_walks_up_parents) ... ok
+test_parse_svn_status_xml_items (__main__.SvnDetectionTests.test_parse_svn_status_xml_items) ... ok
+test_svn_command_failure_returns_local (__main__.SvnDetectionTests.test_svn_command_failure_returns_local) ... ok
+test_svn_detects_m_a_d_replaced_and_untracked (__main__.SvnDetectionTests.test_svn_detects_m_a_d_replaced_and_untracked) ... ok
+test_svn_missing_returns_local (__main__.SvnDetectionTests.test_svn_missing_returns_local) ... ok
+test_svn_status_map (__main__.SvnDetectionTests.test_svn_status_map) ... ok
+test_svn_two_projects_isolated (__main__.SvnDetectionTests.test_svn_two_projects_isolated) ... ok
+test_git_commit_all_command_failure_reports_error (__main__.VcsCommitPullTests.test_git_commit_all_command_failure_reports_error) ... ok
+test_git_commit_all_commits_project_changes (__main__.VcsCommitPullTests.test_git_commit_all_commits_project_changes) ... ok
+test_git_commit_all_empty_message (__main__.VcsCommitPullTests.test_git_commit_all_empty_message) ... ok
+test_git_commit_all_no_repo_root (__main__.VcsCommitPullTests.test_git_commit_all_no_repo_root) ... ok
+test_git_commit_all_scopes_to_project (__main__.VcsCommitPullTests.test_git_commit_all_scopes_to_project) ... ok
+test_pull_failure_reports_error (__main__.VcsCommitPullTests.test_pull_failure_reports_error) ... ok
+test_pull_git_autostash_conflicting (__main__.VcsCommitPullTests.test_pull_git_autostash_conflicting)
+本地未提交修改与远端发生冲突时，autostash 产生冲突并在 result.conflicts 中准确报告。 ... ok
+test_pull_git_autostash_when_dirty (__main__.VcsCommitPullTests.test_pull_git_autostash_when_dirty)
+本地存在未提交修改但与远端不冲突时，自动带 --autostash 拉取并无缝还原本地改动。 ... ok
+test_pull_git_conflict_reports_unmerged_files (__main__.VcsCommitPullTests.test_pull_git_conflict_reports_unmerged_files)
+git pull 合并冲突：ok=False 且列出未合并文件。 ... ok
+test_pull_git_invokes_git_pull (__main__.VcsCommitPullTests.test_pull_git_invokes_git_pull) ... ok
+test_pull_git_reports_changed_files (__main__.VcsCommitPullTests.test_pull_git_reports_changed_files)
+git pull 快进更新：报告带入的文件清单与数量。 ... ok
+test_pull_git_untracked_conflict_and_stash_recovery (__main__.VcsCommitPullTests.test_pull_git_untracked_conflict_and_stash_recovery)
+本地未跟踪文件与远端冲突时，给出明确未跟踪提示，并可通过 include_untracked 暂存后成功拉取。 ... ok
+test_pull_git_updates_worktree (__main__.VcsCommitPullTests.test_pull_git_updates_worktree)
+真实 git：origin 新增提交，工作仓库 pull 后文件出现。 ... ok
+test_pull_local_report_rejected (__main__.VcsCommitPullTests.test_pull_local_report_rejected) ... ok
+test_pull_svn_failure_reports_error (__main__.VcsCommitPullTests.test_pull_svn_failure_reports_error) ... ok
+test_pull_svn_invokes_svn_update (__main__.VcsCommitPullTests.test_pull_svn_invokes_svn_update) ... ok
+test_pull_svn_parses_changes_and_conflicts (__main__.VcsCommitPullTests.test_pull_svn_parses_changes_and_conflicts)
+svn update：解析 U/A 变更与 C 冲突并统计。 ... ok
+test_svn_commit_all_aborts_when_add_fails (__main__.VcsCommitPullTests.test_svn_commit_all_aborts_when_add_fails) ... ok
+test_svn_commit_all_empty_message (__main__.VcsCommitPullTests.test_svn_commit_all_empty_message) ... ok
+test_svn_commit_all_registers_and_commits (__main__.VcsCommitPullTests.test_svn_commit_all_registers_and_commits) ... ok
+test_git_rollback_all_does_not_touch_other_projects (__main__.VcsRollbackTests.test_git_rollback_all_does_not_touch_other_projects)
+回滚只影响当前项目：同一仓库另一项目的未提交改动保持不变。 ... ok
+test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked (__main__.VcsRollbackTests.test_git_rollback_all_keeps_staged_added_when_not_deleting_untracked)
+delete_untracked=False（改动面板 VCS 模式）时，staged 新增文件 ... ok
+test_git_rollback_all_restores_tracked_and_removes_untracked (__main__.VcsRollbackTests.test_git_rollback_all_restores_tracked_and_removes_untracked) ... ok
+test_git_rollback_single_file_restores_target_file_only (__main__.VcsRollbackTests.test_git_rollback_single_file_restores_target_file_only) ... ok
+test_rollback_all_local_returns_message (__main__.VcsRollbackTests.test_rollback_all_local_returns_message) ... ok
+test_svn_rollback_all_deletes_versioned_added_when_untracked_removal_on (__main__.VcsRollbackTests.test_svn_rollback_all_deletes_versioned_added_when_untracked_removal_on)
+svn add 过的文件在 delete_untracked=True 时回滚必须删除：revert 只 ... ok
+test_svn_rollback_all_keeps_versioned_added_when_not_deleting_untracked (__main__.VcsRollbackTests.test_svn_rollback_all_keeps_versioned_added_when_not_deleting_untracked)
+delete_untracked=False（改动面板 VCS 模式）时 added 文件保留为未版本化， ... ok
+test_svn_rollback_all_with_injected_runner (__main__.VcsRollbackTests.test_svn_rollback_all_with_injected_runner)
+svn revert 命令参数正确 + 未版本化文件被删除。 ... ok
+
+----------------------------------------------------------------------
+Ran 83 tests in 58.706s
+
+OK
+</system-out></testcase><testcase name="test_issues.py" classname="scripts.tests" time="0.656"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 0.044s
+
+OK
+</system-out></testcase><testcase name="test_quality_traceability.py" classname="scripts.tests" time="3.344"><failure message="exit code 1" type="TestFailure">..............EE...EEE..............
+======================================================================
+ERROR: test_base_hashes_falls_back_to_content_snapshot (__main__.ReimportTests.test_base_hashes_falls_back_to_content_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 629, in test_base_hashes_falls_back_to_content_snapshot
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_compare_conflict_default_keep_choose_new_and_rollback (__main__.ReimportTests.test_compare_conflict_default_keep_choose_new_and_rollback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 540, in test_compare_conflict_default_keep_choose_new_and_rollback
+    manifest, paths = self._project(root)
+                      ^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_preflight_failure_returns_stable_error_code (__main__.ReimportTests.test_preflight_failure_returns_stable_error_code)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 566, in test_preflight_failure_returns_stable_error_code
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_rollback_last_restores_pre_reimport_content_of_edited_chapter (__main__.ReimportTests.test_rollback_last_restores_pre_reimport_content_of_edited_chapter)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 605, in test_rollback_last_restores_pre_reimport_content_of_edited_chapter
+    manifest, paths = self._project(root)
+                      ^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_source_change_consistent_changed_and_missing (__main__.ReimportTests.test_source_change_consistent_changed_and_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 529, in test_source_change_consistent_changed_and_missing
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+----------------------------------------------------------------------
+Ran 36 tests in 2.361s
+
+FAILED (errors=5)
+</failure><system-out>..............EE...EEE..............
+======================================================================
+ERROR: test_base_hashes_falls_back_to_content_snapshot (__main__.ReimportTests.test_base_hashes_falls_back_to_content_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 629, in test_base_hashes_falls_back_to_content_snapshot
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_compare_conflict_default_keep_choose_new_and_rollback (__main__.ReimportTests.test_compare_conflict_default_keep_choose_new_and_rollback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 540, in test_compare_conflict_default_keep_choose_new_and_rollback
+    manifest, paths = self._project(root)
+                      ^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_preflight_failure_returns_stable_error_code (__main__.ReimportTests.test_preflight_failure_returns_stable_error_code)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 566, in test_preflight_failure_returns_stable_error_code
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_rollback_last_restores_pre_reimport_content_of_edited_chapter (__main__.ReimportTests.test_rollback_last_restores_pre_reimport_content_of_edited_chapter)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 605, in test_rollback_last_restores_pre_reimport_content_of_edited_chapter
+    manifest, paths = self._project(root)
+                      ^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+======================================================================
+ERROR: test_source_change_consistent_changed_and_missing (__main__.ReimportTests.test_source_change_consistent_changed_and_missing)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 529, in test_source_change_consistent_changed_and_missing
+    manifest, paths = self._project(Path(tmp))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_quality_traceability.py", line 524, in _project
+    manifest.save(root)
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 241, in save
+    tmp_path.write_text(self.to_yaml(), encoding="utf-8")
+                        ^^^^^^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\domain\manifest.py", line 219, in to_yaml
+    return yaml.safe_dump(self.to_dict(), allow_unicode=True, sort_keys=False)
+           ^^^^^^^^^^^^^^
+AttributeError: module 'yaml' has no attribute 'safe_dump'
+
+----------------------------------------------------------------------
+Ran 36 tests in 2.361s
+
+FAILED (errors=5)
+</system-out></testcase></testsuite></testsuites>

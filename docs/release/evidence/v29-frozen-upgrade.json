@@ -1,0 +1,57 @@
+{
+  "cli": "D:\\ai_develop_project_space\\doc-tool\\dist\\DocTool\\doc-tool-cli.exe",
+  "steps": [
+    {
+      "step": "migrate",
+      "exitCode": 1,
+      "stdout": "{\n  \"schemaVersion\": 1,\n  \"command\": \"migrate\",\n  \"success\": false,\n  \"errorCode\": \"E9000\",\n  \"results\": [\n    {\n      \"project\": \"C:\\\\Users\\\\18098\\\\AppData\\\\Local\\\\Temp\\\\v29-frozen-u_6k3i_i\\\\legacy\",\n      \"success\": false,\n      \"errorCode\": \"E9000\",\n      \"suggestedAction\": \"请修正源项目内容后重试。\",\n      \"data\": {\n        \"target\": \"C:\\\\Users\\\\18098\\\\AppData\\\\Local\\\\Temp\\\\v29-frozen-u_6k3i_i\\\\upgraded\",",
+      "stderrTail": "\\python3.13\\lib-dynload, D:\\ai_develop_project_space\\doc-tool\\dist\\DocTool\\_internal, D:\\ai_develop_project_space\\doc-tool\\dist\\DocTool\\_internal\\win32, D:\\ai_develop_project_space\\doc-tool\\dist\\DocTool\\_internal\\pythonwin, D:\\ai_develop_project_space\\doc-tool\\dist\\DocTool\\_internal\\pywin32_system32"
+    },
+    {
+      "step": "target-created",
+      "exitCode": 1,
+      "detail": "目标项目未创建"
+    }
+  ],
+  "migrate": {
+    "ok": false,
+    "errorCode": "E9000",
+    "results": [
+      {
+        "project": "C:\\Users\\18098\\AppData\\Local\\Temp\\v29-frozen-u_6k3i_i\\legacy",
+        "success": false,
+        "errorCode": "E9000",
+        "suggestedAction": "请修正源项目内容后重试。",
+        "data": {
+          "target": "C:\\Users\\18098\\AppData\\Local\\Temp\\v29-frozen-u_6k3i_i\\upgraded",
+          "report": null,
+          "events": [
+            {
+              "stage": "load_source",
+              "status": "started",
+              "detail": ""
+            },
+            {
+              "stage": "load_source",
+              "status": "succeeded",
+              "detail": "sourceDocumentType=requirement"
+            },
+            {
+              "stage": "create_staging",
+              "status": "started",
+              "detail": ""
+            },
+            {
+              "stage": "create_staging",
+              "status": "failed",
+              "detail": "[WinError 5] 拒绝访问。: 'C:\\\\Users\\\\18098\\\\AppData\\\\Local\\\\Temp\\\\v29-frozen-u_6k3i_i\\\\.upgraded.migrate-staging-20960-h9jkocag'"
+            }
+          ],
+          "message": "[WinError 5] 拒绝访问。: 'C:\\\\Users\\\\18098\\\\AppData\\\\Local\\\\Temp\\\\v29-frozen-u_6k3i_i\\\\.upgraded.migrate-staging-20960-h9jkocag'"
+        },
+        "issues": []
+      }
+    ]
+  },
+  "sourceUnchanged": true
+}

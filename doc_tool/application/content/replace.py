@@ -204,7 +204,7 @@ class ReplaceService:
                     )
                 )
                 continue
-            results.append(writer.write_text(rel_path, new_text))
+            results.append(writer.write_text(rel_path, new_text, operation="replace"))
         return results
 
     def _rewrite_file(

@@ -1,0 +1,200 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="1" time="3.641"><testsuite name="doc-tool" tests="1" failures="1" time="3.641"><testcase name="test_caption_bookmark_v27.py" classname="scripts.tests" time="3.641"><failure message="exit code 1" type="TestFailure">F.FFF
+======================================================================
+FAIL: test_bookmark_ids_are_unique_and_paired (__main__.CaptionBookmarkTests.test_bookmark_ids_are_unique_and_paired)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 71, in test_bookmark_ids_are_unique_and_paired
+    self.assertEqual(sorted(starts), sorted(ends), "bookmarkStart \u4e0e bookmarkEnd \u5fc5\u987b\u6210\u5bf9")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['0',[14 chars], '4', '5', '505', '506', '507', '508', '509', '510', '6'] != ['0',[14 chars], '4', '5', '505', '506', '507', '508', '509', '510', '6', '7']
+
+Second list contains 1 additional elements.
+First extra element 13:
+'7'
+
+- ['0', '1', '2', '3', '4', '5', '505', '506', '507', '508', '509', '510', '6']
++ ['0',
++  '1',
++  '2',
++  '3',
++  '4',
++  '5',
++  '505',
++  '506',
++  '507',
++  '508',
++  '509',
++  '510',
++  '6',
++  '7'] : bookmarkStart 与 bookmarkEnd 必须成对
+
+======================================================================
+FAIL: test_caption_bookmark_wraps_content (__main__.CaptionBookmarkTests.test_caption_bookmark_wraps_content)
+书签不能是零长度：它必须包住题注号码所在的 run。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 82, in test_caption_bookmark_wraps_content
+    self.assertIsNotNone(match, "\u5e94\u5b58\u5728\u9898\u6ce8\u4e66\u7b7e")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : 应存在题注书签
+
+======================================================================
+FAIL: test_every_ref_target_has_a_matching_bookmark (__main__.CaptionBookmarkTests.test_every_ref_target_has_a_matching_bookmark)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 59, in test_every_ref_target_has_a_matching_bookmark
+    self.assertEqual(missing, [], "REF \u76ee\u6807\u5fc5\u987b\u6709\u540c\u540d\u4e66\u7b7e\uff0c\u5426\u5219 Word \u5237\u65b0\u540e\u62a5\u9519")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['_Toc10143', '_Toc10144', '_Toc10793', '_[1624 chars]256'] != []
+
+First list contains 132 additional elements.
+First extra element 0:
+'_Toc10143'
+
+Diff is 2072 characters long. Set self.maxDiff to None to see it. : REF 目标必须有同名书签，否则 Word 刷新后报错
+
+======================================================================
+FAIL: test_reference_keeps_static_cached_number (__main__.CaptionBookmarkTests.test_reference_keeps_static_cached_number)
+未刷新时仍必须可读：REF 域带静态缓存值。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 91, in test_reference_keeps_static_cached_number
+    self.assertIsNotNone(match, "\u5e94\u5b58\u5728 REF \\\\h \u57df")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : 应存在 REF \\h 域
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.255s
+
+FAILED (failures=4)
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-lumsp6bo\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-lumsp6bo\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-dfmabkfv\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-dfmabkfv\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-1dx_t39d\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-1dx_t39d\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-hb61ora3\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-hb61ora3\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-8p9vzmyi\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-8p9vzmyi\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+</failure><system-out>F.FFF
+======================================================================
+FAIL: test_bookmark_ids_are_unique_and_paired (__main__.CaptionBookmarkTests.test_bookmark_ids_are_unique_and_paired)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 71, in test_bookmark_ids_are_unique_and_paired
+    self.assertEqual(sorted(starts), sorted(ends), "bookmarkStart \u4e0e bookmarkEnd \u5fc5\u987b\u6210\u5bf9")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['0',[14 chars], '4', '5', '505', '506', '507', '508', '509', '510', '6'] != ['0',[14 chars], '4', '5', '505', '506', '507', '508', '509', '510', '6', '7']
+
+Second list contains 1 additional elements.
+First extra element 13:
+'7'
+
+- ['0', '1', '2', '3', '4', '5', '505', '506', '507', '508', '509', '510', '6']
++ ['0',
++  '1',
++  '2',
++  '3',
++  '4',
++  '5',
++  '505',
++  '506',
++  '507',
++  '508',
++  '509',
++  '510',
++  '6',
++  '7'] : bookmarkStart 与 bookmarkEnd 必须成对
+
+======================================================================
+FAIL: test_caption_bookmark_wraps_content (__main__.CaptionBookmarkTests.test_caption_bookmark_wraps_content)
+书签不能是零长度：它必须包住题注号码所在的 run。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 82, in test_caption_bookmark_wraps_content
+    self.assertIsNotNone(match, "\u5e94\u5b58\u5728\u9898\u6ce8\u4e66\u7b7e")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : 应存在题注书签
+
+======================================================================
+FAIL: test_every_ref_target_has_a_matching_bookmark (__main__.CaptionBookmarkTests.test_every_ref_target_has_a_matching_bookmark)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 59, in test_every_ref_target_has_a_matching_bookmark
+    self.assertEqual(missing, [], "REF \u76ee\u6807\u5fc5\u987b\u6709\u540c\u540d\u4e66\u7b7e\uff0c\u5426\u5219 Word \u5237\u65b0\u540e\u62a5\u9519")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['_Toc10143', '_Toc10144', '_Toc10793', '_[1624 chars]256'] != []
+
+First list contains 132 additional elements.
+First extra element 0:
+'_Toc10143'
+
+Diff is 2072 characters long. Set self.maxDiff to None to see it. : REF 目标必须有同名书签，否则 Word 刷新后报错
+
+======================================================================
+FAIL: test_reference_keeps_static_cached_number (__main__.CaptionBookmarkTests.test_reference_keeps_static_cached_number)
+未刷新时仍必须可读：REF 域带静态缓存值。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_caption_bookmark_v27.py", line 91, in test_reference_keeps_static_cached_number
+    self.assertIsNotNone(match, "\u5e94\u5b58\u5728 REF \\\\h \u57df")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpectedly None : 应存在 REF \\h 域
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.255s
+
+FAILED (failures=4)
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-lumsp6bo\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-lumsp6bo\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-dfmabkfv\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-dfmabkfv\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-1dx_t39d\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-1dx_t39d\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-hb61ora3\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-hb61ora3\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-bookmark-8p9vzmyi\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-bookmark-8p9vzmyi\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+</system-out></testcase></testsuite></testsuites>

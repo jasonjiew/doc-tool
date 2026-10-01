@@ -271,6 +271,62 @@ def issues_from_lint(
     return records
 
 
+def issues_from_import_report(
+    report, document_type: str = "", generated_at: str = ""
+) -> List[IssueRecord]:
+    """把导入保真报告（V2.7 5.5）展开成问题中心记录。
+
+    逐特性一条记录，带原因与位置采样（如 ``body[12]`` 或 ``word/footnotes.xml``）；
+    无损失时返回空列表，避免把干净导入标成有问题。
+    """
+    generated = generated_at or utc_now()
+    records: List[IssueRecord] = []
+    for finding in getattr(report, "blocked", ()) or ():
+        records.append(_import_finding_record(finding, SEVERITY_ERROR, document_type, generated))
+    for finding in getattr(report, "degraded", ()) or ():
+        records.append(_import_finding_record(finding, SEVERITY_WARNING, document_type, generated))
+    for note in getattr(report, "degradation_notes", ()) or ():
+        records.append(
+            IssueRecord(
+                source=SOURCE_VALIDATION,
+                issue_type="import_degraded",
+                document_type=document_type,
+                severity=SEVERITY_WARNING,
+                rel_path="",
+                line_no=None,
+                error_code=None,
+                message=str(note),
+                suggested_action="请核对导入后的章节与格式，必要时手工调整。",
+                generated_at=generated,
+            )
+        )
+    return records
+
+
+def _import_finding_record(
+    finding, severity: str, document_type: str, generated: str
+) -> IssueRecord:
+    samples = tuple(getattr(finding, "samples", ()) or ())
+    location = samples[0] if samples else ""
+    rel_path, line_no = _parse_location(location) if location else ("", None)
+    return IssueRecord(
+        source=SOURCE_VALIDATION,
+        issue_type="import_{0}".format(getattr(finding, "feature", "fidelity") or "fidelity"),
+        document_type=document_type,
+        severity=severity,
+        rel_path=rel_path,
+        line_no=line_no,
+        error_code=None,
+        message="{0} {1} 处：{2}".format(
+            getattr(finding, "label", "保真特性"),
+            getattr(finding, "count", 0),
+            "、".join(samples) if samples else "未知位置",
+        ),
+        suggested_action="请核对该位置的原始格式与导入结果。",
+        generated_at=generated,
+    )
+
+
 def filter_issues(
     issues: Iterable[IssueRecord],
     *,

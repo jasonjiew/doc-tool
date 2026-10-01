@@ -1,0 +1,2 @@
+    if template.section_signatures() != output.section_signatures():
+        errors["sections"].append("Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化")

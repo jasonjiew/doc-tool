@@ -1,0 +1,115 @@
+process_parsed_document
+    document,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+    registry: Optional[CaptionRegistry] = None,
+    asset_base: str = "",
+    primary_sect_pr=None,
+    landscape_prototype=None,
+) -> Tuple[int, int, int]:
+    """按共享块模型装配一份 Markdown（正式内核的唯一渲染路径）。"""
+    path = document.path
+    inserted = 0
+    image_count = 0
+    table_count = 0
+    active_list = None
+    sections = landscape_split(document.blocks, primary_sect_pr, landscape_prototype)
+    for section_index, (_orientation, sect_pr, chunk) in enumerate(sections):
+        if section_index:
+            insert_element(insert_before, _section_break_paragraph(sect_pr))
+            inserted += 1
+        available_width = shared.table_content_width(sect_pr, max(1, max_image_width) // 635)
+        for block in chunk:
+            if block.kind == KIND_SECTION:
+                continue
+            if block.kind == KIND_FOOTNOTE_DEF:
+                continue
+            if block.kind == KIND_EMPTY_PARAGRAPH:
+                insert_element(insert_before, etree.Element(qn("p")))
+                inserted += 1
+                continue
+            if block.kind == KIND_HEADING:
+                _render_heading_block(block, insert_before, config, numbering, expressions)
+                inserted += 1
+                continue
+            if block.kind == KIND_CODE:
+                _render_code_block(block, insert_before, available_width)
+                inserted += 1
+                continue
+            if block.kind == KIND_IMAGE:
+                count, _captioned = _render_image_block(
+                    block,
+                    insert_before,
+                    items,
+                    image_manager,
+                    config,
+                    max_image_width,
+                    next_object_id,
+                    registry=registry,
+                    asset_base=asset_base,
+                )
+                inserted += count
+                image_count += 1
+                continue
+            if block.kind == KIND_TABLE:
+                inserted += _render_table_block(
+                    block,
+                    insert_before,
+                    config,
+                    registry=registry,
+                    available_width=available_width,
+                )
+                table_count += 1
+                continue
+            if block.kind == KIND_COMPLEX_TABLE:
+                inserted += _render_complex_table_block(
+                    block, insert_before, items, relationships, config
+                )
+                table_count += 1
+                continue
+            if block.kind == KIND_PAGEBREAK:
+                insert_element(insert_before, shared.make_page_break_paragraph())
+                inserted += 1
+                continue
+            if block.kind == KIND_LIST_ITEM:
+                if numbering is None:
+                    numbering = NumberingManager(items, relationships)
+                if active_list is None or active_list[0] != block.list_kind:
+                    active_list = (
+                        block.list_kind,
+                        numbering.new_list(block.list_kind, block.start),
+                    )
+                insert_element(
+                    insert_before,
+                    make_paragraph(
+                        config.get("bodyStyle"),
+                        block.text,
+                        num_id=active_list[1],
+                        list_level=block.level,
+                        expressions=expressions,
+                        source_path=path,
+                        line_no=block.location.start_line,
+                    ),
+                )
+                inserted += 1
+                continue
+            insert_element(
+                insert_before,
+                make_paragraph(
+                    config.get("bodyStyle"),
+                    block.text,
+                    block.paragraph_format,
+                    expressions=expressions,
+                    source_path=path,
+                    line_no=block.location.start_line,
+                ),
+            )
+            inserted += 1
+    return inserted, image_count, table_count

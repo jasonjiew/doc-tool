@@ -1,0 +1,3 @@
+scripts/validate_docx.py	tools/patches/val_caption_events_old.txt	tools/patches/val_caption_events_new.txt
+scripts/validate_docx.py	tools/patches/val_para_kind_old.txt	tools/patches/val_para_kind_new.txt
+scripts/validate_docx.py	tools/patches/val_caption_helper_old.txt	tools/patches/val_caption_helper_new.txt

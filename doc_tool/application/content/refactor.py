@@ -176,7 +176,7 @@ class RefactorService:
         try:
             for rel_path in sorted(by_file):
                 new_text = self._rewrite_file(rel_path, by_file[rel_path], writer)
-                result = writer.write_text(rel_path, new_text)
+                result = writer.write_text(rel_path, new_text, operation="refactor")
                 results.append(result)
                 if not result.written:
                     raise OSError(result.error or "引用写回失败")
@@ -196,6 +196,11 @@ class RefactorService:
                     raise OSError(result.error or "目标移动失败")
         except Exception:
             writer.rollback(since=checkpoint)
+            # record() deduplicates an already-edited file, so its entry can remain
+            # before checkpoint. Roll back the writes by key as well as new moves.
+            from doc_tool.application.content.writer import OP_EDIT
+            writer.rollback_keys({(OP_EDIT, result.rel_path) for result in results
+                                  if result.written and result.rel_path in by_file})
             raise
         return results
 

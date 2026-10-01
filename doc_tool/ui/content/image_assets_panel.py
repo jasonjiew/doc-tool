@@ -10,6 +10,8 @@ from typing import Callable, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -35,6 +37,7 @@ class ImageAssetsPanel(QWidget):
         on_changed: Optional[Callable[[], None]] = None,
         on_open: Optional[Callable[[str, int], None]] = None,
         writable: bool = True,
+        is_dirty=None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -44,10 +47,15 @@ class ImageAssetsPanel(QWidget):
         self._on_changed = on_changed
         self._on_open = on_open
         self._writable = writable
+        self._is_dirty = is_dirty
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
         outer.setSpacing(4)
+        self._inventory = QTreeWidget(self)
+        self._inventory.setHeaderLabels(['资源（不自动删除）', '尺寸 / 体积', '引用章节:行', '相同字节候选'])
+        self._inventory.itemActivated.connect(lambda item, _: self._on_open(*item.data(0, Qt.UserRole)) if self._on_open and item.data(0, Qt.UserRole) else None)
+        outer.addWidget(self._inventory, 1)
 
         unused_header = QHBoxLayout()
         unused_header.addWidget(QLabel("未使用图片（勾选后移入可回滚回收站）", self))
@@ -70,6 +78,9 @@ class ImageAssetsPanel(QWidget):
         self._repoint_btn.setProperty("btnRole", "compact")
         self._repoint_btn.clicked.connect(self.repoint_selected)
         missing_header.addWidget(self._repoint_btn)
+        self._batch_btn = QPushButton('同一缺图批量修复…', self)
+        self._batch_btn.clicked.connect(self.batch_repair)
+        missing_header.addWidget(self._batch_btn)
         self._remove_ref_btn = QPushButton("删除引用行", self)
         self._remove_ref_btn.setProperty("btnRole", "compact")
         self._remove_ref_btn.clicked.connect(self.remove_reference_line)
@@ -94,11 +105,18 @@ class ImageAssetsPanel(QWidget):
     def refresh(self) -> None:
         self._unused.clear()
         self._missing.clear()
+        self._inventory.clear()
         if self._assets_root is None:
             self._status.setText("资源目录未配置")
             self._set_actions(False)
             return
         unused = scan_unused(self._assets_root, self._index)
+        from doc_tool.application.content.asset_batch import asset_inventory
+        for row in asset_inventory(self._assets_root, self._index):
+            item = QTreeWidgetItem([row['path'], row['dimensions'] + ' / ' + self._format_size(row['bytes']),
+                '; '.join(f'{rel}:{line}' for rel, line in row['references']), ', '.join(row['duplicates'])])
+            item.setData(0, Qt.UserRole, row['references'][0] if row['references'] else None)
+            self._inventory.addTopLevelItem(item)
         for rel_path, size in unused:
             item = QTreeWidgetItem([rel_path, self._format_size(size)])
             item.setData(0, Qt.ItemDataRole.UserRole, rel_path)
@@ -118,6 +136,48 @@ class ImageAssetsPanel(QWidget):
         self._clean_btn.setEnabled(enabled)
         self._repoint_btn.setEnabled(enabled)
         self._remove_ref_btn.setEnabled(enabled)
+        self._batch_btn.setEnabled(enabled)
+
+    def batch_repair(self):
+        ref = self._selected_missing()
+        if ref is None or not self._writable: return
+        selected, _ = QFileDialog.getOpenFileName(self, '选择正确图片（项目外图片将导入）', str(self._assets_root), '图片 (*.png *.jpg *.jpeg *.gif *.bmp *.webp)')
+        if not selected: return
+        from doc_tool.application.content.asset_batch import AssetBatchService
+        from doc_tool.application.content.asset_manager import next_image_name
+        service = AssetBatchService(self._writer, self._index, is_dirty=self._is_dirty)
+        chosen = Path(selected).resolve()
+        rows, imported = [], {}
+        try:
+            for doc_type in self._index.document_types:
+                base = (self._assets_root / doc_type).resolve()
+                try: replacement = chosen.relative_to(base).as_posix()
+                except ValueError:
+                    replacement = 'images/' + next_image_name(self._assets_root, doc_type, chosen.suffix)
+                    target = self._assets_root / doc_type / replacement
+                    imported[target] = chosen.read_bytes()
+                rows.extend(row for row in service.plan(ref.target, replacement) if self._index.files[row.source].document_type == doc_type)
+            dialog = QDialog(self)
+            dialog.setWindowTitle('预览具体引用替换（勾选应用）')
+            layout = QVBoxLayout(dialog)
+            tree = QTreeWidget()
+            tree.setHeaderLabels(['章节:行', '原目标 → 新目标（保留 alt / 尺寸）'])
+            for row in rows:
+                item = QTreeWidgetItem([row.source + ':' + str(row.line), row.old + ' → ' + row.replacement])
+                item.setCheckState(0, Qt.Checked)
+                tree.addTopLevelItem(item)
+            layout.addWidget(tree)
+            buttons = QDialogButtonBox(QDialogButtonBox.Apply | QDialogButtonBox.Cancel)
+            buttons.button(QDialogButtonBox.Apply).clicked.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            dialog.resize(800, 500)
+            if dialog.exec() != QDialog.Accepted: return
+            for n, row in enumerate(rows): row.selected = tree.topLevelItem(n).checkState(0) == Qt.Checked
+            result = service.apply(rows, confirmed=True, imported=imported)
+            self._notify_changed()
+            self._status.setText(f'已处理 {len(result["applied"])} 章；待处理 {len(result["skipped"])} 章（脏编辑/外部变化项已保留，计划自动刷新后可重试）')
+        except (OSError, ValueError) as exc: self._status.setText('批量修复失败，已回滚：' + str(exc))
 
     def clean_checked(self) -> None:
         selected = []

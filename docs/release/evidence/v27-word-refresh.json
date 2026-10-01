@@ -1,0 +1,270 @@
+{
+  "wordAvailable": true,
+  "wordDispatchable": true,
+  "reasons": [],
+  "samples": [
+    {
+      "documentType": "requirement",
+      "executed": true,
+      "success": true,
+      "errorCode": null,
+      "outputPath": "C:\\Users\\18098\\AppData\\Local\\Temp\\v27-word-7kvamq06\\requirement\\output\\GX-V27-REQU 需求说明书样本(3.8).docx",
+      "formal": true,
+      "diagnostic": false,
+      "postRefreshFailures": [
+        {
+          "stage": "started",
+          "detail": ""
+        },
+        {
+          "stage": "succeeded",
+          "detail": "刷新后校验通过"
+        }
+      ],
+      "stages": [
+        {
+          "stage": "revision",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "revision",
+          "status": "succeeded",
+          "detail": "已按 _revision_record.md 末行同步文档版本号：1.0 → 3.8"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded",
+          "detail": "预处理 2 份内容，生成图 1 张"
+        },
+        {
+          "stage": "lint",
+          "status": "succeeded",
+          "detail": "构建前检查发现 2 项（默认带提醒继续）"
+        },
+        {
+          "stage": "build",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "build",
+          "status": "succeeded",
+          "detail": "构建到临时文件：.tmp-GX-V27-REQU 需求说明书样本(3.8).docx"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_pre",
+          "status": "succeeded",
+          "detail": "校验通过"
+        },
+        {
+          "stage": "word_refresh",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "word_refresh",
+          "status": "succeeded",
+          "detail": "TOC、NUMPAGES 与全部 story 域刷新完成"
+        },
+        {
+          "stage": "validate_post",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_post",
+          "status": "succeeded",
+          "detail": "刷新后校验通过"
+        },
+        {
+          "stage": "publish",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "publish",
+          "status": "succeeded",
+          "detail": "已原子发布到：GX-V27-REQU 需求说明书样本(3.8).docx"
+        }
+      ]
+    },
+    {
+      "documentType": "design",
+      "executed": true,
+      "success": true,
+      "errorCode": null,
+      "outputPath": "C:\\Users\\18098\\AppData\\Local\\Temp\\v27-word-7kvamq06\\design\\output\\GX-V27-DESI 详细设计说明书样本(2.2).docx",
+      "formal": true,
+      "diagnostic": false,
+      "postRefreshFailures": [
+        {
+          "stage": "started",
+          "detail": ""
+        },
+        {
+          "stage": "succeeded",
+          "detail": "刷新后校验通过"
+        }
+      ],
+      "stages": [
+        {
+          "stage": "revision",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "revision",
+          "status": "succeeded",
+          "detail": "已按 _revision_record.md 末行同步文档版本号：1.0 → 2.2"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded",
+          "detail": "预处理 2 份内容，生成图 0 张"
+        },
+        {
+          "stage": "lint",
+          "status": "succeeded",
+          "detail": "构建前检查发现 2 项（默认带提醒继续）"
+        },
+        {
+          "stage": "build",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "build",
+          "status": "succeeded",
+          "detail": "构建到临时文件：.tmp-GX-V27-DESI 详细设计说明书样本(2.2).docx"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_pre",
+          "status": "succeeded",
+          "detail": "校验通过"
+        },
+        {
+          "stage": "word_refresh",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "word_refresh",
+          "status": "succeeded",
+          "detail": "TOC、NUMPAGES 与全部 story 域刷新完成"
+        },
+        {
+          "stage": "validate_post",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_post",
+          "status": "succeeded",
+          "detail": "刷新后校验通过"
+        },
+        {
+          "stage": "publish",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "publish",
+          "status": "succeeded",
+          "detail": "已原子发布到：GX-V27-DESI 详细设计说明书样本(2.2).docx"
+        }
+      ]
+    },
+    {
+      "documentType": "test",
+      "executed": true,
+      "success": true,
+      "errorCode": null,
+      "outputPath": "C:\\Users\\18098\\AppData\\Local\\Temp\\v27-word-7kvamq06\\test\\output\\GX-V27-TEST 测试说明书样本(1.0).docx",
+      "formal": true,
+      "diagnostic": false,
+      "postRefreshFailures": [
+        {
+          "stage": "started",
+          "detail": ""
+        },
+        {
+          "stage": "succeeded",
+          "detail": "刷新后校验通过"
+        }
+      ],
+      "stages": [
+        {
+          "stage": "revision",
+          "status": "skipped",
+          "detail": "_revision_record.md 中没有修订记录表，沿用项目版本号"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded",
+          "detail": "预处理 1 份内容，生成图 0 张"
+        },
+        {
+          "stage": "build",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "build",
+          "status": "succeeded",
+          "detail": "构建到临时文件：.tmp-GX-V27-TEST 测试说明书样本(1.0).docx"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_pre",
+          "status": "succeeded",
+          "detail": "校验通过"
+        },
+        {
+          "stage": "word_refresh",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "word_refresh",
+          "status": "succeeded",
+          "detail": "TOC、NUMPAGES 与全部 story 域刷新完成"
+        },
+        {
+          "stage": "validate_post",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "validate_post",
+          "status": "succeeded",
+          "detail": "刷新后校验通过"
+        },
+        {
+          "stage": "publish",
+          "status": "started",
+          "detail": ""
+        },
+        {
+          "stage": "publish",
+          "status": "succeeded",
+          "detail": "已原子发布到：GX-V27-TEST 测试说明书样本(1.0).docx"
+        }
+      ]
+    }
+  ]
+}

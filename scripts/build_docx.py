@@ -54,6 +54,28 @@ from doc_tool.domain.markdown_structure import (
     META_SYNTAX_HINT,
     parse_table_meta as _table_meta,
 )
+from doc_tool.domain.blocks import (
+    KIND_CODE,
+    KIND_COMPLEX_TABLE,
+    KIND_EMPTY_PARAGRAPH,
+    KIND_FOOTNOTE_DEF,
+    KIND_HEADING,
+    KIND_IMAGE,
+    KIND_LIST_ITEM,
+    KIND_PAGEBREAK,
+    KIND_SECTION,
+    KIND_TABLE,
+    SourceLocation,
+    parse_blocks,
+    parse_blocks_file,
+)
+from doc_tool.domain.captions import (
+    KIND_FIGURE,
+    CaptionRegistry,
+    build_registry,
+    resolve_caption_style,
+)
+from doc_tool.kernel_shared import docx_blocks as shared
 
 
 def _parse_xml_safe(data: bytes, part_name: str = ""):
@@ -404,6 +426,72 @@ def apply_para_fmt(ppr, fmt: Optional[str]) -> None:
                 indent.set(qn(attribute), pairs[key])
 
 
+#: 当前构建的题注注册表；由 ``build`` 在装配前设置，供正文交叉引用解析使用。
+#: 单文档构建串行执行，构建结束后清空，避免跨项目串用。
+_ACTIVE_REGISTRY = None
+
+
+def set_active_registry(registry) -> None:
+    """设置当前构建的题注注册表（构建开始时调用）。"""
+    global _ACTIVE_REGISTRY
+    _ACTIVE_REGISTRY = registry
+
+
+def reference_segments(text: str):
+    """把段落文本切成 ``[(kind, value), ...]``。
+
+    ``kind`` 为 ``"text"`` 时 ``value`` 是原文；为 ``"ref"`` 时 ``value`` 是
+    ``(bookmark, number_text, cached_text)``，用于输出 ``REF`` 域与静态缓存值。
+    歧义/缺失引用保留可读占位文本，不生成已知失效的域。
+    """
+    if _ACTIVE_REGISTRY is None or not text or "@" not in text:
+        return [("text", text)]
+    from doc_tool.domain.blocks import REFERENCE_RE
+    from doc_tool.domain.captions import SourceLocation, resolve_inline_references
+
+    segments = []
+    cursor = 0
+    for match in REFERENCE_RE.finditer(text):
+        if match.start() > cursor:
+            segments.append(("text", text[cursor:match.start()]))
+        kind = match.group("kind")
+        token = match.group("slug")
+        resolution = _ACTIVE_REGISTRY.resolve(
+            kind, token, SourceLocation("", 0, 0)
+        )
+        if resolution.resolved and resolution.entry is not None:
+            entry = resolution.entry
+            segments.append(
+                (
+                    "ref",
+                    (
+                        entry.bookmark,
+                        str(entry.number),
+                        resolution.display_text,
+                    ),
+                )
+            )
+        else:
+            segments.append(("text", resolution.display_text))
+        cursor = match.end()
+    if cursor < len(text):
+        segments.append(("text", text[cursor:]))
+    return segments or [("text", text)]
+
+
+def resolve_references(text: str) -> str:
+    """把正文中的 ``@fig-x`` / ``@tbl-x`` 解析为可读显示文本。
+
+    解析结论与校验/预览同源（同一注册表、同一规则）：命中对象显示
+    「图 2 标题」，歧义或缺失保留可读占位文本，不猜测目标。
+    """
+    if _ACTIVE_REGISTRY is None or not text or "@" not in text:
+        return text
+    from doc_tool.domain.captions import resolve_inline_references
+
+    return resolve_inline_references(text, _ACTIVE_REGISTRY)
+
+
 def make_paragraph(
     style_id: Optional[str],
     text: str,
@@ -426,7 +514,14 @@ def make_paragraph(
             num_pr = etree.SubElement(ppr, qn("numPr"))
             etree.SubElement(num_pr, qn("ilvl")).set(qn("val"), str(list_level))
             etree.SubElement(num_pr, qn("numId")).set(qn("val"), str(num_id))
-    append_inline(paragraph, text, expressions, source_path, line_no)
+    # 交叉引用输出为 REF 域 + 静态缓存值（可见文本与校验期望一致）。
+    for kind, value in reference_segments(text):
+        if kind == "ref":
+            bookmark, number_text, cached = value
+            for run in shared.make_reference_runs(bookmark, cached):
+                paragraph.append(run)
+            continue
+        append_inline(paragraph, value, expressions, source_path, line_no)
     return paragraph
 
 
@@ -1076,6 +1171,7 @@ def make_table_from_md(
     table_width: Optional[int] = None,
     row_height: Optional[int] = None,
     extra: Optional[Dict[str, str]] = None,
+    available_width: Optional[int] = None,
 ):
     if not rows:
         raise AutomationError("Markdown 表格没有数据行")
@@ -1088,6 +1184,8 @@ def make_table_from_md(
             widths.extend([2400] * (column_count - len(widths)))
     else:
         widths = [2400] * column_count
+    if available_width:
+        widths = shared.fit_table_widths(widths, column_count, int(available_width))
 
     table = etree.Element(qn("tbl"))
     table_properties = etree.SubElement(table, qn("tblPr"))
@@ -1176,7 +1274,137 @@ def make_table_from_md(
     return table
 
 
+def _template_primary_section(body) -> Optional[etree._Element]:
+    """返回模板正文节属性（用于纵向节与节属性复制）。
+
+    优先取正文末尾的 ``sectPr``（正文节，横向节结束后要恢复的方向与
+    页眉页脚关系以它为准）；模板没有末尾节时才退回第一个节。
+    """
+    if body is None:
+        return None
+    section = body.find(qn("sectPr"))
+    if section is not None:
+        return section
+    for child in body:
+        if child.tag == qn("p"):
+            ppr = child.find(qn("pPr"))
+            if ppr is not None:
+                candidate = ppr.find(qn("sectPr"))
+                if candidate is not None:
+                    return candidate
+    return None
+
+
+def _template_first_section(body) -> Optional[etree._Element]:
+    """返回模板正文的第一个节属性（封面/前言节，含其页眉页脚关系）。"""
+    if body is None:
+        return None
+    for child in body:
+        if child.tag != qn("p"):
+            continue
+        ppr = child.find(qn("pPr"))
+        if ppr is None:
+            continue
+        candidate = ppr.find(qn("sectPr"))
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def _template_landscape_prototype(body, fallback_sect_pr):
+    """模板里已有横向节时以它为原型，否则按主节推导横向属性。"""
+    if body is not None:
+        for section in body.iter(qn("sectPr")):
+            if section is fallback_sect_pr:
+                continue
+            if shared.section_properties_orientation(section) == shared.ORIENT_LANDSCAPE:
+                return section
+    if fallback_sect_pr is None:
+        return None
+    return shared.clone_section_properties(fallback_sect_pr, shared.ORIENT_LANDSCAPE)
+
+
+def landscape_split(blocks, primary_sect_pr, landscape_prototype, first_sect_pr=None):
+    """把块序列按显式横向节标记切分成若干节。
+
+    返回 ``[(orientation, sect_pr, [blocks]), ...]``；``sect_pr`` 是该节
+    新起时**插入正文的节分隔段落**要带的页面设置：
+
+    - 方向未变时返回 ``None``：模板已有的节边界保持原样，不重复插入。
+      多节模板（封面节 + 正文节）已有的首节分隔段落就是章节边界，
+      再插一个同名 sectPr 会把正文切成多余的空节。
+    - 方向切到横向时用主节（或首节，当第一节即横向）的页眉页脚关系
+      做横向副本，保证宽表所在节真的横向且页眉页脚关系正确。
+    - 从横向切回纵向时返回主节属性，让方向在节末恢复、不泄漏到后续章节。
+
+    标记与切分由共享块解析器给出：未闭合节已在解析末尾补隐式关闭、
+    嵌套重复开启被忽略，因此这里只需按序切分即可。
+    """
+    sections = []
+    current = []
+    orientation = shared.section_properties_orientation(primary_sect_pr)
+    for block in blocks:
+        if block.kind == KIND_SECTION and block.marker == "landscape":
+            if current:
+                sections.append((orientation, current))
+            current = []
+            orientation = shared.ORIENT_LANDSCAPE
+            continue
+        if block.kind == KIND_SECTION and block.marker == "end":
+            sections.append((orientation, current))
+            current = []
+            orientation = shared.section_properties_orientation(primary_sect_pr)
+            continue
+        current.append(block)
+    if current or not sections:
+        sections.append((orientation, current))
+
+    body_orientation = shared.section_properties_orientation(primary_sect_pr)
+    resolved = []
+    for index, (item_orientation, chunk) in enumerate(sections):
+        if item_orientation == body_orientation:
+            # 方向与模板正文节一致：沿用模板已有节边界，不插入新的 sectPr。
+            sect_pr = None
+        elif item_orientation == shared.ORIENT_LANDSCAPE:
+            base = first_sect_pr if (index == 0 and first_sect_pr is not None) else primary_sect_pr
+            if base is not None:
+                sect_pr = shared.clone_section_properties(base, shared.ORIENT_LANDSCAPE)
+            elif landscape_prototype is not None:
+                sect_pr = landscape_prototype
+            else:
+                sect_pr = etree.Element(qn("sectPr"))
+        else:
+            # 从横向切回纵向：显式写出模板正文节属性，方向不泄漏到下章。
+            sect_pr = primary_sect_pr
+            if sect_pr is None:
+                sect_pr = etree.Element(qn("sectPr"))
+        resolved.append((item_orientation, sect_pr, chunk))
+    return resolved
+
+
+def _section_break_paragraph(sect_pr) -> etree._Element:
+    """构造带 ``w:sectPr`` 的节分隔段落（节属性挂在段落的 pPr 下）。"""
+    paragraph = etree.Element(qn("p"))
+    ppr = etree.SubElement(paragraph, qn("pPr"))
+    ppr.append(etree.fromstring(etree.tostring(sect_pr)))
+    return paragraph
+
+
+def _table_extra_from_meta(extra) -> Dict[str, str]:
+    """把表格元数据的额外参数转成 ``make_table_from_md`` 需要的字符串字典。
+
+    警告字段（``_columnWarning`` 等）由共享解析返回、不是模板参数，必须剥离，
+    否则会被当成表格属性写入 OOXML。
+    """
+    if not extra:
+        return {}
+    return {
+        str(key): str(value)
+        for key, value in extra.items()
+        if not str(key).startswith("_")
+    }
 def insert_element(insert_before, element) -> None:
+
     if element.tag == qn("tbl"):
         previous = insert_before.getprevious()
         if previous is not None and previous.tag == qn("tbl"):
@@ -2271,6 +2499,325 @@ def _relationship_ids(element) -> List[str]:
     return values
 
 
+def _render_heading_block(block, insert_before, config, numbering, expressions) -> None:
+    """标题块：沿用 V2.6 的书签与编号语义。"""
+    insert_element(
+        insert_before,
+        make_heading(
+            config["headingStyles"],
+            block.text,
+            block.level,
+            num_id=_heading_num_id(numbering),
+            list_level=max(0, block.level - 1),
+            expressions=expressions,
+            bookmark_key=os.path.abspath(block.path) + "#" + block.text,
+        ),
+    )
+
+
+def _render_code_block(block, insert_before, max_width) -> None:
+    """代码块：单格浅底容器，保留缩进、Tab、空行与反引号，允许跨页分页。"""
+    container = shared.make_code_container(
+        shared.split_code_text(block.text), max_width=max_width
+    )
+    insert_element(insert_before, container)
+
+
+def _render_image_block(
+    block,
+    insert_before,
+    items,
+    image_manager,
+    config,
+    max_image_width,
+    next_object_id,
+    registry=None,
+    asset_base: str = "",
+) -> Tuple[int, int]:
+    """图片块：复用既有图片关系/尺寸逻辑，题注走共享注册表。"""
+    # 预处理生成的图（Mermaid 等）落在任务临时目录；用户资产仍在项目资源目录。
+    asset_root = asset_base or config.get("preparedAssetRoot") or config["paths"]["asset_root"]
+    image_path = resolve_resource(asset_root, block.relative_path, "图片")
+    try:
+        with open(image_path, "rb") as handle:
+            data = handle.read()
+        with Image.open(image_path) as image:
+            image.verify()
+    except Exception as exc:
+        raise AutomationError("图片损坏或无法读取 {0}: {1}".format(image_path, exc))
+    extension = os.path.splitext(image_path)[1].lower().lstrip(".")
+    rid, media_part, reused = image_manager.add_or_reuse(data, extension)
+    if not reused:
+        ensure_content_type(items, extension)
+    reference = ImageReference(block.alt, block.relative_path, block.width_px, block.height_px)
+    width, height = image_size_emu(image_path, reference, max_image_width)
+    paragraph = make_image_paragraph(
+        rid, posixpath.basename(media_part), block.alt, width, height, next_object_id()
+    )
+    insert_element(insert_before, paragraph)
+    inserted = 1
+    captioned = 0
+    entry = registry.get(block.ident) if (registry is not None and block.ident) else None
+    if entry is not None:
+        insert_element(
+            insert_before,
+            _caption_paragraph(entry, registry, config, bookmark_id=_bookmark_id_for(entry.bookmark)),
+        )
+        inserted += 1
+        captioned = 1
+    return inserted, captioned
+
+
+def _render_table_block(
+    block, insert_before, config, registry=None, available_width: Optional[int] = None
+) -> int:
+    """普通表格：复用元数据与集团内核参数，按所在节版心限宽。"""
+    meta = block.meta or (None, None, "dxa", None, None, {})
+    style_id, col_widths, width_type, table_width, row_height, extra = meta
+    table = make_table_from_md(
+        block.rows,
+        style_id,
+        col_widths,
+        width_type,
+        table_width,
+        row_height,
+        _table_extra_from_meta(extra),
+        available_width=available_width,
+    )
+    insert_element(insert_before, table)
+    inserted = 1
+    entry = registry.get(block.ident) if (registry is not None and block.ident) else None
+    if entry is not None:
+        insert_element(
+            insert_before,
+            _caption_paragraph(entry, registry, config, bookmark_id=_bookmark_id_for(entry.bookmark)),
+        )
+        inserted += 1
+    return inserted
+
+
+def _render_complex_table_block(block, insert_before, items, relationships, config) -> int:
+    """复杂表格：复用原始 XML 与既有关系校验，不改写原表。"""
+    filename = block.filename
+    if not filename:
+        raise _markdown_error(
+            block.location.path,
+            block.location.start_line,
+            "复杂表格标记缺少 XML 文件名",
+            "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
+            "complex_table_syntax",
+        )
+    table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
+    try:
+        with open(table_path, "rb") as table_file:
+            table_element = _parse_xml_safe(table_file.read(), filename)
+    except Exception as exc:
+        raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
+    if table_element.tag != qn("tbl"):
+        raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(table_path))
+    relationship_map = {
+        relationship.get("Id"): relationship for relationship in relationships
+    }
+    for rid in _relationship_ids(table_element):
+        relationship = relationship_map.get(rid)
+        if relationship is None:
+            raise AutomationError("复杂表格关系不存在: {0} -> {1}".format(table_path, rid))
+        if relationship.get("TargetMode") != "External":
+            target = _resolve_relationship_target(
+                "word/document.xml", relationship.get("Target", "")
+            )
+            if target not in items:
+                raise AutomationError(
+                    "复杂表格关系目标不存在: {0} -> {1}".format(rid, target)
+                )
+    insert_element(insert_before, table_element)
+    return 1
+
+
+_CAPTION_BOOKMARK_BASE = [0]
+
+
+def set_caption_bookmark_base(value: int) -> None:
+    """设定题注书签 id 的起点（取模板已有书签的最大 id）。"""
+    _CAPTION_BOOKMARK_BASE[0] = max(0, int(value))
+
+
+_USED_CAPTION_BOOKMARKS = set()
+
+
+def _bookmark_id_for(name: str) -> int:
+    """同一书签名只允许一次（Word 不允许同名书签）。
+
+    重复标识（如模板里两处 ``{#tbl-params}``）只为首次出现写入书签，
+    后续同名者返回 0（不写入）；交叉引用仍能解析到首次位置。
+    """
+    if not name or name in _USED_CAPTION_BOOKMARKS:
+        return 0
+    _USED_CAPTION_BOOKMARKS.add(name)
+    return _next_bookmark_id()
+
+
+def _next_bookmark_id() -> int:
+    """为题注书签分配唯一 ID。
+
+    Word 要求 ``bookmarkStart`` 与 ``bookmarkEnd`` 共用同一个整数 id。
+    原先题注传入 ``0``，导致书签根本不会写入，Word 刷新后
+    交叉引用只能报“错误!未定义书签”。起点由 ``set_caption_bookmark_base``
+    按**模板已有书签的最大 id** 设定，避免与模板书签撞号。
+    """
+    _CAPTION_BOOKMARK_BASE[0] += 1
+    return _CAPTION_BOOKMARK_BASE[0]
+
+def _caption_paragraph(entry, registry, config, bookmark_id=0):
+    """题注段落：注册表已按全文顺序编号（复杂表格也计入），此处只做输出。
+
+    编号以 ``SEQ`` 域输出并带静态缓存值：未刷新时显示缓存编号，
+    Word 刷新后按全文顺序重算；标识书签用于交叉引用。
+    """
+    number = entry.number
+    if registry is not None and entry.duplicate:
+        # 重复标识只在输出层唯一化：编号随出现顺序递增，目标仍是首次登记对象。
+        number = registry.sequential_number(entry)
+    prefix = "图" if entry.kind == KIND_FIGURE else "表"
+    return shared.make_caption_paragraph(
+        prefix=prefix,
+        label=entry.label,
+        number=number,
+        style_id=config.get("captionStyle") or None,
+        bookmark_name=entry.bookmark,
+        bookmark_id=bookmark_id,
+        field_instruction="SEQ {0} \\* ARABIC".format(prefix),
+    )
+
+
+def process_parsed_document(
+    document,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+    registry: Optional[CaptionRegistry] = None,
+    asset_base: str = "",
+    primary_sect_pr=None,
+    landscape_prototype=None,
+    first_sect_pr=None,
+) -> Tuple[int, int, int]:
+    """按共享块模型装配一份 Markdown（正式内核的唯一渲染路径）。"""
+    path = document.path
+    inserted = 0
+    image_count = 0
+    table_count = 0
+    active_list = None
+    sections = landscape_split(
+        document.blocks, primary_sect_pr, landscape_prototype, first_sect_pr
+    )
+    active_sect_pr = primary_sect_pr
+    for _orientation, sect_pr, chunk in sections:
+        if sect_pr is not None:
+            # 只有方向变化时才插入节边界；sect_pr 描述**新开始**的这一节。
+            insert_element(insert_before, _section_break_paragraph(sect_pr))
+            inserted += 1
+            active_sect_pr = sect_pr
+        available_width = shared.table_content_width(
+            active_sect_pr, max(1, max_image_width) // 635
+        )
+        for block in chunk:
+            if block.kind == KIND_SECTION:
+                # landscape/end 标记已在上面的切分中消费。
+                continue
+            if block.kind == KIND_FOOTNOTE_DEF:
+                # 脚注定义由 ExpressionManager 统一收集，正文不插入。
+                continue
+            if block.kind == KIND_EMPTY_PARAGRAPH:
+                insert_element(insert_before, etree.Element(qn("p")))
+                inserted += 1
+                continue
+            if block.kind == KIND_HEADING:
+                _render_heading_block(block, insert_before, config, numbering, expressions)
+                inserted += 1
+                continue
+            if block.kind == KIND_CODE:
+                _render_code_block(block, insert_before, available_width)
+                inserted += 1
+                continue
+            if block.kind == KIND_IMAGE:
+                count, _captioned = _render_image_block(
+                    block,
+                    insert_before,
+                    items,
+                    image_manager,
+                    config,
+                    max_image_width,
+                    next_object_id,
+                    registry=registry,
+                    asset_base=asset_base,
+                )
+                inserted += count
+                image_count += 1
+                continue
+            if block.kind == KIND_TABLE:
+                inserted += _render_table_block(
+                    block,
+                    insert_before,
+                    config,
+                    registry=registry,
+                    available_width=available_width,
+                )
+                table_count += 1
+                continue
+            if block.kind == KIND_COMPLEX_TABLE:
+                inserted += _render_complex_table_block(
+                    block, insert_before, items, relationships, config
+                )
+                table_count += 1
+                continue
+            if block.kind == KIND_PAGEBREAK:
+                insert_element(insert_before, shared.make_page_break_paragraph())
+                inserted += 1
+                continue
+            if block.kind == KIND_LIST_ITEM:
+                if numbering is None:
+                    numbering = NumberingManager(items, relationships)
+                if active_list is None or active_list[0] != block.list_kind:
+                    active_list = (
+                        block.list_kind,
+                        numbering.new_list(block.list_kind, block.start),
+                    )
+                insert_element(
+                    insert_before,
+                    make_paragraph(
+                        config.get("bodyStyle"),
+                        block.text,
+                        num_id=active_list[1],
+                        list_level=block.level,
+                        expressions=expressions,
+                        source_path=path,
+                        line_no=block.location.start_line,
+                    ),
+                )
+                inserted += 1
+                continue
+            # 默认：普通段落（含围栏外文本与尚未识别的语法）。
+            insert_element(
+                insert_before,
+                make_paragraph(
+                    config.get("bodyStyle"),
+                    block.text,
+                    block.paragraph_format,
+                    expressions=expressions,
+                    source_path=path,
+                    line_no=block.location.start_line,
+                ),
+            )
+            inserted += 1
+    return inserted, image_count, table_count
+
+
 def process_markdown(
     path: str,
     insert_before,
@@ -2282,195 +2829,45 @@ def process_markdown(
     next_object_id,
     numbering: Optional[NumberingManager] = None,
     expressions: Optional[ExpressionManager] = None,
+    registry: Optional[CaptionRegistry] = None,
+    asset_base: str = "",
+    primary_sect_pr=None,
+    landscape_prototype=None,
+    first_sect_pr=None,
 ) -> Tuple[int, int, int]:
-    with open(path, encoding="utf-8") as handle:
-        lines = handle.read().split("\n")
-    inserted = 0
-    image_count = 0
-    table_count = 0
-    pending_format: Optional[str] = None
-    relationship_map = {relationship.get("Id"): relationship for relationship in relationships}
-    index = 0
-    active_list = None
-    while index < len(lines):
-        line = lines[index].rstrip()
-        stripped = line.strip()
-        list_info = parse_list_line(line)
-        if list_info is None:
-            active_list = None
+    """兼容入口：解析 Markdown 后交给共享块模型渲染（V2.7 起）。
 
-        if re.match(r"^\[\^[^\]]+\]:\s*", stripped):
-            index += 1
-            continue
-
-        complex_table = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
-        if complex_table:
-            filename = complex_table.group(2)
-            if not filename:
-                raise _markdown_error(
-                    path,
-                    index + 1,
-                    "复杂表格标记缺少 XML 文件名",
-                    "正确写法形如 <!-- TABLE:1:table_0001.xml -->。",
-                    "complex_table_syntax",
-                )
-            table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
-            try:
-                with open(table_path, "rb") as table_file:
-                    table_element = _parse_xml_safe(table_file.read(), filename)
-            except Exception as exc:
-                raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
-            if table_element.tag != qn("tbl"):
-                raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(table_path))
-            for rid in _relationship_ids(table_element):
-                relationship = relationship_map.get(rid)
-                if relationship is None:
-                    raise AutomationError("复杂表格关系不存在: {0} -> {1}".format(table_path, rid))
-                if relationship.get("TargetMode") != "External":
-                    target = _resolve_relationship_target("word/document.xml", relationship.get("Target", ""))
-                    if target not in items:
-                        raise AutomationError("复杂表格关系目标不存在: {0} -> {1}".format(rid, target))
-            insert_element(insert_before, table_element)
-            inserted += 1
-            table_count += 1
-            index += 1
-            continue
-
-        image_ref = parse_image_reference(stripped)
-        if image_ref is not None:
-            image_path = resolve_resource(config["paths"]["asset_root"], image_ref.relative_path, "图片")
-            try:
-                with open(image_path, "rb") as handle:
-                    data = handle.read()
-                with Image.open(image_path) as image:
-                    image.verify()
-            except Exception as exc:
-                raise AutomationError("图片损坏或无法读取 {0}: {1}".format(image_path, exc))
-            extension = os.path.splitext(image_path)[1].lower().lstrip(".")
-            rid, media_part, reused = image_manager.add_or_reuse(data, extension)
-            if not reused:
-                ensure_content_type(items, extension)
-            width, height = image_size_emu(image_path, image_ref, max_image_width)
-            object_id = next_object_id()
-            paragraph = make_image_paragraph(
-                rid, posixpath.basename(media_part), image_ref.alt, width, height, object_id
-            )
-            insert_element(insert_before, paragraph)
-            inserted += 1
-            image_count += 1
-            index += 1
-            continue
-
-        table_meta = _table_meta(stripped)
-        if stripped.startswith("<!-- TBL:") and table_meta is None:
-            raise _markdown_error(
-                path,
-                index + 1,
-                "表格元数据语法无效",
-                META_SYNTAX_HINT,
-                "table_meta_syntax",
-            )
-        if table_meta is not None:
-            if index + 1 >= len(lines) or not lines[index + 1].strip().startswith("|"):
-                raise _markdown_error(
-                    path,
-                    index + 1,
-                    "表格元数据的下一行不是表格（必须紧跟以 | 开头的表头行）。",
-                    "如果中间有空行请删除；如果这里本来没有表格，请删除这条元数据注释。",
-                    "table_meta_orphan",
-                )
-            block: List[str] = []
-            cursor = index + 1
-            while cursor < len(lines) and lines[cursor].strip().startswith("|"):
-                block.append(lines[cursor])
-                cursor += 1
-            rows = parse_markdown_table(block)
-            insert_element(insert_before, make_table_from_md(rows, *table_meta))
-            inserted += 1
-            table_count += 1
-            index = cursor
-            continue
-
-        if stripped.startswith("|"):
-            block = []
-            while index < len(lines) and lines[index].strip().startswith("|"):
-                block.append(lines[index])
-                index += 1
-            insert_element(insert_before, make_table_from_md(parse_markdown_table(block)))
-            inserted += 1
-            table_count += 1
-            continue
-
-        heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
-        if heading:
-            heading_text = re.sub(r"<br\s*/?>", "\n", heading.group(2).strip(), flags=re.IGNORECASE)
-            insert_element(
-                insert_before,
-                make_heading(
-                    config["headingStyles"],
-                    heading_text,
-                    len(heading.group(1)),
-                    num_id=_heading_num_id(numbering),
-                    list_level=len(heading.group(1)) - 1,
-                    expressions=expressions,
-                    bookmark_key=os.path.abspath(path) + "#" + heading_text,
-                ),
-            )
-            inserted += 1
-            index += 1
-            continue
-
-        if list_info is not None:
-            kind, level, start, item_text = list_info
-            item_text = re.sub(r"<br\s*/?>", "\n", item_text.strip(), flags=re.IGNORECASE)
-            if numbering is None:
-                numbering = NumberingManager(items, relationships)
-            if active_list is None or active_list[0] != kind:
-                active_list = (kind, numbering.new_list(kind, start))
-            insert_element(
-                insert_before,
-                make_paragraph(
-                    config.get("bodyStyle"),
-                    item_text,
-                    num_id=active_list[1],
-                    list_level=level,
-                    expressions=expressions,
-                    source_path=path,
-                    line_no=index + 1,
-                ),
-            )
-            inserted += 1
-            index += 1
-            continue
-
-        paragraph_format = re.fullmatch(r"<!--\s*P:(.*?)\s*-->", stripped)
-        if paragraph_format:
-            pending_format = paragraph_format.group(1)
-            index += 1
-            continue
-        if stripped == "<EMPTY_PAR/>":
-            insert_element(insert_before, etree.Element(qn("p")))
-            inserted += 1
-            index += 1
-            continue
-        if stripped:
-            # HTML break syntax is allowed in ordinary Markdown text as a real Word break.
-            paragraph_text = re.sub(r"<br\s*/?>", "\n", stripped, flags=re.IGNORECASE)
-            insert_element(
-                insert_before,
-                make_paragraph(
-                    config.get("bodyStyle"),
-                    paragraph_text,
-                    pending_format,
-                    expressions=expressions,
-                    source_path=path,
-                    line_no=index + 1,
-                ),
-            )
-            pending_format = None
-            inserted += 1
-        index += 1
-    return inserted, image_count, table_count
+    V2.6 的行扫描实现已由 ``doc_tool.domain.blocks`` 的共享解析取代，
+    避免同一种 Markdown 在多个入口得到不同块语义。
+    """
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeError) as exc:
+        raise AutomationError("Markdown 无法读取 {0}: {1}".format(path, exc))
+    document = parse_blocks(text, path)
+    if expressions is not None:
+        for warning in document.warnings:
+            message = warning.as_text()
+            if message not in expressions.warnings:
+                expressions.warnings.append(message)
+    return process_parsed_document(
+        document,
+        insert_before,
+        items,
+        relationships,
+        image_manager,
+        config,
+        max_image_width,
+        next_object_id,
+        numbering,
+        expressions,
+        registry=registry,
+        asset_base=asset_base,
+        primary_sect_pr=primary_sect_pr,
+        landscape_prototype=landscape_prototype,
+        first_sect_pr=first_sect_pr,
+    )
 
 
 def _validate_zip_xml(items: Dict[str, bytes]) -> None:
@@ -2496,6 +2893,7 @@ def build(
     doc_type: Optional[str] = None,
     output_override: Optional[str] = None,
     config: Optional[Dict] = None,
+    prepared=None,
 ) -> str:
     """Build a DOCX from a template + chapter tree + Markdown assets.
 
@@ -2545,6 +2943,21 @@ def build(
         or [0]
     )
 
+    max_bookmark_id = max(
+        [
+            int(node.get(qn("id")))
+            for node in document_root.iter(qn("bookmarkStart"))
+            if (node.get(qn("id")) or "").isdigit()
+        ]
+        or [0]
+    )
+    set_caption_bookmark_base(max_bookmark_id + 10)
+    _USED_CAPTION_BOOKMARKS.clear()
+    for _node in document_root.iter(qn("bookmarkStart")):
+        _name = _node.get(qn("name"))
+        if _name:
+            _USED_CAPTION_BOOKMARKS.add(_name)
+
     def next_object_id() -> int:
         nonlocal max_object_id
         max_object_id += 1
@@ -2560,11 +2973,12 @@ def build(
         absolute = os.path.abspath(markdown_path)
         expressions.register_bookmark(absolute)
         with open(markdown_path, encoding="utf-8") as handle:
-            markdown_lines = handle.read().splitlines()
-        for line in markdown_lines:
-            heading = re.match(r"^#{1,9}\s+(.+)$", line.strip())
-            if heading:
-                h_text = re.sub(r"<br\s*/?>", "\n", heading.group(1).strip(), flags=re.IGNORECASE)
+            markdown_text = handle.read()
+        # 书签只登记围栏外的标题：代码示例里的 `# 注释` 不是章节标题，
+        # 登记成书签会让同号锚点指向错误位置。
+        for block in parse_blocks(markdown_text, markdown_path).blocks:
+            if block.kind == KIND_HEADING:
+                h_text = block.text
                 h_bm = expressions.register_bookmark(absolute + "#" + h_text)
                 slug_text = re.sub(r"\s+", "-", re.sub(r"[^\w\s一-鿿]+", "", h_text.lower(), flags=re.UNICODE)).strip("-")
                 if slug_text:
@@ -2593,6 +3007,69 @@ def build(
                     expressions.section_title_map.setdefault(h_text, h_bm)
                     expressions.section_title_map.setdefault(re.sub(r"\s+", "", h_text), h_bm)
 
+    # V2.7：先解析全部章节，建立跨章题注注册表（编号与引用全局一致），
+    # 再逐章装配。
+    prepared_map = {}
+    for item in prepared or ():
+        source = os.path.abspath(getattr(item, "source_path", "") or "")
+        if source:
+            prepared_map[source] = item
+    prepared_asset_root = ""
+    for item in prepared_map.values():
+        root = getattr(item, "asset_root", "")
+        if root:
+            prepared_asset_root = root
+            break
+    if prepared_asset_root:
+        # 生成图（Mermaid 等）落在任务临时目录；渲染图片时以它为准。
+        config["preparedAssetRoot"] = prepared_asset_root
+
+    parsed_documents = []
+    for _entry, markdown_path in chapter_entries:
+        if not markdown_path:
+            continue
+        item = prepared_map.get(os.path.abspath(markdown_path))
+        if item is not None:
+            # 预处理只改临时副本；源位置仍是原 .md，报告与定位不受影响。
+            markdown_text = item.read_prepared_text()
+        else:
+            try:
+                with open(markdown_path, encoding="utf-8") as handle:
+                    markdown_text = handle.read()
+            except (OSError, UnicodeError) as exc:
+                raise AutomationError(
+                    "Markdown 无法读取 {0}: {1}".format(markdown_path, exc)
+                )
+        parsed_documents.append(parse_blocks(markdown_text, markdown_path))
+    registry = build_registry(parsed_documents)
+    set_active_registry(registry)
+    # 歧义/缺失引用不阻断出稿，但必须带源文件与行号透出。
+    from doc_tool.domain.captions import reference_warnings
+
+    for item in reference_warnings(parsed_documents, registry):
+        message = "{0}:{1} {2}".format(
+            item.get("path", ""), item.get("line", 0), item.get("message", "")
+        )
+        if message not in expressions.warnings:
+            expressions.warnings.append(message)
+    for document in parsed_documents:
+        for warning in document.warnings:
+            text = warning.as_text()
+            if text not in expressions.warnings:
+                expressions.warnings.append(text)
+
+    primary_sect_pr = _template_primary_section(body)
+    first_sect_pr = _template_first_section(body)
+    landscape_prototype = _template_landscape_prototype(body, primary_sect_pr)
+    bodies_by_path = {document.path: document for document in parsed_documents}
+    if parsed_documents:
+        caption_style = resolve_caption_style(
+            _parse_xml_safe(items["word/styles.xml"], "word/styles.xml"),
+            str(config.get("captionStyle") or ""),
+        )
+        if caption_style:
+            config["captionStyle"] = caption_style
+
     inserted = 0
     images = 0
     tables = 0
@@ -2603,32 +3080,46 @@ def build(
             insert_element(
                 section_properties,
                 make_heading(
-                config["headingStyles"],
-                entry.title,
-                entry.depth,
-                num_id=_heading_num_id(numbering),
-                list_level=entry.depth - 1,
-                expressions=expressions,
-                bookmark_key=os.path.abspath(markdown_path) if markdown_path else os.path.abspath(entry.path),
-            ),
-        )
-            inserted += 1
-        if markdown_path:
-            count, image_count, table_count = process_markdown(
-                markdown_path,
-                section_properties,
-                items,
-                relationship_root,
-                image_manager,
-                config,
-                max_image_width,
-                next_object_id,
-                numbering,
-                expressions,
+                    config["headingStyles"],
+                    entry.title,
+                    entry.depth,
+                    num_id=_heading_num_id(numbering),
+                    list_level=entry.depth - 1,
+                    expressions=expressions,
+                    bookmark_key=(
+                        os.path.abspath(markdown_path)
+                        if markdown_path
+                        else os.path.abspath(entry.path)
+                    ),
+                ),
             )
-            inserted += count
-            images += image_count
-            tables += table_count
+            inserted += 1
+        if not markdown_path:
+            continue
+        document = bodies_by_path.get(markdown_path)
+        if document is None:
+            document = parse_blocks_file(markdown_path) if markdown_path else None
+            if document is None:
+                continue
+        count, image_count, table_count = process_parsed_document(
+            document,
+            section_properties,
+            items,
+            relationship_root,
+            image_manager,
+            config,
+            max_image_width,
+            next_object_id,
+            numbering,
+            expressions,
+            registry=registry,
+            primary_sect_pr=primary_sect_pr,
+            landscape_prototype=landscape_prototype,
+            first_sect_pr=first_sect_pr,
+        )
+        inserted += count
+        images += image_count
+        tables += table_count
 
     revision_rows = update_revision_record(document_root, config, expressions)
     if revision_rows:

@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="5" failures="0" time="16.500"><testsuite name="doc-tool" tests="5" failures="0" time="16.500"><testcase name="test_recovery_entries.py" classname="scripts.tests" time="1.875"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.728s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="8.328"><system-out>...................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 7.748s
+
+OK
+</system-out></testcase><testcase name="test_delivery_history_ui.py" classname="scripts.tests" time="1.297"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.362s
+
+OK
+</system-out></testcase><testcase name="test_quality_traceability.py" classname="scripts.tests" time="3.750"><system-out>....................................
+----------------------------------------------------------------------
+Ran 36 tests in 2.688s
+
+OK
+</system-out></testcase><testcase name="test_command_palette.py" classname="scripts.tests" time="1.250"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.146s
+
+OK
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,8 @@
+    # 只扫描围栏外的正文行：代码示例里的 `# 注释` 与 `![x](y)` 不是标题/图片，
+    # 把它们当成结构问题会误报，也会与构建内核的代码块语义不一致。
+    from doc_tool.domain.markdown_structure import prose_lines
+
+    for line_number, line in prose_lines("\n".join(lines)):
+        stripped = line.strip()
+        heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
+        if heading and len(heading.group(1)) <= depth:

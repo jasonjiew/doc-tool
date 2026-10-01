@@ -1,0 +1,37 @@
+#: 当前构建的题注注册表；由 ``build`` 在装配前设置，供正文交叉引用解析使用。
+#: 单文档构建串行执行，构建结束后清空，避免跨项目串用。
+_ACTIVE_REGISTRY = None
+
+
+def set_active_registry(registry) -> None:
+    """设置当前构建的题注注册表（构建开始时调用）。"""
+    global _ACTIVE_REGISTRY
+    _ACTIVE_REGISTRY = registry
+
+
+def resolve_references(text: str) -> str:
+    """把正文中的 ``@fig-x`` / ``@tbl-x`` 解析为可读显示文本。
+
+    解析结论与校验/预览同源（同一注册表、同一规则）：命中对象显示
+    「图 2 标题」，歧义或缺失保留可读占位文本，不猜测目标。
+    """
+    if _ACTIVE_REGISTRY is None or not text or "@" not in text:
+        return text
+    from doc_tool.domain.captions import resolve_inline_references
+
+    return resolve_inline_references(text, _ACTIVE_REGISTRY)
+
+
+def make_paragraph(
+    style_id: Optional[str],
+    text: str,
+    fmt: Optional[str] = None,
+    *,
+    num_id: Optional[int] = None,
+    list_level: int = 0,
+    expressions=None,
+    source_path: str = "",
+    line_no: int = 0,
+):
+    paragraph = etree.Element(qn("p"))
+    text = resolve_references(text)

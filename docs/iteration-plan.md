@@ -1,5 +1,7 @@
 # Doc Tool 三阶段迭代计划（编排层）
 
+> 2026-09-30：本文保留为历史规划。后续排程以 [V2.6～V2.9 产品与 Codex 执行计划](product-plan-v2.6-v2.9.md) 为准；原 V2.6 阶段不能按当前发布版本号认定完成，具体任务迁移见新计划第 7 节。
+
 > 依据：`analysis/feature-audit.md`（基于 HEAD `12e8483` / v2.5.1）。
 > 本文件只做编排；每个阶段对应一个 OpenSpec 变更（proposal / design / tasks），按 `openspec/changes/<name>/` 实施与验收。
 > 取代 `docs/roadmap.md` 中已完成的计划 1~6 之后的后续排程；`docs/roadmap.md` 保留为历史。

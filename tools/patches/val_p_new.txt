@@ -1,0 +1,22 @@
+def paragraph_text(paragraph) -> str:
+    """段落可见文本：跳过域指令，保留域缓存值（Word 刷新前的可读结果）。"""
+    parts: List[str] = []
+    in_instruction = 0
+    for node in paragraph.iter():
+        if node.tag == qn("fldChar"):
+            kind = node.get(qn("fldCharType"))
+            if kind == "begin":
+                in_instruction += 1
+            elif kind == "separate":
+                in_instruction = 0
+            elif kind == "end" and in_instruction == 0:
+                in_instruction = 0
+        elif in_instruction:
+            continue
+        elif node.tag == qn("t"):
+            parts.append(node.text or "")
+        elif node.tag in (qn("br"), qn("cr")):
+            parts.append("\n")
+        elif node.tag == qn("tab"):
+            parts.append("\t")
+    return "".join(parts).strip()

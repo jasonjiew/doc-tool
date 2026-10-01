@@ -1,0 +1,3 @@
+                if image_hashes:
+                    events.append(Event("I", image_hashes, "body[{0}]".format(index)))
+            elif local_name == "tbl" and started:

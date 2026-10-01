@@ -414,6 +414,11 @@ def heading_style_candidates(styles_root) -> List[HeadingStyleCandidate]:
         if not HEADING_LEVEL_MIN <= level <= HEADING_LEVEL_MAX:
             continue
         based_on_elem = style.find(_qn("basedOn"))
+        # 自定义派生样式（customStyle=1 且有 basedOn）即使沿用了内置名称（如“标题1”），
+        # 也不是 Word 自带样式；否则同一级的内置样式与派生样式会被当成同类，
+        # 使“优先内置名称”的决策失效。
+        if builtin_name and based_on_elem is not None and style.get(_qn("customStyle")) == "1":
+            builtin_name = False
         candidates.append(
             HeadingStyleCandidate(
                 style_id=style_id,

@@ -1,5 +1,7 @@
 # 下一阶段路线图（合并稿）
 
+> 2026-09-30：本文为历史能力路线图。当前产品排程入口为 [V2.6～V2.9 产品与 Codex 执行计划](product-plan-v2.6-v2.9.md)，既有实现和待验收项在 V2.6.x 基线中核验。
+
 > 状态：盘点合并稿，未改业务代码。主链路（Word 导入 → Markdown 维护 → 搜索/替换/引用/重编号/检查 → 改动 Diff → 校验构建 → Word 刷新 → 安装发布）已完整。
 > 下一阶段重点：**保真（Fidelity）· 安全（Safety）· 质量追溯（Quality Traceability）· 协作（Collaboration）**。
 > 本文件是**编排层**：把 P0/P1 全部条目合并为 6 个可独立排期、独立验收的计划，每个计划对应一个 OpenSpec 变更（`openspec/changes/<name>/`）。P2 保留在文末，暂不排程。

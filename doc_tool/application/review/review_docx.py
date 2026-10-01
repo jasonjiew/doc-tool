@@ -1056,49 +1056,26 @@ def _build_diff_markdown_table(
     return table
 
 
-def _create_code_block_box(code_lines: List[str], max_width: int = 9600, is_new: bool = False) -> etree._Element:
-    """为多行代码块构建专用代码框（等宽字体、浅灰背景与精细边框）。"""
-    border_color = "F87171" if is_new else "E2E8F0"
-    bg_color = "FEF2F2" if is_new else "F8FAFC"
-    text_color = "DC2626" if is_new else "1F2937"
+def _create_code_block_box(
+    code_lines: List[str], max_width: int = 9600, is_new: bool = False
+) -> etree._Element:
+    """评审稿代码框（与正式出稿共用同一个容器实现）。
 
-    table = etree.Element(qn("tbl"))
-    tbl_pr = etree.SubElement(table, qn("tblPr"))
-    _apply_table_borders(tbl_pr, border_color, "4")
-    etree.SubElement(tbl_pr, qn("tblW")).set(qn("w"), str(max_width))
-    etree.SubElement(tbl_pr, qn("tblW")).set(qn("type"), "dxa")
+    V2.7 起代码容器由 ``doc_tool.kernel_shared.docx_blocks`` 统一生成，
+    保证三个入口同一份 Markdown 得到同一份 OOXML：缩进、Tab、
+    空行与反引号都保留。评审稿只在增量/修改场景换颜色，
+    不另写一套行拆分逻辑。
+    """
+    from doc_tool.kernel_shared.docx_blocks import make_code_container
 
-    tr = etree.SubElement(table, qn("tr"))
-    tr_pr = etree.SubElement(tr, qn("trPr"))
-    etree.SubElement(tr_pr, qn("cantSplit"))
-
-    tc = etree.SubElement(tr, qn("tc"))
-    tc_pr = etree.SubElement(tc, qn("tcPr"))
-    etree.SubElement(tc_pr, qn("tcW")).set(qn("w"), str(max_width))
-    etree.SubElement(tc_pr, qn("tcW")).set(qn("type"), "dxa")
-
-    shd = etree.SubElement(tc_pr, qn("shd"))
-    shd.set(qn("val"), "clear")
-    shd.set(qn("color"), "auto")
-    shd.set(qn("fill"), bg_color)
-
-    tc_mar = etree.SubElement(tc_pr, qn("tcMar"))
-    for edge, val in (("top", "120"), ("bottom", "120"), ("left", "180"), ("right", "180")):
-        m = etree.SubElement(tc_mar, qn(edge))
-        m.set(qn("w"), val)
-        m.set(qn("type"), "dxa")
-
-    for line in (code_lines or [""]):
-        p = etree.SubElement(tc, qn("p"))
-        ppr = etree.SubElement(p, qn("pPr"))
-        sp = etree.SubElement(ppr, qn("spacing"))
-        sp.set(qn("before"), "0")
-        sp.set(qn("after"), "0")
-        sp.set(qn("line"), "240")
-        sp.set(qn("lineRule"), "auto")
-        _append_text_run(p, line or " ", font_name="Consolas", font_size=18, color=text_color)
-
-    return table
+    return make_code_container(
+        code_lines or [""],
+        max_width=max_width,
+        background="FEF2F2" if is_new else "F8FAFC",
+        border_color="F87171" if is_new else "E2E8F0",
+        text_color="DC2626" if is_new else "1F2937",
+        cant_split=True,
+    )
 
 
 def _render_markdown_lines(

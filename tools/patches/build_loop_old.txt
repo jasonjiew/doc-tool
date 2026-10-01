@@ -1,0 +1,36 @@
+    inserted = 0
+    images = 0
+    tables = 0
+    for entry, markdown_path in chapter_entries:
+        if config.get("is_headless") and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            insert_element(
+                section_properties,
+                make_heading(
+                config["headingStyles"],
+                entry.title,
+                entry.depth,
+                num_id=_heading_num_id(numbering),
+                list_level=entry.depth - 1,
+                expressions=expressions,
+                bookmark_key=os.path.abspath(markdown_path) if markdown_path else os.path.abspath(entry.path),
+            ),
+        )
+            inserted += 1
+        if markdown_path:
+            count, image_count, table_count = process_markdown(
+                markdown_path,
+                section_properties,
+                items,
+                relationship_root,
+                image_manager,
+                config,
+                max_image_width,
+                next_object_id,
+                numbering,
+                expressions,
+            )
+            inserted += count
+            images += image_count
+            tables += table_count

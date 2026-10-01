@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="4" failures="1" time="33.452"><testsuite name="doc-tool" tests="4" failures="1" time="33.452"><testcase name="test_recovery_entries.py" classname="scripts.tests" time="1.843"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.717s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="8.094"><failure message="exit code 1" type="TestFailure">..............................................................................................................F....................................................
+======================================================================
+FAIL: test_restore_moves_deleted_back_and_drops_entry (__main__.RestoreFileTests.test_restore_moves_deleted_back_and_drops_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 2429, in test_restore_moves_deleted_back_and_drops_entry
+    self.assertTrue(writer.manifest.empty)
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 163 tests in 7.512s
+
+FAILED (failures=1)
+</failure><system-out>..............................................................................................................F....................................................
+======================================================================
+FAIL: test_restore_moves_deleted_back_and_drops_entry (__main__.RestoreFileTests.test_restore_moves_deleted_back_and_drops_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 2429, in test_restore_moves_deleted_back_and_drops_entry
+    self.assertTrue(writer.manifest.empty)
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 163 tests in 7.512s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_safety_recovery.py" classname="scripts.tests" time="8.750"><system-out>.....................................................
+----------------------------------------------------------------------
+Ran 53 tests in 7.907s
+
+OK
+</system-out></testcase><testcase name="test_local_history.py" classname="scripts.tests" time="14.765"><system-out>....................s..
+----------------------------------------------------------------------
+Ran 23 tests in 13.570s
+
+OK (skipped=1)
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,6 @@
+scripts/validate_docx.py	tools/patches/val_imports_old.txt	tools/patches/val_imports_new.txt
+scripts/validate_docx.py	tools/patches/val_p_old.txt	tools/patches/val_p_new.txt
+scripts/validate_docx.py	tools/patches/val_tbl_old.txt	tools/patches/val_tbl_new.txt
+scripts/validate_docx.py	tools/patches/val_expected_old.txt	tools/patches/val_expected_new.txt
+scripts/validate_docx.py	tools/patches/val_sections_old.txt	tools/patches/val_sections_new.txt
+scripts/validate_docx.py	tools/patches/val_str_old.txt	tools/patches/val_str_new.txt

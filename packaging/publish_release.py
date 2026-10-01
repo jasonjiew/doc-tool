@@ -10,6 +10,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 
 def _force_utf8_stdio() -> None:
@@ -29,8 +30,10 @@ _force_utf8_stdio()
 GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
 PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
 PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
-VERSION = "2.6.0"
-TAG_NAME = "v2.6.0"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from doc_tool.domain.version import APP_VERSION
+VERSION = APP_VERSION
+TAG_NAME = "v" + VERSION
 PACKAGE_NAME = "DocTool"
 
 
@@ -200,7 +203,8 @@ def main():
         (f"DocTool-{VERSION}.spdx.json", os.path.join(out_dir, f"DocTool-{VERSION}.spdx.json")),
     ]
 
-    cer_path = os.path.join(repo_root, "scripts", "cert-out", "codesign.cer")
+    signing_dir = os.environ.get("CODE_SIGNING_DIR") or os.path.expanduser("~/.doctool/signing")
+    cer_path = os.path.join(signing_dir, "codesign.cer")
     if os.path.exists(cer_path):
         files_to_upload.append(("codesign.cer", cer_path))
 
@@ -248,7 +252,11 @@ def main():
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 
-## 亮点更新（2.6.0）
+## 亮点更新（{VERSION}）
+
+- 多版本本地历史与独立回收记录、只读交付历史浏览与章节比较。
+- 模板填充命名预设/最近任务、共享预检与默认兜底、显式严格检查。
+- 当前缓冲大纲统计、研发片段库、图片引用批量修复与离线只读 HTML 包。
 
 - **代码全量审计与缺陷修复**：
   - 修复 `roundtrip` 错误分类及手动前缀过滤逻辑；

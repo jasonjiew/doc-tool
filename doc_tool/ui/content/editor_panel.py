@@ -45,12 +45,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from doc_tool.ui.content.web_preview_browser import WebPreviewBrowser
-    HAS_WEB_ENGINE = True
-except ImportError:
-    HAS_WEB_ENGINE = False
-
 from doc_tool.application.content.preview import (
     preview_summary,
     render_markdown_html,
@@ -474,6 +468,9 @@ class EditorPanel(QWidget):
         self._rollback_btn.setToolTip("回滚上次保存（用 .bak 恢复）")
         self._rollback_btn.clicked.connect(self.rollback_last)
         layout.addWidget(self._rollback_btn)
+        self._history_btn = QPushButton("本地历史", bar)
+        self._history_btn.clicked.connect(self.open_local_history)
+        layout.addWidget(self._history_btn)
 
         self._ext_btn = QPushButton("外部打开", bar)
         self._ext_btn.setProperty("btnRole", "compact")
@@ -594,6 +591,10 @@ class EditorPanel(QWidget):
             QKeySequence("Ctrl+Alt+T"), self, self.format_table_at_cursor
         )
         self._highlighter = MarkdownHighlighter(self._editor.document())
+        from doc_tool.ui.content.outline_panel import OutlinePanel
+        self._outline_panel = OutlinePanel(self._editor, self.highlight_line, splitter)
+        splitter.insertWidget(0, self._outline_panel)
+        self._outline_panel.setMaximumWidth(260)
         self._find_selections: List[QTextEdit.ExtraSelection] = []
         self._spell_selections: List[QTextEdit.ExtraSelection] = []
         self._flash_selection: Optional[QTextEdit.ExtraSelection] = None
@@ -603,10 +604,10 @@ class EditorPanel(QWidget):
         preview_frame = QWidget(splitter)
         preview_layout = QVBoxLayout(preview_frame)
         preview_layout.setContentsMargins(0, 0, 0, 0)
-        if HAS_WEB_ENGINE:
-            self._preview = WebPreviewBrowser(preview_frame, editor_panel=self)
-        else:
-            self._preview = _PreviewBrowser(preview_frame, editor_panel=self)
+        # V2.7：预览统一为内置结构预览（Qt 文本浏览器 + 受控 HTML）。
+        # WebEngine 分支已停用并从打包排除：稳定且不引入约 120 MB
+        # 运行环境与额外进程兼容负担；精确分页仍以真实 Word 为准。
+        self._preview = _PreviewBrowser(preview_frame, editor_panel=self)
         self._preview.setReadOnly(True)
         # 关闭外部链接自动打开：http(s) 链接改由 anchorClicked 处理器用系统浏览器
         # 打开；line-N 锚点用于预览点击定位到源行。
@@ -616,11 +617,9 @@ class EditorPanel(QWidget):
         splitter.addWidget(preview_frame)
         self._preview_frame = preview_frame
 
-        splitter.setSizes([600, 400])
+        splitter.setSizes([210, 600, 400])
         self._splitter = splitter
 
-        if HAS_WEB_ENGINE and isinstance(self._preview, WebPreviewBrowser):
-            self._preview.set_dark(self._dark)
 
         self._apply_edit_state()
 
@@ -636,6 +635,7 @@ class EditorPanel(QWidget):
             self._editor.setPlainText(text)
         finally:
             self._editor.blockSignals(False)
+        self._outline_panel.refresh()
         self._preview_timer.stop()
         self._spell_timer.stop()
         self._mermaid_timer.stop()
@@ -669,6 +669,7 @@ class EditorPanel(QWidget):
             self._editor.setPlainText(text)
         finally:
             self._editor.blockSignals(False)
+        self._outline_panel.refresh()
         self._preview_timer.stop()
         self._spell_timer.stop()
         self._mermaid_timer.stop()
@@ -745,6 +746,8 @@ class EditorPanel(QWidget):
             self._autosave.clear(self._rel_path)
         if result.error:
             self._status_label.setText("已保存（改动清单保存失败：{0}）".format(result.error))
+        elif getattr(result, "warnings", None):
+            self._status_label.setText("已保存（{0}）".format("；".join(result.warnings)))
         elif getattr(result, "backup_failed", False):
             self._status_label.setText("已保存（⚠ 备份失败，回滚不可用）")
         else:
@@ -754,6 +757,25 @@ class EditorPanel(QWidget):
         self._update_dirty()
         self._update_save_state()
         return True
+
+    def open_local_history(self):
+        if self._rel_path is None:
+            return
+        from doc_tool.ui.content.recovery_dialog import RecoveryDialog
+        def guard(rel):
+            if not self.is_dirty():
+                return True
+            from doc_tool.ui.content.unsaved_prompt import confirm_unsaved_dialog
+            from doc_tool.application.content.unsaved import UnsavedChoice
+            choice = confirm_unsaved_dialog([rel], '恢复历史')
+            if choice == UnsavedChoice.CANCEL:
+                return False
+            return self.save() if choice == UnsavedChoice.SAVE else True
+        def restored(rel):
+            self.load(rel, self._writer_abs(rel).read_text(encoding="utf-8"))
+            if self._on_saved:
+                self._on_saved(rel)
+        RecoveryDialog(self._writer, rel_path=self._rel_path, guard=guard, on_restored=restored, parent=self).exec()
 
     def rollback_last(self) -> bool:
         """回滚本文件最近一次保存（用 .bak 恢复）。"""
@@ -1176,7 +1198,7 @@ class EditorPanel(QWidget):
         """打开代码片段管理器对话框（增删改 + 预览）。"""
         from doc_tool.ui.content.snippet_dialog import SnippetDialog
 
-        dialog = SnippetDialog(self._snippet_store, parent=self)
+        dialog = SnippetDialog(self._snippet_store, parent=self, writable=self._writable)
         dialog.insert_requested.connect(self.insert_snippet)
         dialog.exec()
 
@@ -1703,14 +1725,6 @@ class EditorPanel(QWidget):
         self._refresh_preview(self._editor.toPlainText())
 
     def _refresh_preview(self, text: str) -> None:
-        if HAS_WEB_ENGINE and isinstance(self._preview, WebPreviewBrowser):
-            try:
-                base_url = self._preview_base_url()
-                base_str = base_url.toString() if hasattr(base_url, 'toString') else (str(base_url) if base_url else '')
-                self._preview.set_markdown(text, base_str)
-                return
-            except Exception:
-                pass
         document = self._preview.document()
         if hasattr(document, "setBaseUrl"):
             document.setBaseUrl(self._preview_base_url())
@@ -1725,10 +1739,7 @@ class EditorPanel(QWidget):
         """更新暗黑模式状态并刷新当前预览。"""
         if self._dark != dark:
             self._dark = dark
-            if HAS_WEB_ENGINE and isinstance(self._preview, WebPreviewBrowser):
-                self._preview.set_dark(dark)
-            else:
-                self._refresh_preview(self._editor.toPlainText())
+            self._refresh_preview(self._editor.toPlainText())
 
     def _preview_base_url(self) -> QUrl:
         """返回当前文档图片等相对资源的解析目录。"""

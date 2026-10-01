@@ -1,0 +1,14 @@
+def _caption_paragraph(entry, registry, config):
+    """题注段落：注册表已按全文顺序编号（复杂表格也计入），此处只做输出。"""
+    number = entry.number
+    if registry is not None and entry.duplicate:
+        # 重复标识只在输出层唯一化：编号随出现顺序递增，目标仍是首次登记对象。
+        number = registry.sequential_number(entry)
+    return shared.make_caption_paragraph(
+        prefix="图" if entry.kind == KIND_FIGURE else "表",
+        label=entry.label,
+        number=number,
+        style_id=config.get("captionStyle") or None,
+        bookmark_name=entry.bookmark,
+        bookmark_id=0,
+    )

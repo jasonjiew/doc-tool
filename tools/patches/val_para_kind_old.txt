@@ -1,0 +1,5 @@
+        paragraph_kind = (
+            "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", block.text) else "P"
+        )
+        events.append(Event(paragraph_kind, _expected_text(block.text, registry), source))
+    return events

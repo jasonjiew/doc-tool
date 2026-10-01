@@ -1,0 +1,4 @@
+    else:
+        widths = [2400] * column_count
+
+    table = etree.Element(qn("tbl"))

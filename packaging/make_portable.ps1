@@ -49,11 +49,13 @@ try {
         (Join-Path $RepoRoot "packaging\portable\请先读我.txt"),
         (Join-Path $RepoRoot "packaging\portable\安装证书.cmd")
     )
-    $cer = Join-Path $RepoRoot "scripts\cert-out\codesign.cer"
+    $signingDir = $env:CODE_SIGNING_DIR
+    if (-not $signingDir) { $signingDir = Join-Path $env:USERPROFILE ".doctool\signing" }
+    $cer = Join-Path $signingDir "codesign.cer"
     if (Test-Path $cer) {
         $zipItems += $cer
     } else {
-        Write-Warning "未找到 scripts\cert-out\codesign.cer：便携包不含公司证书（CI 环境属预期）。"
+        Write-Warning "未找到外部签名目录中的 codesign.cer：便携包不含公司证书（CI 环境属预期）。"
     }
     Compress-Archive -Path $zipItems -DestinationPath $Zip -CompressionLevel Optimal
 } finally {

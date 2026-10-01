@@ -1,0 +1,2 @@
+scripts/build_docx.py	tools/patches/fix_anchor_old.txt	tools/patches/fix_anchor_new.txt
+scripts/build_docx.py	tools/patches/fix_parse_old.txt	tools/patches/fix_parse_new.txt

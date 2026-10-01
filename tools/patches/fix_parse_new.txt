@@ -1,0 +1,3 @@
+            document = parse_blocks_file(markdown_path) if markdown_path else None
+            if document is None:
+                continue

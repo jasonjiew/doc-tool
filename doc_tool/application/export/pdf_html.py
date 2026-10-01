@@ -23,7 +23,7 @@ def _review_dir(output_dir: Path) -> Path:
     return target
 
 
-def export_html(chapters: Sequence[Tuple[str, str]], output_dir: Path, version: str) -> Path:
+def export_html(chapters: Sequence[Tuple[str, str]], output_dir: Path, version: str, *, use_cli=True) -> Path:
     import html as _html
 
     navigation = []
@@ -34,12 +34,12 @@ def export_html(chapters: Sequence[Tuple[str, str]], output_dir: Path, version: 
         navigation.append('<li><a href="#{0}">{1}</a></li>'.format(anchor, safe_title))
         sections.append(
             '<section id="{0}" data-rel-path="{1}"><h1>{1}</h1>{2}</section>'.format(
-                anchor, safe_title, render_markdown_html(markdown, use_cli=True)
+                anchor, safe_title, render_markdown_html(markdown, use_cli=use_cli)
             )
         )
     document = """<!doctype html><html><head><meta charset="utf-8"><title>Review {0}</title>
 <style>body{{font-family:Arial,'Microsoft YaHei',sans-serif;max-width:1100px;margin:auto;display:grid;grid-template-columns:230px 1fr;gap:24px}}nav{{position:sticky;top:0;height:100vh}}section{{border-bottom:1px solid #ddd;padding-bottom:24px}}table{{border-collapse:collapse}}</style>
-</head><body><nav><h2>章节导航</h2><ul>{1}</ul></nav><main>{2}</main></body></html>""".format(version, "".join(navigation), "".join(sections))
+</head><body><nav><h2>章节导航</h2><ul>{1}</ul></nav><main>{2}</main></body></html>""".format(_html.escape(version), "".join(navigation), "".join(sections))
     target = _review_dir(output_dir) / "review-{0}-{1}.html".format(version, _stamp())
     target.write_text(document, encoding="utf-8")
     return target

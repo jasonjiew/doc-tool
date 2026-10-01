@@ -44,7 +44,8 @@ class DeriveStepListTests(unittest.TestCase):
             ("publish", "started", "", None),
             ("publish", "succeeded", "已原子发布", None),
         ])
-        self.assertEqual(len(steps), 5)
+        # V2.7 起管线新增 prepare / lint 阶段；revision 不在该面板的步骤序列内。
+        self.assertEqual(len(steps), 7)
         by_stage = {s.stage: s.status for s in steps}
         self.assertEqual(by_stage["build"], STEP_STATUS_SUCCESS)
         self.assertEqual(by_stage["validate_pre"], STEP_STATUS_SUCCESS)
@@ -52,10 +53,16 @@ class DeriveStepListTests(unittest.TestCase):
         # word_refresh / validate_post 从未 started -> 保持待处理
         self.assertEqual(by_stage["word_refresh"], STEP_STATUS_PENDING)
         self.assertEqual(by_stage["validate_post"], STEP_STATUS_PENDING)
-        # 阶段顺序与管线一致（build 在最前，publish 在最后）
+        # 阶段顺序必须与管线顺序同源（revision 之外的全部阶段，按管线次序）
         self.assertEqual([s.stage for s in steps], [
-            "build", "validate_pre", "word_refresh", "validate_post", "publish",
+            "prepare", "lint", "build", "validate_pre", "word_refresh",
+            "validate_post", "publish",
         ])
+        # 与内核管线顺序保持一致（防止两处各写一份清单而漂移）
+        from doc_tool.application.pipeline import PIPELINE_STAGE_ORDER
+
+        expected = [stage for stage in PIPELINE_STAGE_ORDER if stage != "revision"]
+        self.assertEqual([s.stage for s in steps], expected)
 
     def test_skipped_stage_marks_skipped_and_keeps_order(self):
         """诊断模式：word_refresh/validate_post 跳过，后续仍按原顺序推进。"""

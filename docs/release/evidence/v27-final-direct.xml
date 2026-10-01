@@ -1,0 +1,492 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="5" failures="1" time="11.961"><testsuite name="doc-tool" tests="5" failures="1" time="11.961"><testcase name="test_expression_contract.py" classname="scripts.tests" time="1.630"><failure message="exit code 1" type="TestFailure">D:\ai_develop_project_space\doc-tool\scripts\build_docx.py:1313: FutureWarning: Truth-testing of elements was a source of confusion and will always return True in future versions. Use specific 'len(elem)' or 'elem is not None' test instead.
+  sect_pr = landscape_prototype or shared.clone_section_properties(
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+F[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+[FAIL] Section/方向/页边距 保持模板体系: Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化
+F...............
+======================================================================
+FAIL: test_build_outputs_code_container_captions_and_landscape (__main__.BuildIntegrationTests.test_build_outputs_code_container_captions_and_landscape)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_expression_contract.py", line 274, in test_build_outputs_code_container_captions_and_landscape
+    self.assertIn("portrait", orientations)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'portrait' not found in ['landscape']
+
+======================================================================
+FAIL: test_validation_passes_for_fixture (__main__.BuildIntegrationTests.test_validation_passes_for_fixture)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_expression_contract.py", line 308, in test_validation_passes_for_fixture
+    self.assertTrue(ok, detail)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: False is not true : # requirement 严格校验报告
+
+- 输出: `C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx`
+
+## 校验结果
+
+- [PASS] DOCX ZIP 与全部 XML 可解析
+- [PASS] Relationship Target 与引用完整
+- [PASS] 章节编号、层级与必需资源预检 — 章节条目 1
+- [PASS] 目录/Markdown 与 Word 元素顺序、上下文严格一致
+- [PASS] Heading 数量、文本、层级、顺序一致
+- [PASS] 正文文本与位置一致
+- [PASS] 普通表格文本一致
+- [PASS] 复杂表格 OOXML 一致 — 复杂表格 0
+- [PASS] 图片对象、内容哈希与位置一致
+- [PASS] 媒体无重复打包 — media=4, duplicateFiles=0, duplicateBytes=0
+- [PASS] document.xml 根节点结构合法
+- [PASS] updateFields 仅位于 settings.xml
+- [PASS] Styles/Font/Theme 保持模板体系
+- [PASS] Numbering 保持模板体系
+- [FAIL] Section/方向/页边距 保持模板体系 — Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化
+- [PASS] Header 保持模板体系
+- [PASS] Footer 保持模板体系
+- [PASS] settings.xml 保持模板体系
+- [PASS] 封面编号、版本与 NUMPAGES 字段正确 — {'文件编号': 'GX-V27-001', '版本号': '1.0', '页数': '0'}
+- [PASS] TOC 域存在
+
+## 关键指标
+
+- Markdown: 1
+- Heading: 8
+- 正文段落(非空): 10
+- 普通表格: 8
+- 复杂表格: 0
+- Word 顶层表格: 8
+- 图片: 1
+- 媒体部件: 4
+- 重复媒体: 0
+- DOCX 大小(字节): 197326
+
+## 总结
+
+- PASS: 19
+- FAIL: 1
+- 结论: **失败**
+
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.727s
+
+FAILED (failures=2)
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx
+[requirement] 插入元素=30, 表格=4, 图片=1, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx
+[requirement] 插入元素=30, 表格=4, 图片=1, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\logs\v27-validation.md
+[requirement] PASS=19 FAIL=1
+</failure><system-out>D:\ai_develop_project_space\doc-tool\scripts\build_docx.py:1313: FutureWarning: Truth-testing of elements was a source of confusion and will always return True in future versions. Use specific 'len(elem)' or 'elem is not None' test instead.
+  sect_pr = landscape_prototype or shared.clone_section_properties(
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+F[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+[FAIL] Section/方向/页边距 保持模板体系: Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化
+F...............
+======================================================================
+FAIL: test_build_outputs_code_container_captions_and_landscape (__main__.BuildIntegrationTests.test_build_outputs_code_container_captions_and_landscape)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_expression_contract.py", line 274, in test_build_outputs_code_container_captions_and_landscape
+    self.assertIn("portrait", orientations)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'portrait' not found in ['landscape']
+
+======================================================================
+FAIL: test_validation_passes_for_fixture (__main__.BuildIntegrationTests.test_validation_passes_for_fixture)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_expression_contract.py", line 308, in test_validation_passes_for_fixture
+    self.assertTrue(ok, detail)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: False is not true : # requirement 严格校验报告
+
+- 输出: `C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx`
+
+## 校验结果
+
+- [PASS] DOCX ZIP 与全部 XML 可解析
+- [PASS] Relationship Target 与引用完整
+- [PASS] 章节编号、层级与必需资源预检 — 章节条目 1
+- [PASS] 目录/Markdown 与 Word 元素顺序、上下文严格一致
+- [PASS] Heading 数量、文本、层级、顺序一致
+- [PASS] 正文文本与位置一致
+- [PASS] 普通表格文本一致
+- [PASS] 复杂表格 OOXML 一致 — 复杂表格 0
+- [PASS] 图片对象、内容哈希与位置一致
+- [PASS] 媒体无重复打包 — media=4, duplicateFiles=0, duplicateBytes=0
+- [PASS] document.xml 根节点结构合法
+- [PASS] updateFields 仅位于 settings.xml
+- [PASS] Styles/Font/Theme 保持模板体系
+- [PASS] Numbering 保持模板体系
+- [FAIL] Section/方向/页边距 保持模板体系 — Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化
+- [PASS] Header 保持模板体系
+- [PASS] Footer 保持模板体系
+- [PASS] settings.xml 保持模板体系
+- [PASS] 封面编号、版本与 NUMPAGES 字段正确 — {'文件编号': 'GX-V27-001', '版本号': '1.0', '页数': '0'}
+- [PASS] TOC 域存在
+
+## 关键指标
+
+- Markdown: 1
+- Heading: 8
+- 正文段落(非空): 10
+- 普通表格: 8
+- 复杂表格: 0
+- Word 顶层表格: 8
+- 图片: 1
+- 媒体部件: 4
+- 重复媒体: 0
+- DOCX 大小(字节): 197326
+
+## 总结
+
+- PASS: 19
+- FAIL: 1
+- 结论: **失败**
+
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.727s
+
+FAILED (failures=2)
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx
+[requirement] 插入元素=30, 表格=4, 图片=1, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\output\表达契约(1.0).docx
+[requirement] 插入元素=30, 表格=4, 图片=1, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-expression-jev3dfo8\project\logs\v27-validation.md
+[requirement] PASS=19 FAIL=1
+</system-out></testcase><testcase name="test_docx_common.py" classname="scripts.tests" time="1.560"><system-out>test_cross_file_and_section_anchor_resolution_not_swallowed (__main__.HyperlinkOOXMLStructureAndJumpTests.test_cross_file_and_section_anchor_resolution_not_swallowed)
+测试锚点链接（如 #3.4、#第3章、#蓝牙配对）不会被当前文件起始书签错误吞噬。 ... ok
+test_dynamic_hyperlink_style_id_from_styles_xml (__main__.HyperlinkOOXMLStructureAndJumpTests.test_dynamic_hyperlink_style_id_from_styles_xml) ... ok
+test_find_bookmark_for_section_disambiguation (__main__.HyperlinkOOXMLStructureAndJumpTests.test_find_bookmark_for_section_disambiguation)
+测试 find_bookmark_for_section 不会把带标题的多级小节（如 '1.1 目的'、'3.4 同步'）误识别为第1章或第3章。 ... ok
+test_hyperlink_ooxml_structure_and_style (__main__.HyperlinkOOXMLStructureAndJumpTests.test_hyperlink_ooxml_structure_and_style) ... ok
+test_jump_to_current_chapter_and_section_fallbacks (__main__.HyperlinkOOXMLStructureAndJumpTests.test_jump_to_current_chapter_and_section_fallbacks) ... ok
+test_markdown_visible_text_italics_with_space (__main__.HyperlinkOOXMLStructureAndJumpTests.test_markdown_visible_text_italics_with_space)
+测试 Markdown 行内斜体含空格时与 build_docx 生成的可见文本一致。 ... ok
+test_output_filename_deduplication (__main__.HyperlinkOOXMLStructureAndJumpTests.test_output_filename_deduplication)
+测试升级版本时避免重复拼接版本号括号（如 (1.6)(1.7).docx）。 ... ok
+test_parent_chapter_bookmark_resolution_for_subsections (__main__.HyperlinkOOXMLStructureAndJumpTests.test_parent_chapter_bookmark_resolution_for_subsections)
+测试多级目录下子文件通过 '#本章' 或 '本章节' 精确跳转到所属第1级父章节。 ... ok
+test_punctuation_and_range_normalization (__main__.HyperlinkOOXMLStructureAndJumpTests.test_punctuation_and_range_normalization)
+测试全角半角标点、数值区间波浪号与正负号等语义等价。 ... ok
+test_revision_summary_cell_hyperlink_structure (__main__.HyperlinkOOXMLStructureAndJumpTests.test_revision_summary_cell_hyperlink_structure) ... ok
+test_rpr_child_element_order_canonical_ooxml (__main__.HyperlinkOOXMLStructureAndJumpTests.test_rpr_child_element_order_canonical_ooxml)
+测试超链接与格式化文本的 rPr 子元素严格遵循 OOXML CT_RPr 顺序：rStyle -&gt; rFonts/b/i -&gt; color -&gt; u。 ... ok
+test_strip_manual_prefix_letters_and_roman (__main__.HyperlinkOOXMLStructureAndJumpTests.test_strip_manual_prefix_letters_and_roman)
+测试字母序号与罗马数字列表前缀识别剥离。 ... ok
+test_bold_wildcard_and_multistar_stay_literal (__main__.MarkdownContractTests.test_bold_wildcard_and_multistar_stay_literal) ... ok
+test_bold_with_punctuation_and_multisentence (__main__.MarkdownContractTests.test_bold_with_punctuation_and_multisentence) ... ok
+test_br_becomes_real_word_break (__main__.MarkdownContractTests.test_br_becomes_real_word_break) ... ok
+test_external_and_internal_hyperlinks (__main__.MarkdownContractTests.test_external_and_internal_hyperlinks) ... ok
+test_footnote_reference_and_part_generation (__main__.MarkdownContractTests.test_footnote_reference_and_part_generation) ... ok
+test_image_dimensions_are_optional (__main__.MarkdownContractTests.test_image_dimensions_are_optional) ... ok
+test_inline_bold_italic_and_code_runs (__main__.MarkdownContractTests.test_inline_bold_italic_and_code_runs) ... ok
+test_inline_bold_italic_three_asterisks (__main__.MarkdownContractTests.test_inline_bold_italic_three_asterisks) ... ok
+test_inline_italic_in_chinese_sentence (__main__.MarkdownContractTests.test_inline_italic_in_chinese_sentence) ... ok
+test_inline_italic_with_punctuation (__main__.MarkdownContractTests.test_inline_italic_with_punctuation) ... ok
+test_internal_link_resolves_root_relative_and_by_name (__main__.MarkdownContractTests.test_internal_link_resolves_root_relative_and_by_name) ... ok
+test_list_parser_requires_whitespace_and_tracks_indent (__main__.MarkdownContractTests.test_list_parser_requires_whitespace_and_tracks_indent) ... ok
+test_minimal_build_emits_expression_parts_deterministically (__main__.MarkdownContractTests.test_minimal_build_emits_expression_parts_deterministically) ... ok
+test_numbering_manager_creates_true_multilevel_list (__main__.MarkdownContractTests.test_numbering_manager_creates_true_multilevel_list) ... ok
+test_stable_bookmark_name_is_deterministic (__main__.MarkdownContractTests.test_stable_bookmark_name_is_deterministic) ... ok
+test_table_escaped_pipe_backslash_and_break (__main__.MarkdownContractTests.test_table_escaped_pipe_backslash_and_break) ... ok
+test_unclosed_inline_marker_stays_literal (__main__.MarkdownContractTests.test_unclosed_inline_marker_stays_literal) ... ok
+test_custom_available_bookmarks_iterable (__main__.NeutralizeDanglingHyperlinksTests.test_custom_available_bookmarks_iterable) ... ok
+test_dangling_hyperlink_preserves_tail_text (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_preserves_tail_text) ... ok
+test_dangling_hyperlink_unlinked_when_bookmark_missing (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_unlinked_when_bookmark_missing) ... ok
+test_dangling_hyperlink_with_direct_text (__main__.NeutralizeDanglingHyperlinksTests.test_dangling_hyperlink_with_direct_text) ... ok
+test_empty_hyperlink_without_target_unlinked (__main__.NeutralizeDanglingHyperlinksTests.test_empty_hyperlink_without_target_unlinked) ... ok
+test_expression_errors_ignores_external_hyperlink_anchor (__main__.NeutralizeDanglingHyperlinksTests.test_expression_errors_ignores_external_hyperlink_anchor) ... ok
+test_expression_manager_avoids_template_bookmark_id_collision (__main__.NeutralizeDanglingHyperlinksTests.test_expression_manager_avoids_template_bookmark_id_collision) ... ok
+test_expression_manager_scans_all_parts_for_bookmark_ids (__main__.NeutralizeDanglingHyperlinksTests.test_expression_manager_scans_all_parts_for_bookmark_ids) ... ok
+test_external_hyperlink_with_rid_and_anchor_preserved (__main__.NeutralizeDanglingHyperlinksTests.test_external_hyperlink_with_rid_and_anchor_preserved) ... ok
+test_external_hyperlink_with_rid_preserved (__main__.NeutralizeDanglingHyperlinksTests.test_external_hyperlink_with_rid_preserved) ... ok
+test_header_footer_signatures_preserves_order_mixed_fields (__main__.NeutralizeDanglingHyperlinksTests.test_header_footer_signatures_preserves_order_mixed_fields) ... ok
+test_markdown_visible_text_preserves_multiplication_across_breaks (__main__.NeutralizeDanglingHyperlinksTests.test_markdown_visible_text_preserves_multiplication_across_breaks) ... ok
+test_valid_hyperlink_preserved_when_bookmark_exists (__main__.NeutralizeDanglingHyperlinksTests.test_valid_hyperlink_preserved_when_bookmark_exists) ... ok
+test_end_run_in_next_paragraph (__main__.NeutralizeHyperlinkFieldsTests.test_end_run_in_next_paragraph) ... ok
+test_field_runs_wrapped_in_hyperlink_element (__main__.NeutralizeHyperlinkFieldsTests.test_field_runs_wrapped_in_hyperlink_element) ... ok
+test_fldsimple_hyperlink_unlinked (__main__.NeutralizeHyperlinkFieldsTests.test_fldsimple_hyperlink_unlinked) ... ok
+test_native_hyperlink_without_field_untouched (__main__.NeutralizeHyperlinkFieldsTests.test_native_hyperlink_without_field_untouched) ... ok
+test_nested_pageref_inside_toc_not_touched (__main__.NeutralizeHyperlinkFieldsTests.test_nested_pageref_inside_toc_not_touched) ... ok
+test_non_hyperlink_field_untouched (__main__.NeutralizeHyperlinkFieldsTests.test_non_hyperlink_field_untouched) ... ok
+test_simple_hyperlink_field_unlinked (__main__.NeutralizeHyperlinkFieldsTests.test_simple_hyperlink_field_unlinked) ... ok
+test_index_is_parent_body_before_child (__main__.TreeContractTests.test_index_is_parent_body_before_child) ... ok
+test_missing_image_is_fatal (__main__.TreeContractTests.test_missing_image_is_fatal) ... ok
+test_numbering_gap_fails_with_exact_suggestion (__main__.TreeContractTests.test_numbering_gap_fails_with_exact_suggestion) ... ok
+
+----------------------------------------------------------------------
+Ran 52 tests in 0.467s
+
+OK
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpbra4b1rn\one.docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpbra4b1rn\two.docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\tmpbra4b1rn\analysis\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_project_build.py" classname="scripts.tests" time="4.462"><system-out>test_build_outputs_are_byte_identical (__main__.LegacyProjectConsistencyTests.test_build_outputs_are_byte_identical)
+同一模板/内容/资源下，新旧入口构建的 DOCX 字节哈希一致。 ... ok
+test_config_from_project_matches_legacy (__main__.LegacyProjectConsistencyTests.test_config_from_project_matches_legacy)
+config_from_project 产出的路径与 load_config 一致。 ... ok
+test_corrupt_template_raises_automation_error (__main__.LegacyProjectConsistencyTests.test_corrupt_template_raises_automation_error)
+模板不是合法 DOCX 时映射为 AutomationError（统一入口中性异常）。 ... ok
+test_project_validate_matches_legacy (__main__.LegacyProjectConsistencyTests.test_project_validate_matches_legacy)
+新旧入口的校验结果一致（同时通过或同时失败）。 ... ok
+test_validate_events_are_identical (__main__.LegacyProjectConsistencyTests.test_validate_events_are_identical)
+新旧入口的校验事件流（Heading/正文/表格）一致。 ... ok
+test_build_failure_returns_error_code (__main__.PipelineServiceTests.test_build_failure_returns_error_code)
+构建失败时返回结构化错误码。 ... ok
+test_skip_word_refresh_pipeline_returns_structured_events (__main__.PipelineServiceTests.test_skip_word_refresh_pipeline_returns_structured_events)
+跳过 Word 刷新的管线返回结构化阶段事件（构建与刷新前校验必须成功）。 ... ok
+test_extra_rows_follow_last_template_row_formatting (__main__.RevisionRecordBuildTests.test_extra_rows_follow_last_template_row_formatting)
+Markdown 行数超过模板数据行时，多出来的行沿用模板最后一行排版。 ... ok
+test_markdown_rows_reach_output_document (__main__.RevisionRecordBuildTests.test_markdown_rows_reach_output_document)
+Markdown 表格的数据行原样落到产物修订表（含 ``\|`` 转义还原）。 ... ok
+test_missing_markdown_keeps_template_rows (__main__.RevisionRecordBuildTests.test_missing_markdown_keeps_template_rows)
+没有 ``_revision_record.md`` 时保留模板原表，不清空、不报错。 ... ok
+test_multiline_summary_becomes_line_breaks (__main__.RevisionRecordBuildTests.test_multiline_summary_becomes_line_breaks)
+摘要里的 ``&lt;br&gt;`` 转成 ``w:br`` 换行，而不是塞进单个 ``w:t``。 ... ok
+test_pipeline_syncs_document_version_from_last_row (__main__.RevisionRecordBuildTests.test_pipeline_syncs_document_version_from_last_row)
+管线按修订记录末行版本号定产物版本号，且从不改写该文件。 ... ok
+test_rebuilt_rows_keep_template_row_formatting (__main__.RevisionRecordBuildTests.test_rebuilt_rows_keep_template_row_formatting)
+重建的数据行沿用模板数据行排版（行高/网格偏移/边框/宽度单位/对齐）。 ... ok
+test_template_rows_are_replaced_not_appended (__main__.RevisionRecordBuildTests.test_template_rows_are_replaced_not_appended)
+模板自带的数据行被 Markdown 全量替换，不与新行并存。 ... ok
+test_absolute_path_rejected (__main__.SpecialPathRegressionTests.test_absolute_path_rejected)
+绝对路径作为项目内资源被拒绝。 ... ok
+test_build_with_chinese_space_bracket_ampersand_path (__main__.SpecialPathRegressionTests.test_build_with_chinese_space_bracket_ampersand_path)
+在含中文、空格、括号、&amp; 的项目路径下构建成功。 ... ok
+test_config_from_project_rejects_escape_in_manifest (__main__.SpecialPathRegressionTests.test_config_from_project_rejects_escape_in_manifest)
+清单中 templateDocx 越界时 resolve_paths 抛出 PathEscapeError。 ... ok
+test_manifest_roundtrip_with_special_path (__main__.SpecialPathRegressionTests.test_manifest_roundtrip_with_special_path)
+清单在特殊路径下保存/加载后路径仍正确。 ... ok
+test_path_escape_rejected_in_resource (__main__.SpecialPathRegressionTests.test_path_escape_rejected_in_resource)
+资源路径越界（..）被 ProjectPaths 拒绝。 ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 3.401s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-njpn2o_e\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-njpn2o_e\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-eo2ub63x\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-eo2ub63x\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-eo2ub63x\legacy-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-eo2ub63x\project-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-cfh7kp1t\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-cfh7kp1t\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipeline-y4grjsre\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipeline-y4grjsre\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 31 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-hnugmgef\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-oaamvsnv\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-s6p77a7b\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-j0_ft2mr\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-72_r3_6i\output\.tmp-GX-TEST-001 项目化构建测试(1.1).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-revision-build-72_r3_6i\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-4gstiksn\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-ln7xc28z\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-zq1ls_ur\测试 项目(1.0) &amp; 验证\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-zq1ls_ur\测试 项目(1.0) &amp; 验证\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_markdown_structure.py" classname="scripts.tests" time="1.092"><system-out>test_error_presentation_prefers_concrete_detail (__main__.FailurePresentationTests.test_error_presentation_prefers_concrete_detail) ... ok
+test_exception_locations_are_relative_to_content_root (__main__.FailurePresentationTests.test_exception_locations_are_relative_to_content_root) ... ok
+test_exception_locations_fall_back_to_file_name_outside_root (__main__.FailurePresentationTests.test_exception_locations_fall_back_to_file_name_outside_root) ... ok
+test_format_stage_locations_renders_lines_for_result_card (__main__.FailurePresentationTests.test_format_stage_locations_renders_lines_for_result_card) ... ok
+test_pipeline_failure_expands_into_one_issue_per_location (__main__.FailurePresentationTests.test_pipeline_failure_expands_into_one_issue_per_location) ... ok
+test_pipeline_failure_without_locations_keeps_single_record (__main__.FailurePresentationTests.test_pipeline_failure_without_locations_keeps_single_record) ... ok
+test_plain_exception_yields_no_locations (__main__.FailurePresentationTests.test_plain_exception_yields_no_locations) ... ok
+test_single_location_summary_has_no_count_prefix (__main__.FailurePresentationTests.test_single_location_summary_has_no_count_prefix) ... ok
+test_summary_leads_with_first_location_and_total_count (__main__.FailurePresentationTests.test_summary_leads_with_first_location_and_total_count) ... ok
+test_check_bare_mermaid_structure_with_preceding_comment (__main__.MarkdownStructureLintRuleTests.test_check_bare_mermaid_structure_with_preceding_comment)
+裸 Mermaid 块前带注释时，行号精确指向错误代码行且 blocking=True。 ... ok
+test_check_mermaid_structure_blocking_on_syntax_error (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_blocking_on_syntax_error)
+Mermaid 语法错误在构建前契约中被标记为 blocking=True。 ... ok
+test_check_mermaid_structure_detects_broken_fence (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_broken_fence)
+Mermaid 围栏反引号少于 3 个（如 ``mermaid）时应报告语法错误。 ... ok
+test_check_mermaid_structure_detects_mismatched_inline_backticks (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_mismatched_inline_backticks)
+双反引号开头但单反引号闭合的残缺标记应被正确判定为未闭合。 ... ok
+test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch)
+单反引号开头但双反引号/三反引号结尾，或波浪线不匹配时均应报告语法错误。 ... ok
+test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block)
+代码块内部引用残缺 mermaid 示例（如 ```markdown 块内）不应误报阻断错误。 ... ok
+test_check_mermaid_structure_ignores_inline_code_span (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_inline_code_span)
+行首包含行内代码如 `mermaid` 语法时，不应被误报为残缺围栏。 ... ok
+test_check_mermaid_structure_supports_case_insensitive_sequence_notes (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_case_insensitive_sequence_notes)
+Mermaid sequenceDiagram 支持小写 note over 语句 ... ok
+test_check_mermaid_structure_supports_chained_edges_with_labels (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_chained_edges_with_labels)
+Mermaid flowchart 支持带标签的链式连线 A --&gt;|label| B --&gt; C ... ok
+test_check_mermaid_structure_supports_dotted_text_edge (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_dotted_text_edge)
+Mermaid flowchart 支持虚线文字连线 A -. text .-&gt; B ... ok
+test_check_mermaid_structure_tolerates_bold_delimiters (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_tolerates_bold_delimiters)
+Mermaid 节点若括号被 Markdown 加粗符号包裹时容错支持 ... ok
+test_non_blocking_findings_stay_warning_even_when_rule_is_error (__main__.MarkdownStructureLintRuleTests.test_non_blocking_findings_stay_warning_even_when_rule_is_error) ... ok
+test_orphan_meta_is_reported_before_merging (__main__.MarkdownStructureLintRuleTests.test_orphan_meta_is_reported_before_merging) ... ok
+test_rule_is_enabled_by_default_for_every_document_type (__main__.MarkdownStructureLintRuleTests.test_rule_is_enabled_by_default_for_every_document_type) ... ok
+test_wellformed_document_is_clean (__main__.MarkdownStructureLintRuleTests.test_wellformed_document_is_clean) ... ok
+test_format_location_renders_path_line_message_hint (__main__.StructuredLocationTests.test_format_location_renders_path_line_message_hint) ... ok
+test_non_blocking_findings_do_not_fail_the_build (__main__.StructuredLocationTests.test_non_blocking_findings_do_not_fail_the_build) ... ok
+test_orphan_meta_fails_prebuild_with_path_line_and_hint (__main__.StructuredLocationTests.test_orphan_meta_fails_prebuild_with_path_line_and_hint) ... ok
+test_prebuild_reports_every_problem_in_one_pass (__main__.StructuredLocationTests.test_prebuild_reports_every_problem_in_one_pass) ... ok
+test_declared_column_count_mismatch_is_warning_with_actual_numbers (__main__.TableStructureContractTests.test_declared_column_count_mismatch_is_warning_with_actual_numbers) ... ok
+test_escaped_pipe_is_not_a_column_separator (__main__.TableStructureContractTests.test_escaped_pipe_is_not_a_column_separator) ... ok
+test_fewer_declared_widths_explains_widths_fall_back (__main__.TableStructureContractTests.test_fewer_declared_widths_explains_widths_fall_back) ... ok
+test_invalid_meta_syntax_is_blocking_and_carries_example (__main__.TableStructureContractTests.test_invalid_meta_syntax_is_blocking_and_carries_example) ... ok
+test_meta_followed_by_blank_line_is_blocking_with_gap_hint (__main__.TableStructureContractTests.test_meta_followed_by_blank_line_is_blocking_with_gap_hint) ... ok
+test_meta_parsing_is_shared_with_kernel (__main__.TableStructureContractTests.test_meta_parsing_is_shared_with_kernel) ... ok
+test_meta_with_no_table_at_all_hints_removing_meta (__main__.TableStructureContractTests.test_meta_with_no_table_at_all_hints_removing_meta) ... ok
+test_missing_separator_and_ragged_rows_are_warnings (__main__.TableStructureContractTests.test_missing_separator_and_ragged_rows_are_warnings) ... ok
+test_split_row_still_raises_automation_error_for_kernel (__main__.TableStructureContractTests.test_split_row_still_raises_automation_error_for_kernel) ... ok
+test_wellformed_table_reports_nothing (__main__.TableStructureContractTests.test_wellformed_table_reports_nothing) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.110s
+
+OK
+</system-out></testcase><testcase name="test_import_project.py" classname="scripts.tests" time="3.217"><system-out>test_complex_table_extracted_as_xml (__main__.ExtractionRegressionTests.test_complex_table_extracted_as_xml)
+复杂表格（gridSpan）提取为 XML 资源。 ... ok
+test_event_order_preserved (__main__.ExtractionRegressionTests.test_event_order_preserved)
+正文/图片/表格按源文档顺序提取，事件顺序保持一致。 ... ok
+test_image_extracted_with_dimensions (__main__.ExtractionRegressionTests.test_image_extracted_with_dimensions)
+图片提取并保留尺寸标注。 ... ok
+test_paragraph_with_soft_break_extracted_as_br_and_roundtrips (__main__.ExtractionRegressionTests.test_paragraph_with_soft_break_extracted_as_br_and_roundtrips)
+段落内含软换行（&lt;w:br/&gt;）提取为 &lt;br&gt;，且完整导入能通过往返门禁。 ... ok
+test_parent_body_writes_index_md_before_children (__main__.ExtractionRegressionTests.test_parent_body_writes_index_md_before_children)
+父章节自身正文写入 _index.md 且目录树在子章节之前。 ... ok
+test_simple_table_extracted_as_markdown (__main__.ExtractionRegressionTests.test_simple_table_extracted_as_markdown)
+普通表格提取为 Markdown 表格（带 TBL 头）。 ... ok
+test_atomic_publish_no_partial_project_on_failure (__main__.ImportEndToEndTests.test_atomic_publish_no_partial_project_on_failure)
+任务 4.5：失败时不会留下半成品项目目录。 ... ok
+test_cancelled_import_does_not_publish_project (__main__.ImportEndToEndTests.test_cancelled_import_does_not_publish_project) ... ok
+test_derived_heading1_style_does_not_win_collision (__main__.ImportEndToEndTests.test_derived_heading1_style_does_not_win_collision)
+派生自定义「标题1」不得顶掉内置 heading 1（真实设计模板缺陷）。 ... ok
+test_failure_isolation_cleans_staging_and_logs (__main__.ImportEndToEndTests.test_failure_isolation_cleans_staging_and_logs)
+任务 4.7：试构建失败后暂存隔离清理并写诊断日志，源文档与正式项目不受影响。 ... ok
+test_general_docx_full_import (__main__.ImportEndToEndTests.test_general_docx_full_import)
+通用大文档完整首次导入：预检-&gt;提取-&gt;拆分-&gt;结构校验-&gt;试构建-&gt;原子发布。 ... ok
+test_general_docx_without_company_cover_full_import (__main__.ImportEndToEndTests.test_general_docx_without_company_cover_full_import)
+通用大文档不要求星河封面、文档编号或版本。 ... ok
+test_legacy_doc_format_converted_and_imported_successfully (__main__.ImportEndToEndTests.test_legacy_doc_format_converted_and_imported_successfully)
+测试旧版 .doc 格式经过 ensure_docx_source 自动转换为 .docx 并全流程导入。 ... ok
+test_legacy_document_type_import_rejected (__main__.ImportEndToEndTests.test_legacy_document_type_import_rejected)
+任务 4.4：公共版拒绝新建 requirement/design 项目且不创建目录。 ... ok
+test_manifest_heading_styles_float_key_rejected (__main__.ImportEndToEndTests.test_manifest_heading_styles_float_key_rejected)
+headingStyles 的浮点键（1.5）必须被拒绝，而非静默截断成级别 1。 ... ok
+test_manifest_portability (__main__.ImportEndToEndTests.test_manifest_portability)
+清单使用相对路径且记录源哈希，复制到另一路径仍可加载。 ... ok
+test_renamed_docx_import (__main__.ImportEndToEndTests.test_renamed_docx_import)
+改名 DOCX（文件名与基线不同）仍能完整导入。 ... ok
+test_source_docx_not_modified (__main__.ImportEndToEndTests.test_source_docx_not_modified)
+任务 4.4：成功导入后源 DOCX 字节不变。 ... ok
+test_target_exists_rejected (__main__.ImportEndToEndTests.test_target_exists_rejected)
+任务 4.6：目标项目已存在时预写入拒绝，不修改已有项目。 ... ok
+test_block_diff_blocks_publish_and_cleans_staging (__main__.RoundtripGateTests.test_block_diff_blocks_publish_and_cleans_staging) ... ok
+test_diagnostic_log_contains_fidelity_and_roundtrip_summary (__main__.RoundtripGateTests.test_diagnostic_log_contains_fidelity_and_roundtrip_summary) ... ok
+test_diagnostic_log_contains_rich_roundtrip_issues_and_preview (__main__.RoundtripGateTests.test_diagnostic_log_contains_rich_roundtrip_issues_and_preview) ... ok
+test_ignore_roundtrip_block_allows_block_report (__main__.RoundtripGateTests.test_ignore_roundtrip_block_allows_block_report)
+当开启 ignore_roundtrip_block 时，即使存在 BLOCK 往返差异也能成功发布，并记录审计报告。 ... ok
+test_import_command_formats_rich_failure_message_and_action (__main__.RoundtripGateTests.test_import_command_formats_rich_failure_message_and_action) ... ok
+test_require_exact_roundtrip_blocks_warn (__main__.RoundtripGateTests.test_require_exact_roundtrip_blocks_warn) ... ok
+test_success_persists_fidelity_and_roundtrip_reports (__main__.RoundtripGateTests.test_success_persists_fidelity_and_roundtrip_reports) ... ok
+test_warn_diff_allowed_by_default (__main__.RoundtripGateTests.test_warn_diff_allowed_by_default) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 1.995s
+
+OK
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-reg-861ti0xq\.sb_proj.import-staging-26168-5qa50bov\output\.trial-build.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-qw3_sguk\.冲突样式项目.import-staging-26168-qblnx143\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-i4vizup4\.测试项目.import-staging-26168-4idifkur\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\.通用大文档项目.import-staging-26168-_p5160o2\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\通用大文档项目\output\运维手册.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\通用大文档项目\output\运维手册.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-05b0s3sw\通用大文档项目\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-erasx2nq\.旧版文档项目.import-staging-26168-xabj_293\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-xx82w_bg\.测试项目.import-staging-26168-qkolphak\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-f_aefc1o\.改名项目.import-staging-26168-0_coqvt9\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-p8h6a0zq\.测试项目.import-staging-26168-ay_378gf\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-import-e2e-w_326luz\.已有项目A.import-staging-26168-wcocv3z5\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-pbqbbinh\.门禁项目.import-staging-26168-hpb91n5v\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-b4vyeak_\.门禁项目.import-staging-26168-fp30c7ut\output\.trial-build.docx
+[general] 插入元素=15, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-7dhtq7ig\.门禁项目.import-staging-26168-iu4lwh2b\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-xx5rhm50\.门禁项目.import-staging-26168-6s3oyf9q\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-jj18mu17\.命令门禁.import-staging-26168-l51vk2wp\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-k1onoasm\.门禁项目.import-staging-26168-aqk66mhi\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-3smo478a\.门禁项目.import-staging-26168-l8cb4m80\output\.trial-build.docx
+[general] 插入元素=15, 表格=2, 图片=1, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-roundtrip-gate-ws1and1h\.门禁项目.import-staging-26168-gplgfpq1\output\.trial-build.docx
+[general] 插入元素=14, 表格=2, 图片=1, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

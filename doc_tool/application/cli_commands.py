@@ -161,6 +161,24 @@ def import_command(args) -> CommandResult:
         if (not result.success and result.suggested_action)
         else ("请查看导入诊断日志并修正源文档。" if not result.success else "")
     )
+    # V2.7（5.5）：把「保留/降级/阻断」导入报告接入命令结果与问题中心。
+    # 这里只对输出做聚合，不给定新的诊断结论：结论来自预检保真扫描与往返门禁。
+    import_report = None
+    import_issues = []
+    try:
+        from doc_tool.adapters.fidelity import build_import_report
+        from doc_tool.application.issues import issues_from_import_report
+        from doc_tool.adapters.preflight import preflight as _preflight
+
+        preview = _preflight(
+            str(args.docx), allow_missing_headings=True, heading_style_map=None
+        )
+        import_report = preview.import_report or build_import_report(preview.fidelity)
+        import_issues = issues_from_import_report(import_report)
+    except Exception:  # noqa: BLE001 - 报告不影响导入结果
+        import_report = None
+        import_issues = []
+
     item = ProjectCommandResult(
         project=str(target),
         success=result.success,
@@ -172,7 +190,11 @@ def import_command(args) -> CommandResult:
             "sourceSha256": result.source_sha256,
             "events": [to_json_value(event) for event in result.events],
             "diagnosticLog": str(result.diagnostic_log) if result.diagnostic_log else None,
+            "importReport": import_report.markdown_text() if import_report is not None else None,
+            "importStatus": import_report.status if import_report is not None else None,
+            "lossy": bool(import_report.lossy) if import_report is not None else False,
         },
+        issues=import_issues,
     )
     return CommandResult("import", [item])
 

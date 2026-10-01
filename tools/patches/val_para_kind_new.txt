@@ -1,0 +1,26 @@
+        resolved = _expected_text(block.text, registry)
+        paragraph_kind = (
+            "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", block.text) else "P"
+        )
+        events.append(Event(paragraph_kind, resolved, source))
+    return events
+
+
+def _expected_caption_event(block, registry, source: str) -> Optional[Event]:
+    """题注对象的预期题注段落事件；未登记题注时返回 None。"""
+    from doc_tool.domain.captions import KIND_FIGURE as CAPTION_FIGURE
+
+    if registry is None:
+        return None
+    ident = getattr(block, "ident", "") or ""
+    if not ident:
+        return None
+    entry = registry.get(ident)
+    if entry is None:
+        return None
+    prefix = "图" if entry.kind == CAPTION_FIGURE else "表"
+    number = entry.number
+    if entry.duplicate:
+        number = registry.sequential_number(entry)
+    label = "图 {0} {1}".format(number, entry.label).strip() if prefix == "图" else "表 {0} {1}".format(number, entry.label).strip()
+    return Event("P", normalize_business_text(label), source)

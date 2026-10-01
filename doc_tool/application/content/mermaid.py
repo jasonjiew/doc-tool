@@ -1044,6 +1044,68 @@ def _clean_source_for_cli(source: str) -> str:
     return "\n".join(cleaned)
 
 
+def _kill_process_tree(process) -> None:
+    """终止本任务启动的进程树（不动其他进程）。
+
+    mermaid-cli 会拉起 Chromium 子进程；只 kill 直接子进程会留下孤儿
+    渲染器进程。Windows 上用 ``taskkill /T`` 清整棵，其余平台只能杀
+    直接子进程（POSIX 下需要自己的进程组时才能连带子进程）。
+    """
+    if process is None:
+        return
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
+    try:
+        process.kill()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=5)
+    except Exception:  # noqa: BLE001 - 清理失败不影响兜底结果
+        pass
+
+
+def _run_cli(cmd, timeout: int):
+    """运行 mermaid-cli，超时后清理本任务进程树。
+
+    返回 ``(returncode, stdout, stderr, timed_out)``；无法启动进程时返回 ``None``。
+    """
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=creationflags,
+        )
+    except (OSError, ValueError):
+        return None
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+        return process.returncode, stdout, stderr, False
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(process)
+        try:
+            stdout, stderr = process.communicate(timeout=5)
+        except Exception:  # noqa: BLE001
+            stdout, stderr = "", ""
+        return -1, stdout, stderr, True
+
+
 def _render_with_cli(source: str, want_png: bool = True) -> Optional[RenderResult]:
     executable = _find_mmdc()
     if not executable:
@@ -1064,18 +1126,17 @@ def _render_with_cli(source: str, want_png: bool = True) -> Optional[RenderResul
         if not want_png:
             # 极速矢量预览模式：Chromium 仅渲染纯 SVG，跳过昂贵的 3x PNG 渲染
             svg_cmd = base_cmd + ["-o", str(output_svg)]
-            try:
-                completed_svg = subprocess.run(
-                    svg_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    check=False,
-                )
-            except (OSError, subprocess.SubprocessError):
+            completed = _run_cli(svg_cmd, 30)
+            if completed is None:
                 return None
-            if completed_svg.returncode != 0 or not output_svg.exists():
-                err_text = completed_svg.stderr or completed_svg.stdout or ""
+            returncode, stdout_text, stderr_text, timed_out = completed
+            if timed_out:
+                return RenderResult(
+                    False,
+                    error="mermaid-cli 渲染超时（30 秒），已清理本任务进程树",
+                )
+            if returncode != 0 or not output_svg.exists():
+                err_text = stderr_text or stdout_text or ""
                 m = re.search(r"Parse error on line \d+:[\s\S]*?(?=\n\s*at\b|\Z)", err_text)
                 clean_err = m.group(0).strip() if m else (err_text.splitlines()[0] if err_text.strip() else "mermaid-cli 渲染失败")
                 return RenderResult(False, error=clean_err)
@@ -1086,32 +1147,34 @@ def _render_with_cli(source: str, want_png: bool = True) -> Optional[RenderResul
 
         # 1. 优先直接由 Chromium 生成视网膜 3x 超清 PNG，确保 CSS/foreignObject 完美渲染且无单词截断
         png_cmd = base_cmd + ["-o", str(output_png), "-s", "3"]
-        try:
-            completed_png = subprocess.run(
-                png_cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
+        completed = _run_cli(png_cmd, 60)
+        if completed is None:
             return None
+        png_returncode, png_stdout, png_stderr, png_timed_out = completed
+        if png_timed_out:
+            return RenderResult(
+                False,
+                error="mermaid-cli 渲染超时（60 秒），已清理本任务进程树",
+            )
 
+        class _Completed:
+            def __init__(self, returncode, stdout, stderr):
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = stderr
+
+        completed_png = _Completed(png_returncode, png_stdout, png_stderr)
         completed_svg = None
         err_png = completed_png.stderr or completed_png.stdout or ""
         is_syntax_err = "Parse error" in err_png or "Syntax error" in err_png
         if not is_syntax_err:
             # 2. 同时生成 SVG 供矢量图预览
             svg_cmd = base_cmd + ["-o", str(output_svg)]
-            try:
-                completed_svg = subprocess.run(
-                    svg_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    check=False,
-                )
-            except (OSError, subprocess.SubprocessError):
+            second = _run_cli(svg_cmd, 30)
+            if second is not None:
+                svg_returncode, svg_stdout, svg_stderr, _svg_timed_out = second
+                completed_svg = _Completed(svg_returncode, svg_stdout, svg_stderr)
+            else:
                 completed_svg = None
 
         if (completed_png.returncode != 0 and (completed_svg is None or completed_svg.returncode != 0)) or (not output_png.exists() and not output_svg.exists()):

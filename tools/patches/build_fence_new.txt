@@ -1,0 +1,7 @@
+        with open(markdown_path, encoding="utf-8") as handle:
+            markdown_text = handle.read()
+        # 书签只登记围栏外的标题：代码示例里的 `# 注释` 不是章节标题，
+        # 登记成书签会让同号锚点指向错误位置。
+        for block in parse_blocks(markdown_text, markdown_path).blocks:
+            if block.kind == KIND_HEADING:
+                h_text = block.text

@@ -23,6 +23,37 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
+
+def prose_lines(text):
+    """Yield source lines outside CommonMark fences, preserving 1-based positions."""
+    fence = None
+    comment = False
+    for number, line in enumerate(text.splitlines(), 1):
+        match = re.match(r'^\s{0,3}(`{3,}|~{3,})(.*)$', line)
+        if match:
+            mark, tail = match.groups()
+            if fence is None:
+                fence = mark
+            elif mark[0] == fence[0] and len(mark) >= len(fence) and not tail.strip():
+                fence = None
+            continue
+        if fence is not None: continue
+        if '<!--' in line: comment = True
+        if comment:
+            if '-->' in line: comment = False
+            continue
+        if line.strip() == '<EMPTY_PAR/>': continue
+        yield number, line
+
+
+def markdown_headings(text):
+    headings = []
+    for number, line in prose_lines(text):
+        match = re.match(r'^\s{0,3}(#{1,6})\s+(.*?)\s*$', line)
+        if match:
+            headings.append((len(match[1]), re.sub(r'\s+#+\s*$', '', match[2]), number))
+    return headings
+
 # 表格元数据注释前缀（``<!-- TBL:style=.. type=.. tw=.. cols=.. -->``）。
 TABLE_META_PREFIX = "<!-- TBL:"
 

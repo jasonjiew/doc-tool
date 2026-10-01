@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="1" time="9.953"><testsuite name="doc-tool" tests="1" failures="1" time="9.953"><testcase name="test_local_history.py" classname="scripts.tests" time="9.953"><failure message="exit code 1" type="TestFailure">...............F.s..
+======================================================================
+FAIL: test_replace_and_refactor_share_history_and_vcs_transaction_rollback (__main__.LocalHistoryTests.test_replace_and_refactor_share_history_and_vcs_transaction_rollback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_local_history.py", line 259, in test_replace_and_refactor_share_history_and_vcs_transaction_rollback
+    self.assertEqual(self.path.read_text(), "new text")
+AssertionError: 'changed text' != 'new text'
+- changed text
++ new text
+
+
+----------------------------------------------------------------------
+Ran 20 tests in 8.781s
+
+FAILED (failures=1, skipped=1)
+</failure><system-out>...............F.s..
+======================================================================
+FAIL: test_replace_and_refactor_share_history_and_vcs_transaction_rollback (__main__.LocalHistoryTests.test_replace_and_refactor_share_history_and_vcs_transaction_rollback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_local_history.py", line 259, in test_replace_and_refactor_share_history_and_vcs_transaction_rollback
+    self.assertEqual(self.path.read_text(), "new text")
+AssertionError: 'changed text' != 'new text'
+- changed text
++ new text
+
+
+----------------------------------------------------------------------
+Ran 20 tests in 8.781s
+
+FAILED (failures=1, skipped=1)
+</system-out></testcase></testsuite></testsuites>

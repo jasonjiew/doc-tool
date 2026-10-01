@@ -1863,7 +1863,7 @@ class CreateDeleteTests(unittest.TestCase):
         self.assertTrue(Path(entry.trash_path).exists())
         self.assertTrue(
             Path(entry.trash_path).as_posix().endswith(
-                ".state/trash/requirement/第1章 引言/1.1 目的.md"
+                "/payload/requirement/第1章 引言/1.1 目的.md"
             )
         )
 

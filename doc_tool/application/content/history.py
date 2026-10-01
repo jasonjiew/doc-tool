@@ -106,6 +106,10 @@ class BuildHistoryStore:
         for path in self.root.glob("*.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("历史记录必须是对象")
+                if not isinstance(data.get('contentFiles', {}), dict):
+                    raise ValueError("章节快照索引损坏")
                 output_path = Path(str(data.get("outputPath", "")))
                 entries.append(
                     HistoryEntry(
@@ -119,8 +123,9 @@ class BuildHistoryStore:
                         formal=bool(data.get("formal", False)),
                     )
                 )
-            except (OSError, ValueError, TypeError):
-                continue
+            except (OSError, ValueError, TypeError) as exc:
+                entries.append(HistoryEntry(path.stem, "", "", False, "", False,
+                                            {"error": "记录损坏：" + str(exc)}))
         return sorted(
             entries,
             key=lambda entry: (entry.completed_at, entry.history_id),
@@ -144,8 +149,13 @@ class BuildHistoryStore:
         }
 
     def text_diff(self, older_id: str, newer_id: str, rel_path: str) -> str:
-        old_path = self.root / older_id / "content" / rel_path
-        new_path = self.root / newer_id / "content" / rel_path
+        self.get(older_id)
+        self.get(newer_id)
+        from doc_tool.application.content.writer import _resolve_inside
+        old_root = _resolve_inside(self.root, older_id + "/content")
+        new_root = _resolve_inside(self.root, newer_id + "/content")
+        old_path = _resolve_inside(old_root, rel_path)
+        new_path = _resolve_inside(new_root, rel_path)
         old_text = old_path.read_text(encoding="utf-8") if old_path.is_file() else ""
         new_text = new_path.read_text(encoding="utf-8") if new_path.is_file() else ""
         return render_unified_diff(old_text, new_text)

@@ -1,0 +1,280 @@
+{
+  "appVersion": "2.8.0",
+  "packs": [
+    {
+      "pack": "generic-requirement",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "installed": true,
+      "installErrors": [],
+      "reloaded": true,
+      "reloadWarnings": [],
+      "chapterOrder": [
+        "1 概述.md",
+        "2 设计.md",
+        "3 附录.md"
+      ],
+      "unlisted": [
+        "3 附录.md"
+      ],
+      "variableText": "产品 {{待确认：productName}}，负责人 {{待确认：owner}}",
+      "undefinedVariables": [
+        "productName",
+        "owner"
+      ],
+      "reviewGate": {
+        "defaultAllowed": true,
+        "defaultReasons": [
+          "存在 1 条待修改/待复核意见。"
+        ],
+        "strictAllowed": false
+      },
+      "termsFallback": {
+        "terms": [],
+        "warnings": [
+          "术语配置不可用（格式损坏：Expecting property name enclosed in double quotes: line 1 column 3 (char 2)），已回退空术语表继续。"
+        ]
+      },
+      "checkStatus": "ok",
+      "checkExitCode": 0,
+      "checkStages": [
+        {
+          "stage": "lint",
+          "status": "succeeded"
+        },
+        {
+          "stage": "revision",
+          "status": "started"
+        },
+        {
+          "stage": "revision",
+          "status": "succeeded"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded"
+        },
+        {
+          "stage": "build",
+          "status": "started"
+        },
+        {
+          "stage": "build",
+          "status": "succeeded"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "started"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "succeeded"
+        },
+        {
+          "stage": "word_refresh",
+          "status": "skipped"
+        },
+        {
+          "stage": "validate_post",
+          "status": "skipped"
+        },
+        {
+          "stage": "publish",
+          "status": "started"
+        },
+        {
+          "stage": "publish",
+          "status": "succeeded"
+        },
+        {
+          "stage": "audit",
+          "status": "ok"
+        }
+      ],
+      "migration": {
+        "fromSchema": 1,
+        "toSchema": 2,
+        "applied": true,
+        "backup": true,
+        "finalSchema": 2
+      }
+    },
+    {
+      "pack": "generic-design",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "installed": true,
+      "installErrors": [],
+      "reloaded": true,
+      "reloadWarnings": [],
+      "chapterOrder": [
+        "1 概述.md",
+        "2 设计.md",
+        "3 附录.md"
+      ],
+      "unlisted": [
+        "3 附录.md"
+      ],
+      "variableText": "产品 {{待确认：productName}}，负责人 {{待确认：owner}}",
+      "undefinedVariables": [
+        "productName",
+        "owner"
+      ],
+      "reviewGate": {
+        "defaultAllowed": true,
+        "defaultReasons": [
+          "存在 1 条待修改/待复核意见。"
+        ],
+        "strictAllowed": false
+      },
+      "termsFallback": {
+        "terms": [],
+        "warnings": [
+          "术语配置不可用（格式损坏：Expecting property name enclosed in double quotes: line 1 column 3 (char 2)），已回退空术语表继续。"
+        ]
+      },
+      "checkStatus": "ok",
+      "checkExitCode": 0,
+      "checkStages": [
+        {
+          "stage": "lint",
+          "status": "succeeded"
+        },
+        {
+          "stage": "revision",
+          "status": "started"
+        },
+        {
+          "stage": "revision",
+          "status": "succeeded"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded"
+        },
+        {
+          "stage": "build",
+          "status": "started"
+        },
+        {
+          "stage": "build",
+          "status": "succeeded"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "started"
+        },
+        {
+          "stage": "validate_pre",
+          "status": "succeeded"
+        },
+        {
+          "stage": "word_refresh",
+          "status": "skipped"
+        },
+        {
+          "stage": "validate_post",
+          "status": "skipped"
+        },
+        {
+          "stage": "publish",
+          "status": "started"
+        },
+        {
+          "stage": "publish",
+          "status": "succeeded"
+        },
+        {
+          "stage": "audit",
+          "status": "warning"
+        }
+      ],
+      "migration": {
+        "fromSchema": 1,
+        "toSchema": 2,
+        "applied": true,
+        "backup": true,
+        "finalSchema": 2
+      }
+    },
+    {
+      "pack": "generic-test",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "installed": true,
+      "installErrors": [],
+      "reloaded": true,
+      "reloadWarnings": [],
+      "chapterOrder": [
+        "1 概述.md",
+        "2 设计.md",
+        "3 附录.md"
+      ],
+      "unlisted": [
+        "3 附录.md"
+      ],
+      "variableText": "产品 {{待确认：productName}}，负责人 {{待确认：owner}}",
+      "undefinedVariables": [
+        "productName",
+        "owner"
+      ],
+      "reviewGate": {
+        "defaultAllowed": true,
+        "defaultReasons": [
+          "存在 1 条待修改/待复核意见。"
+        ],
+        "strictAllowed": false
+      },
+      "termsFallback": {
+        "terms": [],
+        "warnings": [
+          "术语配置不可用（格式损坏：Expecting property name enclosed in double quotes: line 1 column 3 (char 2)），已回退空术语表继续。"
+        ]
+      },
+      "checkStatus": "ok",
+      "checkExitCode": 0,
+      "checkStages": [
+        {
+          "stage": "lint",
+          "status": "succeeded"
+        },
+        {
+          "stage": "revision",
+          "status": "skipped"
+        },
+        {
+          "stage": "prepare",
+          "status": "succeeded"
+        },
+        {
+          "stage": "build",
+          "status": "started"
+        },
+        {
+          "stage": "build",
+          "status": "failed"
+        },
+        {
+          "stage": "audit",
+          "status": "skipped"
+        }
+      ],
+      "migration": {
+        "fromSchema": 1,
+        "toSchema": 2,
+        "applied": true,
+        "backup": true,
+        "finalSchema": 2
+      }
+    }
+  ],
+  "legacyV1": {
+    "schemaVersion": 1,
+    "writable": true,
+    "chaptersDeclared": false
+  },
+  "notes": []
+}

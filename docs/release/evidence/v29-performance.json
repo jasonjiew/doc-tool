@@ -1,0 +1,37 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.13.13",
+    "machine": "AMD64"
+  },
+  "fixture": {
+    "documents": 3,
+    "chapters": 300,
+    "items": 1000,
+    "requirements": 600,
+    "designs": 300,
+    "tests": 100,
+    "relations": 400
+  },
+  "timingsSeconds": {
+    "documentGeneration": 0.0002,
+    "itemIndex": 0.0013,
+    "graphBuild": 0.0098,
+    "matrix": 0.0139,
+    "impact": 0.0001,
+    "total": 0.0252
+  },
+  "results": {
+    "chaptersMarked": 3,
+    "coverageApplicable": true,
+    "designCoverage": 0.5,
+    "testCoverage": 0.1667,
+    "impactEntries": 2
+  },
+  "thresholdsSeconds": {
+    "matrix": 5.0,
+    "impact": 5.0,
+    "itemIndex": 5.0
+  },
+  "passed": true
+}

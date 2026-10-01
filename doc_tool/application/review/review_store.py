@@ -36,6 +36,17 @@ class ReviewComment:
     review_note: str = ""
     evidence: str = ""
     open_issue: str = ""
+    # --- V2.8 28-F：内容版本绑定与生命周期（旧台账缺省仍可读） ---
+    #: 录入意见时的内容指纹（用于判定内容是否已变）。
+    content_hash: str = ""
+    #: 基线（比对/审阅基准）标识。
+    baseline_id: str = ""
+    #: 意见所属的评审包标识。
+    package_id: str = ""
+    #: 生命周期：待修改 / 待复核 / 通过 / 失效。
+    lifecycle_status: str = ""
+    #: 失效或待复核的原因说明。
+    stale_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -129,6 +140,7 @@ class ReviewStore:
             review_note=review_note.strip(),
             evidence=evidence.strip(),
             open_issue=open_issue.strip(),
+            lifecycle_status="待修改",
         )
         comments = self.comments()
         comments.append(item)
@@ -179,7 +191,11 @@ class ReviewStore:
                 item.status = "resolved" if resolved else "unresolved"
                 item.resolved_at = _now() if resolved else ""
                 if resolved:
-                    item.confirm_status = "已确认"
+                    # V2.8：标记已修改只能进入待复核，不得自动算作“通过”。
+                    item.lifecycle_status = "待复核"
+                    item.confirm_status = "待复核"
+                else:
+                    item.lifecycle_status = "待修改"
                 self._save_comments(comments)
                 return item
         raise KeyError(comment_id)

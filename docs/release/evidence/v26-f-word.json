@@ -1,0 +1,46 @@
+{
+  "word": {
+    "available": false,
+    "pywin32Available": true,
+    "interactiveSession": true,
+    "wordDispatchable": false,
+    "version": "",
+    "reasons": [
+      "Word COM 启动失败，请确认 Microsoft Word 已正确安装。"
+    ]
+  },
+  "samples": [
+    {
+      "name": "enterprise-standard",
+      "output": "tmp\\v26-word-samples\\enterprise-standard.docx",
+      "refreshState": "ok",
+      "warnings": [],
+      "status": "完成"
+    },
+    {
+      "name": "custom-style",
+      "output": "tmp\\v26-word-samples\\custom-style.docx",
+      "refreshState": "ok",
+      "warnings": [
+        "模板未识别到任何标题样式，已回退 Word 内置「标题 1~6」样式；可在「样式映射」中手动指定模板样式。",
+        "模板未定义全部标题样式（缺 2、3、4、5、6 级），缺失层级沿用相邻标题样式。",
+        "模板未识别到任何标题样式，已回退 Word 内置「标题 1~6」样式；可在「样式映射」中手动指定模板样式。"
+      ],
+      "status": "带提醒完成"
+    },
+    {
+      "name": "full-old-body",
+      "output": "tmp\\v26-word-samples\\full-old-body.docx",
+      "refreshState": "ok",
+      "warnings": [
+        "已从底模清理 3 个正文标题段（保留封面/页眉/样式）。"
+      ],
+      "status": "带提醒完成"
+    }
+  ],
+  "manualAcceptance": false,
+  "pending": [
+    "企业样本封面/页眉/字体/多级标题/目录人工对照",
+    "旧 markdown-template-fill 5.1/5.2 手工 GUI 验收"
+  ]
+}

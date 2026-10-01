@@ -1,0 +1,1 @@
+def registry_warnings(registry: CaptionRegistry) -> List[Dict[str, object]]:

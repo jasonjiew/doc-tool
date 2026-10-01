@@ -1,0 +1,8 @@
+    previous_props = None
+    for section_index, (_orientation, sect_pr, chunk) in enumerate(sections):
+        if section_index:
+            # 节分隔段落的 sectPr 描述的是**上一段内容**所属的节：
+            # 先关闭上一节，新节属性由后续内容（或正文末尾 sectPr）承担。
+            insert_element(insert_before, _section_break_paragraph(previous_props))
+            inserted += 1
+        previous_props = sect_pr

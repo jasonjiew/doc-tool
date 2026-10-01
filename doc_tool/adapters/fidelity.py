@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from lxml import etree
 
@@ -150,6 +150,96 @@ class FidelityReport:
                 )
             )
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class ImportFidelityReport:
+    """导入保真报告（V2.7 5.5）。
+
+    把「保真扫描结论」与「往返门禁结论」合并成一份面向用户的结论：
+
+    - ``preserved``：已保留的特性（info）；
+    - ``degraded``：可计数的降级（warning，如列表层级/样式回退）；
+    - ``blocked``：无法保留的特性（默认拦截）；
+    - ``degradation_notes``：往返门禁给出的非计数说明。
+
+    无任何降级/拦截时 ``lossy`` 为 False，报告才能写“未发现差异”。
+    """
+
+    preserved: Tuple[FidelityFinding, ...] = field(default_factory=tuple)
+    degraded: Tuple[FidelityFinding, ...] = field(default_factory=tuple)
+    blocked: Tuple[FidelityFinding, ...] = field(default_factory=tuple)
+    degradation_notes: Tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def lossy(self) -> bool:
+        """是否存在真实损失（降级或拦截）。"""
+        return bool(self.degraded or self.blocked or self.degradation_notes)
+
+    @property
+    def status(self) -> str:
+        if self.blocked:
+            return "blocked"
+        if self.degraded or self.degradation_notes:
+            return "warning"
+        return "ok"
+
+    def markdown_text(self) -> str:
+        lines = ["## 导入保真报告", ""]
+        if not self.lossy:
+            lines.append("未发现差异（已保留 {0} 类特性）。".format(len(self.preserved)))
+            return "\n".join(lines)
+        lines.append("| 结论 | 特性 | 数量 | 位置/资源 |")
+        lines.append("|------|------|------|------------|")
+        for finding in self.blocked:
+            lines.append(
+                "| 阻断 | {0} | {1} | {2} |".format(
+                    finding.label, finding.count, "、".join(finding.samples) or "—"
+                )
+            )
+        for finding in self.degraded:
+            lines.append(
+                "| 降级 | {0} | {1} | {2} |".format(
+                    finding.label, finding.count, "、".join(finding.samples) or "—"
+                )
+            )
+        for note in self.degradation_notes:
+            lines.append("| 降级 | {0} | — | — |".format(note))
+        if self.preserved:
+            lines.append("")
+            lines.append(
+                "保留特性：" + "、".join(finding.label for finding in self.preserved)
+            )
+        return "\n".join(lines)
+
+
+def build_import_report(
+    fidelity: Optional[FidelityReport] = None,
+    roundtrip=None,
+) -> ImportFidelityReport:
+    """合并保真扫描与往返检查，得到导入保真报告。
+
+    ``roundtrip`` 传 ``doc_tool.adapters.roundtrip`` 的检查结果（可为 None）：
+    只取其中不阻断的差异说明作为降级说明，避免与保真特性重复计数。
+    """
+    preserved: List[FidelityFinding] = []
+    degraded: List[FidelityFinding] = []
+    blocked: List[FidelityFinding] = []
+    if fidelity is not None:
+        preserved = list(fidelity.info_findings)
+        degraded = list(fidelity.warn_findings)
+        blocked = list(fidelity.block_findings)
+    notes: List[str] = []
+    for item in getattr(roundtrip, "warn_issues", ()) or ():
+        text = str(getattr(item, "message", item)).strip()
+        if text and text not in notes:
+            notes.append(text)
+    return ImportFidelityReport(
+        preserved=tuple(preserved),
+        degraded=tuple(degraded),
+        blocked=tuple(blocked),
+        degradation_notes=tuple(notes),
+    )
 
 
 def scan_fidelity(parts: Dict[str, bytes]) -> FidelityReport:

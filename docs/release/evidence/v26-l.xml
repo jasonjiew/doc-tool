@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="1" time="6.671"><testsuite name="doc-tool" tests="3" failures="1" time="6.671"><testcase name="test_readonly_html.py" classname="scripts.tests" time="1.531"><failure message="exit code 1" type="TestFailure">E
+======================================================================
+ERROR: test_offline_chinese_assets_source_locations_and_safety (__main__.HtmlPreviewTests.test_offline_chinese_assets_source_locations_and_safety)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_readonly_html.py", line 28, in test_offline_chinese_assets_source_locations_and_safety
+    with patch('doc_tool.application.content.mermaid.render_cli', side_effect=AssertionError('no mmdc')):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\18098\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\unittest\mock.py", line 1467, in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\18098\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\unittest\mock.py", line 1437, in get_original
+    raise AttributeError(
+AttributeError: &lt;module 'doc_tool.application.content.mermaid' from 'D:\\ai_develop_project_space\\doc-tool\\doc_tool\\application\\content\\mermaid.py'&gt; does not have the attribute 'render_cli'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.176s
+
+FAILED (errors=1)
+</failure><system-out>E
+======================================================================
+ERROR: test_offline_chinese_assets_source_locations_and_safety (__main__.HtmlPreviewTests.test_offline_chinese_assets_source_locations_and_safety)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_readonly_html.py", line 28, in test_offline_chinese_assets_source_locations_and_safety
+    with patch('doc_tool.application.content.mermaid.render_cli', side_effect=AssertionError('no mmdc')):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\18098\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\unittest\mock.py", line 1467, in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\18098\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\unittest\mock.py", line 1437, in get_original
+    raise AttributeError(
+AttributeError: &lt;module 'doc_tool.application.content.mermaid' from 'D:\\ai_develop_project_space\\doc-tool\\doc_tool\\application\\content\\mermaid.py'&gt; does not have the attribute 'render_cli'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.176s
+
+FAILED (errors=1)
+</system-out></testcase><testcase name="test_quality_traceability.py" classname="scripts.tests" time="3.844"><system-out>....................................
+----------------------------------------------------------------------
+Ran 36 tests in 2.794s
+
+OK
+</system-out></testcase><testcase name="test_command_palette.py" classname="scripts.tests" time="1.296"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.104s
+
+OK
+</system-out></testcase></testsuite></testsuites>

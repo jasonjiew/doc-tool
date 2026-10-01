@@ -16,8 +16,8 @@
 
 | 模式 | 命令 | 产物 |
 |---|---|---|
-| 生成自签名证书 | `.\new-code-signing-cert.ps1 -CompanyName "公司全称" -Password "密码"` | `cert-out\codesign.pfx`（含私钥）+ `codesign.cer`（公钥） |
-| 生成 CSR（申请商业证书） | `.\new-code-signing-cert.ps1 -MakeCsr -CompanyName "公司全称" -Password "密码"` | `cert-out\codesign.csr`（提交 CA）+ `codesign-request.pfx`（私钥备份，勿外传）+ `codesign-request.cer` |
+| 生成自签名证书 | `.\new-code-signing-cert.ps1 -CompanyName "公司全称" -Password "密码"` | 外部 signing 目录的 `codesign.pfx`（含私钥）+ `codesign.cer`（公钥） |
+| 生成 CSR（申请商业证书） | `.\new-code-signing-cert.ps1 -MakeCsr -CompanyName "公司全称" -Password "密码"` | 外部 signing 目录的 `codesign.csr`（提交 CA）+ `codesign-request.pfx`（私钥备份，勿外传）+ `codesign-request.cer` |
 | 生成证书并签名 exe | `.\new-code-signing-cert.ps1 -CompanyName "公司全称" -Password "密码" -SignFile ".\dist\DocTool.exe"` | 签名后的 exe + 证书 |
 
 要点：
@@ -26,8 +26,12 @@
   PEM 格式 64 列换行），私钥备份为 PFX；CA 返回正式证书后用该 PFX 装配签名证书。
 - `-Trust`：生成后导入本机「受信任的根证书颁发机构 / 受信任的发布者」（仅测试机）。
 - 签名需要 Windows SDK 的 `signtool.exe`（未找到时脚本会提示安装）。
-- 产物默认输出到 `scripts\cert-out\`（可用 `-OutputDir` 指定）；该目录已加入 `.gitignore`，
-  证书与私钥严禁提交到代码仓库。
+- 产物默认输出到仓库外 `%USERPROFILE%\.doctool\signing\`，可用 `CODE_SIGNING_DIR`
+  或 `-OutputDir` 指定外部目录；生成脚本拒绝仓库内输出。证书私钥和密码严禁提交。
+- 签名使用 `CODE_SIGNING_PFX` / `CODE_SIGNING_PASSWORD`，或外部目录中的
+  `codesign.pfx` / `pfx-password.txt`。便携包和发布脚本只读取该目录的公钥 `codesign.cer`。
+  原 `scripts/cert-out` 不再作为读取源；升级时将材料移到外部目录并校验完整性，
+  不在报告中记录密码或私钥。无配置的 CI 继续跳过签名，配置不完整则报错。
 
 ---
 
@@ -225,27 +229,27 @@ A：EV 必须；OV 通常交付 PFX 文件（部分 CA 也强制用令牌）。P
 |---|---|---|---|
 | `scripts/new-code-signing-cert.ps1` | 主流程脚本（生成/签名/验证） | ✅ 可共享 | Git 仓库 |
 | `docs/code-signing-certificate.md` | 本文档 | ✅ 可共享 | Git 仓库 |
-| `scripts/cert-out/codesign.cer` | 证书公钥（用于目标机器安装信任） | ✅ 可共享 | Git 仓库 / 内网盘 / 邮件 |
-| `scripts/cert-out/codesign.pfx` | **证书私钥（含导出密码）** | ❌ **严禁共享** | 仅签名负责人保管 |
+| `~/.doctool/signing/codesign.cer` | 证书公钥（用于目标机器安装信任） | ✅ 可共享 | 分发包 / 内网盘 |
+| `~/.doctool/signing/codesign.pfx` | **证书私钥** | ❌ **严禁共享** | 仅签名负责人保管 |
 | 导出密码 | PFX 口令 | ❌ **严禁共享** | 密码管理器 / 加密传递 |
 
 ### 6.2 团队角色分工（建议）
 
 - **签名负责人（1~2 人）**：持有 `codesign.pfx` + 密码，负责每次打包后执行签名。签名命令：
   ```powershell
-  .\scripts\new-code-signing-cert.ps1 -PfxFile .\scripts\cert-out\codesign.pfx `
+  .\scripts\new-code-signing-cert.ps1 -PfxFile "$env:USERPROFILE\.doctool\signing\codesign.pfx" `
       -Password "<密码>" -SignFile "<要签名的exe>"
   ```
 - **普通成员**：只需要安装 `codesign.cer` 到本机信任库即可正常使用已签名软件；需要自己生成测试证书时，运行脚本的默认模式（`-CompanyName` 填自己团队名即可，互不影响）。
 
 ### 6.3 Git 安全约定
 
-- 仓库 `.gitignore` 已包含 `*.pfx`、`*.key`、`*.pem` 规则，**私钥文件不会被提交**，请勿改动或移除。
-- 提交前可用以下命令自查：
-  ```cmd
-  git check-ignore scripts/cert-out/codesign.pfx   :: 输出路径=已忽略（安全）
+- 仓库 `.gitignore` 包含私钥、密码与旧签名目录规则；忽略不能替代外部存放，也不能保护已经跟踪的文件。
+- 提交前可用以下命令扫描跟踪文件与现有分发目录：
+  ```powershell
+  python packaging/scan_leaks.py --strict
   ```
-- `codesign.cer`（公钥）可以正常提交，方便团队成员拉取后一键安装信任。
+- `codesign.cer`（公钥）从外部目录随便携包分发；旧 scripts/cert-out 目录整体排除公开导出。
 - **切勿**把密码写进脚本、批处理或任何会进仓库的文件（如 `.cmd`、`build_exe.ps1`）。
 
 ### 6.4 其他团队机器的信任安装

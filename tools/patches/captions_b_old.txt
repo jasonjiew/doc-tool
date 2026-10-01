@@ -1,0 +1,10 @@
+        output_ident, rewritten = self._unique_output_ident(ident)
+        entry = CaptionEntry(
+            ident=ident,
+            output_ident=output_ident,
+            kind=kind,
+            number=number,
+            label=label,
+            location=location,
+            duplicate=duplicate or rewritten,
+        )

@@ -1,0 +1,68 @@
+def expected_markdown_events(
+    path: str, config: Dict, available_bookmarks: Optional[Iterable[str]] = None
+) -> List[Event]:
+    with open(path, encoding="utf-8") as handle:
+        lines = handle.read().split("\n")
+    events: List[Event] = []
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        source = "{0}:{1}".format(path, index + 1)
+        complex_table = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
+        if complex_table:
+            filename = complex_table.group(2)
+            if not filename:
+                raise AutomationError("{0} 复杂表格标记缺少 XML 文件名".format(source))
+            table_path = resolve_resource(config["paths"]["table_root"], filename, "复杂表格")
+            element = _expected_table_xml(table_path, available_bookmarks=available_bookmarks)
+            events.append(Event("C", normalize_matrix(table_matrix(element)), source, canonical_xml(element)))
+            index += 1
+            continue
+        image = parse_image_reference(stripped)
+        if image is not None:
+            image_path = resolve_resource(config["paths"]["asset_root"], image.relative_path, "图片")
+            with open(image_path, "rb") as image_file:
+                image_hash = hashlib.sha256(image_file.read()).hexdigest()
+            events.append(Event("I", (image_hash,), source))
+            index += 1
+            continue
+        if stripped.startswith("<!-- TBL:"):
+            index += 1
+            block: List[str] = []
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                block.append(lines[index])
+                index += 1
+            events.append(Event("T", normalize_matrix(tuple(tuple(row) for row in parse_markdown_table(block))), source))
+            continue
+        if stripped.startswith("|"):
+            block = []
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                block.append(lines[index])
+                index += 1
+            events.append(Event("T", normalize_matrix(tuple(tuple(row) for row in parse_markdown_table(block))), source))
+            continue
+        heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
+        if heading:
+            events.append(Event("H", (len(heading.group(1)), markdown_visible_text(heading.group(2))), source))
+            index += 1
+            continue
+        unordered = re.match(r"^(\s*)[-*]\s+(.+)$", lines[index])
+        if unordered:
+            events.append(Event("L", (markdown_visible_text(unordered.group(2)), str(min(8, len(unordered.group(1).replace("\t", "    ")) // 2)), "*"), source))
+            index += 1
+            continue
+        ordered = re.match(r"^(\s*)(\d{1,3})[.、]\s+(.+)$", lines[index])
+        if ordered:
+            events.append(Event("L", (markdown_visible_text(ordered.group(3)), str(min(8, len(ordered.group(1).replace("\t", "    ")) // 2)), "#"), source))
+            index += 1
+            continue
+        if re.match(r"^\[\^[^\]]+\]:\s*", stripped):
+            index += 1
+            continue
+        if re.fullmatch(r"<!--\s*P:.*?\s*-->", stripped) or stripped == "<EMPTY_PAR/>" or not stripped:
+            index += 1
+            continue
+        kind = "X" if re.search(r"\[[^\]]+\]\([^)]+\)|\[\^[^\]]+\]", stripped) else "P"
+        events.append(Event(kind, markdown_visible_text(stripped), source))
+        index += 1
+    return events

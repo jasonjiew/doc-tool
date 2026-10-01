@@ -172,6 +172,10 @@ flowchart LR
         self.assertTrue(hasattr(dialog, "btn_save"))
         self.assertEqual(dialog.btn_save.text(), "保存图片")
 
+    @unittest.skip(
+        "V2.7（5.1）已停用 WebEngine 预览分支：编辑器只用内置结构预览，"
+        "WebEngine 从打包排除，本测试保留作为历史参考。"
+    )
     def test_web_preview_browser_json_payload_extraction(self):
         """测试 WebPreviewBrowser 处理前端传来的 JSON (含 SVG 与源码) 格式。"""
         from doc_tool.ui.content.web_preview_browser import WebPreviewBrowser
@@ -189,6 +193,10 @@ flowchart LR
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0], "flowchart TD\nA-->B")
 
+    @unittest.skip(
+        "V2.7（5.1）已停用 WebEngine 预览分支；内置预览的双向定位由"
+        "test_preview_registry/编辑器预览回归覆盖。"
+    )
     def test_scroll_to_heading_throttle(self):
         """测试标题滚动定位防抖节流，同一标题不重复下发脚本。"""
         from doc_tool.ui.content.web_preview_browser import WebPreviewBrowser

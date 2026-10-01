@@ -1,0 +1,4 @@
+    template_geometry = _section_geometry(template)
+    output_geometry = _section_geometry(output)
+    if output_geometry[: len(template_geometry)] != template_geometry:
+        errors["sections"].append("Word 刷新后 Section 数量、纸张、方向或页边距变化")

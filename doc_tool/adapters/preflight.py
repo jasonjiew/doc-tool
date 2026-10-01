@@ -25,7 +25,12 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from lxml import etree
 
-from doc_tool.adapters.fidelity import FidelityReport, scan_fidelity
+from doc_tool.adapters.fidelity import (
+    FidelityReport,
+    ImportFidelityReport,
+    build_import_report,
+    scan_fidelity,
+)
 from doc_tool.domain.errors import (
     BrokenRelationshipError,
     DocToolError,
@@ -119,6 +124,8 @@ class ImportPreview:
     relationship_count: int = 0
     warnings: List[str] = field(default_factory=list)
     fidelity: Optional[FidelityReport] = None
+    #: 导入保真报告（V2.7 5.5）：保留/降级/阻断分级，供结果页与问题中心复用。
+    import_report: Optional[ImportFidelityReport] = None
     style_census: Dict[str, StyleCensus] = field(default_factory=dict)
 
     @property
@@ -254,6 +261,7 @@ def preflight(
                 relationship_count=len(rel_map),
                 warnings=warnings,
                 fidelity=fidelity_report,
+                import_report=build_import_report(fidelity_report),
                 style_census=style_census,
             )
     except OOXMLSecurityError as exc:

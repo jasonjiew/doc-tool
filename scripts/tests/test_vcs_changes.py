@@ -827,16 +827,14 @@ class BackupPolicyTests(unittest.TestCase):
         )
         self.assertEqual(list(self.content.rglob("*.bak")), [])
 
-    def test_vcs_mode_rollback_reports_missing_backup(self):
-        """VCS 模式无 .bak：本地清单回滚给出明确失败提示而非静默成功。"""
+    def test_vcs_mode_rollback_uses_local_history_without_backup(self):
+        """VCS 模式无 .bak：新记录通过本地历史恢复写前内容。"""
         writer = self._writer(backup_enabled=False)
         writer.write_text(self.rel, "v2")
         failures = writer.rollback()
-        self.assertEqual(len(failures), 1)
-        self.assertIn(self.rel, failures[0])
-        # 文件保持 v2（未被错误回滚）
+        self.assertEqual(failures, [])
         self.assertEqual(
-            (self.content / self.rel).read_text(encoding="utf-8"), "v2"
+            (self.content / self.rel).read_text(encoding="utf-8"), "v1"
         )
 
     def test_vcs_mode_create_then_edit_rollback_delete_only(self):

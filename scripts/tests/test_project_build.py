@@ -460,6 +460,38 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertTrue(history["diagnostic"])
         self.assertTrue(history["outputSha256"])
 
+    def test_prepare_stage_runs_and_cleans_temp_dir(self) -> None:
+        """V2.7 内容预处理阶段：成功时不遗留任务临时目录。"""
+        import glob
+
+        from doc_tool.application.pipeline import STAGE_PREPARE, run_pipeline
+
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        before = set(glob.glob(os.path.join(tempfile.gettempdir(), "doc-tool-prepare-*")))
+        result = run_pipeline(manifest, paths, skip_word_refresh=True)
+        after = set(glob.glob(os.path.join(tempfile.gettempdir(), "doc-tool-prepare-*")))
+        self.assertTrue(result.success)
+        stage_map = {event.stage: event.status for event in result.events}
+        self.assertEqual(stage_map.get(STAGE_PREPARE), "succeeded")
+        self.assertEqual(before, after, "预处理临时目录必须在管线结束时清理")
+
+    def test_cancelled_pipeline_does_not_publish(self) -> None:
+        """取消后不产生正式产物，且源文件与旧记录保持不变。"""
+        from doc_tool.application.pipeline import run_pipeline
+        from doc_tool.domain.cancellation import CancellationToken
+
+        manifest = _make_manifest(self.project_root)
+        paths = manifest.resolve_paths(self.project_root)
+        token = CancellationToken()
+        token.request_cancel()
+        result = run_pipeline(
+            manifest, paths, skip_word_refresh=True, cancel_token=token
+        )
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "E5003")
+        self.assertFalse(paths.output_dir.joinpath("GX-TEST-001 项目化构建测试(1.0).docx").exists())
+
     def test_build_failure_returns_error_code(self) -> None:
         """构建失败时返回结构化错误码。"""
         from doc_tool.application.pipeline import run_pipeline

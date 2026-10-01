@@ -36,7 +36,7 @@ param(
     # PFX 导出密码（生成证书模式必填）
     [string]$Password,
 
-    # 输出目录（默认脚本所在目录下 cert-out）
+    # 仓库外输出目录（默认 ~/.doctool/signing，可用 CODE_SIGNING_DIR 配置）
     [string]$OutputDir,
 
     # 证书有效期（天），自签名模式默认 1095（3 年）
@@ -62,9 +62,22 @@ $ErrorActionPreference = "Stop"
 
 # ---------- 路径准备 ----------
 if (-not $OutputDir) {
-    $OutputDir = Join-Path $PSScriptRoot "cert-out"
+    $OutputDir = $env:CODE_SIGNING_DIR
+    if (-not $OutputDir) { $OutputDir = Join-Path $env:USERPROFILE ".doctool\signing" }
+}
+$OutputDir = [IO.Path]::GetFullPath($OutputDir)
+$certRepoRoot = (Resolve-Path "$PSScriptRoot\..").Path
+if ($OutputDir.Equals($certRepoRoot, [StringComparison]::OrdinalIgnoreCase) -or
+    $OutputDir.StartsWith($certRepoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "证书输出目录必须位于源码仓库外。"
 }
 $null = New-Item -ItemType Directory -Force -Path $OutputDir
+if ($PfxFile) {
+    $certInputPath = (Resolve-Path -LiteralPath $PfxFile).Path
+    if ($certInputPath.StartsWith($certRepoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "签名私钥必须位于源码仓库外。"
+    }
+}
 
 # ---------- 模式一：生成 CSR（申请商业证书） ----------
 if ($MakeCsr) {

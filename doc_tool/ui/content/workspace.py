@@ -193,7 +193,7 @@ class ContentWorkspace(QWidget):
         self._index: Optional[ContentIndex] = None
         self._index_service = ContentIndexService(self._content_root)
         self._writer = ContentWriter(
-            self._content_root, self._state_dir, assets_root=self._assets_root
+            self._content_root, self._state_dir, assets_root=self._assets_root, writable=self._writable
         )
         # VCS 管理下的项目不生成 .md.bak（版本控制已提供恢复能力），
         # 避免 .bak 污染 git/svn 工作树；本地项目保持原备份/回滚行为。
@@ -255,6 +255,10 @@ class ContentWorkspace(QWidget):
         tree_layout = QVBoxLayout(self.tree_host)
         tree_layout.setContentsMargins(0, 0, 0, 0)
         tree_layout.addWidget(self._tree)
+        from PySide6.QtWidgets import QPushButton
+        trash_button = QPushButton("回收站（正文 / 资源）", self.tree_host)
+        trash_button.clicked.connect(self.open_trash)
+        tree_layout.addWidget(trash_button)
 
         self.tabs_host = TabsHost(
             self._writer,
@@ -448,6 +452,7 @@ class ContentWorkspace(QWidget):
             on_changed=self._after_write,
             on_open=self._open_and_locate,
             writable=self._writable,
+            is_dirty=self._editor_is_dirty,
         )
         self._panels.addTab(images, "图片")
         self._remove_placeholder("图片")
@@ -476,6 +481,10 @@ class ContentWorkspace(QWidget):
         self._panels.addTab(changes, "改动")
         self._remove_placeholder("改动")
         self._changes_panel = changes
+        from PySide6.QtWidgets import QPushButton
+        trash_button = QPushButton("浏览回收站", changes)
+        trash_button.clicked.connect(self.open_trash)
+        changes.layout().addWidget(trash_button)
         self._refresh_changes_panel(status)
         if self._on_branch_changed is not None and self._change_source == "git":
             try:
@@ -1038,13 +1047,18 @@ class ContentWorkspace(QWidget):
             panel.set_source(self._change_source, self._change_source_note)
             panel.set_items(self._change_items(status, source=self._change_source))
 
+    def open_trash(self):
+        from doc_tool.ui.content.recovery_dialog import RecoveryDialog
+        RecoveryDialog(self._writer, guard=lambda rel: self._confirm_rename_dirty([rel]),
+                       on_restored=self._after_restore, parent=self).exec()
+
     def _after_restore(self, rel_path: Optional[str] = None) -> None:
         """改动面板恢复单个文件后：重建索引与树并刷新徽标/面板。"""
         self._vcs.invalidate_cache()
         if hasattr(self, "tabs_host"):
-            if rel_path is not None:
+            if rel_path is not None and not rel_path.startswith('assets/'):
                 self.tabs_host.reload_file(rel_path)
-            else:
+            elif rel_path is None:
                 for p in self.tabs_host.open_rel_paths():
                     self.tabs_host.reload_file(p)
         if self._index is None:
@@ -1928,6 +1942,7 @@ class ContentWorkspace(QWidget):
 
     def set_writable(self, writable: bool) -> None:
         self._writable = writable
+        self._writer.set_writable(writable)
         self._tree.set_writable(writable)
         self.tabs_host.set_writable(writable)
         for panel in (

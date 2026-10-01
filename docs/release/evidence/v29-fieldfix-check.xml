@@ -1,0 +1,196 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="6" failures="0" time="23.333"><testsuite name="doc-tool" tests="6" failures="0" time="23.333"><testcase name="test_expression_contract.py" classname="scripts.tests" time="2.834"><system-out>[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.......................[warn] C:\Users\18098\AppData\Local\Temp\v27-refwarn-dvf3x05_\project\content\1 引用.md:3 引用 @fig-missing 未找到对应题注对象。
+...[warn] C:\Users\18098\AppData\Local\Temp\v27-refreshed-1cw0mnpt\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-refreshed-1cw0mnpt\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+..........
+----------------------------------------------------------------------
+Ran 38 tests in 1.792s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\logs\v27-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-ctkinul5\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refwarn-dvf3x05_\project\output\o.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refreshed-1cw0mnpt\project\output\o.docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+</system-out></testcase><testcase name="test_project_build.py" classname="scripts.tests" time="5.168"><system-out>test_build_outputs_are_byte_identical (__main__.LegacyProjectConsistencyTests.test_build_outputs_are_byte_identical)
+同一模板/内容/资源下，新旧入口构建的 DOCX 字节哈希一致。 ... ok
+test_config_from_project_matches_legacy (__main__.LegacyProjectConsistencyTests.test_config_from_project_matches_legacy)
+config_from_project 产出的路径与 load_config 一致。 ... ok
+test_corrupt_template_raises_automation_error (__main__.LegacyProjectConsistencyTests.test_corrupt_template_raises_automation_error)
+模板不是合法 DOCX 时映射为 AutomationError（统一入口中性异常）。 ... ok
+test_project_validate_matches_legacy (__main__.LegacyProjectConsistencyTests.test_project_validate_matches_legacy)
+新旧入口的校验结果一致（同时通过或同时失败）。 ... ok
+test_validate_events_are_identical (__main__.LegacyProjectConsistencyTests.test_validate_events_are_identical)
+新旧入口的校验事件流（Heading/正文/表格）一致。 ... ok
+test_build_failure_returns_error_code (__main__.PipelineServiceTests.test_build_failure_returns_error_code)
+构建失败时返回结构化错误码。 ... ok
+test_cancelled_pipeline_does_not_publish (__main__.PipelineServiceTests.test_cancelled_pipeline_does_not_publish)
+取消后不产生正式产物，且源文件与旧记录保持不变。 ... ok
+test_prepare_stage_runs_and_cleans_temp_dir (__main__.PipelineServiceTests.test_prepare_stage_runs_and_cleans_temp_dir)
+V2.7 内容预处理阶段：成功时不遗留任务临时目录。 ... ok
+test_skip_word_refresh_pipeline_returns_structured_events (__main__.PipelineServiceTests.test_skip_word_refresh_pipeline_returns_structured_events)
+跳过 Word 刷新的管线返回结构化阶段事件（构建与刷新前校验必须成功）。 ... ok
+test_extra_rows_follow_last_template_row_formatting (__main__.RevisionRecordBuildTests.test_extra_rows_follow_last_template_row_formatting)
+Markdown 行数超过模板数据行时，多出来的行沿用模板最后一行排版。 ... ok
+test_markdown_rows_reach_output_document (__main__.RevisionRecordBuildTests.test_markdown_rows_reach_output_document)
+Markdown 表格的数据行原样落到产物修订表（含 ``\|`` 转义还原）。 ... ok
+test_missing_markdown_keeps_template_rows (__main__.RevisionRecordBuildTests.test_missing_markdown_keeps_template_rows)
+没有 ``_revision_record.md`` 时保留模板原表，不清空、不报错。 ... ok
+test_multiline_summary_becomes_line_breaks (__main__.RevisionRecordBuildTests.test_multiline_summary_becomes_line_breaks)
+摘要里的 ``&lt;br&gt;`` 转成 ``w:br`` 换行，而不是塞进单个 ``w:t``。 ... ok
+test_pipeline_syncs_document_version_from_last_row (__main__.RevisionRecordBuildTests.test_pipeline_syncs_document_version_from_last_row)
+管线按修订记录末行版本号定产物版本号，且从不改写该文件。 ... ok
+test_rebuilt_rows_keep_template_row_formatting (__main__.RevisionRecordBuildTests.test_rebuilt_rows_keep_template_row_formatting)
+重建的数据行沿用模板数据行排版（行高/网格偏移/边框/宽度单位/对齐）。 ... ok
+test_template_rows_are_replaced_not_appended (__main__.RevisionRecordBuildTests.test_template_rows_are_replaced_not_appended)
+模板自带的数据行被 Markdown 全量替换，不与新行并存。 ... ok
+test_absolute_path_rejected (__main__.SpecialPathRegressionTests.test_absolute_path_rejected)
+绝对路径作为项目内资源被拒绝。 ... ok
+test_build_with_chinese_space_bracket_ampersand_path (__main__.SpecialPathRegressionTests.test_build_with_chinese_space_bracket_ampersand_path)
+在含中文、空格、括号、&amp; 的项目路径下构建成功。 ... ok
+test_config_from_project_rejects_escape_in_manifest (__main__.SpecialPathRegressionTests.test_config_from_project_rejects_escape_in_manifest)
+清单中 templateDocx 越界时 resolve_paths 抛出 PathEscapeError。 ... ok
+test_manifest_roundtrip_with_special_path (__main__.SpecialPathRegressionTests.test_manifest_roundtrip_with_special_path)
+清单在特殊路径下保存/加载后路径仍正确。 ... ok
+test_path_escape_rejected_in_resource (__main__.SpecialPathRegressionTests.test_path_escape_rejected_in_resource)
+资源路径越界（..）被 ProjectPaths 拒绝。 ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 4.019s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-sc5xiilf\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-sc5xiilf\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-sy1seio0\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-sy1seio0\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-sy1seio0\legacy-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-project-build-sy1seio0\project-report.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-7f9kmpog\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-project-build-7f9kmpog\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipeline-bq_taeyc\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipeline-bq_taeyc\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-pipeline-qddoclyp\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-pipeline-qddoclyp\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 31 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-8qzy929h\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-i8wq15p9\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-uflup483\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-5fniwg9s\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-2adxgvym\output\.tmp-GX-TEST-001 项目化构建测试(1.1).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-revision-build-2adxgvym\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-7b5vqhav\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 2 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-revision-build-18ew5ow5\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-_uecshkr\测试 项目(1.0) &amp; 验证\output\GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-special-path-_uecshkr\测试 项目(1.0) &amp; 验证\output\legacy-build.docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_contract_fidelity_v27.py" classname="scripts.tests" time="1.209"><system-out>..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.250s
+
+OK
+</system-out></testcase><testcase name="test_cli_check_v27.py" classname="scripts.tests" time="2.722"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 1.431s
+
+OK
+</system-out></testcase><testcase name="test_pipeline_gates_v27.py" classname="scripts.tests" time="8.270"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 7.033s
+
+OK
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-lint-stage-_5yyn4gj\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-lint-stage-_5yyn4gj\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-lint-stage-3hqohwys\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=12, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-lint-stage-3hqohwys\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refresh-z_kdyplk\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-refresh-z_kdyplk\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refresh-z_kdyplk\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-refresh-z_kdyplk\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+</system-out></testcase><testcase name="test_prepared_source.py" classname="scripts.tests" time="3.130"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 2.189s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-prepare-build-5hs9xd93\project\output\预处理(1.0).docx
+[requirement] 插入元素=4, 表格=0, 图片=1, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

@@ -126,6 +126,19 @@ class ProjectManifest:
     allow_missing_headings: bool = False
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
+    # --- schema v2 可选字段（V2.8） ---
+    #: 文档类别（来自规范包 ``documentKind``）；空表示未声明。
+    documentKind: str = ""
+    #: 显式章节顺序（相对 contentRoot 的 POSIX 路径或目录名）。
+    chapters: list = field(default_factory=list)
+    #: 变量表：名称 -> 字符串值（不递归展开）。
+    variables: Dict[str, str] = field(default_factory=dict)
+    #: 规范包引用：``{"id": ..., "version": ..., "hash": ...}``。
+    standardPack: Dict[str, str] = field(default_factory=dict)
+    #: 检查策略来源：``"pack"`` / ``"project"`` / ``"builtin"``（空表示继承旧行为）。
+    qualitySource: str = ""
+    #: v2 章节顺序的容错提醒（越界/重复等跳过原因）。
+    chapterWarnings: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
         try:
@@ -162,6 +175,47 @@ class ProjectManifest:
                 "刷新超时不能小于 60 秒。",
                 details={"timeout": str(self.refreshTimeoutSeconds)},
             )
+        self._normalize_v2_fields()
+
+    def _normalize_v2_fields(self) -> None:
+        """规范化 schema v2 可选字段：非法值跳过而不报错（容错优先）。
+
+        只保留可用部分：章节顺序去重、路径越界/非法项目追加到
+        ``chapterWarnings``，让上层集中报告而不中断建项与出稿。
+        """
+        self.documentKind = str(self.documentKind or "").strip()
+        self.qualitySource = str(self.qualitySource or "").strip()
+        self.chapterWarnings = list(self.chapterWarnings or [])
+        cleaned = []
+        seen = set()
+        for item in self.chapters or []:
+            value = str(item or "").strip().replace("\\", "/")
+            if not value:
+                continue
+            if value.startswith("/") or ".." in value.split("/"):
+                self.chapterWarnings.append(
+                    "章节顺序中的越界项已跳过：{0}".format(value)
+                )
+                continue
+            if value in seen:
+                self.chapterWarnings.append("章节顺序重复项已去重：{0}".format(value))
+                continue
+            seen.add(value)
+            cleaned.append(value)
+        self.chapters = cleaned
+        variables: Dict[str, str] = {}
+        for key, value in (self.variables or {}).items():
+            name = str(key or "").strip()
+            if not name:
+                continue
+            variables[name] = "" if value is None else str(value)
+        self.variables = variables
+        pack: Dict[str, str] = {}
+        for key in ("id", "version", "hash"):
+            raw = (self.standardPack or {}).get(key)
+            if raw is not None:
+                pack[key] = str(raw)
+        self.standardPack = pack
 
     # --- 路径访问（经 ProjectPaths 解析与包含校验） ---
 
@@ -191,7 +245,7 @@ class ProjectManifest:
     # --- 序列化 ---
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        data = {
             "schemaVersion": self.schemaVersion,
             "projectId": self.projectId,
             "documentType": self.documentType,
@@ -211,6 +265,16 @@ class ProjectManifest:
             "createdAt": self.createdAt,
             "updatedAt": self.updatedAt,
         }
+        for key, value in (
+            ("documentKind", self.documentKind),
+            ("chapters", list(self.chapters or [])),
+            ("variables", dict(self.variables or {})),
+            ("standardPack", dict(self.standardPack or {})),
+            ("qualitySource", self.qualitySource),
+        ):
+            if value:
+                data[key] = value
+        return data
 
     def to_yaml(self) -> str:
         global yaml
@@ -357,6 +421,11 @@ class ProjectManifest:
                 ),
                 createdAt=data.get("createdAt"),
                 updatedAt=data.get("updatedAt"),
+                documentKind=str(data.get("documentKind", "") or ""),
+                chapters=list(data.get("chapters") or []),
+                variables=dict(data.get("variables") or {}),
+                standardPack=dict(data.get("standardPack") or {}),
+                qualitySource=str(data.get("qualitySource", "") or ""),
             )
         except KeyError as exc:
             raise ProjectManifestError(

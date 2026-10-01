@@ -32,6 +32,37 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
+class SigningConfigurationTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "PowerShell signing configuration")
+    def test_signing_skips_missing_config_and_rejects_repo_private_key(self):
+        import subprocess
+
+        script = str(Path(REPO_ROOT) / "packaging" / "sign_artifacts.ps1")
+        with tempfile.TemporaryDirectory() as external, tempfile.TemporaryDirectory(dir=REPO_ROOT) as inside:
+            env = os.environ.copy()
+            env.pop("CODE_SIGNING_PFX", None)
+            env.pop("CODE_SIGNING_PASSWORD", None)
+            env["CODE_SIGNING_DIR"] = external
+            command = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+                       "-Target", str(Path(external) / "unused.exe")]
+            skipped = subprocess.run(command, env=env, capture_output=True, timeout=15)
+            self.assertEqual(skipped.returncode, 0)
+            private_key = Path(inside) / "fixture.pfx"
+            private_key.write_bytes(b"synthetic key")
+            env["CODE_SIGNING_PFX"] = str(private_key)
+            env["CODE_SIGNING_PASSWORD"] = "synthetic-test-value"
+            rejected = subprocess.run(command, env=env, capture_output=True, timeout=15)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertNotIn(b"synthetic-test-value", rejected.stdout + rejected.stderr)
+            private_key.unlink()
+            env["CODE_SIGNING_PFX"] = str(Path(external) / "fixture.pfx")
+            Path(env["CODE_SIGNING_PFX"]).write_bytes(b"synthetic key")
+            env.pop("CODE_SIGNING_PASSWORD")
+            incomplete = subprocess.run(command, env=env, capture_output=True, timeout=15)
+            self.assertNotEqual(incomplete.returncode, 0)
+            self.assertFalse((Path(external) / "unused.exe").exists())
+
+
 class ResourceRootTests(unittest.TestCase):
     """任务 8.2：resource_root() 开发态与冻结态定位。"""
 

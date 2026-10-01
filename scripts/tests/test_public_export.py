@@ -109,6 +109,17 @@ class ScanVocabularyTests(unittest.TestCase):
 
 
 class OoxmlContentScanTests(unittest.TestCase):
+    def test_generic_fallback_allowlist_is_exact(self):
+        scanner = _load_scan_leaks()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            resource = root / '_internal/doc_tool/resources'
+            resource.mkdir(parents=True)
+            _write_docx(resource / 'generic-template.docx', 'Generic document')
+            self.assertEqual(scanner.scan_docx_leaks(root), [])
+            _write_docx(resource / 'company.docx', 'Private document')
+            self.assertEqual(len(scanner.scan_docx_leaks(root)), 1)
+
     """任务 8.5：DOCX/OOXML 内部内容扫描正负测试。"""
 
     @classmethod
@@ -146,6 +157,34 @@ class OoxmlContentScanTests(unittest.TestCase):
 
 class PublicExportTests(unittest.TestCase):
     """任务 8.1/8.7：净化公开源码导出。"""
+
+    def test_accidentally_tracked_signing_material_is_excluded_and_detected(self):
+        from unittest.mock import patch
+
+        module_path = Path(REPO_ROOT) / "packaging" / "export_public_source.py"
+        spec = importlib.util.spec_from_file_location("doc_tool_export_security", module_path)
+        export = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(export)
+        scan = _load_scan_leaks()
+        sensitive = ["scripts/cert-out/codesign.cer", "backup/private.pfx.bak",
+                     "config/pfx-password.txt", "local/pfx-password.txt.bak", "other/private.key"]
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            output = Path(tmp) / "export"
+            for rel in sensitive + ["README.md"]:
+                path = source / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("synthetic fixture", encoding="utf-8")
+            with patch.object(export, "REPO_ROOT", source), patch.object(
+                export, "_tracked_files", return_value=sensitive + ["README.md"]
+            ):
+                copied, excluded = export.export_public_source(output)
+            self.assertEqual(copied, ["README.md"])
+            self.assertEqual(set(excluded), set(sensitive))
+            self.assertEqual(len(scan.scan_forbidden_files(source)), len(sensitive))
+            fake_git = type("GitResult", (), {"returncode": 0, "stdout": "\n".join(sensitive)})()
+            with patch("subprocess.run", return_value=fake_git):
+                self.assertEqual(len(scan.scan_repo_for_secrets(source)), len(sensitive))
 
     def test_export_excludes_company_dirs_and_validates(self):
         module_path = Path(REPO_ROOT) / "packaging" / "export_public_source.py"

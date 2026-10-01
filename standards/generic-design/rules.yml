@@ -1,0 +1,4 @@
+rules:
+- ruleId: duplicate_title
+  severity: warning
+  enabled: true

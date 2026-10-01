@@ -1,5 +1,7 @@
 ## Why
 
+> 排程迁移（2026-09-30）：本提案作为历史来源保留，后续执行以 `docs/product-plan-v2.6-v2.9.md` 和四个 `product-v2*` change 为准。原任务按新计划第 7 节分配到 V2.6.x/V2.7/V2.8/V2.9，不因本注记自动标完成或归档。
+
 `analysis/feature-audit.md`（基于 HEAD `12e8483` / v2.5.1）确认：正式出稿链路仍有 4 个"每次出稿都会撞上"的表达缺口（围栏代码块退化为正文、无发布终审、Word 刷新后域错误静默放行、修订记录零预填），以及 2 个隐性缺陷（打包排除 `QtWebEngine` 导致终端用户预览与开发者不一致；`scripts/cert-out/*.pfx` 与密码文件在工作区内）。这些问题全部可以在**不改架构**的前提下修复，且多数可复用已有代码（`review_docx._create_code_block_box`、`revision_record.build_revision_record`、`writer.ChangeJournal`）。
 
 本变更是三阶段迭代计划的第一阶段（v2.6）：**小改动、高收益**，目标是让"正式出稿"不再出现刺眼缺陷，让 CI 有单入口门禁，并消除两处隐患。

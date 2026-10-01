@@ -1,0 +1,12 @@
+schemaVersion: 1
+packId: generic-design
+version: 1.0.0
+documentKind: design
+description: 通用详细设计说明书规范包（可公开分发）
+files:
+  skeleton/1 引言.md: 7f4f838903b6436ec2a3d82b2ec59255946a06f2422704990ed647df05f52d6a
+  skeleton/2 设计说明.md: ef9f8a6f6776d0964bada8d2e7038745ee1a170d99214df2caf41247debc2cfc
+  variables.yml: a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1
+  terms.yml: ea09613932d3a437cf21ac2ed4e314c23bb175b1d98ea54ad12af40b1ad92526
+  rules.yml: 9217e98f5c102fd8396367a3e53493696bdefe53eae7fc69f6f500464ef1e385
+  template.docx: 5088f7daf091212240de96f87373c9f1f31c7b2b60adebfee83359b685fa8619

@@ -89,6 +89,23 @@ def format_preview_summary(preview) -> str:
             lines.append("  [{0}] {1}: {2}{3}".format(tag, finding.label, finding.count, sample))
         if fidelity.has_block:
             lines.append("  ⛔ 存在阻断特性：请在下方勾选「我已了解上述阻断特性可能导致内容损失，仍然导入」后点击「下一步」。")
+    # V2.7（5.5）：导入保真报告把「保留/降级/阻断」集中说清楚，
+    # 有损时不得只显示“无告警”。
+    import_report = getattr(preview, "import_report", None)
+    if import_report is not None and import_report.lossy:
+        lines.append("")
+        lines.append("保真结论：{0}".format(
+            {"blocked": "存在无法保留特性", "warning": "带提醒导入"}
+            .get(import_report.status, import_report.status)
+        ))
+        for finding in import_report.blocked:
+            lines.append("  [阻断] {0}: {1}".format(finding.label, finding.count))
+        for finding in import_report.degraded:
+            lines.append("  [降级] {0}: {1}".format(finding.label, finding.count))
+        for note in import_report.degradation_notes:
+            lines.append("  [降级] {0}".format(note))
+        if import_report.preserved:
+            lines.append("  已保留：" + "、".join(f.label for f in import_report.preserved))
     return "\n".join(lines)
 
 

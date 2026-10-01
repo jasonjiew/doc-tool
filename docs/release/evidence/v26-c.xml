@@ -1,0 +1,82 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="4" failures="2" time="34.656"><testsuite name="doc-tool" tests="4" failures="2" time="34.656"><testcase name="test_recovery_entries.py" classname="scripts.tests" time="1.937"><failure message="exit code 1" type="TestFailure">..E.
+======================================================================
+ERROR: test_legacy_resources_boundary_and_occupied_failure (__main__.RecoveryEntriesTests.test_legacy_resources_boundary_and_occupied_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_recovery_entries.py", line 73, in test_legacy_resources_boundary_and_occupied_failure
+    self.writer.manifest.add(ChangeEntry('delete', 'legacy.md', trash_path=str(legacy)))
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChangeManifest' object has no attribute 'add'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.772s
+
+FAILED (errors=1)
+</failure><system-out>..E.
+======================================================================
+ERROR: test_legacy_resources_boundary_and_occupied_failure (__main__.RecoveryEntriesTests.test_legacy_resources_boundary_and_occupied_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_recovery_entries.py", line 73, in test_legacy_resources_boundary_and_occupied_failure
+    self.writer.manifest.add(ChangeEntry('delete', 'legacy.md', trash_path=str(legacy)))
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChangeManifest' object has no attribute 'add'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.772s
+
+FAILED (errors=1)
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="8.141"><failure message="exit code 1" type="TestFailure">................................................F.............................................................F....................................................
+======================================================================
+FAIL: test_delete_moves_to_trash_and_records (__main__.CreateDeleteTests.test_delete_moves_to_trash_and_records)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 1864, in test_delete_moves_to_trash_and_records
+    self.assertTrue(
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_restore_moves_deleted_back_and_drops_entry (__main__.RestoreFileTests.test_restore_moves_deleted_back_and_drops_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 2429, in test_restore_moves_deleted_back_and_drops_entry
+    self.assertTrue(writer.manifest.empty)
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 163 tests in 7.568s
+
+FAILED (failures=2)
+</failure><system-out>................................................F.............................................................F....................................................
+======================================================================
+FAIL: test_delete_moves_to_trash_and_records (__main__.CreateDeleteTests.test_delete_moves_to_trash_and_records)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 1864, in test_delete_moves_to_trash_and_records
+    self.assertTrue(
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_restore_moves_deleted_back_and_drops_entry (__main__.RestoreFileTests.test_restore_moves_deleted_back_and_drops_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_content_operations.py", line 2429, in test_restore_moves_deleted_back_and_drops_entry
+    self.assertTrue(writer.manifest.empty)
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 163 tests in 7.568s
+
+FAILED (failures=2)
+</system-out></testcase><testcase name="test_safety_recovery.py" classname="scripts.tests" time="9.359"><system-out>.....................................................
+----------------------------------------------------------------------
+Ran 53 tests in 8.530s
+
+OK
+</system-out></testcase><testcase name="test_local_history.py" classname="scripts.tests" time="15.219"><system-out>....................s..
+----------------------------------------------------------------------
+Ran 23 tests in 13.997s
+
+OK (skipped=1)
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,15 @@
+                if image_hashes:
+                    events.append(Event("I", image_hashes, "body[{0}]".format(index)))
+            elif local_name == "tbl" and started:
+                if is_code_container(element):
+                    # 代码容器在事件层等价于表格，但比较内容必须是代码文本，
+                    # 不能与用户表格矩阵混用（否则代码示例会被误判为表格差异）。
+                    lines = code_container_lines(element) or [""]
+                    events.append(
+                        Event(
+                            "T",
+                            normalize_matrix((("\n".join(lines),),)),
+                            "body[{0}]".format(index),
+                        )
+                    )
+                    continue

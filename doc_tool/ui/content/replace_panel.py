@@ -295,7 +295,10 @@ class ReplacePanel(QWidget):
         self._after_applied(results)
         self._refresh_file_matches(match.rel_path)
         self._render_matches()
-        if any(getattr(r, "backup_failed", False) for r in results):
+        history_warnings = [message for result in results for message in getattr(result, "warnings", [])]
+        if history_warnings:
+            self._set_status("已替换 1 处（{0}）".format("；".join(dict.fromkeys(history_warnings))))
+        elif any(getattr(r, "backup_failed", False) for r in results):
             self._set_status("已替换 1 处（⚠ 备份失败，回滚不可用）")
         else:
             self._set_status("已替换 1 处")
@@ -357,7 +360,11 @@ class ReplacePanel(QWidget):
         no_backup = [
             r.rel_path for r in results if getattr(r, "backup_failed", False)
         ]
-        if no_backup:
+        history_warnings = [message for result in results for message in getattr(result, "warnings", [])]
+        if history_warnings:
+            self._set_status("已批量替换 {0} 处（{1} 个文件）；{2}".format(
+                total, len(files), "；".join(dict.fromkeys(history_warnings))))
+        elif no_backup:
             self._set_status(
                 "已批量替换 {0} 处（{1} 个文件）；以下文件备份失败，回滚不可用：{2}".format(
                     total, len(files), "、".join(no_backup)

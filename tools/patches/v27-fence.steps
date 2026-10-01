@@ -1,0 +1,3 @@
+scripts/docx_common.py	tools/patches/common_fence_old.txt	tools/patches/common_fence_new.txt
+scripts/build_docx.py	tools/patches/build_fence_old.txt	tools/patches/build_fence_new.txt
+scripts/tests/run_tests.py	tools/patches/runtests_old.txt	tools/patches/runtests_new.txt

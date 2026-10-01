@@ -1,0 +1,4 @@
+    for section_index, (_orientation, sect_pr, chunk) in enumerate(sections):
+        if section_index:
+            insert_element(insert_before, _section_break_paragraph(sect_pr))
+            inserted += 1

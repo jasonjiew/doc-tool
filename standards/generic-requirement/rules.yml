@@ -1,0 +1,4 @@
+rules:
+- ruleId: todo_residual
+  severity: warning
+  enabled: true

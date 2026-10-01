@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union, Sequence
 
 from doc_tool.domain.manifest import ProjectManifest
 from doc_tool.domain.paths import (
@@ -271,17 +271,21 @@ def build_with_project(
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
     on_warning: Optional[Callable[[str], None]] = None,
+    prepared=None,
 ) -> str:
     """以项目上下文调用 ``build_docx.build``，返回输出 DOCX 路径。
 
     ``on_warning`` 可选：构建不阻断的表达式警告（缺失链接目标、未定义脚注等，
     形如 ``源文件:行号 描述``）逐条回调，供上层透出（CLI stderr / 管线日志）。
+
+    ``prepared`` 可选：V2.7 内容预处理（``PreparedSource``）的结果列表，
+    提供预处理后的临时 Markdown 与生成图资源目录。
     """
     ensure_kernel_importable()
     from build_docx import build  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
-    output = build(config=config)
+    output = build(config=config, prepared=prepared)
     if on_warning is not None:
         for warning in config.get("_expressionWarnings", []):
             on_warning(warning)
@@ -336,6 +340,8 @@ def validate_with_project(
     baseline: bool = False,
     require_refreshed: Optional[bool] = None,
     report_override: Optional[Union[str, Path]] = None,
+    asset_overrides: Optional[Dict[str, str]] = None,
+    prepared_texts: Optional[Dict[str, str]] = None,
 ) -> bool:
     """以项目上下文调用 ``validate_docx.validate``，返回是否通过。
 
@@ -346,6 +352,12 @@ def validate_with_project(
     from validate_docx import validate  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
+    if asset_overrides:
+        # 预处理生成图所在的临时资源目录（按源 Markdown 绝对路径）。
+        config["assetRootOverrides"] = dict(asset_overrides)
+    if prepared_texts:
+        # 预处理后的内容用于推导预期事件（与实际装配一致）。
+        config["preparedTexts"] = dict(prepared_texts)
     output_path = config["paths"]["output"]
     if require_refreshed is None:
         require_refreshed = infer_require_refreshed(output_path)

@@ -5,6 +5,11 @@
 主线程 0 阻塞卡顿、100% 官方 Mermaid 全图表语法支持、支持平移抓手与无级缩放。
 """
 
+# V2.7（5.1）：该 WebEngine 预览分支已停用。编辑器预览统一走内置结构预览
+# （doc_tool.application.content.preview + _PreviewBrowser）；打包排除 PySide6.QtWebEngine*
+# 以减少约 120 MB 运行环境与企业终端进程兼容负担（见 packaging/doc_tool.spec 的 excludes）。
+# 本文件仅保留供历史参考与现有测试，不再被编辑器导入。
+
 from __future__ import annotations
 
 import json

@@ -32,7 +32,7 @@ sys.path.insert(0, SCRIPTS)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-DIST_DIR = os.path.join(REPO_ROOT, "dist", "DocTool")
+DIST_DIR = os.environ.get("DOC_TOOL_SMOKE_DIST", os.path.join(REPO_ROOT, "dist", "DocTool"))
 INTERNAL_DIR = os.path.join(DIST_DIR, "_internal")
 EXE_PATH = os.path.join(DIST_DIR, "DocTool.exe")
 CLI_EXE_PATH = os.path.join(DIST_DIR, "doc-tool-cli.exe")

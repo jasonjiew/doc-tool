@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="0" time="17.297"><testsuite name="doc-tool" tests="1" failures="0" time="17.297"><testcase name="test_local_history.py" classname="scripts.tests" time="17.297"><system-out>....................s..
+----------------------------------------------------------------------
+Ran 23 tests in 15.663s
+
+OK (skipped=1)
+</system-out></testcase></testsuite></testsuites>

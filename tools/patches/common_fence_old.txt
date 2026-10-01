@@ -1,0 +1,4 @@
+    for line_number, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
+        if heading and len(heading.group(1)) <= depth:

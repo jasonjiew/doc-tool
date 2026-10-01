@@ -1,0 +1,13 @@
+def expected_content_events(
+    config: Dict, available_bookmarks: Optional[Iterable[str]] = None
+) -> List[Event]:
+    events: List[Event] = []
+    is_headless = bool(config.get("is_headless", False))
+    for entry, markdown_path in iter_chapter_entries(config):
+        if is_headless and entry.depth == 1 and entry.title in ("正文", "01-正文"):
+            pass
+        else:
+            events.append(Event("H", (entry.depth, normalize_business_text(entry.title)), entry.path))
+        if markdown_path:
+            events.extend(expected_markdown_events(markdown_path, config, available_bookmarks=available_bookmarks))
+    return events

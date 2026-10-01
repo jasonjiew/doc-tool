@@ -1,0 +1,26 @@
+from doc_tool.domain.markdown_structure import (
+    META_SYNTAX_HINT,
+    parse_table_meta as _table_meta,
+)
+from doc_tool.domain.blocks import (
+    KIND_CODE,
+    KIND_COMPLEX_TABLE,
+    KIND_EMPTY_PARAGRAPH,
+    KIND_FOOTNOTE_DEF,
+    KIND_HEADING,
+    KIND_IMAGE,
+    KIND_LIST_ITEM,
+    KIND_PAGEBREAK,
+    KIND_SECTION,
+    KIND_TABLE,
+    SourceLocation,
+    parse_blocks,
+    parse_blocks_file,
+)
+from doc_tool.domain.captions import (
+    KIND_FIGURE,
+    CaptionRegistry,
+    build_registry,
+    resolve_caption_style,
+)
+from doc_tool.kernel_shared import docx_blocks as shared

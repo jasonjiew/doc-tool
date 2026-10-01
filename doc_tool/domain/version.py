@@ -14,7 +14,22 @@ from functools import lru_cache
 from typing import Dict
 
 
-# 应用语义版本：2.6.0 为模板填充——Word 底模 + Markdown 离线出稿（互转模板方向、专属向导、
+# 应用语义版本：2.9.0 变更可追溯——研发文档工作区（多文档角色与集合版本）、
+# 稳定条目 DOC-ITEM 与旧编号迁移、显式关系图（satisfies/verifies/depends_on）、
+# 需求—设计—测试矩阵与可解释覆盖率（N/A 不报 0%）、变更影响与复核记录、
+# 完整集合基线事务（逐文件 SHA-256、租约、部分集合）与基线查询/比较/安全恢复；
+# CLI 新增 ``trace`` 与 ``impact``。
+# 2.8.0 面向团队标准化——项目 schema v2（显式章节与变量、
+# 默认保持 v1）、声明式规范包（解析/安全解压/固定版本/升级差异）与三个通用示例包、
+# 项目内共享规则/术语（quality/ 位置 + 旧 .state 迁移）、项目概览聚合、
+# 内容版本评审生命周期与修订记录预填、离线 HTML 评审包与幂等回流、
+# 重导入计划/应用与 Git 三方冲突合并。
+# 2.7.0 建立跨入口共享表达契约与可靠交付——
+# 共享块模型/代码容器、离线 Mermaid 构建预处理与缓存、题注与交叉引用（SEQ/REF 域 + 静态缓存值）、
+# 显式横向节与分页、内置结构预览统一（停用 WebEngine 分支）、发布质量门禁（构建前检查 + STAGE_AUDIT）、
+# 统一 ``check`` 命令与结构化报告、无 Word/刷新失败的可打开待刷新产物与安全登记回滚。
+# 2.6.1 补齐本地历史/回收站、交付历史、预设预检、创作辅助及只读 HTML。
+# 2.6.0 为模板填充——Word 底模 + Markdown 离线出稿（互转模板方向、专属向导、
 # CLI template-fill 子命令）、样式映射兜底、完整文档底模正文清理、内容保真降级（行内图片/引用块/
 # 代码块/Setext/任务列表/front matter）；
 # 2.5.2 为全仓代码审计与缺陷修复、路径与清单规范化、Windows 大小写去重、修订表提取鲁棒性及回归测试套件加固；
@@ -38,13 +53,15 @@ from typing import Dict
 # 1.4.0 为修订记录以 _revision_record.md 为唯一维护点，并修复修订表
 # 回填、排版与换行；1.3.0 的 mermaid 官方网页渲染后端已撤销（ad5c1fd），未发布；
 # 1.2.0 为多窗口、版本控制变更、mermaid-cli 渲染与机器可读 CLI 发布。
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.9.0"
 
 # 项目清单 ``project.yml`` 的模式版本。每次不兼容变更必须 +1 并实现迁移。
-PROJECT_SCHEMA_VERSION = 1
+# v2（V2.8）新增可选 ``documentKind`` / ``chapters`` / ``variables`` / ``standardPack``；
+# v1 继续可读可写，升级必须由用户显式选择（默认保持 v1）。
+PROJECT_SCHEMA_VERSION = 2
 
 # 当前应用支持读写的历史与当前模式版本集合。
-SUPPORTED_PROJECT_SCHEMA_VERSIONS = (1,)
+SUPPORTED_PROJECT_SCHEMA_VERSIONS = (1, 2)
 
 
 @lru_cache(maxsize=1)

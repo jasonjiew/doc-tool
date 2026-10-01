@@ -6,8 +6,8 @@
 .DESCRIPTION
     签名材料与优先级：
       1. 环境变量 CODE_SIGNING_PFX / CODE_SIGNING_PASSWORD（CI 用，两个都要）；
-      2. 仓库 scripts\cert-out\codesign.pfx + pfx-password.txt（本机复用，
-         由 scripts\new-code-signing-cert.ps1 生成，cert-out 已在 .gitignore）。
+      2. 仓库外 CODE_SIGNING_DIR（默认 ~/.doctool/signing）中的
+         codesign.pfx + pfx-password.txt；不得从源码目录读取私钥。
     两者都没有时跳过签名并返回 0（不阻断未配置签名的内部构建），输出提示。
 
     行为要点：
@@ -44,19 +44,35 @@ $RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path
 # --- 1. 签名材料 ---
 $pfx = $env:CODE_SIGNING_PFX
 $password = $env:CODE_SIGNING_PASSWORD
-if ([string]::IsNullOrWhiteSpace($pfx) -or [string]::IsNullOrWhiteSpace($password)) {
-    $localPfx = Join-Path $RepoRoot "scripts\cert-out\codesign.pfx"
-    $localPwFile = Join-Path $RepoRoot "scripts\cert-out\pfx-password.txt"
-    if ((Test-Path $localPfx) -and (Test-Path $localPwFile)) {
-        $pfx = $localPfx
-        $password = [System.IO.File]::ReadAllText($localPwFile).Trim()
-    }
+$signingDir = $env:CODE_SIGNING_DIR
+if (-not $signingDir) { $signingDir = Join-Path $env:USERPROFILE ".doctool\signing" }
+if ([string]::IsNullOrWhiteSpace($pfx)) {
+    $localPfx = Join-Path $signingDir "codesign.pfx"
+    if (Test-Path -LiteralPath $localPfx) { $pfx = $localPfx }
 }
 if (-not $pfx) {
-    Write-Host "未配置签名材料（环境变量 CODE_SIGNING_PFX/PASSWORD 或 scripts\cert-out），跳过签名。" -ForegroundColor DarkGray
+    Write-Host "未配置签名材料（CODE_SIGNING_PFX/PASSWORD 或仓库外 CODE_SIGNING_DIR），跳过签名。" -ForegroundColor DarkGray
     return
 }
-if (-not (Test-Path $pfx)) { throw "PFX 不存在: $pfx" }
+if (-not (Test-Path -LiteralPath $pfx -PathType Leaf)) { throw "PFX 不存在: $pfx" }
+$pfx = (Resolve-Path -LiteralPath $pfx).Path
+if ($pfx.StartsWith($RepoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "签名私钥必须位于仓库外，请配置 CODE_SIGNING_PFX 或 CODE_SIGNING_DIR。"
+}
+if ([string]::IsNullOrWhiteSpace($password)) {
+    $localPwFile = [IO.Path]::GetFullPath((Join-Path $signingDir "pfx-password.txt"))
+    if ($localPwFile.StartsWith($RepoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "签名密码文件必须位于仓库外。"
+    }
+    if (Test-Path -LiteralPath $localPwFile) {
+        $localPwFile = (Resolve-Path -LiteralPath $localPwFile).Path
+        if ($localPwFile.StartsWith($RepoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "签名密码文件必须位于仓库外。"
+        }
+        $password = [IO.File]::ReadAllText($localPwFile).Trim()
+    }
+}
+if ([string]::IsNullOrWhiteSpace($password)) { throw "缺少签名密码，请配置 CODE_SIGNING_PASSWORD 或外部密码文件。" }
 
 # --- 2. signtool ---
 $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source

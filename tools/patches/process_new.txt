@@ -1,0 +1,57 @@
+def process_markdown(
+    path: str,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+    registry: Optional[CaptionRegistry] = None,
+    asset_base: str = "",
+    primary_sect_pr=None,
+    landscape_prototype=None,
+) -> Tuple[int, int, int]:
+    """兼容入口：解析 Markdown 后交给共享块模型渲染（V2.7 起）。"""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeError) as exc:
+        raise AutomationError("Markdown 无法读取 {0}: {1}".format(path, exc))
+    document = parse_blocks(text, path)
+    if expressions is not None:
+        for warning in document.warnings:
+            expressions.warnings.append(warning.as_text())
+    return process_parsed_document(
+        document,
+        insert_before,
+        items,
+        relationships,
+        image_manager,
+        config,
+        max_image_width,
+        next_object_id,
+        numbering,
+        expressions,
+        registry=registry,
+        asset_base=asset_base,
+        primary_sect_pr=primary_sect_pr,
+        landscape_prototype=landscape_prototype,
+    )
+
+
+def _legacy_process_markdown(
+    path: str,
+    insert_before,
+    items: Dict[str, bytes],
+    relationships,
+    image_manager: ImageManager,
+    config: Dict,
+    max_image_width: int,
+    next_object_id,
+    numbering: Optional[NumberingManager] = None,
+    expressions: Optional[ExpressionManager] = None,
+) -> Tuple[int, int, int]:
+    """V2.6 行扫描实现；保留供对照与回退，不再由 build 调用。"""

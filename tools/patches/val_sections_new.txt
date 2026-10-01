@@ -1,0 +1,10 @@
+    template_sections = template.section_signatures()
+    output_sections = output.section_signatures()
+    # V2.7 显式横向节：源 Markdown 可以切分出额外节，此时输出必须以模板节属性
+    # 为前缀，多出的节只能是横向节且必须能表达为模板主节的横向副本。
+    if output_sections[: len(template_sections)] != template_sections:
+        errors["sections"].append("Section 数量/页面尺寸/方向/边距/页眉页脚引用发生变化")
+    elif len(output_sections) > len(template_sections):
+        portrait_prefix = template_sections[: max(1, len(template_sections) - 1)]
+        if output_sections[: len(portrait_prefix)] != portrait_prefix:
+            errors["sections"].append("横向节切分改变了模板原有节属性")

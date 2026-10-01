@@ -2,7 +2,8 @@
 """写入安全：备份、原子写、改动清单与回滚。
 
 所有内容写路径（编辑器保存、全局替换、重命名联动）统一经由本模块：
-- 写前把原文件备份为 ``同目录/<文件>.bak``（覆盖式，保留最近一份）。
+- 写前保存项目内有界本地历史；本地模式保留 ``同目录/<文件>.bak`` 兼容备份。
+  历史故障时必须验证本次旧内容的 .bak；无可靠恢复点拒绝覆盖。
 - 写入用 tmp 文件 + ``os.replace`` 原子替换，跨卷失败回退 ``shutil.move``，
   避免写入中断损坏文件（与 ``ProjectManifest.save`` 同一套路）。
 - 会话改动清单落盘到项目 ``.state/``，供一键回滚。
@@ -17,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from uuid import uuid4
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
@@ -79,13 +81,24 @@ def _resolve_inside(content_root: Path, rel_path: str) -> Path:
 
 def atomic_write(file_path: Path, text: str) -> None:
     """原子写入文本：tmp + os.replace，跨卷回退 shutil.move。"""
+    atomic_write_bytes(file_path, text.encode("utf-8"))
+
+
+def atomic_write_bytes(file_path: Path, data: bytes) -> None:
+    """Use the existing atomic replacement for byte-exact recovery points."""
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
-    tmp_path.write_text(text, encoding="utf-8")
+    tmp_path = file_path.with_name(file_path.name + "." + uuid4().hex + ".tmp")
+    tmp_path.write_bytes(data)
     try:
-        os.replace(str(tmp_path), str(file_path))
-    except OSError:
-        shutil.move(str(tmp_path), str(file_path))
+        try:
+            os.replace(str(tmp_path), str(file_path))
+        except OSError:
+            shutil.move(str(tmp_path), str(file_path))
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 @dataclass
@@ -97,6 +110,7 @@ class ChangeEntry:
     backup_path: Optional[str] = None  # .bak 绝对路径（edit 必填，rename 可选）
     original_path: Optional[str] = None  # 原名（仅 rename）
     trash_path: Optional[str] = None  # 回收站内绝对路径（仅 delete）
+    history_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -105,6 +119,7 @@ class ChangeEntry:
             "backupPath": self.backup_path,
             "originalPath": self.original_path,
             "trashPath": self.trash_path,
+            "historyId": self.history_id,
         }
 
     @classmethod
@@ -115,6 +130,7 @@ class ChangeEntry:
             backup_path=data.get("backupPath"),
             original_path=data.get("originalPath"),
             trash_path=data.get("trashPath"),
+            history_id=data.get("historyId"),
         )
 
 
@@ -126,8 +142,10 @@ class WriteResult:
     backup_path: Optional[str]  # 已创建备份路径（绝对路径）；未变化为 None
     written: bool
     error: Optional[str] = None
-    backup_failed: bool = False  # 预期建立备份但失败（回滚不可用）
+    backup_failed: bool = False  # 兼容 .bak 建立失败；仍可能有可靠本地历史
     path: str = ""  # 写入后的绝对路径
+    warnings: List[str] = field(default_factory=list)
+    history_id: Optional[str] = None
 
 
 class ChangeManifest:
@@ -241,6 +259,7 @@ class ContentWriter:
         state_dir: Path,
         assets_root: Optional[Path] = None,
         backup_enabled: bool = True,
+        writable: bool = True,
     ) -> None:
         self._content_root: Path = Path(content_root).resolve()
         self._manifest = ChangeManifest(state_dir)
@@ -251,6 +270,13 @@ class ContentWriter:
         # VCS 管理下的项目不生成 .md.bak（版本控制已提供恢复能力），
         # 避免 .bak 污染 git/svn 工作树；非 VCS 项目保持原备份行为。
         self._backup_enabled = backup_enabled
+        self._writable = writable
+        from doc_tool.application.content.local_history import LocalHistoryStore
+        self.local_history = LocalHistoryStore(self._content_root, state_dir, writable=writable)
+
+    def set_writable(self, writable: bool) -> None:
+        self._writable = bool(writable)
+        self.local_history.writable = self._writable
 
     @property
     def manifest(self) -> ChangeManifest:
@@ -302,8 +328,13 @@ class ContentWriter:
             return None, False
         backup_path = _backup_path_for(file_path)
         try:
+            if backup_path.is_symlink():
+                raise OSError("备份路径是符号链接")
+            backup_path = _resolve_inside(self._content_root, backup_path.relative_to(self._content_root).as_posix())
             shutil.copy2(str(file_path), str(backup_path))
-        except OSError:
+            if backup_path.read_bytes() != file_path.read_bytes():
+                raise OSError("备份回读不一致")
+        except (OSError, ValueError):
             return None, True
         return str(backup_path), False
 
@@ -314,16 +345,22 @@ class ContentWriter:
         路径抛异常（否则编辑器保存槽会崩溃、文件已改但界面显示未保存）。
         """
         try:
+            self._manifest.file.resolve().relative_to(self.local_history.project_root)
             self._manifest.record(entry)
             return None
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             return "改动清单保存失败（回滚记录不可用）：{0}".format(exc)
 
-    def write_text(self, rel_path: str, text: str) -> WriteResult:
+    def write_text(self, rel_path: str, text: str, *, operation="save") -> WriteResult:
         """写入文件内容（备份 + 原子写 + 记录 edit 条目）。
 
         写入失败时保留已建备份，返回 error。
         """
+        if not self._writable:
+            return WriteResult(rel_path, None, False, error="只读项目不能保存或恢复正文")
+        warnings = []
+        snapshot = None
+        self.local_history.warnings.clear()
         try:
             target = _resolve_inside(self._content_root, rel_path)
         except PathOutsideContentError as exc:
@@ -333,7 +370,33 @@ class ContentWriter:
                 written=False,
                 error=str(exc),
             )
+        old = None
+        if target.exists():
+            try:
+                old = target.read_bytes()
+            except OSError as exc:
+                return WriteResult(rel_path, None, False, error=str(exc))
+            try:
+                snapshot = self.local_history.capture(rel_path, old, operation)
+            except (OSError, ValueError) as exc:
+                warnings.append("多版本历史降级，尝试 .bak 恢复点：{0}".format(exc))
         backup, backup_failed = self._backup(target)
+        if old is not None and snapshot is None:
+            # In VCS mode .bak is normally disabled, but it is still the emergency fallback.
+            try:
+                if not backup:
+                    if _backup_path_for(target).is_symlink():
+                        raise OSError("备份路径是符号链接")
+                    backup = str(_resolve_inside(self._content_root, rel_path + BACKUP_SUFFIX))
+                    atomic_write_bytes(Path(backup), old)
+                if Path(backup).read_bytes() != old:
+                    raise OSError("备份内容回读不一致")
+                backup_failed = False
+            except (OSError, ValueError) as exc:
+                return WriteResult(rel_path, None, False, error="无法保留旧正文，已停止覆盖：{0}".format(exc),
+                                   backup_failed=True, warnings=warnings)
+        elif backup_failed:
+            warnings.append("兼容 .bak 备份失败，旧正文已保留在本地历史")
         try:
             atomic_write(target, text)
         except OSError as exc:
@@ -345,8 +408,14 @@ class ContentWriter:
                 backup_failed=backup_failed,
             )
         manifest_error = self._record_change(
-            ChangeEntry(operation=OP_EDIT, rel_path=rel_path, backup_path=backup)
+            ChangeEntry(operation=OP_EDIT, rel_path=rel_path, backup_path=backup,
+                        history_id=snapshot.snapshot_id if snapshot else None)
         )
+        try:
+            self.local_history.prune(rel_path)
+        except (OSError, ValueError) as exc:
+            warnings.append("历史保留策略暂未完成，恢复点仍保留：{0}".format(exc))
+        warnings.extend(self.local_history.warnings)
         return WriteResult(
             rel_path=rel_path,
             backup_path=backup,
@@ -354,6 +423,8 @@ class ContentWriter:
             error=manifest_error,
             backup_failed=backup_failed,
             path=str(target),
+            warnings=warnings,
+            history_id=snapshot.snapshot_id if snapshot else None,
         )
 
     def rename(
@@ -454,7 +525,7 @@ class ContentWriter:
         )
 
     def delete_file(self, rel_path: str) -> WriteResult:
-        """软删除：移动文件到 <state_dir>/trash/<rel_path> 并记 delete 条目。
+        """软删除：移动到独立 operation-id 目录并记 delete 条目。
 
         回收站镜像相对结构防同名冲突；文件移出 contentRoot 后构建/校验
         天然跳过。回滚经 trash_path 恢复。``assets/`` 前缀的 rel_path 解析到
@@ -477,15 +548,14 @@ class ContentWriter:
                 written=False,
                 error="源文件不存在：{0}".format(inner),
             )
-        trash_target = self._trash_dir / rel_path
+        if not self._writable:
+            return WriteResult(rel_path, None, False, error="只读项目不能删除")
+        from doc_tool.application.content.trash import TrashStore
         try:
+            trash_target = Path(TrashStore(self).prepare(rel_path).trash_path)
             trash_target.parent.mkdir(parents=True, exist_ok=True)
-            if trash_target.exists():
-                # 上次软删除未回滚时槽位已被占用：先清掉旧回收站副本，
-                # 保证"删除→重建→再删除"等重复删除能成功而非静默失败。
-                trash_target.unlink()
             _rename_with_fallback(source, trash_target)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             return WriteResult(
                 rel_path=rel_path,
                 backup_path=None,
@@ -584,6 +654,8 @@ class ContentWriter:
 
         成功后改动清单相应条目被移除；失败返回 ``written=False`` + error。
         """
+        if not self._writable:
+            return WriteResult(rel_path, None, False, error="只读项目不能恢复")
         try:
             root, inner = self._split_root(rel_path)
             target = _resolve_inside(root, inner)
@@ -612,9 +684,12 @@ class ContentWriter:
         if status == "deleted":
             if trash_path and Path(trash_path).exists():
                 try:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    _rename_with_fallback(Path(trash_path), target)
-                except OSError as exc:
+                    from doc_tool.application.content.trash import TrashStore, TrashEntry
+                    store = TrashStore(self)
+                    store.restore(TrashEntry("legacy", rel_path, "未记录",
+                        "resource" if rel_path.startswith(ASSET_PREFIX) else "content", trash_path),
+                        mode="overwrite", confirmed=True)
+                except (OSError, ValueError) as exc:
                     return WriteResult(
                         rel_path=rel_path,
                         backup_path=None,
@@ -641,6 +716,8 @@ class ContentWriter:
                 )
             self._manifest.load()
             self._manifest.drop(OP_DELETE, rel_path)
+            self._manifest.drop(OP_CREATE, rel_path)
+            self._manifest.drop(OP_EDIT, rel_path)
             return WriteResult(
                 rel_path=rel_path, backup_path=None, written=True, path=str(target)
             )
@@ -709,6 +786,8 @@ class ContentWriter:
             if entry.backup_path and Path(entry.backup_path).exists():
                 shutil.copy2(entry.backup_path, str(target))
                 self._discard_backup(entry.backup_path)
+            elif entry.history_id:
+                atomic_write_bytes(target, self.local_history.read_bytes(entry.rel_path, entry.history_id))
             elif entry.backup_path:
                 # 清单声明了备份但文件缺失：无法恢复，报告失败而非静默成功。
                 raise OSError(
@@ -729,6 +808,10 @@ class ContentWriter:
             root, inner = self._split_root(entry.rel_path)
             target = _resolve_inside(root, inner)
             if entry.trash_path and Path(entry.trash_path).exists():
+                from doc_tool.application.content.trash import TrashStore
+                TrashStore(self).safe(entry.trash_path)
+                if target.exists():
+                    raise OSError("恢复目标已存在，请在回收站选择副本或覆盖")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 _rename_with_fallback(Path(entry.trash_path), target)
             else:

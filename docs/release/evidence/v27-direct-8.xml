@@ -1,0 +1,159 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="6" failures="1" time="47.572"><testsuite name="doc-tool" tests="6" failures="1" time="47.572"><testcase name="test_expression_contract.py" classname="scripts.tests" time="2.163"><system-out>[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+.[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+...............[warn] C:\Users\18098\AppData\Local\Temp\v27-refwarn-adu1w1v6\project\content\1 引用.md:3 引用 @fig-missing 未找到对应题注对象。
+...[warn] C:\Users\18098\AppData\Local\Temp\v27-refreshed-x0la3ucu\project\content\1 表达契约.md:71 引用 @fig-unknown 未找到对应题注对象。
+[warn] C:\Users\18098\AppData\Local\Temp\v27-refreshed-x0la3ucu\project\content\1 表达契约.md:61 表格题注标识 tbl-params 与第 48 行重复；输出层会分配唯一名称。
+..........
+----------------------------------------------------------------------
+Ran 30 tests in 1.245s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\logs\v27-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-expression-16vtgsbw\project\output\表达契约(1.0).docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refwarn-adu1w1v6\project\output\o.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-refreshed-x0la3ucu\project\output\o.docx
+[requirement] 插入元素=29, 表格=4, 图片=1, 去重媒体=0
+</system-out></testcase><testcase name="test_prepared_source.py" classname="scripts.tests" time="3.069"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 2.190s
+
+OK
+[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-prepare-build-pll9yrbj\project\output\预处理(1.0).docx
+[requirement] 插入元素=4, 表格=0, 图片=1, 去重媒体=0
+</system-out></testcase><testcase name="test_diagram_viewer_interaction.py" classname="scripts.tests" time="3.510"><system-out>.........ss
+----------------------------------------------------------------------
+Ran 11 tests in 1.304s
+
+OK (skipped=2)
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="28.759"><failure message="exit code 1" type="TestFailure">................................F......................................................................QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+...................................................................
+======================================================================
+FAIL: test_mermaid_dialog_templates_and_interactive_validation (__main__.EditorAuthoringWorkbenchTests.test_mermaid_dialog_templates_and_interactive_validation)
+Mermaid 工作台：支持模板下拉填入、语法错误双击定位与多图表类型校验。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 2722, in test_mermaid_dialog_templates_and_interactive_validation
+    self.assertTrue("渲染成功" in dlg.status.text() or "语法有效" in dlg.status.text())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 170 tests in 27.214s
+
+FAILED (failures=1)
+</failure><system-out>................................F......................................................................QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+...................................................................
+======================================================================
+FAIL: test_mermaid_dialog_templates_and_interactive_validation (__main__.EditorAuthoringWorkbenchTests.test_mermaid_dialog_templates_and_interactive_validation)
+Mermaid 工作台：支持模板下拉填入、语法错误双击定位与多图表类型校验。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 2722, in test_mermaid_dialog_templates_and_interactive_validation
+    self.assertTrue("渲染成功" in dlg.status.text() or "语法有效" in dlg.status.text())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 170 tests in 27.214s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_template_fill.py" classname="scripts.tests" time="7.151"><system-out>...[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpa0rwuqyn\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpt47pbq_r\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpt47pbq_r\dirty.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpt47pbq_r\clean.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpvercj7_l\out_c.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[1/1] 手册.md → 手册.docx 成功
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpqa2aunoq\out\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+OK 手册.md → 手册.docx
+    产物标题：1 级 1 个。
+成功 1 个，失败 0 个。
+[1/1] legacy.md → legacy.html 成功
+.OK legacy.md → legacy.html
+成功 1 个，失败 0 个。
+--template 仅对 Markdown 源生效：本次输入中没有 Markdown 文件。
+......................................[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmprjvawkwu\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpne1tlvkr\b.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpdbnmaqpa\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp78fkyrhi\out\样品.docx
+[general] 插入元素=5, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpbuvhk_uc\out\样品.docx
+[general] 插入元素=9, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpily8gt9b\out\样品.docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp5r69w49s\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp89w8vszt\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpx527yls_\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpsqidukf7\out\样品.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpabh76zbc\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpp5rjz1l_\out\map.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-m0p92m4_\assembled.docx
+[general] 插入元素=1, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：1 个章节 → C:\Users\18098\AppData\Local\Temp\tmpfxb7008w\o.docx
+[warn] 底模不可用，已采用替代底模：D:\ai_develop_project_space\doc-tool\templates\requirement-template.docx
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\template-fill-snapshot-tfignw0b\assembled.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：2 个章节 → C:\Users\18098\AppData\Local\Temp\tmpat0v4t07\out\合并.docx
+样式映射格式无效：'样式=级别'（应为 样式ID=级别，如 章标题=1）
+.源必须是 Markdown 文件（.md/.markdown）：a.docx
+.............
+----------------------------------------------------------------------
+Ran 59 tests in 5.446s
+
+OK
+</system-out></testcase><testcase name="test_review_docx.py" classname="scripts.tests" time="2.920"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 1.577s
+
+OK
+</system-out></testcase></testsuite></testsuites>

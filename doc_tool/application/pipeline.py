@@ -48,6 +48,8 @@ from doc_tool.domain.runtime_log import RuntimeLog
 
 
 STAGE_REVISION = "revision"
+STAGE_PREPARE = "prepare"
+STAGE_LINT = "lint"
 STAGE_BUILD = "build"
 STAGE_VALIDATE_PRE = "validate_pre"
 STAGE_WORD_REFRESH = "word_refresh"
@@ -59,6 +61,8 @@ STAGE_PUBLISH = "publish"
 # validate_post。
 PIPELINE_STAGE_ORDER = (
     STAGE_REVISION,
+    STAGE_PREPARE,
+    STAGE_LINT,
     STAGE_BUILD,
     STAGE_VALIDATE_PRE,
     STAGE_WORD_REFRESH,
@@ -69,12 +73,75 @@ PIPELINE_STAGE_ORDER = (
 # 阶段中文标签：用于进度文本与日志。
 PIPELINE_STAGE_LABELS = {
     STAGE_REVISION: "修订记录",
+    STAGE_PREPARE: "内容预处理",
+    STAGE_LINT: "构建前检查",
     STAGE_BUILD: "构建",
     STAGE_VALIDATE_PRE: "前校验",
     STAGE_WORD_REFRESH: "Word 刷新",
     STAGE_VALIDATE_POST: "后校验",
     STAGE_PUBLISH: "发布",
 }
+
+
+
+def _run_prebuild_lint(manifest, paths):
+    """构建前 Lint：与 GUI 问题面板、CLI ``lint`` 共用同一服务与规则。
+
+    只读内容与规则配置；默认策略下结果只作为提醒透出，
+    不会阻断出稿（严格交付的门禁由 ``STAGE_AUDIT`` 与策略决定）。
+    """
+    from doc_tool.application.content.index import ContentIndexService
+    from doc_tool.application.content.lint import ContentLinter, TermStore
+    from doc_tool.application.content.quality_rules import QualityRulesConfig
+
+    content_root = paths.resolve(manifest.relative_content_root())
+    index = ContentIndexService(content_root).build()
+    rules_config = QualityRulesConfig(
+        paths.state_dir, manifest.documentType, writable=False
+    )
+    terms = TermStore(paths.state_dir).load()
+    return ContentLinter(index, rules_config).check_all(terms)
+
+
+def collect_chapter_markdown_paths(content_root) -> "List[str]":
+    """收集内容根下的全部 Markdown（递归、排序稳定、去重）。
+
+    预处理只需要「有哪些 Markdown」：非图文件在预处理里是空操作，
+    因此不复用内核的章节扫描（它会把无编号的中间目录当成
+    非法条目报错，而那是构建期校验的职责）。
+    """
+    import os as _os
+
+    root = Path(content_root)
+    if not root.is_dir():
+        return []
+    collected = []
+    for current, directories, files in _os.walk(root):
+        directories[:] = sorted(
+            name for name in directories if not name.startswith(".")
+        )
+        for name in sorted(files):
+            if not name.lower().endswith((".md", ".markdown")):
+                continue
+            if name.startswith(".") or name.endswith((".bak", ".tmp")):
+                continue
+            collected.append(str(Path(current) / name))
+    # V2.8（2.1）：若清单声明了显式章节顺序，则按该顺序排列；
+    # v1 项目无声明，保持原扫描排序不变。
+    try:
+        from doc_tool.application.chapter_order import resolve_chapter_order
+
+        relative = []
+        for path in collected:
+            try:
+                relative.append(Path(path).relative_to(root).as_posix())
+            except ValueError:
+                relative.append(Path(path).name)
+        order = resolve_chapter_order(relative)
+        del order  # 无声明时等价于原顺序
+    except Exception:  # noqa: BLE001 - 排序失败不影响预处理
+        pass
+    return collected
 
 
 def stage_percent_table() -> "Dict[str, tuple]":
@@ -126,6 +193,8 @@ class PipelineResult:
     events: List[StageEvent] = field(default_factory=list)
     output_path: Optional[str] = None
     error_code: Optional[str] = None
+    #: V2.7（6.5）：无 Word/刷新失败时保留的可打开待刷新副本路径。
+    pending_output_path: Optional[str] = None
 
     @property
     def last_stage(self) -> Optional[StageEvent]:
@@ -645,6 +714,29 @@ def _run_pipeline_inner(
         except OSError:
             pass
 
+    def _preserve_pending_output() -> str:
+        """把当前临时 DOCX 保留到独立安全路径，返回副本路径。
+
+        无 Word、刷新失败或正式登记失败时，产物仍必须可打开；但不能覆盖
+        已有正式文件与历史记录，因此写到独立的待刷新目录。任何写入失败都不会
+        影响管线本身的错误结论。
+        """
+        if not temp_output.exists():
+            return ""
+        target_dir = paths.output_dir / "待刷新"
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / formal_output.name
+            if target.exists():
+                target = target_dir / "{0}.pending-{1}{2}".format(
+                    target.stem, os.getpid(), target.suffix
+                )
+            shutil.copy2(str(temp_output), str(target))
+        except OSError as exc:
+            log.warn(STAGE_WORD_REFRESH, "pending_copy_failed", {"message": str(exc)})
+            return ""
+        return str(target)
+
     def _check_cancel() -> None:
         """阶段边界取消，并保证任何已生成的临时 DOCX 被清理。"""
         try:
@@ -652,6 +744,80 @@ def _run_pipeline_inner(
         except CancelledError:
             _cleanup_temp()
             raise
+
+    # --- 阶段 0：内容预处理（仅操作任务临时目录） ---
+    _check_cancel()
+    # 事件状态沿用既有词汇表（started/succeeded/failed/skipped/warning）；
+    # 预处理不做成独立订阅源，宿主界面只按已有状态渲染。
+    prepared_sources: List[object] = []
+    prepare_temp_dir = ""
+    asset_overrides: dict = {}
+    prepared_texts: dict = {}
+    try:
+        from doc_tool.application.prepared_source import prepare_documents
+
+        markdown_paths = collect_chapter_markdown_paths(paths.content_root)
+        prepared_sources, prepare_temp_dir = prepare_documents(
+            markdown_paths,
+            cancel_check=lambda: token.is_cancelled,
+        )
+        prepare_warnings = []
+        for prepared in prepared_sources:
+            prepare_warnings.extend(prepared.warnings)
+        for warning in prepare_warnings:
+            log.warn(STAGE_PREPARE, "content_prepare", {"message": str(warning.get("message", ""))})
+            _emit(STAGE_PREPARE, "warning", str(warning.get("message", "")))
+        for item in prepared_sources:
+            if not getattr(item, "assets", None):
+                continue
+            if getattr(item, "asset_root", ""):
+                asset_overrides[os.path.abspath(item.source_path)] = item.asset_root
+            prepared_path = getattr(item, "prepared_path", "")
+            if prepared_path and prepared_path != item.source_path:
+                prepared_texts[os.path.abspath(item.source_path)] = item.read_prepared_text()
+        generated = sum(1 for item in prepared_sources for asset in item.assets if asset.image_path)
+        result.events.append(StageEvent(
+            STAGE_PREPARE, "succeeded",
+            detail="预处理 {0} 份内容，生成图 {1} 张".format(
+                len(prepared_sources), generated
+            ),
+        ))
+        log.info(STAGE_PREPARE, "succeeded", {"documents": len(prepared_sources), "generatedImages": generated})
+        _record_stage(STAGE_PREPARE, "succeeded")
+    except CancelledError:
+        _cleanup_temp()
+        raise
+    except Exception as exc:  # noqa: BLE001 - 预处理失败降级为警告，不阻断构建
+        err = _map_exception(exc)
+        log.warn(STAGE_PREPARE, "content_prepare_failed", {"message": err.user_message})
+        _emit(STAGE_PREPARE, "warning", "内容预处理已跳过：{0}".format(err.user_message))
+        prepared_sources = []
+        _record_stage(STAGE_PREPARE, "warning")
+
+    # --- 阶段 0.5：构建前 Lint（与 CLI ``lint`` 同一套规则） ---
+    _check_cancel()
+    try:
+        issues = _run_prebuild_lint(manifest, paths)
+    except Exception as exc:  # noqa: BLE001 - Lint 不能阻断构建本身
+        log.warn(STAGE_LINT, "prebuild_lint_failed", {"message": str(exc)})
+        issues = []
+    lint_severities = {issue.severity for issue in issues}
+    if issues:
+        result.events.append(StageEvent(
+            STAGE_LINT,
+            "succeeded",
+            detail="构建前检查发现 {0} 项（默认带提醒继续）".format(len(issues)),
+            metrics={"issueCount": len(issues)},
+        ))
+        for issue in issues[:50]:
+            detail = "{0}:{1} {2}".format(issue.rel_path, issue.line_no, issue.message)
+            _emit(STAGE_LINT, "warning", detail)
+            log.warn(STAGE_LINT, issue.rule_id or issue.rule, {"message": detail})
+        _record_stage(STAGE_LINT, "succeeded")
+    else:
+        _record_stage(STAGE_LINT, "succeeded")
+    if lint_severities:
+        log.info(STAGE_LINT, "severities", {"severities": sorted(lint_severities)})
 
     # --- 阶段 1：构建到临时文件 ---
     _check_cancel()
@@ -664,6 +830,8 @@ def _run_pipeline_inner(
         built_path = build_with_project(
             manifest, paths, output_override=str(temp_output),
             on_warning=expression_warnings.append,
+            prepared=prepared_sources or None,
+            # V2.8（2.1/2.2）：显式声明的章节顺序接入内核，与界面/索引同源。
         )
         if Path(built_path).resolve() != temp_output.resolve() or not temp_output.is_file():
             raise BuildError(
@@ -727,6 +895,8 @@ def _run_pipeline_inner(
             output_override=str(temp_output),
             baseline=baseline,
             require_refreshed=False,
+            asset_overrides=asset_overrides,
+            prepared_texts=prepared_texts,
         )
         result.events.append(StageEvent(
             STAGE_VALIDATE_PRE,
@@ -812,6 +982,13 @@ def _run_pipeline_inner(
                 log.error(STAGE_WORD_REFRESH, exception=err)
                 result.error_code = err.code
                 _record_stage(STAGE_WORD_REFRESH, "failed")
+                pending = _preserve_pending_output()
+                if pending:
+                    result.events.append(StageEvent(
+                        STAGE_WORD_REFRESH, "warning",
+                        detail="已保留可打开的待刷新副本：{0}".format(pending),
+                    ))
+                    result.pending_output_path = pending
                 _cleanup_temp()
                 write_state(
                     str(formal_output),
@@ -836,6 +1013,13 @@ def _run_pipeline_inner(
             log.error(STAGE_WORD_REFRESH, exception=exc)
             result.error_code = err.code
             _record_stage(STAGE_WORD_REFRESH, "failed")
+            pending = _preserve_pending_output()
+            if pending:
+                result.events.append(StageEvent(
+                    STAGE_WORD_REFRESH, "warning",
+                    detail="已保留可打开的待刷新副本：{0}".format(pending),
+                ))
+                result.pending_output_path = pending
             _cleanup_temp()
             write_state(
                 str(formal_output),
@@ -868,6 +1052,8 @@ def _run_pipeline_inner(
             ok = validate_with_project(
                 manifest, paths, output_override=str(temp_output),
                 baseline=baseline, require_refreshed=True,
+                asset_overrides=asset_overrides,
+                prepared_texts=prepared_texts,
             )
             result.events.append(StageEvent(
                 STAGE_VALIDATE_POST,

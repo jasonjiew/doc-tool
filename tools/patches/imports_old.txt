@@ -1,0 +1,4 @@
+from doc_tool.domain.markdown_structure import (
+    META_SYNTAX_HINT,
+    parse_table_meta as _table_meta,
+)

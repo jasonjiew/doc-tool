@@ -1,0 +1,12 @@
+schemaVersion: 1
+packId: generic-requirement
+version: 1.0.0
+documentKind: requirement
+description: 通用需求说明书规范包（可公开分发）
+files:
+  skeleton/1 引言.md: 80aca7f9badd316b536518488a6e8a004dd4f6c31133797a09ff7b46f5f1f874
+  skeleton/2 需求描述.md: a189f657236ca027b8c22c038051df007de323fea076d00a543b079906133637
+  variables.yml: a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1
+  terms.yml: b327183ff06b820d38ba0342033ec64be5c73dc6916542c6a9e77ee3249a6bda
+  rules.yml: 93a83d3020353699457c28d9ec041c585b5486755975905358e36973bf2c3064
+  template.docx: 373aac17222693fac6fbc14428b7335426a3b6bac10a41e576e360a64dd1a9d2

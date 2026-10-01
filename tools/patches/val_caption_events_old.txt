@@ -1,0 +1,11 @@
+        if block.kind == KIND_IMAGE:
+            image_path = resolve_resource(config["paths"]["asset_root"], block.relative_path, "图片")
+            with open(image_path, "rb") as image_file:
+                image_hash = hashlib.sha256(image_file.read()).hexdigest()
+            events.append(Event("I", (image_hash,), source))
+            continue
+        if block.kind == KIND_TABLE:
+            events.append(
+                Event("T", normalize_matrix(tuple(tuple(row) for row in block.rows)), source)
+            )
+            continue

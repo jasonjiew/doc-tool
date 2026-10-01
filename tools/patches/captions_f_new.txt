@@ -1,0 +1,6 @@
+    def resolve_token(self, kind: str, token: str) -> str:
+        """无位置的引用解析：返回显示文本（供预期事件与预览复用）。"""
+        resolution = self.resolve(kind, token, SourceLocation("", 0, 0))
+        return resolution.display_text
+
+    def resolve(self, kind: str, token: str, location: SourceLocation) -> ReferenceResolution:

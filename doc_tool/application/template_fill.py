@@ -48,6 +48,8 @@ from doc_tool.domain.ooxml import (
 # 一级标题产出「第N章 标题」目录，其余产出「N.M 标题.md」。
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
+#: 共享块解析器同款的围栏开标记（允许 0-3 个前导空格）。
+_FENCE_OPEN_RE = re.compile(r"^(?P<indent> {0,3})(?P<mark>`{3,}|~{3,})(?P<info>.*)$")
 _REMOTE_URL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
 # 内容保真降级：行内图片拆出独立成行、引用块转缩进、水平线转空段。
@@ -311,6 +313,12 @@ def _preprocess_markdown(
             )
             return "【图片缺失：{0}】".format(alt)
         candidate = source_dir / relative
+        try:
+            candidate.resolve().relative_to(source_dir.resolve())
+        except ValueError:
+            state.missing_images += 1
+            _warn(warnings, "图片越界：{0}（已用占位文本替代）。".format(relative), on_warning)
+            return "【图片越界：{0}】".format(alt)
         if not candidate.is_file():
             state.missing_images += 1
             _warn(
@@ -369,21 +377,25 @@ def _preprocess_markdown(
         raw = lines[index]
         if in_fence:
             if _FENCE_RE.match(raw):
+                # 围栏结束行也得交给内核：否则下游不知道代码块在哪里
+                # 结束，块内的 ``# 注释`` 会被当成章节标题。
+                out.append(raw)
                 in_fence = False
                 prev_plain = None
                 index += 1
                 continue
-            stripped = raw.strip()
-            if not stripped:
+            if not raw.strip():
                 # 代码块空行以空段落保留，块内版面不塌缩。
                 out.append(_EMPTY_PAR)
-            elif "`" not in stripped:
-                out.append("`{0}`".format(stripped))
             else:
-                out.append(stripped)
+                # 内容原样交给内核：缩进、Tab、空行与反引号都得保留，
+                # 内核把围栏块输出为代码容器，不再在此降级为等宽段落。
+                out.append(raw)
             index += 1
             continue
         if _FENCE_RE.match(raw):
+            # 开标记同样保留，与结束行成对交给内核解析。
+            out.append(raw)
             in_fence = True
             state.code_blocks += 1
             prev_plain = None
@@ -493,8 +505,26 @@ def _split_markdown(text: str) -> Tuple[List[str], List[_Node]]:
     roots: List[_Node] = []
     stack: List[_Node] = []
     preamble: List[str] = []
+    # 围栏代码块内的 ``# 注释`` 不是章节标题：这里与共享块解析器
+    # （``doc_tool.domain.blocks``）保持同一套围栏规则，避免分章节时把代码
+    # 内容拆成标题。
+    fence = None
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         stripped = raw.strip()
+        fence_match = _FENCE_OPEN_RE.match(raw)
+        if fence_match:
+            mark = fence_match.group("mark")
+            if fence is None:
+                fence = mark
+            elif mark[0] == fence[0] and len(mark) >= len(fence) and not fence_match.group("info").strip():
+                fence = None
+            target = stack[-1].content if stack else (roots[0].content if roots else preamble)
+            target.append(raw)
+            continue
+        if fence is not None:
+            target = stack[-1].content if stack else (roots[0].content if roots else preamble)
+            target.append(raw)
+            continue
         match = _HEADING_RE.match(stripped)
         split_ok = False
         if match:

@@ -19,13 +19,21 @@
 
 [CmdletBinding()]
 param(
-    [string]$RepoRoot = ""
+    [string]$RepoRoot = "",
+    [string]$DistDir = "",
+    [string]$PythonExecutable = "python"
 )
 
 $ErrorActionPreference = "Stop"
 if (-not $RepoRoot) { $RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path }
 
-$DistDir = Join-Path $RepoRoot "dist\DocTool"
+if (-not $DistDir) { $DistDir = Join-Path $RepoRoot "dist\DocTool" }
+$resolvedRepo = (Resolve-Path -LiteralPath $RepoRoot).Path.TrimEnd('\')
+$resolvedDist = [IO.Path]::GetFullPath($DistDir)
+if (-not $resolvedDist.StartsWith($resolvedRepo + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw "harden_dist target must stay inside RepoRoot: $resolvedDist"
+}
+$DistDir = $resolvedDist
 $Internal = Join-Path $DistDir "_internal"
 if (-not (Test-Path -LiteralPath $Internal)) {
     Write-Host "harden_dist: $Internal not found - skipping (onefile mode or dist not built yet)." -ForegroundColor DarkGray
@@ -65,7 +73,7 @@ for p in sorted(glob.glob(os.path.join(d, "*.py"))):
     with open(p + "c", "wb") as f:
         f.write(data)
 '@
-        $pyCompile | & python - $scripts
+        $pyCompile | & $PythonExecutable - $scripts
         if ($LASTEXITCODE -ne 0) { throw "script compile failed (exit $LASTEXITCODE) on $scripts" }
         foreach ($f in $pyFiles) {
             $pyc = Join-Path $f.Directory.FullName ($f.BaseName + ".pyc")

@@ -31,6 +31,31 @@ class Snippet:
     body: str
 
 
+BUILTIN_SNIPPETS = (
+    Snippet('研发-功能验收', '功能与可测试验收要点', '## ${1:功能名称}\n${2:功能描述}\n\n### 验收要点\n- 给定 ${3:前置条件}，当 ${4:操作}，应 ${5:结果}。\n'),
+    Snippet('研发-接口字段', '接口与字段表', '## ${1:接口名称}\n方法：${2:POST} ${3:/api/path}\n\n| 字段 | 类型 | 必填 | 约束 |\n|---|---|---|---|\n| ${4:field} | ${5:string} | ${6:是} | ${7:说明} |\n'),
+    Snippet('研发-异常边界', '异常与边界处理', '### ${1:异常与边界}\n- 触发：${2:输入或状态}\n- 处理：${3:用户提示与恢复动作}\n- 保留：${4:已有数据}\n'),
+    Snippet('研发-修订', '修订说明', '| 版本 | 日期 | 修改说明 |\n|---|---|---|\n| ${1:版本} | ${2:日期} | ${3:修改说明} |\n'),
+    Snippet('研发-流程', '可编辑 Mermaid 流程源码', '```mermaid\nflowchart TD\n  A[${1:开始}] --> B[${2:处理}]\n  B --> C[${3:结束}]\n```\n'),
+    Snippet('研发-时序', '可编辑 Mermaid 时序源码', '```mermaid\nsequenceDiagram\n  participant A as ${1:调用方}\n  participant B as ${2:服务}\n  A->>B: ${3:请求}\n  B-->>A: ${4:响应}\n```\n'),
+)
+
+
+def decode_library(text):
+    data = json.loads(text)
+    if not isinstance(data, dict) or data.get('schemaVersion') != 1 or not isinstance(data.get('snippets'), list):
+        raise ValueError('片段库必须是 schemaVersion 1 JSON')
+    values = []
+    seen = set()
+    for row in data['snippets']:
+        if not isinstance(row, dict) or any(not isinstance(row.get(key), str) for key in ('trigger', 'description', 'body')):
+            raise ValueError('片段字段必须是文本')
+        if not row['trigger'].strip() or row['trigger'] in seen: raise ValueError('触发词为空或重复')
+        seen.add(row['trigger'])
+        values.append(Snippet(row['trigger'], row['description'], row['body']))
+    return values
+
+
 @dataclass(frozen=True)
 class Placeholder:
     """展开后文本中的一处占位符。"""
@@ -91,7 +116,9 @@ class SnippetStore:
 
     def load(self) -> None:
         """从磁盘加载；缺失/损坏视为空配置，不抛异常。"""
+        previous = self._snippets
         self._snippets = []
+        self._load_error = False
         try:
             with open(self._path, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
@@ -112,25 +139,59 @@ class SnippetStore:
                 )
             self._snippets = loaded
         except (OSError, json.JSONDecodeError, UnicodeError):
-            self._snippets = []
+            self._snippets = previous
+            self._load_error = os.path.exists(self._path)
 
     def snippets(self) -> List[Snippet]:
         return list(self._snippets)
 
+    def library(self, query=''):
+        users = {s.trigger for s in self._snippets}
+        values = self._snippets + [s for s in BUILTIN_SNIPPETS if s.trigger not in users]
+        return [s for s in values if query.casefold() in (s.trigger + ' ' + s.description).casefold()]
+
+    def is_builtin(self, snippet):
+        return snippet in BUILTIN_SNIPPETS and not any(s.trigger == snippet.trigger for s in self._snippets)
+
+    def export_library(self, selected):
+        return json.dumps({'schemaVersion': 1, 'snippets': [s.__dict__ for s in selected]}, ensure_ascii=False, indent=2)
+
+    def merge_library(self, incoming, *, conflicts='skip', confirmed=False):
+        if not confirmed: return []
+        if conflicts not in ('skip', 'rename', 'replace'): raise ValueError('非法冲突策略')
+        values = {s.trigger: s for s in self._snippets}
+        changed = []
+        for snippet in incoming:
+            trigger = snippet.trigger
+            if trigger in values:
+                if conflicts == 'skip': continue
+                if conflicts == 'rename':
+                    n = 1
+                    while trigger in values:
+                        trigger = snippet.trigger + '-' + str(n)
+                        n += 1
+            values[trigger] = Snippet(trigger, snippet.description, snippet.body)
+            changed.append(trigger)
+        original = self._snippets
+        self._snippets = list(values.values())
+        if not self.save():
+            self._snippets = original
+            raise OSError('片段库写入失败，原配置已保留')
+        return changed
+
     def find(self, trigger: str) -> Optional[Snippet]:
-        for snippet in self._snippets:
+        for snippet in self.library():
             if snippet.trigger == trigger:
                 return snippet
         return None
 
     # --- 写 ---
 
-    def save(self) -> None:
+    def save(self) -> bool:
         """原子写回磁盘（tmp + replace；失败静默，不影响编辑）。"""
         directory = os.path.dirname(self._path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
         payload = {
+            "schemaVersion": 1,
             "snippets": [
                 {
                     "trigger": s.trigger,
@@ -142,25 +203,35 @@ class SnippetStore:
         }
         tmp_path = self._path + ".tmp"
         try:
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            if self._load_error and os.path.exists(self._path):
+                from uuid import uuid4
+                import shutil
+                shutil.copyfile(self._path, self._path + '.damaged-' + uuid4().hex)
             with open(tmp_path, "w", encoding="utf-8") as handle:
                 json.dump(payload, handle, ensure_ascii=False, indent=2)
             os.replace(tmp_path, self._path)
+            self._load_error = False
+            return True
         except OSError:
             try:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
             except OSError:
                 pass
+            return False
 
     def add(self, snippet: Snippet) -> bool:
         """新增片段；触发词重复时不覆盖（返回 False）。"""
-        if self.find(snippet.trigger) is not None:
+        if not snippet.trigger.strip() or self.find(snippet.trigger) is not None:
             return False
         self._snippets.append(
             Snippet(snippet.trigger, snippet.description, snippet.body)
         )
-        self.save()
-        return True
+        if self.save(): return True
+        self._snippets.pop()
+        return False
 
     def update(self, trigger: str, snippet: Snippet) -> bool:
         """按触发词更新片段；不存在返回 False。
@@ -176,8 +247,9 @@ class SnippetStore:
                 self._snippets[index] = Snippet(
                     snippet.trigger, snippet.description, snippet.body
                 )
-                self.save()
-                return True
+                if self.save(): return True
+                self._snippets[index] = existing
+                return False
         return False
 
     def remove(self, trigger: str) -> bool:
@@ -185,6 +257,8 @@ class SnippetStore:
         kept = [s for s in self._snippets if s.trigger != trigger]
         if len(kept) == len(self._snippets):
             return False
+        original = self._snippets
         self._snippets = kept
-        self.save()
-        return True
+        if self.save(): return True
+        self._snippets = original
+        return False

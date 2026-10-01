@@ -1,0 +1,79 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="2" failures="0" time="5.984"><testsuite name="doc-tool" tests="2" failures="0" time="5.984"><testcase name="test_template_fill_presets.py" classname="scripts.tests" time="1.297"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.074s
+
+OK
+</system-out></testcase><testcase name="test_template_fill.py" classname="scripts.tests" time="4.687"><system-out>...[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp5yjgz8xm\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpw1g64hj8\out_a.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpw1g64hj8\dirty.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpw1g64hj8\clean.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpm4lgyian\out_c.md.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[1/1] 手册.md → 手册.docx 成功
+.[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpqcwae40v\out\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+OK 手册.md → 手册.docx
+    产物标题：1 级 1 个。
+成功 1 个，失败 0 个。
+[1/1] legacy.md → legacy.html 成功
+.OK legacy.md → legacy.html
+成功 1 个，失败 0 个。
+--template 仅对 Markdown 源生效：本次输入中没有 Markdown 文件。
+.....................................[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp47rq7gzl\手册.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpo18hnhna\b.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp5n_ar8fl\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpgo4c_0hu\out\样品.docx
+[general] 插入元素=5, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpfy9xx8wc\out\样品.docx
+[general] 插入元素=9, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpog2glfk2\out\样品.docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpbt7bmpy7\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=1, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpxvl9fc4n\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpo64992em\out\样品.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpqt67mz11\out\样品.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmp7rpsath5\out\样品.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpaw2d2xg8\out\map.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+[FAIL] 模板填充失败（E6009）：Word 模板无法解析：文件不是有效的 ZIP 包或不存在（路径=C:\Users\18098\AppData\Local\Temp\tmpt2l_ovem\junk.docx，前16字节=b'stub'）：File is not a zip file 请确认 Word 底模为可正常打开的 .docx，且 Markdown 内容满足构建约束（标题层级连续、图片路径有效）；错误详情中会给出具体位置。
+..[general] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[general] 生成完成: C:\Users\18098\AppData\Local\Temp\tmpq52tg0h5\out\合并.docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+模板填充完成：2 个章节 → C:\Users\18098\AppData\Local\Temp\tmpq52tg0h5\out\合并.docx
+样式映射格式无效：'样式=级别'（应为 样式ID=级别，如 章标题=1）
+.源必须是 Markdown 文件（.md/.markdown）：a.docx
+.............
+----------------------------------------------------------------------
+Ran 58 tests in 3.483s
+
+OK
+</system-out></testcase></testsuite></testsuites>
