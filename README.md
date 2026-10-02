@@ -3,14 +3,15 @@
 > **Docs-as-Code for Enterprise Documents**  
 > 把大型 Word 文档工程化拆解为可版本追踪、可多人协同、可严谨审查的 Markdown 章节树，并在出稿时一键可靠重建为符合企业规范的正式 DOCX 交付物。
 
-[![Version](https://img.shields.io/badge/version-2.6.1-blue.svg)](https://github.com/wangjie0721666-web/doc-tool)
+[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/wangjie0721666-web/doc-tool)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **当前开发验收版本**：`v2.6.1`（本地候选；真实 Word / 安装验收待补，尚未公开发布）
+- **当前代码版本**：`v2.9.0`（V2.7～V2.9 规范变更已归档；实际入口、回归与实机验证范围见功能清单，不能据此认定全部验收或公开发布完成）
 - **代码仓库**：<https://github.com/wangjie0721666-web/doc-tool>
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md)
+- **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)（2026-10-01 代码基线为 2.9.0；规划、入口及实机验证状态分别列明）
 
 ---
 

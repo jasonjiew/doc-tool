@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "batchId": "batch-delivery-example",
+  "policy": {
+    "execution": "serial",
+    "wordBusy": "waiting-refresh",
+    "onPartial": "keep-useful",
+    "strict": false,
+    "autoRetryLimit": 0,
+    "idempotencyScope": "local-common-registry"
+  },
+  "defaults": {
+    "formats": ["docx", "html"],
+    "destination": "delivery-out",
+    "sourceMode": "saved",
+    "strict": false,
+    "refresh": true
+  },
+  "entries": [
+    {
+      "id": "alpha",
+      "member": "members/Alpha",
+      "kind": "project",
+      "variantId": "standard",
+      "formats": ["docx", "html"],
+      "outputName": "Alpha-交付稿"
+    },
+    {
+      "id": "beta",
+      "member": "members/Beta",
+      "kind": "project",
+      "formats": ["docx", "html"],
+      "outputName": "Beta-交付稿"
+    }
+  ]
+}

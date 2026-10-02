@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -139,6 +140,15 @@ class ExportTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def test_export_rejects_source_and_manifest_destinations(self):
+        source = self.root / "relations.yml"
+        for destination in (source, self.manifest_path):
+            with self.subTest(destination=destination):
+                before = destination.read_bytes()
+                with self.assertRaises(ValueError):
+                    export_package(self.root, self.manifest_path, destination)
+                self.assertEqual(destination.read_bytes(), before)
+
     def test_export_contains_registered_files_and_manifest(self):
         target, skipped = export_package(self.root, self.manifest_path, self.tmp / "out.zip")
         self.assertIsNotNone(target)
@@ -196,6 +206,28 @@ class RecoveryTests(unittest.TestCase):
         self.assertTrue((destination / "identity-map.json").is_file())
         # \u539f\u526f\u672c\u4e0d\u53d7\u5f71\u54cd
         self.assertTrue((self.root / "content" / "1 \u6982\u8ff0.md").is_file())
+
+    def test_recovery_rejects_overlapping_source_directory(self):
+        before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        for destination in (self.root, self.root / "restored", self.tmp):
+            with self.subTest(destination=destination):
+                with self.assertRaises(ValueError):
+                    recover_baseline(self.root, self.manifest_path, destination, overwrite=True)
+                after = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+                self.assertEqual(before, after)
+
+    def test_relative_destination_conflict_renames(self):
+        destination = self.tmp / "relative-restored"
+        (destination / "content").mkdir(parents=True)
+        (destination / "content" / "1 \u6982\u8ff0.md").write_text("existing", encoding="utf-8")
+        previous = Path.cwd()
+        try:
+            os.chdir(self.tmp)
+            result = recover_baseline(self.root, self.manifest_path, Path("relative-restored"))
+        finally:
+            os.chdir(previous)
+        self.assertTrue(result["renamed"])
+        self.assertTrue((destination / "content" / "1 \u6982\u8ff0.1.md").is_file())
 
     def test_conflict_renamed_by_default(self):
         destination = self.tmp / "restored"

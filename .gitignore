@@ -100,3 +100,13 @@ invoke_args.json
 # 本地诊断/隔离产物（不入仓库）
 *.broken
 .tmp-*/
+
+# 本地回归、审查与交付归档产物
+/test-results-*.xml
+/deliverables/
+/analysis/_core_tmp/
+/analysis/review-test-deps/
+/analysis/current-review-*
+/analysis/review-regressions-*.xml
+/analysis/ui-interaction-audit-20261002/
+/tools/mermaid-cli/probe.js

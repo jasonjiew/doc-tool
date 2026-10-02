@@ -622,12 +622,15 @@ class _PreflightPage(QWizardPage):
         self._preview_text = QPlainTextEdit(self)
         self._preview_text.setReadOnly(True)
         layout.addWidget(self._preview_text, 1)
+        # CORE 2.1：复杂内容不再要求逐项风险勾选才能继续。这里只保留一行
+        # 说明，普通路径直接给可用项目；需要门禁的用户在「项目信息 → 高级选项」
+        # 里显式勾选严格模式。
         self._confirm_block = QCheckBox(
-            "我已了解上述阻断特性可能导致内容损失，仍然导入", self
+            "以上缺口将在导入结果中集中列出，正文保留占位并可从原件查看", self
         )
-        self._confirm_block.setStyleSheet("color: #a12622; font-weight: bold; padding: 4px 0;")
-        self._confirm_block.hide()
-        self._confirm_block.toggled.connect(lambda _checked: self.completeChanged.emit())
+        self._confirm_block.setStyleSheet("color: #6b7280; padding: 4px 0;")
+        self._confirm_block.setEnabled(False)
+        self._confirm_block.show()
         layout.addWidget(self._confirm_block)
         self._preview_ok = False
         self._has_block = False
@@ -643,11 +646,6 @@ class _PreflightPage(QWizardPage):
                 getattr(preview, "fidelity", None) is not None
                 and preview.fidelity.has_block
             )
-            if self._has_block:
-                self._confirm_block.show()
-            else:
-                self._confirm_block.hide()
-                self._confirm_block.setChecked(False)
             self._status_label.setText("预检完成")
             self.completeChanged.emit()
             return
@@ -683,11 +681,6 @@ class _PreflightPage(QWizardPage):
                 and getattr(preview, "fidelity", None) is not None
                 and preview.fidelity.has_block
             )
-            if self._has_block:
-                self._confirm_block.show()
-            else:
-                self._confirm_block.hide()
-                self._confirm_block.setChecked(False)
         self._status_label.setText("预检完成" if self._preview_ok else "预检未通过")
         self.completeChanged.emit()
 
@@ -695,11 +688,8 @@ class _PreflightPage(QWizardPage):
         self._preview_text.setPlainText(text)
 
     def isComplete(self) -> bool:
-        if not self._preview_ok:
-            return False
-        if self._has_block:
-            return self._confirm_block.isChecked()
-        return True
+        # 预检通过即可继续：内容缺口集中到结果页处理，不做强制确认门槛。
+        return bool(self._preview_ok)
 
 
 class _StyleMappingPage(QWizardPage):
@@ -914,11 +904,21 @@ class _StyleMappingPage(QWizardPage):
         return result
 
     def isComplete(self) -> bool:
-        return 1 in self.mapping().values()
+        mapping = self.mapping()
+        # CORE 2.2：空映射不单独阻止导入（按自动识别/单章继续）；
+        # 只要用户给出了映射，就必须包含一级标题。
+        if not mapping:
+            return True
+        return 1 in mapping.values()
 
     def validatePage(self) -> bool:
         mapping = self.mapping()
         from doc_tool.adapters.preflight import validate_heading_mapping
+
+        if not mapping:
+            # 用户未指定映射：交给自动识别（无标题时按单章接管）。
+            self.wizard()._heading_style_map = None
+            return True
 
         error = validate_heading_mapping(
             self.wizard()._source_page.source_path(), mapping
@@ -1652,17 +1652,16 @@ class ImportWizard(QWizard):
             )
             wants_tuning = getattr(self._source_page, "wants_custom_mapping", False)
 
-            if preview and preview.has_heading1 and not has_block and not wants_tuning:
+            # CORE 2.1/U-1：普通路径直接进入项目信息（最多两次主要提交）。
+            # 细调大纲/映射是「调整章节」的主动选择，不再是必经页；复杂内容
+            # 也不再因为 has_block 强迫用户先看技术页并逐项确认。
+            if preview and not wants_tuning:
                 return 3
-
-            if preview and wants_tuning and not has_block:
-                return 2
 
             return 1
         elif current == 1:
-            preview = self._preview
             wants_tuning = getattr(self._source_page, "wants_custom_mapping", False)
-            if preview and preview.has_heading1 and not wants_tuning:
+            if not wants_tuning:
                 return 3
             return 2
         elif current == 2:
@@ -1799,6 +1798,23 @@ class ImportWizard(QWizard):
             if self._preview and getattr(self._preview, "heading_style_map", None)
             else None
         )
+        # CORE R5：界面选择的命名预设优先（没有手工映射时），保存请求一并传给导入
+        preset_name = str(getattr(self, "_intake_preset_name", "") or "")
+        save_preset = str(getattr(self, "_intake_save_preset", "") or "")
+        if preset_name and not self._mapping_page.mapping():
+            try:
+                from doc_tool.application.intake_entries import _preset_style_names
+                from doc_tool.application.intake_presets import IntakePresets
+
+                preset = IntakePresets().find(preset_name)
+                if preset is not None:
+                    resolved = IntakePresets().resolve(
+                        preset, _preset_style_names(Path(self._source_page.source_path())),
+                    )
+                    if resolved.mapping:
+                        heading_map = dict(resolved.mapping)
+            except Exception:  # noqa: BLE001 - 预设不可用则按自动识别
+                pass
         request = ImportRequest(
             source_docx=Path(self._source_page.source_path()),
             target_project_root=Path(target_root),
@@ -1809,7 +1825,16 @@ class ImportWizard(QWizard):
             require_exact_roundtrip=bool(self._require_exact_roundtrip),
             heading_style_map=heading_map,
             allow_missing_headings=True,
+            # CORE 2.2/2.3：按同一份大纲整理计划压平跳级、在明确范围内保留
+            # 标题前正文；普通模式不让缺口阻断导入。
+            normalize_heading_levels=True,
+            decide_pre_title_body=True,
+            ignore_roundtrip_block=not bool(self._require_exact_roundtrip),
         )
+        if preset_name:
+            setattr(request, "intakePresetName", preset_name)
+        if save_preset:
+            setattr(request, "intakeSavePreset", save_preset)
         self._import_started = True
         started = self._runner.start(
             TaskSpec(

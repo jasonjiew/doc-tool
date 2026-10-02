@@ -18,7 +18,10 @@ from doc_tool.ui.content.editor_panel import EditorPanel
 
 
 class TabsHost(QWidget):
-    """多标签编辑器宿主。"""
+    """多标签编辑器宿主。
+
+    ``text_resolver``：预览展开器（V3.0 3.4），由工作区注入，保证预览与出稿同源。
+    """
 
     def __init__(
         self,
@@ -30,8 +33,10 @@ class TabsHost(QWidget):
         writable: bool = True,
         autosave=None,
         parent: Optional[QWidget] = None,
+        text_resolver: Optional[Callable[[str, str], str]] = None,
     ) -> None:
         super().__init__(parent)
+        self._text_resolver = text_resolver
         self._writer = writer
         self._on_saved = on_saved
         self._on_current_changed = on_current_changed

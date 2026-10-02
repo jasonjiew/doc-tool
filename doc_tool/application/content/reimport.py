@@ -412,6 +412,8 @@ class ReimportService:
             self._source_replaced = True
             self.manifest.sourceSha256 = file_sha256(source_path)
             self.manifest.save(self.paths.root, backup=True)
+            # CORE-C 3.4：再次导入保存新的来源版本，旧原件（版本副本）不被覆盖。
+            self._record_source_version(new_source)
             return ReimportResult(True, changes, conflicts)
         except DocToolError as exc:
             self._rollback_reimport(writer, touched)
@@ -427,6 +429,46 @@ class ReimportService:
                 source_path.with_suffix(".docx.tmp").unlink(missing_ok=True)
             except OSError:
                 pass
+
+    def _record_source_version(self, new_source) -> None:
+        """把本轮再次导入的源登记为新的来源版本（尽力而为，不影响导入结果）。
+
+        写 ``original/versions/<sha8>-<文件名>`` 并追加到
+        ``original/import-record.json``；旧占位仍能查到自己的原出处。
+        """
+        try:
+            from doc_tool.application.import_record import (
+                ImportRecord,
+                append_source_version,
+                archive_source_version,
+                read_import_record,
+                write_import_record,
+            )
+
+            record = read_import_record(self.paths.root)
+            if record is None:
+                record = ImportRecord(
+                    sourceSha256=self.manifest.sourceSha256,
+                    sourceFile=self.paths.source_docx.name,
+                    actualPolicy="normal",
+                    documentType=self.manifest.documentType,
+                    documentName=self.manifest.documentName,
+                    documentNo=self.manifest.documentNo,
+                    documentVersion=self.manifest.documentVersion,
+                )
+            source = Path(new_source)
+            if not source.is_file():
+                source = self.paths.source_docx
+            version = archive_source_version(
+                self.paths.root, source, self.manifest.sourceSha256,
+                note="再次导入来源版本",
+            )
+            append_source_version(record, version)
+            record.sourceSha256 = self.manifest.sourceSha256
+            record.sourceFile = source.name
+            write_import_record(self.paths.root, record)
+        except Exception:  # noqa: BLE001 - 账本记录失败不改变重导入结果
+            pass
 
     def rollback_last(self) -> List[str]:
         payload = json.loads(self.transaction_file.read_text(encoding="utf-8"))

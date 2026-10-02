@@ -142,6 +142,20 @@ def import_command(args) -> CommandResult:
             )
         ])
     target = Path(args.target_dir).resolve() / name
+    # CORE R5：命名映射预设（唯一实现在 intake_presets，避免多处各写一遍）
+    preset_name = str(getattr(args, "preset", "") or "").strip()
+    save_preset = str(getattr(args, "save_preset", "") or "").strip()
+    heading_map = None
+    preset_info = {}
+    preset_warnings = []
+    style_names = {}
+    if preset_name:
+        from doc_tool.application.intake_presets import resolve_for_source, source_style_names
+
+        style_names = source_style_names(Path(args.docx))
+        resolved, preset_info, preset_warnings = resolve_for_source(preset_name, Path(args.docx))
+        if resolved is not None and resolved.mapping:
+            heading_map = dict(resolved.mapping)
     request = ImportRequest(
         source_docx=Path(args.docx),
         target_project_root=target,
@@ -149,11 +163,22 @@ def import_command(args) -> CommandResult:
         document_no=args.document_no,
         document_name=args.document_name or args.name,
         document_version=args.document_version,
+        heading_style_map=heading_map,
     )
     result = import_first_time(request)
+    saved_preset = ""
+    if save_preset and result.success:
+        from doc_tool.application.intake_presets import save_from_import
+
+        saved_preset, save_warnings = save_from_import(
+            save_preset, Path(args.docx), heading_map or (preset_info.get("mapping") or {}),
+            style_names=style_names,
+        )
+        preset_warnings.extend(save_warnings)
+
     failure_msg = ""
     if not result.success:
-        failed_events = [e for e in result.events if e.status == "failed" and e.detail]
+        failed_events = [event for event in result.events if event.status == "failed" and event.detail]
         if failed_events:
             failure_msg = failed_events[-1].detail
     suggested_action = (
@@ -161,6 +186,7 @@ def import_command(args) -> CommandResult:
         if (not result.success and result.suggested_action)
         else ("请查看导入诊断日志并修正源文档。" if not result.success else "")
     )
+
     # V2.7（5.5）：把「保留/降级/阻断」导入报告接入命令结果与问题中心。
     # 这里只对输出做聚合，不给定新的诊断结论：结论来自预检保真扫描与往返门禁。
     import_report = None
@@ -193,6 +219,16 @@ def import_command(args) -> CommandResult:
             "importReport": import_report.markdown_text() if import_report is not None else None,
             "importStatus": import_report.status if import_report is not None else None,
             "lossy": bool(import_report.lossy) if import_report is not None else False,
+            "preset": dict(preset_info),
+            "savedPreset": saved_preset or str(getattr(result, "savedPreset", "") or ""),
+            "presetWarnings": list(preset_warnings) + [
+                item for item in (getattr(result, "warnings", None) or [])
+                if "预设" in str(item)
+            ],
+            "environmentWarnings": [
+                item for item in (getattr(result, "warnings", None) or [])
+                if "预设" not in str(item)
+            ],
         },
         issues=import_issues,
     )

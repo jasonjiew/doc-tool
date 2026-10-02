@@ -183,7 +183,6 @@ def import_review_package(
     from doc_tool.application.review.versioned_review import (
         STATUS_PENDING_FIX,
         STATUS_PENDING_RECHECK,
-        content_hash,
     )
 
     path = Path(package_path)
@@ -207,7 +206,7 @@ def import_review_package(
         result.message = result.rejected_reason
         return result
     source_project = str(data.get("projectId", "") or "")
-    if project_id and source_project and source_project != project_id:
+    if project_id and source_project != project_id:
         result.rejected_reason = "意见包来自其他项目，已拒绝。"
         result.message = result.rejected_reason
         return result
@@ -230,7 +229,20 @@ def import_review_package(
             result.skipped += 1
             continue
         rel_path = str(item.get("relPath", item.get("rel_path", "")) or "")
-        line_no = int(item.get("lineNo", item.get("line_no", 1)) or 1)
+        raw_line_no = item.get("lineNo", item.get("line_no", 1))
+        if not (type(raw_line_no) is int or
+                isinstance(raw_line_no, str) and re.fullmatch(r"[0-9]+", raw_line_no)):
+            result.rejected_reason = "意见行号必须为正整数。"
+            result.message = result.rejected_reason
+            return result
+        try:
+            line_no = int(raw_line_no)
+        except ValueError:
+            line_no = 0
+        if line_no < 1:
+            result.rejected_reason = "意见行号必须为正整数。"
+            result.message = result.rejected_reason
+            return result
         chapter_no = str(item.get("chapterNo", item.get("chapter_no", "")) or "")
         if (author, text, chapter_no) in signatures:
             result.duplicates += 1
@@ -244,7 +256,7 @@ def import_review_package(
                 line_no,
                 chapter_no,
                 str(item.get("contentHash", item.get("content_hash", "")) or ""),
-                item.get("packageId") or item.get("package_id"),
+                item.get("packageId") or item.get("package_id") or data.get("packageId"),
             )
         )
 
@@ -261,14 +273,16 @@ def import_review_package(
             )
             added_ids.append(comment.comment_id)
             current = ""
-            if current_hashes and rel_path:
-                current = current_hashes.get(rel_path, "")
-            bind_hash = current or recorded_hash
+            if current_hashes:
+                current = current_hashes.get(rel_path or chapter_no, "")
+            bind_hash = recorded_hash or current
             updates = {"lifecycle_status": STATUS_PENDING_FIX}
             if bind_hash:
                 updates["content_hash"] = bind_hash
             if package_id:
                 updates["package_id"] = str(package_id)
+            if data.get("baselineId"):
+                updates["baseline_id"] = str(data["baselineId"])
             store.update_comment(comment.comment_id, **updates)
             if recorded_hash and current and recorded_hash != current:
                 store.update_comment(
@@ -283,6 +297,7 @@ def import_review_package(
         _rollback_ids(store, added_ids)
         result.success = False
         result.added = 0
+        result.pending_recheck = 0
         result.message = "导入失败已回滚：{0}".format(exc)
         result.rejected_reason = result.message
         return result

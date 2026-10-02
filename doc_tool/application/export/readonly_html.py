@@ -23,7 +23,8 @@ class HtmlSnapshot:
 
 
 def export_readonly_html(content_root, assets_root, output_dir, version='', *, rel_path=None,
-                         omitted_unsaved=(), cancel_token=None):
+                         omitted_unsaved=(), cancel_token=None, text_resolver=None,
+                         document_assets=False):
     content_root, assets_root = Path(content_root), Path(assets_root)
     preview_root = _resolve_inside(Path(output_dir), 'preview')
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '-' + uuid4().hex[:8]
@@ -38,6 +39,15 @@ def export_readonly_html(content_root, assets_root, output_dir, version='', *, r
                 path = _resolve_inside(content_root, rel)
                 raw = path.read_bytes()
                 text = raw.decode('utf-8')
+                if text_resolver is not None:
+                    # V3.0 3.4：只读 HTML 与出稿同源——先展开固定模块引用再渲染。
+                    try:
+                        resolved = text_resolver(rel, text)
+                    except Exception as exc:  # noqa: BLE001 - 展开失败保留原文并提醒
+                        resolved = text
+                        warnings.append(dict(path=rel, line=0, message='模块展开失败，保留原文：' + str(exc)))
+                    if isinstance(resolved, str) and resolved:
+                        text = resolved
             except (OSError, ValueError) as exc:
                 warnings.append(dict(path=rel, line=0, message='跳过不可读章节：' + str(exc)))
                 continue
@@ -51,7 +61,7 @@ def export_readonly_html(content_root, assets_root, output_dir, version='', *, r
                 for match in reversed(list(_IMAGE_RE.finditer(line))):
                     target = match[2]
                     try:
-                        base = _resolve_inside(assets_root, infer_document_type(rel))
+                        base = assets_root if document_assets else _resolve_inside(assets_root, infer_document_type(rel))
                         image = _resolve_inside(base, target)
                         if image.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'):
                             raise ValueError('资源格式不支持静态安全复制')

@@ -3116,6 +3116,8 @@ def build(
             primary_sect_pr=primary_sect_pr,
             landscape_prototype=landscape_prototype,
             first_sect_pr=first_sect_pr,
+            asset_base=(getattr(prepared_map.get(os.path.abspath(markdown_path)), "asset_root", "")
+                        or config["paths"]["asset_root"]),
         )
         inserted += count
         images += image_count

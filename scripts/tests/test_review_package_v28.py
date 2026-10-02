@@ -192,6 +192,42 @@ class ImportTests(unittest.TestCase):
         self.assertIn("其他项目", result.rejected_reason)
         self.assertEqual(self.store.comments(), [])
 
+    def test_missing_project_id_rejected(self):
+        for value in (None, ""):
+            with self.subTest(project_id=value):
+                path = self._write(self._payload(projectId=value, comments=[{"author": "a", "text": "x"}]))
+                result = import_review_package(path, self.store, project_id="proj-1")
+                self.assertFalse(result.success)
+                self.assertEqual(self.store.comments(), [])
+
+    def test_invalid_line_number_rejected_before_any_write(self):
+        for value in ("bad", [], {}, 1.5, True, -1, "0"):
+            with self.subTest(line_no=value):
+                path = self._write(self._payload(comments=[
+                    {"author": "a", "text": "valid"},
+                    {"author": "b", "text": "invalid", "lineNo": value},
+                ]))
+                result = import_review_package(path, self.store, project_id="proj-1")
+                self.assertFalse(result.success)
+                self.assertEqual(self.store.comments(), [])
+
+    def test_browser_chapter_comment_detects_old_hash_and_keeps_package_binding(self):
+        chapter = "1 概述"
+        package = build_review_package(self.tmp, [(chapter, "old")], output_dir=self.tmp / "out",
+                                       project_id="proj-1", baseline_id="baseline-1")
+        payload = json.loads(package.json_path.read_text(encoding="utf-8"))
+        payload["comments"] = [{"author": "a", "text": "browser comment", "relPath": "",
+                                "lineNo": 1, "chapterNo": chapter,
+                                "contentHash": payload["contentHashes"][chapter]}]
+        result = import_review_package(self._write(payload), self.store, project_id="proj-1",
+                                       current_hashes={chapter: content_hash("new")})
+        self.assertTrue(result.success)
+        self.assertEqual(result.pending_recheck, 1)
+        comment = self.store.comments()[0]
+        self.assertEqual(comment.package_id, package.package_id)
+        self.assertEqual(comment.baseline_id, "baseline-1")
+        self.assertEqual(comment.content_hash, content_hash("old"))
+
     def test_wrong_schema_rejected(self):
         path = self._write(self._payload(schema="some-other/v9"))
         result = import_review_package(path, self.store, project_id="proj-1")

@@ -310,7 +310,13 @@ def register_manifest(
     try:
         tmp = target.with_suffix(".yml.tmp")
         tmp.write_text(manifest.to_yaml(), encoding="utf-8")
-        os.replace(str(tmp), str(target))
+        try:
+            os.replace(str(tmp), str(target))
+        except OSError:
+            # 跨设备/文件过滤层拒绝 rename 时回退移动：登记不因该限制失败。
+            import shutil as _shutil
+
+            _shutil.move(str(tmp), str(target))
     except OSError as exc:
         return None, "\u767b\u8bb0\u5931\u8d25\uff08\u6210\u679c\u4ecd\u4fdd\u7559\uff09\uff1a{0}".format(exc)
     return target, note

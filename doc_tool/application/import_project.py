@@ -102,6 +102,22 @@ class ImportRequest:
     heading_style_map: Optional[Dict[str, int]] = None
     allow_missing_headings: bool = False
     ignore_roundtrip_block: bool = False
+    #: CORE 2.3：按大纲整理计划压平跳级标题（保留标题文本与正文顺序）。
+    normalize_heading_levels: bool = False
+    #: CORE 2.2：自动判断标题前正文范围；为 False 时保持旧行为（不额外建章）。
+    decide_pre_title_body: bool = False
+    #: CORE R5：应用的命名导入映射预设（未命中项回退自动识别）。
+    intakePresetName: str = ""
+    #: CORE R5：导入成功后把本次使用的映射保存为该名称的预设。
+    intakeSavePreset: str = ""
+    #: 标题前正文章节名（仅在决定“保留”时使用）。
+    pre_title_chapter_title: str = "前言"
+    #: CORE 2.4：试构建失败时用通用底模做一次有界回退重试。
+    bounded_template_retry: bool = True
+    #: CORE 3.1：写入 ``original/import-record.json`` 导入记录。
+    write_intake_record: bool = True
+    #: CORE 4.1：只接管这些章节（按标题匹配，空表示整份）；祖先结构自动保留。
+    selected_section_titles: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -121,6 +137,10 @@ class ImportResult:
     error_code: Optional[str] = None
     diagnostic_log: Optional[Path] = None
     suggested_action: Optional[str] = None
+    #: CORE R5：预设解析等非阻断提醒（如实带出，不冒充成功/失败）。
+    warnings: List[str] = field(default_factory=list)
+    #: CORE R5：本次保存的预设名称（空表示未保存）。
+    savedPreset: str = ""
 
     @property
     def last_stage(self) -> Optional[ImportStageEvent]:
@@ -169,10 +189,28 @@ def import_first_time(
         _check_cancel()
         _record(result, STAGE_PREFLIGHT, "started")
         allow_missing = bool(request.allow_missing_headings)
+        # 严格模式（require_exact_roundtrip 且未忽略阻断）保留 fail-closed；
+        # 普通模式把“缺资源”等可定位缺口转成告警，正文用占位继续（CORE 2.4）。
+        strict_mode = bool(request.require_exact_roundtrip) and not bool(
+            request.ignore_roundtrip_block
+        )
+        # CORE R5：命名映射预设（唯一实现在 intake_presets；未命中项回退自动识别）
+        effective_heading_map = request.heading_style_map
+        resolved_preset = None
+        if request.intakePresetName:
+            from doc_tool.application.intake_presets import resolve_for_source
+
+            resolved_preset, _preset_info, preset_warnings = resolve_for_source(
+                request.intakePresetName, actual_source,
+            )
+            result.warnings.extend(preset_warnings)
+            if effective_heading_map is None and resolved_preset is not None and resolved_preset.mapping:
+                effective_heading_map = dict(resolved_preset.mapping)
         preview = preflight(
             str(actual_source),
-            heading_style_map=request.heading_style_map,
+            heading_style_map=effective_heading_map,
             allow_missing_headings=allow_missing,
+            tolerate_missing_resources=not strict_mode,
         )
         fidelity_report = getattr(preview, "fidelity", None)
         if request.document_type not in READABLE_DOCUMENT_TYPES:
@@ -197,6 +235,50 @@ def import_first_time(
         }
         if fidelity_report is not None:
             preflight_metrics["fidelity"] = fidelity_report.summary_text()
+
+        # --- 大纲整理计划（CORE 2.2/2.3）：预览与提取共用同一份决定 ---
+        from doc_tool.application.intake_contract import IntakePolicy, PlannedTarget
+        from doc_tool.application.intake_outline import (
+            PRE_TITLE_RETAIN,
+            build_plan,
+            decision_style_map,
+        )
+
+        effective_heading_map = request.heading_style_map
+        outline_plan = None
+        intake_plan = None
+        retain_pre_title = False
+        if request.normalize_heading_levels or request.decide_pre_title_body:
+            policy = IntakePolicy.strict() if strict_mode else IntakePolicy.normal()
+            _plan, outline_plan = build_plan(
+                preview,
+                source=source_path,
+                target=PlannedTarget(
+                    directory=str(target),
+                    document_name=request.document_name,
+                    document_no=request.document_no,
+                    document_version=request.document_version,
+                ),
+                policy=policy,
+                document_type=request.document_type,
+                pre_title_blocks=getattr(preview, "pre_title_blocks", []) or [],
+                normalize=bool(request.normalize_heading_levels),
+            )
+            if request.normalize_heading_levels and outline_plan.remapped_count:
+                # 只调整需要整理的样式级别，保留其余自动识别结果。
+                base_map = dict(preview.heading_style_map or {})
+                normalized = decision_style_map(outline_plan.decisions)
+                effective_heading_map = {
+                    style_id: int(normalized.get(style_id, level))
+                    for style_id, level in base_map.items()
+                } or request.heading_style_map
+                preflight_metrics["levelAdjustments"] = outline_plan.remapped_count
+            if request.decide_pre_title_body:
+                retain_pre_title = outline_plan.pre_title_mode == PRE_TITLE_RETAIN
+                preflight_metrics["preTitleMode"] = outline_plan.pre_title_mode
+            intake_plan = _plan
+        if preview.warnings:
+            preflight_metrics["warnings"] = list(preview.warnings)
         _record(result, STAGE_PREFLIGHT, "succeeded", metrics=preflight_metrics)
 
         # 3. 创建同卷暂存目录
@@ -226,7 +308,7 @@ def import_first_time(
         template_meta = generate_template(
             paths.source_docx,
             paths.template_docx,
-            heading_style_map=request.heading_style_map,
+            heading_style_map=effective_heading_map,
             allow_missing_headings=allow_missing,
         )
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
@@ -243,8 +325,10 @@ def import_first_time(
             paths.images_dir(request.document_type),
             paths.tables_dir(request.document_type),
             request.document_type,
-            heading_style_map=request.heading_style_map,
+            heading_style_map=effective_heading_map,
             allow_missing_headings=allow_missing,
+            retain_pre_title_body=retain_pre_title,
+            pre_title_title=request.pre_title_chapter_title,
         )
         _record(result, STAGE_EXTRACT_CONTENT, "succeeded", metrics={
             "chapters": extraction.chapter_count,
@@ -262,6 +346,28 @@ def import_first_time(
             "mds": split_result.mds,
             "indexes": split_result.indexes,
         })
+
+        # CORE 4.1：按勾选范围裁剪章节树；未选正文不加入，范围外引用集中说明。
+        selection_notes: List[str] = []
+        if request.selected_section_titles:
+            from doc_tool.application.intake_scope import (
+                prune_content_tree, selection_from_titles,
+            )
+
+            scope_plan = intake_plan or _fallback_scope_plan(preview, request)
+            selection = selection_from_titles(scope_plan, request.selected_section_titles)
+            prune = prune_content_tree(
+                paths.content_dir(request.document_type), selection,
+                document_type=request.document_type,
+                assets_root=paths.assets_dir(request.document_type),
+            )
+            selection_notes = prune.summary_lines()
+            for line in selection_notes:
+                _record(result, STAGE_SPLIT_CONTENT, "warning", detail=line)
+            _record(result, STAGE_SPLIT_CONTENT, "succeeded", metrics={
+                "kept": len(prune.kept), "removed": len(prune.removed),
+                "danglingReferences": len(prune.dangling_references),
+            })
 
         # 7.5 初始化修订记录（从模板/源文档提取，无修订表时生成标准表头）
         try:
@@ -295,37 +401,99 @@ def import_first_time(
         # 10. 试构建 (4.5)
         _check_cancel()
         _record(result, STAGE_TRIAL_BUILD, "started")
-        trial_output = _trial_build(manifest, paths)
+        fallback_note = ""
+        try:
+            trial_output = _trial_build(manifest, paths)
+        except Exception as first_error:  # noqa: BLE001 - 有界回退后再决定失败
+            if not request.bounded_template_retry or strict_mode:
+                raise
+            fallback_note = _apply_generic_template_fallback(paths, manifest)
+            if not fallback_note:
+                raise
+            _record(result, STAGE_TRIAL_BUILD, "warning", detail=fallback_note)
+            trial_output = _trial_build(manifest, paths)
         _record(result, STAGE_TRIAL_BUILD, "succeeded", metrics={
             "output": Path(trial_output).name,
+            "fallback": fallback_note,
         })
 
         # 10b. 往返差异门禁 (2.5)：trial_build 后、publish 前，fail-closed。
         _check_cancel()
         _record(result, STAGE_ROUNDTRIP_CHECK, "started")
-        roundtrip_report = _run_roundtrip_check(
-            request, paths.source_docx, trial_output, manifest.headingStyles
-        )
-        should_block = (
-            (request.require_exact_roundtrip and roundtrip_report.issues)
-            or (roundtrip_report.has_block and not request.ignore_roundtrip_block)
-        )
-        if should_block:
-            raise RoundtripCheckError.from_report(
-                roundtrip_report,
-                require_exact=request.require_exact_roundtrip,
+        roundtrip_report = None
+        roundtrip_error: Optional[BaseException] = None
+        try:
+            roundtrip_report = _run_roundtrip_check(
+                request, paths.source_docx, trial_output, manifest.headingStyles,
+                heading_style_map_override=effective_heading_map,
             )
-        _remove_trial_output(trial_output)
-        _record(result, STAGE_ROUNDTRIP_CHECK, "succeeded", metrics={
-            "sourceElements": roundtrip_report.source_count,
-            "rebuiltElements": roundtrip_report.rebuilt_count,
-            "issues": len(roundtrip_report.issues),
-            "block": len(roundtrip_report.block_issues),
-            "warn": len(roundtrip_report.warn_issues),
-        })
+        except RoundtripCheckError as exc:
+            if strict_mode:
+                raise
+            # 对照未完成：记录原因，不毁掉已验证可用的项目（CORE 2.4/D4）。
+            roundtrip_error = exc
+            _record(result, STAGE_ROUNDTRIP_CHECK, "warning",
+                    detail="往返对照未完成：{0}".format(exc.user_message))
+        if roundtrip_report is None:
+            _remove_trial_output(trial_output)
+            _record(result, STAGE_ROUNDTRIP_CHECK, "succeeded", metrics={
+                "comparison": "unavailable",
+                "reason": str(roundtrip_error or ""),
+            })
+        if roundtrip_report is not None:
+            should_block = (
+                (request.require_exact_roundtrip and roundtrip_report.issues)
+                or (roundtrip_report.has_block and not request.ignore_roundtrip_block)
+            )
+            if should_block:
+                raise RoundtripCheckError.from_report(
+                    roundtrip_report,
+                    require_exact=request.require_exact_roundtrip,
+                )
+            _remove_trial_output(trial_output)
+            _record(result, STAGE_ROUNDTRIP_CHECK, "succeeded", metrics={
+                "sourceElements": roundtrip_report.source_count,
+                "rebuiltElements": roundtrip_report.rebuilt_count,
+                "issues": len(roundtrip_report.issues),
+                "block": len(roundtrip_report.block_issues),
+                "warn": len(roundtrip_report.warn_issues),
+            })
+        else:
+            should_block = False
 
         # 2.7 保真报告与往返差异摘要持久化到成功项目 logs/（尽力而为）。
         _persist_reports(paths, fidelity_report, roundtrip_report)
+
+        # CORE 3.1-3.4：写导入记录（原件/哈希/决定/处理事实/来源版本）。
+        if selection_notes:
+            preflight_metrics.setdefault("selectionNotes", list(selection_notes))
+        intake_record = None
+        if request.write_intake_record:
+            try:
+                intake_record = _write_intake_record(
+                    paths, request, staging_paths_root=staging,
+                    source_docx=paths.source_docx, sha256=sha256,
+                    preview=preview, extraction=extraction,
+                    outline_plan=outline_plan, strict_mode=strict_mode,
+                    roundtrip_error=roundtrip_error, target=target,
+                    fallback_note=fallback_note,
+                )
+            except Exception as exc:  # noqa: BLE001 - 账本失败不阻断可用项目
+                _record(result, STAGE_SAVE_MANIFEST, "warning",
+                        detail="导入记录写入失败：{0}".format(exc))
+
+        # 严格模式：按声明的阈值在发布前拒绝新项目（普通模式不阻断）。
+        if strict_mode and intake_record is not None and intake_record.to_fix_count():
+            raise RoundtripCheckError(
+                "严格模式命中 {0} 项内容问题，已拒绝发布此新项目。".format(
+                    intake_record.to_fix_count()
+                ),
+                suggested_action=(
+                    "改用普通模式导入得到可用项目，或在 Word 中处理这些问题后重试；"
+                    "源文件与诊断结果已保留。"
+                ),
+                details={"findings": str(intake_record.to_fix_count())},
+            )
 
         # 2.8 播种重导入基线：首次导入的正文哈希作为后续重导入冲突判定基线。
         _seed_reimport_base(paths, request.document_type)
@@ -340,10 +508,48 @@ def import_first_time(
         _record(result, STAGE_PUBLISH, "succeeded", metrics={"project": target.name})
 
         result.success = True
+        # CORE R5：导入成功后按请求保存命名预设（唯一实现在 intake_presets）
+        if request.intakeSavePreset:
+            from doc_tool.application.intake_presets import save_from_import
+
+            mapping = dict(effective_heading_map or {})
+            if not mapping and resolved_preset is not None:
+                mapping = dict(getattr(resolved_preset, "mapping", None) or {})
+            if not mapping:
+                mapping = {
+                    str(k): int(v)
+                    for k, v in dict(getattr(preview, "heading_style_map", None) or {}).items()
+                }
+            census = getattr(preview, "style_census", None) or {}
+            names = {
+                str(key): str(getattr(value, "name", "") or "") for key, value in census.items()
+            }
+            saved, save_warnings = save_from_import(
+                request.intakeSavePreset, actual_source, mapping, style_names=names,
+            )
+            result.warnings.extend(save_warnings)
+            if saved:
+                result.savedPreset = saved
         return result
 
     except Exception as exc:
         err = _map_exception(exc)
+        # 受限环境（透明加密/杀软）会把写入与读取变成笼统错误：补一次自检给出可执行建议
+        probe = None
+        try:
+            from doc_tool.application.env_probe import diagnose_environment
+
+            probe = diagnose_environment(
+                directory=str(target.parent),
+                docx=str(source_path) if source_path.is_file() else None,
+            )
+        except Exception:  # noqa: BLE001 - 自检失败不影响原始错误
+            probe = None
+        if probe is not None and not probe.ok:
+            result.warnings.extend(probe.advice[:3])
+            if probe.advice:
+                # 环境自检的建议一定比“联系支持”更可执行：优先采用
+                err.suggested_action = probe.advice[0]
         result.error_code = err.code
         result.suggested_action = err.suggested_action
         status = "cancelled" if isinstance(err, CancelledError) else "failed"
@@ -541,6 +747,145 @@ def _trial_build(manifest: ProjectManifest, paths: ProjectPaths) -> str:
     return str(trial_output)
 
 
+def _fallback_scope_plan(preview, request: ImportRequest):
+    """范围裁剪在没有大纲计划时的最小计划（按预检标题直接构造章节候选）。"""
+    from doc_tool.application.intake_contract import (
+        IntakePlan, IntakePolicy, PlannedTarget,
+    )
+    from doc_tool.application.intake_outline import build_plan
+
+    plan, _outline = build_plan(
+        preview,
+        source=Path(request.source_docx),
+        target=PlannedTarget(document_name=request.document_name),
+        policy=IntakePolicy.strict() if request.require_exact_roundtrip else IntakePolicy.normal(),
+        document_type=request.document_type,
+        pre_title_blocks=getattr(preview, "pre_title_blocks", []) or [],
+    )
+    return plan
+
+
+def _generic_template_path() -> Optional[Path]:
+    """仓库/打包内的通用底模（缺失时返回 None）。"""
+    candidate = Path(__file__).resolve().parent.parent / "resources" / "generic-template.docx"
+    if candidate.is_file():
+        return candidate
+    try:
+        from doc_tool.application.template_fill_plan import resource_root
+
+        root = Path(resource_root())
+        fallback = root / "generic-template.docx"
+        if fallback.is_file():
+            return fallback
+    except Exception:  # noqa: BLE001 - 打包环境缺少该模块时按无底模处理
+        pass
+    return None
+
+
+def _apply_generic_template_fallback(paths: ProjectPaths, manifest: ProjectManifest) -> str:
+    """试构建失败后的**一次**有界回退：改用通用底模并保留原有正文。
+
+    返回一行说明（供结果页展示实际采用的底模）；无可用底模时返回空串，
+    调用方据此把该输入判为失败（不宣告导入完成）。
+    """
+    generic = _generic_template_path()
+    if generic is None:
+        return ""
+    try:
+        shutil.copy2(str(generic), str(paths.template_docx))
+    except OSError:
+        return ""
+    return "试构建失败：已改用通用底模重试一次（原底模留在原件中，可再调整）"
+
+
+def _fidelity_findings_without_extraction(fidelity_findings, extraction_findings):
+    """去掉已被“带章节定位的提取事实”覆盖的文档级保真事实（CORE 3.2）。
+
+    同一 feature（如 textbox）在文档级统计里没有章节/元素序号；提取阶段已经给出
+    可定位、可替换的事实，保留两条只会让结果页出现重复项。
+    """
+    covered_features = {
+        item.feature for item in extraction_findings if item.target_chapter
+    }
+    return [
+        item for item in fidelity_findings
+        if not (item.feature in covered_features and not item.target_chapter)
+    ]
+
+
+def _write_intake_record(
+    paths: ProjectPaths,
+    request: ImportRequest,
+    *,
+    staging_paths_root: Optional[Path],
+    source_docx: Path,
+    sha256: str,
+    preview,
+    extraction,
+    outline_plan,
+    strict_mode: bool,
+    roundtrip_error: Optional[BaseException],
+    target: Path,
+    fallback_note: str = "",
+):
+    """把本轮导入的来源、决定与处理事实写入 ``original/import-record.json``。
+
+    返回写入的 :class:`ImportRecord`（供严格模式发布前按阈值判断）。
+    """
+    from doc_tool.application.import_record import (
+        ImportRecord,
+        append_source_version,
+        archive_source_version,
+        findings_from_extraction,
+        findings_from_fidelity,
+        merge_findings,
+        placeholder_lines,
+        unavailable_from_roundtrip,
+        write_import_record,
+    )
+
+    root = Path(staging_paths_root) if staging_paths_root is not None else paths.root
+    retained_rel = "original/source.docx"
+    record = ImportRecord(
+        sourceSha256=sha256,
+        sourceFile=Path(request.source_docx).name,
+        actualPolicy="strict" if strict_mode else "normal",
+        documentType=request.document_type,
+        documentName=request.document_name,
+        documentNo=request.document_no,
+        documentVersion=request.document_version,
+        selectedSections=list(request.selected_section_titles),
+        headingDecisions=(
+            [item.to_dict() for item in outline_plan.decisions] if outline_plan else []
+        ),
+        findings=merge_findings(
+            _fidelity_findings_without_extraction(
+                findings_from_fidelity(getattr(preview, "fidelity", None), retained_path=retained_rel),
+                findings_from_extraction(extraction, retained_path=retained_rel),
+            ),
+            findings_from_extraction(extraction, retained_path=retained_rel),
+        ),
+        # 正文里实际写入的占位清单（CORE 3.2）：与占位行同一来源，便于结果页/导出核对。
+        placeholderLines=placeholder_lines(merge_findings(
+            findings_from_extraction(extraction, retained_path=retained_rel),
+        )),
+        unavailableComparisons=unavailable_from_roundtrip(roundtrip_error),
+        retainedPath=retained_rel,
+    )
+    for warning in list(getattr(preview, "warnings", None) or [])[:10]:
+        text_warning = str(warning)
+        if "缺" in text_warning or "未找到" in text_warning:
+            record.unavailableComparisons.append(text_warning)
+    if fallback_note:
+        record.unavailableComparisons.append(fallback_note)
+    append_source_version(
+        record,
+        archive_source_version(root, source_docx, sha256, note="首次导入原件"),
+    )
+    write_import_record(root, record)
+    return record
+
+
 def _remove_trial_output(trial_output: str) -> None:
     """往返门禁完成后清理试构建临时产物。"""
     try:
@@ -554,6 +899,7 @@ def _run_roundtrip_check(
     source_docx: Path,
     trial_output: str,
     manifest_heading_styles: Optional[Dict[int, str]] = None,
+    heading_style_map_override: Optional[Dict[str, int]] = None,
 ):
     """执行源 Word 与试构建重建 Word 的往返差异对比。
 
@@ -566,9 +912,10 @@ def _run_roundtrip_check(
     # 用户映射（styleId -> 级别）优先；否则用清单已消解冲突的决策映射
     # （级别 -> styleId），两者都是「试构建实际用的样式」。
     heading_styles: Optional[Dict[int, str]] = None
-    if request.heading_style_map:
+    effective_map = heading_style_map_override or request.heading_style_map
+    if effective_map:
         heading_styles = {
-            level: style_id for style_id, level in request.heading_style_map.items()
+            level: style_id for style_id, level in effective_map.items()
         }
     elif manifest_heading_styles:
         heading_styles = {int(level): str(sid) for level, sid in manifest_heading_styles.items()}
@@ -590,9 +937,15 @@ def _persist_reports(paths: ProjectPaths, fidelity_report, roundtrip_report) -> 
             (paths.logs_dir / "fidelity.md").write_text(
                 fidelity_report.markdown_text() + "\n", encoding="utf-8"
             )
-        (paths.logs_dir / "roundtrip.md").write_text(
-            roundtrip_report.markdown_text() + "\n", encoding="utf-8"
-        )
+        if roundtrip_report is not None:
+            (paths.logs_dir / "roundtrip.md").write_text(
+                roundtrip_report.markdown_text() + "\n", encoding="utf-8"
+            )
+        else:
+            (paths.logs_dir / "roundtrip.md").write_text(
+                "## 往返对照\n\n对照未完成，未得出差异结论（不视为对照通过）。\n",
+                encoding="utf-8",
+            )
     except OSError:
         # 日志写入失败不中止导入。
         pass

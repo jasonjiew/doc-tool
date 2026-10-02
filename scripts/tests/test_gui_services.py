@@ -440,7 +440,11 @@ class ProjectServiceTests(unittest.TestCase):
         # 修改清单的 schemaVersion 为更高的不兼容版本
         manifest_path = Path(self._tmp) / "project.yml"
         content = manifest_path.read_text(encoding="utf-8")
-        content = content.replace("schemaVersion: 1", "schemaVersion: 99")
+        # 清单版本随 PROJECT_SCHEMA_VERSION 演进（当前为 2）：按正则改写，
+        # 避免硬编码 "schemaVersion: 1" 在版本提升后静默失效。
+        import re as _re
+
+        content = _re.sub(r"schemaVersion:\s*\d+", "schemaVersion: 99", content, count=1)
         manifest_path.write_text(content, encoding="utf-8")
 
         # 高版本可只读打开但 is_writable 为 False
@@ -662,19 +666,19 @@ class WizardFidelityAndMappingTests(unittest.TestCase):
         self.addCleanup(wizard.close)
         return wizard
 
-    def test_preflight_block_gate_requires_confirmation(self):
+    def test_preflight_block_no_longer_gates_normal_import(self):
+        """CORE 2.1：复杂内容不再要求逐项风险勾选；结构性预检失败仍阻断。"""
         wizard = self._wizard()
         page = wizard._preflight_page
         page._preview_ok = True
         page._has_block = True
         page._confirm_block.setChecked(False)
-        self.assertFalse(page.isComplete(), "存在阻断特性且未确认时不得继续")
-        page._confirm_block.setChecked(True)
-        self.assertTrue(page.isComplete(), "确认「仍然导入」后放行")
-        # 无阻断特性时不要求确认
-        page._has_block = False
-        page._confirm_block.setChecked(False)
-        self.assertTrue(page.isComplete())
+        self.assertTrue(
+            page.isComplete(),
+            "存在公式/批注等缺口时普通模式直接给可用项目，不再要求风险确认",
+        )
+        # 提示行只做说明，不参与门禁
+        self.assertFalse(page._confirm_block.isEnabled())
         # 结构性预检失败始终阻断
         page._preview_ok = False
         self.assertFalse(page.isComplete())
@@ -718,12 +722,16 @@ class WizardFidelityAndMappingTests(unittest.TestCase):
         page._populate(preview)
         self.assertEqual(page.mapping(), {"ChapterTitle": 1}, "自动识别级别应预填")
         self.assertTrue(page.isComplete(), "存在级别 1 映射时允许继续")
-        # 把 ChapterTitle 改为忽略 -> 无 H1 -> 不可继续
+        # 把 ChapterTitle 改为忽略 -> 空映射：CORE 2.2 允许按自动识别/单章继续
         chapter_combo = next(r["combo"] for r in page._rows if r["style_id"] == "ChapterTitle")
         chapter_combo.setCurrentIndex(chapter_combo.findData(0))
-        self.assertFalse(page.isComplete(), "缺少级别 1 映射时不可继续")
-        # 映射 SectionTitle 到级别 1 -> 恢复可继续
+        self.assertEqual(page.mapping(), {})
+        self.assertTrue(page.isComplete(), "空样式映射不单独阻止可用正文导入")
+        # 给出部分映射但不含一级标题 -> 不可继续（避免把正文样式当标题）
         section_combo = next(r["combo"] for r in page._rows if r["style_id"] == "SectionTitle")
+        section_combo.setCurrentIndex(section_combo.findData(3))
+        self.assertFalse(page.isComplete(), "已给出映射时必须包含级别 1")
+        # 映射 SectionTitle 到级别 1 -> 恢复可继续
         section_combo.setCurrentIndex(section_combo.findData(1))
         self.assertTrue(page.isComplete())
         self.assertEqual(page.mapping()["SectionTitle"], 1)
@@ -3578,7 +3586,7 @@ class WizardUXOptimizationTests(unittest.TestCase):
         return wizard
 
     def test_smart_skip_next_id_with_heading1(self):
-        """当预检已自动识别标准 Heading 1 且无阻断时，步骤 1 直接跳步至步骤 4（项目信息）。"""
+        """CORE 2.1/U-1：普通路径最多两次主要提交，直达项目信息（步骤 4）。"""
         from types import SimpleNamespace
         wizard = self._wizard()
         wizard._preview = SimpleNamespace(
@@ -3588,18 +3596,25 @@ class WizardUXOptimizationTests(unittest.TestCase):
         wizard._source_page._wants_tuning = False
         self.assertEqual(wizard.nextId(), 3, "标准文档应自动跳过日志与样式映射，直达步骤 4")
 
+        # 复杂内容（有 BLOCK 缺口）也不再强迫先看技术页并逐项确认
+        wizard._preview = SimpleNamespace(
+            has_heading1=True,
+            fidelity=SimpleNamespace(has_block=True),
+        )
+        self.assertEqual(wizard.nextId(), 3, "有复杂缺口仍直达项目信息，缺口集中到结果页")
+
         wizard._source_page._wants_tuning = True
-        self.assertEqual(wizard.nextId(), 2, "用户勾选微调时应进入样式映射页")
+        self.assertEqual(wizard.nextId(), 1, "用户主动细调时先看预检/大纲页")
 
     def test_smart_skip_next_id_without_heading1(self):
-        """当预检未检测到 Heading 1 时，步骤 1 引导至样式映射或预检页。"""
+        """CORE 2.2：无标题文档按单章接管，不必先进入样式映射页。"""
         from types import SimpleNamespace
         wizard = self._wizard()
         wizard._preview = SimpleNamespace(
             has_heading1=False,
             fidelity=SimpleNamespace(has_block=False),
         )
-        self.assertEqual(wizard.nextId(), 1)
+        self.assertEqual(wizard.nextId(), 3, "无标题文档直接进入项目信息，按单章接管")
 
     def test_smart_skip_next_id_from_preflight_page(self):
         """从预检页（Page 1）若大纲良好，nextId 跳过映射页直达项目信息页（Page 3）。"""

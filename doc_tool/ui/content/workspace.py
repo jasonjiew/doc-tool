@@ -145,6 +145,7 @@ class ContentWorkspace(QWidget):
         on_branch_changed: Optional[Callable[[str], None]] = None,
         on_stage: Optional[Callable[[str], None]] = None,
         unsaved_resolver: Optional[UnsavedResolver] = None,
+        text_resolver: Optional[Callable[[str, str], str]] = None,
         restore_drafts_choice=None,
         change_detection_mode: Optional[str] = None,
         parent: Optional[QWidget] = None,
@@ -267,6 +268,7 @@ class ContentWorkspace(QWidget):
             assets_root=self._assets_root,
             writable=self._writable,
             autosave=self._autosave,
+            text_resolver=text_resolver,
         )
 
         self.panels_host = QWidget(self)

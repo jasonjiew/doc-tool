@@ -1,6 +1,6 @@
 # 下一阶段路线图（合并稿）
 
-> 2026-09-30：本文为历史能力路线图。当前产品排程入口为 [V2.6～V2.9 产品与 Codex 执行计划](product-plan-v2.6-v2.9.md)，既有实现和待验收项在 V2.6.x 基线中核验。
+> 2026-10-01：本文为历史能力路线图，下文状态保留当时记录。当前统一排程见 [产品总路线图](product-master-roadmap.md)，实际能力及界面缺口见 [功能总清单](product-function-catalog.md)。V2 归档、CORE 在执行和后续 V3 计划分别核对，不用历史状态推断当前全部验收完成。
 
 > 状态：盘点合并稿，未改业务代码。主链路（Word 导入 → Markdown 维护 → 搜索/替换/引用/重编号/检查 → 改动 Diff → 校验构建 → Word 刷新 → 安装发布）已完整。
 > 下一阶段重点：**保真（Fidelity）· 安全（Safety）· 质量追溯（Quality Traceability）· 协作（Collaboration）**。

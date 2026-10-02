@@ -342,9 +342,11 @@ class EditorPanel(QWidget):
         snippet_store=None,
         user_dict=None,
         spellchecker=None,
+        text_resolver: Optional[Callable[[str, str], str]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
+        self._text_resolver = text_resolver
         self._writer = writer
         self._on_saved = on_saved
         self._assets_root = assets_root
@@ -1644,6 +1646,10 @@ class EditorPanel(QWidget):
     def is_dirty(self) -> bool:
         return self._dirty
 
+    def plain_text(self) -> str:
+        """当前编辑器文本（供缓冲收集/出稿使用；不写盘、不清脏标记）。"""
+        return self._editor.toPlainText()
+
     # --- 会话状态读写（供会话快照/恢复） ---
 
     def scroll_position(self) -> int:
@@ -1724,7 +1730,22 @@ class EditorPanel(QWidget):
     def _schedule_preview(self) -> None:
         self._refresh_preview(self._editor.toPlainText())
 
+    def _resolved_preview_text(self, text: str) -> str:
+        """预览与出稿同源：有展开器时先展开固定模块引用（V3.0 3.4）。
+
+        展开失败保留原文并提示，绝不让预览与 Word/HTML 出现两套内容。
+        """
+        resolver = getattr(self, "_text_resolver", None)
+        if resolver is None or not text:
+            return text
+        try:
+            resolved = resolver(str(self._rel_path or ""), text)
+        except Exception:  # noqa: BLE001 - 展开失败保留原文
+            return text
+        return resolved if isinstance(resolved, str) and resolved else text
+
     def _refresh_preview(self, text: str) -> None:
+        text = self._resolved_preview_text(text)
         document = self._preview.document()
         if hasattr(document, "setBaseUrl"):
             document.setBaseUrl(self._preview_base_url())

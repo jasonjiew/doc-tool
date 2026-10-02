@@ -331,19 +331,26 @@ class HomeExperienceIterationTests(unittest.TestCase):
         self.assertTrue(home._recent_cards[7].isHidden())
         self.assertTrue(home._search_empty_label.isHidden())
 
-    def test_recent_projects_invalid_path_locate_disabled(self):
-        """测试失效路径的定位按钮自动禁用，防范假点击。"""
+    def test_recent_projects_invalid_path_offers_relocate(self):
+        """失效路径不再“只能移除”：规范 R9 要求提供可用的“重新定位”。
+
+        旧断言（定位按钮禁用且提示“无法”）在第二十七轮规范覆盖审计后按 R9 更新为
+        “按钮可用 + 点击后进入重新定位流程”。
+        """
         missing_dir = self.tmp_path / "missing_target"
         entries = [
             RecentEntry(path=str(missing_dir), name="missing", document_name="已失效项目"),
         ]
-        home = EmptyState()
+        relocated = []
+        home = EmptyState(on_relocate_recent=lambda old, new: relocated.append((old, new)))
         home.set_recent_projects(entries)
 
         btns = home._recent_cards[0].findChildren(QPushButton)
-        locate_btn = next(b for b in btns if b.text() == "📁")
-        self.assertFalse(locate_btn.isEnabled())
-        self.assertIn("无法", locate_btn.toolTip())
+        relocate_btn = next(b for b in btns if b.property("recentAction") == "relocate")
+        self.assertTrue(relocate_btn.isEnabled(), "失效条目应可重新定位")
+        self.assertIn("重新选择", relocate_btn.toolTip())
+        self.assertEqual([b for b in btns if b.text() == "📁"], [],
+                         "失效条目不再保留失效的“在资源管理器中定位”按钮")
 
     def test_close_project_blocked_when_runner_is_running(self):
         """测试当任务正在运行中时，MainWindow.close_project 拒绝关闭并保护工作区。"""

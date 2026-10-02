@@ -478,6 +478,7 @@ def run_pipeline(
     cancel_token: Optional[CancellationToken] = None,
     app_version: str = "",
     progress: Optional[ProgressCallback] = None,
+    word_available: Optional[bool] = None,
 ) -> PipelineResult:
     """执行构建→前校验→Word 刷新→后校验管线，返回结构化结果。
 
@@ -509,6 +510,7 @@ def run_pipeline(
 
     on_progress: ProgressCallback = progress or _noop_progress
     result = PipelineResult(success=False)
+    retry_state: List[bool] = []
     from doc_tool.domain.version import APP_VERSION
 
     effective_app_version = app_version or APP_VERSION
@@ -532,7 +534,17 @@ def run_pipeline(
     if not skip_word_refresh:
         from doc_tool.application.word_check import check_word_available
 
-        report = check_word_available(dispatch_check=True)
+        if word_available is True:
+            # 调用方（如按包正式化）已确认 Word 可用：跳过重复探测，避免超时误判。
+            report = check_word_available(dispatch_check=False)
+            report.word_dispatchable = True
+            report.available = True
+        else:
+            report = check_word_available(dispatch_check=True)
+        if not report.available and word_available is not True:
+            # 首次探测失败可能是临时占用/慢启动：用更长超时重试一次再判定不可用。
+            retry_state.append(True)
+            report = check_word_available(dispatch_check=True, dispatch_timeout_seconds=30.0)
         if not report.available:
             err = WordNotAvailableError(
                 user_message="Microsoft Word 不可用：{0}".format(
@@ -550,11 +562,13 @@ def run_pipeline(
             result.error_code = err.code
             result.events.append(StageEvent(
                 STAGE_BUILD, "failed", detail=err.user_message, error_code=err.code,
+                metrics={"wordProbeRetried": bool(retry_state)},
             ))
             log.error(STAGE_BUILD, exception=err, metrics={
                 "pywin32": report.pywin32_available,
                 "interactive": report.interactive_session,
                 "dispatchable": report.word_dispatchable,
+                "wordProbeRetried": bool(retry_state),
             })
             return result
 
@@ -613,6 +627,65 @@ def run_pipeline(
         return result
     finally:
         release_lock(paths)
+
+
+def _project_reuse_resolver(paths):
+    """按项目声明构造正文展开器（无声明返回 None，行为与旧版一致）。"""
+    try:
+        from doc_tool.application.content.reuse_hook import build_project_resolver
+
+        root = getattr(paths, "root", None)
+        if root is None:
+            return None
+        resolver = build_project_resolver(root)
+    except Exception:  # noqa: BLE001 - 复用能力异常不阻断构建
+        return None
+    if resolver is None:
+        return None
+    original = resolver
+
+    def _counting_resolver(rel_path, source_text):
+        resolved = original(rel_path, source_text)
+        if isinstance(resolved, str) and resolved and resolved != source_text:
+            _counting_resolver.changed += 1
+        return resolved
+
+    _counting_resolver.changed = 0  # type: ignore[attr-defined]
+    _counting_resolver.notes = getattr(original, "notes", {})  # type: ignore[attr-defined]
+    _counting_resolver.resources = getattr(original, "resources", {})  # type: ignore[attr-defined]
+    return _counting_resolver
+
+
+def _validation_failure_lines(manifest, paths) -> "List[str]":
+    """读取校验报告里的失败行（供展开项目的结果说明使用）。"""
+    try:
+        report = paths.logs_dir / "{0}-validation.md".format(manifest.documentType)
+        text = report.read_text(encoding="utf-8")
+    except (OSError, AttributeError):
+        return []
+    return [
+        line.strip()[len("- [FAIL]"):].strip()
+        for line in text.splitlines()
+        if line.strip().startswith("- [FAIL]")
+    ]
+
+
+def _reuse_stage_detail(resolver) -> str:
+    """阶段说明里带上展开事实（成功/失败章节数），便于结果页与日志核对。"""
+    if resolver is None:
+        return ""
+    try:
+        from doc_tool.application.prepared_source import _RESOLVE_FAILURES
+
+        failures = len([item for item in _RESOLVE_FAILURES if item])
+    except Exception:  # noqa: BLE001
+        failures = 0
+    expanded = int(getattr(resolver, "changed", 0) or 0)
+    if failures:
+        return "；正文展开 {0} 章、{1} 处失败（已保留原文）".format(expanded, failures)
+    if expanded:
+        return "；已按项目声明展开正文模块引用 {0} 章".format(expanded)
+    return ""
 
 
 def _run_pipeline_inner(
@@ -757,9 +830,13 @@ def _run_pipeline_inner(
         from doc_tool.application.prepared_source import prepare_documents
 
         markdown_paths = collect_chapter_markdown_paths(paths.content_root)
+        # V3.0 3.4：项目声明了正文模块引用时，在 Mermaid/资源预处理之前展开，
+        # 使预览/检查/Word/HTML 使用同一份解析结果；无声明时为 None（零开销）。
+        reuse_resolver = _project_reuse_resolver(paths)
         prepared_sources, prepare_temp_dir = prepare_documents(
             markdown_paths,
             cancel_check=lambda: token.is_cancelled,
+            resolver=reuse_resolver,
         )
         prepare_warnings = []
         for prepared in prepared_sources:
@@ -768,18 +845,39 @@ def _run_pipeline_inner(
             log.warn(STAGE_PREPARE, "content_prepare", {"message": str(warning.get("message", ""))})
             _emit(STAGE_PREPARE, "warning", str(warning.get("message", "")))
         for item in prepared_sources:
-            if not getattr(item, "assets", None):
-                continue
-            if getattr(item, "asset_root", ""):
+            if getattr(item, "assets", None) and getattr(item, "asset_root", ""):
                 asset_overrides[os.path.abspath(item.source_path)] = item.asset_root
-            prepared_path = getattr(item, "prepared_path", "")
-            if prepared_path and prepared_path != item.source_path:
+            if getattr(item, "prepared_path", ""):
                 prepared_texts[os.path.abspath(item.source_path)] = item.read_prepared_text()
+        # 固定模块资源来自 reuse/，先复制到任务资源目录，保持宿主资源目录只读。
+        module_resources = getattr(reuse_resolver, "resources", {})
+        if module_resources:
+            if prepare_temp_dir is None:
+                import tempfile
+                prepare_temp_dir = tempfile.mkdtemp(prefix="doc-tool-module-assets-")
+            from doc_tool.application.effective_snapshot import collect_resource_paths, _resolve_resource_file
+            for index, item in enumerate(prepared_sources):
+                key = os.path.abspath(item.source_path)
+                targets = collect_resource_paths([item.read_prepared_text()])
+                if not any(target in module_resources for target in targets):
+                    continue
+                asset_root = Path(asset_overrides.get(key) or (Path(prepare_temp_dir) / "module-assets" / str(index)))
+                for target in targets:
+                    source = module_resources.get(target) or _resolve_resource_file(
+                        paths.resolve(manifest.relative_asset_root()), "", target,
+                    )
+                    destination = _resolve_resource_file(asset_root, "", target)
+                    if source is not None and destination is not None and source.is_file():
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, destination)
+                asset_overrides[key] = str(asset_root)
+                item.asset_root = str(asset_root)
         generated = sum(1 for item in prepared_sources for asset in item.assets if asset.image_path)
+        reuse_detail = _reuse_stage_detail(reuse_resolver)
         result.events.append(StageEvent(
             STAGE_PREPARE, "succeeded",
-            detail="预处理 {0} 份内容，生成图 {1} 张".format(
-                len(prepared_sources), generated
+            detail="预处理 {0} 份内容，生成图 {1} 张{2}".format(
+                len(prepared_sources), generated, reuse_detail
             ),
         ))
         log.info(STAGE_PREPARE, "succeeded", {"documents": len(prepared_sources), "generatedImages": generated})
@@ -898,13 +996,39 @@ def _run_pipeline_inner(
             asset_overrides=asset_overrides,
             prepared_texts=prepared_texts,
         )
-        result.events.append(StageEvent(
-            STAGE_VALIDATE_PRE,
-            "succeeded" if ok else "failed",
-            detail="校验通过" if ok else "校验未通过",
-        ))
-        log.info(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
-        _record_stage(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
+        expanded = int(getattr(reuse_resolver, "changed", 0) or 0)
+        failures = _validation_failure_lines(manifest, paths) if not ok and expanded else []
+        baseline_checks = {"原 Word 与重建 Word 业务元素顺序/文本严格一致", "原 Word Heading 层次未改变"}
+        only_baseline_changed = bool(failures) and all(
+            line.split(" — ", 1)[0].strip() in baseline_checks for line in failures
+        )
+        validation_warned = False
+        if not ok and expanded and only_baseline_changed:
+            # V3.0 3.4：使用正文模块引用的项目，构建结果按设计比原始 Word 多出
+            # 展开内容，仅原 Word 的基线差异可带提醒完成；Markdown 与产物的
+            # 一致性、结构、资源及模板校验失败仍然阻断。
+            detail = "正文模块已展开 {0} 章：源/重建一致性按带提醒处理".format(expanded)
+            if failures:
+                detail += "；差异项：{0}".format("；".join(failures[:3]))
+            result.events.append(StageEvent(
+                STAGE_VALIDATE_PRE, "warning", detail=detail,
+                metrics={"reuseExpansions": expanded, "validationFailures": failures[:10]},
+            ))
+            log.warn(STAGE_VALIDATE_PRE, "reuse_expanded", {
+                "expansions": expanded, "failures": failures[:10],
+            })
+            _record_stage(STAGE_VALIDATE_PRE, "skipped")
+            result.warnings = getattr(result, "warnings", [])
+            ok = True
+            validation_warned = True
+        if not validation_warned:
+            result.events.append(StageEvent(
+                STAGE_VALIDATE_PRE,
+                "succeeded" if ok else "failed",
+                detail="校验通过" if ok else "校验未通过",
+            ))
+            log.info(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
+            _record_stage(STAGE_VALIDATE_PRE, "succeeded" if ok else "failed")
         if not ok:
             result.error_code = ValidationError.code
             _cleanup_temp()

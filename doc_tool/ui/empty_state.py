@@ -177,6 +177,7 @@ class EmptyState(QWidget):
         on_open_project: Optional[Callable[[], None]] = None,
         on_open_recent: Optional[Callable[[str], None]] = None,
         on_remove_recent: Optional[Callable[[str], None]] = None,
+        on_relocate_recent: Optional[Callable[[str, str], None]] = None,
         on_convert: Optional[Callable[[Optional[str]], None]] = None,
         on_pdf_toolbox: Optional[Callable[[Optional[str]], None]] = None,
         on_drop_files: Optional[Callable[[List[Path]], None]] = None,
@@ -192,6 +193,7 @@ class EmptyState(QWidget):
         self._on_open_project = on_open_project
         self._on_open_recent = on_open_recent
         self._on_remove_recent = on_remove_recent
+        self._on_relocate_recent = on_relocate_recent
         self._on_convert = on_convert
         self._on_pdf_toolbox = on_pdf_toolbox
         self._on_drop_files = on_drop_files
@@ -649,10 +651,12 @@ class EmptyState(QWidget):
         # 路径存在性校验
         exists = Path(entry.path).is_dir()
         if not exists:
-            card.setToolTip("项目目录已移动或删除：{0}\n点击 ✕ 可直接从列表移除".format(entry.path))
+            card.setToolTip(
+                "项目目录已移动或删除：{0}\n点击 🔍 可重新定位，点击 ✕ 可从列表移除".format(entry.path)
+            )
             invalid_pill = _make_pill("路径失效", muted=True, parent=card)
             invalid_pill.setProperty("pillTone", "warning")
-            invalid_pill.setToolTip("项目目录已移动或删除，点击 ✕ 可直接从列表移除")
+            invalid_pill.setToolTip("项目目录已移动或删除，可重新定位或从列表移除")
             row.addWidget(invalid_pill)
         else:
             card.setToolTip(entry.path)
@@ -670,8 +674,13 @@ class EmptyState(QWidget):
             locate_btn.setToolTip("在文件资源管理器中定位目录")
             locate_btn.clicked.connect(lambda _=False, p=entry.path: self._handle_locate_project(p))
         else:
-            locate_btn.setEnabled(False)
-            locate_btn.setToolTip("目录不存在或已移动，无法在资源管理器中定位")
+            # 规范 R9：失效条目要能“重新定位”，而不是只能移除（第二十七轮规范覆盖审计）
+            locate_btn.setText("🔍")
+            locate_btn.setProperty("recentAction", "relocate")
+            locate_btn.setToolTip("项目已移动：重新选择它的目录")
+            locate_btn.clicked.connect(
+                lambda _=False, p=entry.path: self._handle_relocate_project(p)
+            )
         row.addWidget(locate_btn)
 
         copy_btn = QPushButton("📋", card)
@@ -741,6 +750,27 @@ class EmptyState(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(p.parent)))
         else:
             QToolTip.showText(QCursor.pos(), "项目目录已移动或删除，无法在资源管理器中定位")
+
+    def _handle_relocate_project(self, path: str) -> None:
+        """失效的最近项目：让用户重新选择目录（必须仍是项目）。"""
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        start_dir = str(Path(path).parent) if path else ""
+        chosen = QFileDialog.getExistingDirectory(self, "重新定位项目目录", start_dir)
+        if not chosen:
+            return
+        candidate = Path(chosen)
+        manifest_path = candidate / "project.yml"
+        if not manifest_path.is_file():
+            QMessageBox.information(
+                self, "不是项目目录",
+                "所选目录缺少 project.yml，无法作为项目重新定位：\n{0}".format(chosen),
+            )
+            return
+        if self._on_relocate_recent is not None:
+            self._on_relocate_recent(str(path), str(candidate))
+        else:
+            QToolTip.showText(QCursor.pos(), "已选择新目录：{0}".format(chosen))
 
     def _handle_copy_path(self, path: str, btn: QPushButton) -> None:
         """复制项目路径到剪贴板并提示。"""

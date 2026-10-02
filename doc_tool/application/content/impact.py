@@ -364,7 +364,13 @@ class ReviewRecordStore:
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         import os
 
-        os.replace(str(tmp), str(self.file))
+        try:
+            os.replace(str(tmp), str(self.file))
+        except OSError:
+            # 跨设备/文件过滤层拒绝 rename 时回退移动，避免负责人记录整批丢失。
+            import shutil as _shutil
+
+            _shutil.move(str(tmp), str(self.file))
         return self.file
 
     def confirm(

@@ -143,7 +143,11 @@ class PartialCollectionTests(unittest.TestCase):
         before = [item.relative_path for item in manifest.files]
         from unittest import mock
 
-        with mock.patch("os.replace", side_effect=OSError("\u78c1\u76d8\u9519\u8bef")):
+        # 登记先尝试原子替换，跨设备/文件过滤层拒绝 rename 时回退 shutil.move；
+        # 这里让两条路径都失败，验证“登记失败仍保留已有成果”。
+        with mock.patch("os.replace", side_effect=OSError("disk")), mock.patch(
+            "shutil.move", side_effect=OSError("disk")
+        ):
             path, note = register_manifest(self.root, manifest)
         self.assertIsNone(path)
         self.assertIn("\u4ecd\u4fdd\u7559", note)

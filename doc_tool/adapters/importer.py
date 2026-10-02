@@ -337,6 +337,8 @@ class ExtractionResult:
     chapters: List[Dict] = field(default_factory=list)
     image_map: List[Dict] = field(default_factory=list)
     table_map: List[Dict] = field(default_factory=list)
+    #: 暂不支持对象（公式/脚注/文本框/OLE/批注）的逐段落事实（CORE 3.2）。
+    unsupported_map: List[Dict] = field(default_factory=list)
 
 
 def extract_content(
@@ -347,6 +349,8 @@ def extract_content(
     document_type: str,
     heading_style_map: Optional[Dict[str, int]] = None,
     allow_missing_headings: bool = False,
+    retain_pre_title_body: bool = False,
+    pre_title_title: str = "前言",
 ) -> ExtractionResult:
     """从源 DOCX 提取正文 Markdown、图片与复杂表格（任务 4.2）。
 
@@ -363,6 +367,9 @@ def extract_content(
         document_type: 文档类型（general/requirement/design），用于资源映射前缀。
         heading_style_map: 可选的用户样式映射覆盖（styleId -> 级别 1~6）；
             传入时不自行解析 styles.xml，标题识别直接使用该映射。
+        retain_pre_title_body: 为 True 时把第一个标题之前的正文作为
+            ``pre_title_title`` 章节保留（默认 False，保持旧行为不变，由导入
+            计划在“明确范围”内显式开启，避免默认复制底模封面）。
 
     Returns:
         提取结果统计。
@@ -406,6 +413,13 @@ def extract_content(
         else:
             raise ValueError("源文档未找到第一个 Heading 1，无法确定正文起点。")
 
+    # 标题前正文：仅在计划明确要求时保留，并作为独立章节而非并入首章。
+    pre_title_chapter: Optional[str] = None
+    if retain_pre_title_body and start_idx is not None and start_idx > 0:
+        if _has_meaningful_content(children[:start_idx]):
+            pre_title_chapter = pre_title_title
+            start_idx = 0
+
     img_map: List[Dict] = []
     tbl_map: List[Dict] = []
     img_counter = 0
@@ -416,7 +430,10 @@ def extract_content(
     cur_file: Optional[Path] = None
     cur_lines: Optional[List[str]] = None
 
-    for el in children[start_idx:]:
+    unsupported_map: List[Dict] = []
+    for element_index, el in enumerate(children):
+        if element_index < start_idx:
+            continue
         tag = etree.QName(el).localname
         if tag == "sectPr":
             continue
@@ -443,10 +460,13 @@ def extract_content(
                         el, rel_map, media_files, images_dir,
                         img_counter, img_map, cur_chapter, document_type, cur_lines,
                     )
+                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
                 continue
             if cur_file is None:
-                if txt or has_img:
-                    cur_chapter = "正文"
+                pre_title_objects = _unsupported_features(el)
+                if txt or has_img or pre_title_objects:
+                    cur_chapter = pre_title_chapter or "正文"
+                    pre_title_chapter = None
                     fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
                     cur_file = content_dir / fname
                     cur_lines = ["# " + cur_chapter, ""]
@@ -475,15 +495,21 @@ def extract_content(
                     el, rel_map, media_files, images_dir,
                     img_counter, img_map, cur_chapter, document_type, cur_lines,
                 )
+                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
             elif txt == "":
                 if cur_lines and cur_lines[-1] != "<EMPTY_PAR/>":
                     cur_lines.append("<EMPTY_PAR/>")
+                # 空文本段落里也可能只有暂不支持对象（如无文本的文本框）：
+                # 这里同样记录事实并在需要时插入可见占位（CORE 3.2）。
+                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
             else:
                 _emit_paragraph(el, txt, cur_lines)
                 cur_lines.append("")
+                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
         elif tag == "tbl":
             if cur_file is None:
-                cur_chapter = "正文"
+                cur_chapter = pre_title_chapter or "正文"
+                pre_title_chapter = None
                 fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
                 cur_file = content_dir / fname
                 cur_lines = ["# " + cur_chapter, ""]
@@ -514,6 +540,7 @@ def extract_content(
         chapters=chapter_order,
         image_map=img_map,
         table_map=tbl_map,
+        unsupported_map=unsupported_map,
     )
 
 
@@ -599,6 +626,22 @@ def _para_image_info(p) -> List[Dict]:
     return infos
 
 
+def _has_meaningful_content(children) -> bool:
+    """判断给定正文元素里是否有可读内容（文本/图片/表格/暂不支持对象）。
+
+    只含文本框/OLE 等暂不支持对象的段落同样“有意义”：若不算数，标题前这类段落会在
+    ``start_idx`` 选择时被整段跳过，既没有事实记录也没有正文占位（复核发现）。
+    """
+    for el in children or ():
+        tag = etree.QName(el).localname
+        if tag == "p":
+            if _para_text(el).strip() or _para_has_image(el) or _unsupported_features(el):
+                return True
+        elif tag == "tbl":
+            return True
+    return False
+
+
 def _emit_images(
     el, rel_map, media_files, images_dir, img_counter, img_map,
     cur_chapter, document_type, cur_lines,
@@ -609,6 +652,20 @@ def _emit_images(
     for info in image_infos:
         relation = rel_map.get(info["rid"])
         if relation is None:
+            # 关系缺失：正文保留可见占位，位置可定位（CORE 2.4/C 3.2）。
+            img_map.append({
+                "original_rid": info["rid"],
+                "file": "",
+                "chapter": cur_chapter or "",
+                "source_index": img_counter + 1,
+                "width_px": None,
+                "height_px": None,
+                "missing": True,
+                "target": "",
+                "source_part": "word/document.xml",
+            })
+            cur_lines.append(_placeholder_marker("图片", info["rid"]))
+            cur_lines.append("")
             continue
         target = relation.get("target", "")
         if relation.get("targetMode", "").lower() == "external" or target.lstrip().lower().startswith(
@@ -630,6 +687,20 @@ def _emit_images(
             elif media_key.startswith("word/") and media_key[5:] in media_files:
                 media_key = media_key[5:]
             else:
+                # 包内资源缺失：占位可见、可定位，不静默丢图。
+                img_map.append({
+                    "original_rid": info["rid"],
+                    "file": "",
+                    "chapter": cur_chapter or "",
+                    "source_index": img_counter + 1,
+                    "width_px": None,
+                    "height_px": None,
+                    "missing": True,
+                    "target": target,
+                    "source_part": "word/document.xml",
+                })
+                cur_lines.append(_placeholder_marker("图片", target))
+                cur_lines.append("")
                 continue
         img_counter += 1
         media_data = media_files[media_key]
@@ -653,6 +724,69 @@ def _emit_images(
             "height_px": h_px,
         })
     return img_counter, img_map
+
+
+#: 暂不支持对象的检测规则：元素本地名 → (feature, 中文标签)。
+_UNSUPPORTED_RULES = (
+    (("oMath", "oMathPara"), "formula", "公式"),
+    (("footnoteReference", "endnoteReference"), "footnote", "脚注"),
+    (("txbxContent", "textbox"), "textbox", "文本框"),
+    (("object", "OLEObject"), "ole", "嵌入对象"),
+    (("commentReference",), "comment", "批注"),
+)
+
+
+def _unsupported_features(el) -> List[str]:
+    """返回本段落里出现的暂不支持对象标签（去重、稳定顺序）。"""
+    labels: List[str] = []
+    for node in el.iter():
+        local = etree.QName(node).localname
+        for locals_, feature, label in _UNSUPPORTED_RULES:
+            if local in locals_ and (feature, label) not in labels:
+                labels.append((feature, label))
+    return labels
+
+
+def _emit_unsupported(
+    el, txt, cur_chapter, source_index, cur_lines, unsupported_map,
+) -> None:
+    """正文可见占位 + 事实记录（CORE 3.2）。
+
+    - 段落里提取到了文本（如 OMML/文本框文本已降级为纯文本）→ 记为“文本降级（可编辑）”，
+      不插入占位，避免正文出现重复提示；
+    - 没有提取到文本 → 插入可见占位，并记录章节与元素序号，结果页可定位、可替换。
+    """
+    labels = _unsupported_features(el)
+    if not labels:
+        return
+    sample = "body[{0}]".format(source_index)
+    paragraph_text = bool(str(txt or "").strip())
+    for feature, label in labels:
+        # 公式（OMML m:t）与文本框（w:txbxContent 的 w:t）的文本会随段落一起被提取；
+        # 脚注/尾注/批注的正文在独立部件里，OLE 对象也不是文本——这些一律按原件留存 + 占位，
+        # 不能因为“同段还有别的文字”就宣称文本降级（复核发现）。
+        degradable = feature in ("formula", "textbox")
+        has_text = bool(paragraph_text and degradable)
+        unsupported_map.append({
+            "feature": feature,
+            "label": label,
+            "chapter": cur_chapter or "",
+            "source_index": source_index,
+            "sample": sample,
+            "source_part": "word/document.xml",
+            "handling": "text-degraded" if has_text else "placeholder",
+            "has_text": has_text,
+        })
+        if not has_text:
+            cur_lines.append(_placeholder_marker(label, sample))
+            cur_lines.append("")
+
+
+def _placeholder_marker(feature: str, source: str) -> str:
+    """正文占位标记；与 ``placeholder_text`` 同一前缀，便于导出/源码包识别。"""
+    from doc_tool.application.intake_contract import placeholder_text
+
+    return placeholder_text(feature, source)
 
 
 def _emit_paragraph(el, txt, cur_lines) -> None:

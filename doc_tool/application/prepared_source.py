@@ -34,6 +34,9 @@ from doc_tool.domain.blocks import (
     parse_blocks,
 )
 
+#: 正文展开失败事实（V3.0 3.4）：供调用方在报告中说明，不改变既有返回结构。
+_RESOLVE_FAILURES: List[Dict[str, str]] = []
+
 
 #: 缓存格式版本；渲染参数或输出结构变化时必须递增，避免复用旧语义结果。
 CACHE_FORMAT_VERSION = "v1"
@@ -393,6 +396,7 @@ def prepare_markdown(
     cancel_check: Optional[Callable[[], bool]] = None,
     text: Optional[str] = None,
     asset_subdir: str = "assets",
+    resolver: Optional[Callable[[str, str], str]] = None,
 ) -> PreparedSource:
     """把一份 Markdown 预处理成可构建的临时文件。
 
@@ -403,6 +407,9 @@ def prepare_markdown(
         renderer: 可注入的渲染函数（测试用），默认复用 ``mermaid.render``。
         cancel_check: 返回 True 表示用户已取消当前任务。
         text: 已读取的 Markdown 文本；为空时从 ``path`` 读取。
+        resolver: 可选正文展开器 ``(path, text) -> text``（V3.0 固定模块引用）。
+            在 Mermaid/资源预处理**之前**调用，保证预览/检查/Word/HTML 使用同一
+            份展开内容；没有模块标记时实现方应原样返回，避免额外开销。
     """
     cache_dir = Path(cache_root) if cache_root else default_cache_root()
     if text is None:
@@ -421,6 +428,16 @@ def prepare_markdown(
             )
             return prepared
 
+    if resolver is not None:
+        try:
+            resolved_text = resolver(path, text)
+        except Exception as exc:  # noqa: BLE001 - 展开失败保留原文，不阻断构建
+            resolved_text = text
+            _RESOLVE_FAILURES.append(
+                {"path": path, "message": str(exc) or type(exc).__name__}
+            )
+        if isinstance(resolved_text, str) and resolved_text:
+            text = resolved_text
     document = parse_blocks(text, path)
     prepared = PreparedSource(source_path=path)
     prepared.parse_warnings = [warning.to_dict() for warning in document.warnings]
@@ -653,6 +670,7 @@ def prepare_documents(
     cache_root: Optional[Path] = None,
     renderer: Optional[Callable[[str, str], object]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    resolver: Optional[Callable[[str, str], str]] = None,
 ) -> Tuple[List[PreparedSource], Optional[str]]:
     """批量预处理多份 Markdown，共用一个临时目录。
 
@@ -669,6 +687,7 @@ def prepare_documents(
             cache_root=cache_root,
             renderer=renderer,
             cancel_check=cancel_check,
+            resolver=resolver,
         )
         if prepared.temp_dir:
             # 子目录已挂到共享目录下，交给共享目录统一清理。

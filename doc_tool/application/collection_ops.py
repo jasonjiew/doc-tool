@@ -243,7 +243,15 @@ def export_package(
     """
     base = Path(root).resolve()
     manifest = load_manifest(manifest_path)
-    target = Path(destination)
+    target = Path(destination).resolve()
+    protected = [Path(manifest_path).resolve()]
+    protected.extend(
+        source for item in manifest.files
+        if (source := _resolve_inside(base, item.relative_path)) is not None
+    )
+    if any(target == source or (target.exists() and source.exists() and target.samefile(source))
+           for source in protected):
+        raise ValueError("导出目标不能覆盖基线源文件或清单。")
     target.parent.mkdir(parents=True, exist_ok=True)
     skipped: List[str] = []
     written: List[str] = []
@@ -289,7 +297,9 @@ def recover_baseline(
     """
     base = Path(root).resolve()
     manifest = load_manifest(manifest_path)
-    target_root = Path(destination)
+    target_root = Path(destination).resolve()
+    if target_root == base or base in target_root.parents or target_root in base.parents:
+        raise ValueError("恢复目标必须与基线源目录分离。")
     result = {
         "restored": [],
         "skipped": [],

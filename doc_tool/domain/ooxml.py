@@ -209,8 +209,25 @@ def read_docx_package(path: Union[str, Path]) -> DocxPackage:
                 reason="doc_as_docx",
                 cause=exc,
             ) from exc
+        # 受限环境（透明加密/杀软）会让读取得到密文或直接 PermissionError：
+        # 这类情况要给“加入信任列表”的建议，而不是让用户去重新另存 docx。
+        environment_advice = ""
+        if not h.startswith(b"PK"):
+            try:
+                from doc_tool.application.env_probe import probe_docx_read
+
+                probe = probe_docx_read(file_path)
+                if not probe.ok and probe.advice:
+                    environment_advice = probe.advice[0]
+            except Exception:  # noqa: BLE001 - 自检不可用不影响原始错误
+                environment_advice = ""
+        message = "文件不是有效的 ZIP 包或不存在（路径={0}，前16字节={1!r}）：{2}".format(
+            file_path, h, exc
+        )
+        if environment_advice:
+            message = "{0}；{1}".format(message, environment_advice)
         raise OOXMLSecurityError(
-            "文件不是有效的 ZIP 包或不存在（路径={0}，前16字节={1!r}）：{2}".format(file_path, h, exc),
+            message,
             part_name="",
             reason="zip",
             cause=exc,

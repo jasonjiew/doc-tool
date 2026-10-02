@@ -127,6 +127,8 @@ class ImportPreview:
     #: 导入保真报告（V2.7 5.5）：保留/降级/阻断分级，供结果页与问题中心复用。
     import_report: Optional[ImportFidelityReport] = None
     style_census: Dict[str, StyleCensus] = field(default_factory=dict)
+    #: 标题前正文摘要（CORE 2.2）：``{"kind": "p"|"image"|"table", "text": ...}``。
+    pre_title_blocks: List[Dict[str, object]] = field(default_factory=list)
 
     @property
     def has_heading1(self) -> bool:
@@ -140,6 +142,7 @@ def preflight(
     path: Union[str, Path],
     heading_style_map: Optional[Dict[str, int]] = None,
     allow_missing_headings: bool = False,
+    tolerate_missing_resources: bool = False,
 ) -> ImportPreview:
     """对任意文件名的 DOCX 执行完整预检，返回预览模型。
 
@@ -152,6 +155,9 @@ def preflight(
             传入时不再自动解析 styles.xml 的 Heading 样式，标题树按该映射构建。
         allow_missing_headings: 为 True 时跳过标题层级 fail-closed 校验，
             供向导在进入「样式映射」步骤前扫描用；结构性错误仍会抛出。
+        tolerate_missing_resources: 为 True 时不因“正文引用但包内缺失的资源”
+            （典型：缺一张图片）整体拒绝导入，而是转成告警并让正文用占位继续
+            （CORE 2.4/兜底原则）；包/XML 无法安全解析等结构性错误仍会抛出。
 
     Returns:
         ``ImportPreview`` 预览模型。
@@ -176,7 +182,15 @@ def preflight(
 
             # --- 3.2 关系目标完整性 ---
             rel_map = _parse_relationships(parts)
-            _check_relationship_targets(rel_map, set(package.names))
+            resource_warnings: List[str] = []
+            try:
+                _check_relationship_targets(rel_map, set(package.names))
+            except BrokenRelationshipError as exc:
+                if not tolerate_missing_resources:
+                    raise
+                resource_warnings.append(
+                    "{0}（普通模式继续：缺资源位置在正文保留占位）".format(exc.user_message)
+                )
 
             # --- 3.3 标题样式映射与标题树 ---
             if heading_style_map is None:
@@ -215,7 +229,15 @@ def preflight(
                 _validate_heading_hierarchy(headings)
 
             # --- 3.2 续：正文资源引用预检 ---
-            body_resource_warnings = _check_body_resource_references(parts, rel_map)
+            try:
+                body_resource_warnings = _check_body_resource_references(parts, rel_map)
+            except BrokenRelationshipError as exc:
+                if not tolerate_missing_resources:
+                    raise
+                resource_warnings.append(
+                    "{0}（普通模式继续：缺资源位置在正文保留占位）".format(exc.user_message)
+                )
+                body_resource_warnings = []
 
             # --- 2.1 保真扫描（分级报告，随预览返回） ---
             fidelity_report = scan_fidelity(parts)
@@ -234,7 +256,8 @@ def preflight(
             for h in headings:
                 level_counts[h.level] = level_counts.get(h.level, 0) + 1
 
-            warnings: List[str] = []
+            pre_title_blocks = _collect_pre_title_blocks(parts, headings)
+            warnings: List[str] = list(resource_warnings)
             if not heading_style_map:
                 warnings.append("未在 styles.xml 中找到任何 Heading 样式定义。")
             warnings.extend(body_resource_warnings)
@@ -263,6 +286,7 @@ def preflight(
                 fidelity=fidelity_report,
                 import_report=build_import_report(fidelity_report),
                 style_census=style_census,
+                pre_title_blocks=pre_title_blocks,
             )
     except OOXMLSecurityError as exc:
         raise _map_security_error(exc) from exc
@@ -336,6 +360,37 @@ def _map_security_error(exc: OOXMLSecurityError) -> DocToolError:
             details={"missingPart": exc.part_name},
         )
     return InvalidDocxError(str(exc))
+
+
+def _collect_pre_title_blocks(parts: Dict[str, bytes], headings) -> List[Dict[str, object]]:
+    """收集第一个标题之前的正文摘要（只看结构，不落盘正文）。"""
+    blocks: List[Dict[str, object]] = []
+    if not headings:
+        return blocks
+    document_xml = parts.get("word/document.xml")
+    if document_xml is None:
+        return blocks
+    first_index = int(getattr(headings[0], "body_index", 0) or 0)
+    if first_index <= 0:
+        return blocks
+    root = parse_xml_safe(document_xml, "word/document.xml")
+    body = root.find(_qn("body"))
+    if body is None:
+        return blocks
+    for element in list(body)[:first_index]:
+        local = etree.QName(element).localname
+        if local == "p":
+            text = _para_text(element).strip()
+            has_image = any(True for _ in element.iter(A + "blip")) or any(
+                etree.QName(node).localname == "imagedata" for node in element.iter()
+            )
+            if has_image:
+                blocks.append({"kind": "image", "text": ""})
+            if text:
+                blocks.append({"kind": "p", "text": text})
+        elif local == "tbl":
+            blocks.append({"kind": "table", "text": ""})
+    return blocks
 
 
 def _check_xml_wellformed(parts: Dict[str, bytes]) -> None:

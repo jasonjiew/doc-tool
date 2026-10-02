@@ -5,9 +5,10 @@ from doc_tool.application.export.readonly_html import export_readonly_html
 
 
 class HtmlPreviewDialog(QDialog):
-    def __init__(self, summary, workspace, open_directory, parent=None):
+    def __init__(self, summary, workspace, open_directory, parent=None, *, text_resolver=None):
         super().__init__(parent)
         self.summary, self.workspace, self.open_directory = summary, workspace, open_directory
+        self._text_resolver = text_resolver
         self.runner = TaskRunner()
         self.last_directory = None
         self.setWindowTitle('只读离线 HTML 快照（非正式发布）')
@@ -50,7 +51,8 @@ class HtmlPreviewDialog(QDialog):
         paths = self.summary.paths
         self.runner.start(TaskSpec(name='readonly-html', target=export_readonly_html,
             args=(paths.content_root, paths.assets_root, paths.output_dir, self.summary.manifest.documentVersion),
-            kwargs=dict(rel_path=self.scope.currentData(), omitted_unsaved=omitted)),
+            kwargs=dict(rel_path=self.scope.currentData(), omitted_unsaved=omitted,
+                        text_resolver=self._text_resolver)),
             on_event=lambda event: self.details.appendPlainText(event.detail or event.kind), on_done=self.done)
         self.run_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)

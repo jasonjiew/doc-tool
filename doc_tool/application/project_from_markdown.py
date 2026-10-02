@@ -91,8 +91,11 @@ def create_project_from_markdown(
         name = source.name
         target = content_root / name
         if target.exists():
-            stem = "{0}-{1}".format(source.stem, index + 1)
-            target = content_root / (stem + source.suffix)
+            suffix_index = index + 1
+            while target.exists():
+                stem = "{0}-{1}".format(source.stem, suffix_index)
+                target = content_root / (stem + source.suffix)
+                suffix_index += 1
             result.warnings.append("\u540c\u540d\u7ae0\u8282\u5df2\u5b58\u5728\uff0c\u5df2\u91cd\u547d\u540d\uff1a{0}".format(target.name))
         try:
             shutil.copy2(source, target)

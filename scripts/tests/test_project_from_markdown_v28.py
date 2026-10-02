@@ -60,6 +60,20 @@ class MarkdownProjectTests(unittest.TestCase):
         self.assertEqual(manifest.chapters, ["1 概述.md", "2 设计.md", "3 附录.md"])
         self.assertEqual(result.chapters, manifest.chapters)
 
+    def test_duplicate_source_names_do_not_overwrite_renamed_chapters(self):
+        first = self._write("a-3.md", "first")
+        second = self._write("a.md", "second")
+        other = self.tmp / "other"
+        other.mkdir()
+        third = other / "a.md"
+        third.write_text("third" + NL, encoding="utf-8")
+        result = create_project_from_markdown([first, second, third], self.project)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(len(result.chapters), 3)
+        self.assertEqual(len(set(result.chapters)), 3)
+        texts = [(self.project / "content" / name).read_text(encoding="utf-8") for name in result.chapters]
+        self.assertEqual(texts, ["first" + NL, "second" + NL, "third" + NL])
+
     def test_explicit_order_overrides_and_appends_unlisted(self):
         first = self._write("1 概述.md")
         second = self._write("2 设计.md")
