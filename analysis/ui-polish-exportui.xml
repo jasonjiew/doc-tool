@@ -1,0 +1,93 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="0" time="100.536"><testsuite name="doc-tool" tests="3" failures="0" time="100.536"><testcase name="test_core_export_ui.py" classname="scripts.tests" time="3.450"><system-out /></testcase><testcase name="test_core_export_snapshot.py" classname="scripts.tests" time="84.343"><system-out>test_cancel_keeps_completed_formats (__main__.ExportTests.test_cancel_keeps_completed_formats) ... ok
+test_invalid_destination_falls_back_and_keeps_settings (__main__.ExportTests.test_invalid_destination_falls_back_and_keeps_settings) ... ok
+test_multi_format_partial_success_keeps_usable_results (__main__.ExportTests.test_multi_format_partial_success_keeps_usable_results) ... ok
+test_retry_only_failed_format_reuses_original_round (__main__.ExportTests.test_retry_only_failed_format_reuses_original_round) ... ok
+test_same_name_uses_new_safe_name_instead_of_overwriting (__main__.ExportTests.test_same_name_uses_new_safe_name_instead_of_overwriting) ... ok
+test_scope_and_summary_report_actual_range (__main__.ExportTests.test_scope_and_summary_report_actual_range) ... ok
+test_source_package_is_portable_and_excludes_user_data (__main__.ExportTests.test_source_package_is_portable_and_excludes_user_data) ... ok
+test_source_package_keeps_assets_and_parent_body_when_moved (__main__.ExportTests.test_source_package_keeps_assets_and_parent_body_when_moved) ... ok
+test_source_package_reports_missing_resource (__main__.ExportTests.test_source_package_reports_missing_resource) ... ok
+test_action_items_are_direct_and_limited (__main__.ReadonlyAndActionTests.test_action_items_are_direct_and_limited) ... ok
+test_readonly_project_exports_to_external_dir_without_writing_inside (__main__.ReadonlyAndActionTests.test_readonly_project_exports_to_external_dir_without_writing_inside) ... ok
+test_buffer_edit_is_captured_without_touching_disk (__main__.SnapshotTests.test_buffer_edit_is_captured_without_touching_disk) ... ok
+test_cache_key_tracks_content_and_scope (__main__.SnapshotTests.test_cache_key_tracks_content_and_scope) ... ok
+test_saved_mode_ignores_buffer_edits (__main__.SnapshotTests.test_saved_mode_ignores_buffer_edits) ... ok
+test_scope_selects_chapters_in_project_order (__main__.SnapshotTests.test_scope_selects_chapters_in_project_order) ... ok
+test_snapshot_assets_use_manifest_resource_root (__main__.SnapshotTests.test_snapshot_assets_use_manifest_resource_root) ... ok
+test_snapshot_rejects_work_directory_over_source_project (__main__.SnapshotTests.test_snapshot_rejects_work_directory_over_source_project) ... ok
+test_source_updated_detection (__main__.SnapshotTests.test_source_updated_detection) ... ok
+test_preview_uses_same_snapshot_content_as_export (__main__.SnapshotViewTests.test_preview_uses_same_snapshot_content_as_export) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 80.953s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-61208-1\.proj.import-staging-61208-ebuitjp6\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121059-a517a90e\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121059-a517a90e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121100-b03b0d7c\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121100-b03b0d7c\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121114-a4c4545a\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121114-a4c4545a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121127-d8d4b5a4\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121127-d8d4b5a4\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121148-95307fd7\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121148-95307fd7\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121159-30c65a20\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-61208-1\proj\.state\snapshots\20261002T121159-30c65a20\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-61208-2\.proj.import-staging-61208-zlppm5x5\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\.doctool\snapshots\20261002T121213-57fe506f\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\.doctool\snapshots\20261002T121213-57fe506f\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-61208-3\.proj.import-staging-61208-14ouvo28\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-61208-4\.proj.import-staging-61208-4qxrl8tl\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_gui_loop.py" classname="scripts.tests" time="12.744"><system-out>test_loop_import_edit_export_open_without_word (__main__.GuiLoopTests.test_loop_import_edit_export_open_without_word)
+源已选 → 进入编辑 → 改一章 → 快速导出 → 打开结果：全程真实服务。 ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_loop_with_real_word_refresh_when_available (__main__.GuiLoopTests.test_loop_with_real_word_refresh_when_available)
+实机项：真实 Word 刷新闭环默认跳过，需显式开启 CORE_REAL_WORD=1。 ... skipped '真实 Word 刷新闭环为实机项：设置 CORE_REAL_WORD=1 后执行'
+test_u3_editor_reachable_and_preview_shared (__main__.GuiLoopTests.test_u3_editor_reachable_and_preview_shared)
+U-3：常用动作与章节编辑可达；预览基于同一份内容。 ... ok
+test_u8_cancel_without_running_task_is_safe (__main__.GuiLoopTests.test_u8_cancel_without_running_task_is_safe)
+U-8：没有运行中的任务时取消不报错、不弹阻断框。 ... ok
+test_u9_window_and_shortcuts (__main__.GuiLoopTests.test_u9_window_and_shortcuts)
+U-9：1280×720 逻辑窗口下主操作可达，快捷键不冲突。 ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 10.051s
+
+OK (skipped=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\.闭环.import-staging-34776-yzb35rnp\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\闭环\.state\snapshots\20261002T121225-37cf4ad1\output\.tmp-闭环(1.0).docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\闭环\.state\snapshots\20261002T121225-37cf4ad1\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\.闭环.import-staging-34776-su6n566t\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\.闭环.import-staging-34776-59zwzixa\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\.闭环.import-staging-34776-rlinsb4b\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-34776-1\out\.闭环.import-staging-34776-g39l1z88\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

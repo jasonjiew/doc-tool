@@ -1,0 +1,360 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="12" failures="1" time="173.108"><testsuite name="doc-tool" tests="12" failures="1" time="173.108"><testcase name="test_ui_polish_entry_drop.py" classname="scripts.tests" time="4.724"><system-out>test_convert_card_drop_uses_convert_route (__main__.HomeDropRoutingTests.test_convert_card_drop_uses_convert_route) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+ok
+test_drop_without_urls_is_ignored (__main__.HomeDropRoutingTests.test_drop_without_urls_is_ignored) ... This plugin does not support propagateSizeHints()
+ok
+test_intake_area_drop_uses_intake_route (__main__.HomeDropRoutingTests.test_intake_area_drop_uses_intake_route) ... This plugin does not support propagateSizeHints()
+ok
+test_intake_route_and_import_button_share_one_handler (__main__.HomeDropRoutingTests.test_intake_route_and_import_button_share_one_handler)
+主区拖放接线必须就是「新建项目…」按钮使用的同一 handler。 ... ok
+test_positionless_event_keeps_legacy_convert_route (__main__.HomeDropRoutingTests.test_positionless_event_keeps_legacy_convert_route) ... This plugin does not support propagateSizeHints()
+ok
+test_convert_card_drop_of_docx_enters_convert (__main__.MainWindowIntakeDropTests.test_convert_card_drop_of_docx_enters_convert) ... ok
+test_main_area_drop_of_docx_opens_import_wizard_once (__main__.MainWindowIntakeDropTests.test_main_area_drop_of_docx_opens_import_wizard_once) ... ok
+test_main_area_drop_of_markdown_builds_one_project (__main__.MainWindowIntakeDropTests.test_main_area_drop_of_markdown_builds_one_project) ... ok
+test_unsupported_source_on_intake_keeps_file_untouched (__main__.MainWindowIntakeDropTests.test_unsupported_source_on_intake_keeps_file_untouched) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 1.039s
+
+OK
+</system-out></testcase><testcase name="test_ui_polish_quick_export.py" classname="scripts.tests" time="10.339"><system-out>test_availability_ignores_missing_word_but_respects_running (__main__.ProjectBarQuickExportTests.test_availability_ignores_missing_word_but_respects_running) ... ok
+test_button_calls_injected_handler (__main__.ProjectBarQuickExportTests.test_button_calls_injected_handler) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_tooltip_reports_unsaved_source_and_count (__main__.ProjectBarQuickExportTests.test_tooltip_reports_unsaved_source_and_count) ... ok
+test_busy_runner_refuses_second_start_and_keeps_state (__main__.QuickExportWiringTests.test_busy_runner_refuses_second_start_and_keeps_state) ... ok
+test_button_menu_and_shortcut_share_one_handler (__main__.QuickExportWiringTests.test_button_menu_and_shortcut_share_one_handler) ... ok
+test_project_bar_tooltip_reflects_real_unsaved_count (__main__.QuickExportWiringTests.test_project_bar_tooltip_reflects_real_unsaved_count) ... ok
+test_quick_export_uses_daily_defaults_and_counts_unsaved (__main__.QuickExportWiringTests.test_quick_export_uses_daily_defaults_and_counts_unsaved) ... ok
+test_quick_export_without_buffers_falls_back_to_saved (__main__.QuickExportWiringTests.test_quick_export_without_buffers_falls_back_to_saved) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 6.327s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-24392-1\.proj.import-staging-24392-nky126_y\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-24392-1\.proj.import-staging-24392-h_lxlmlo\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-24392-1\.proj.import-staging-24392-u9y5wmts\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-24392-1\.proj.import-staging-24392-4nbhtr3u\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-24392-1\.proj.import-staging-24392-uwtww5s7\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_entries_ui.py" classname="scripts.tests" time="4.922"><system-out>test_docx_import_goes_to_wizard_with_selected_file (__main__.EntryWiringTests.test_docx_import_goes_to_wizard_with_selected_file) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_home_new_project_button_uses_import_entry (__main__.EntryWiringTests.test_home_new_project_button_uses_import_entry) ... ok
+test_markdown_entry_uses_selected_files_in_order (__main__.EntryWiringTests.test_markdown_entry_uses_selected_files_in_order) ... ok
+test_markdown_import_creates_project_and_opens_it (__main__.EntryWiringTests.test_markdown_import_creates_project_and_opens_it) ... ok
+test_open_project_docx_routes_to_reimport_not_new_project (__main__.EntryWiringTests.test_open_project_docx_routes_to_reimport_not_new_project) ... ok
+test_pack_entry_calls_real_pack_service (__main__.EntryWiringTests.test_pack_entry_calls_real_pack_service) ... ok
+test_unsupported_input_warns_without_service_call (__main__.EntryWiringTests.test_unsupported_input_warns_without_service_call) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.017s
+
+OK
+</system-out></testcase><testcase name="test_core_intake_presets_gui.py" classname="scripts.tests" time="4.328"><system-out>test_command_lists_and_stores_pending_preset (__main__.IntakePresetGuiEntryTests.test_command_lists_and_stores_pending_preset) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_unknown_preset_raises_clear_error (__main__.IntakePresetGuiEntryTests.test_unknown_preset_raises_clear_error) ... ok
+test_wizard_receives_pending_preset (__main__.IntakePresetGuiEntryTests.test_wizard_receives_pending_preset) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 1.346s
+
+OK
+</system-out></testcase><testcase name="test_home_experience_iteration.py" classname="scripts.tests" time="3.725"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+..........This plugin does not support propagateSizeHints()
+.This plugin does not support raise()
+......This plugin does not support propagateSizeHints()
+..
+----------------------------------------------------------------------
+Ran 19 tests in 1.845s
+
+OK
+</system-out></testcase><testcase name="test_core_export_ui.py" classname="scripts.tests" time="9.664"><system-out>test_change_directory_keeps_editor_buffer_for_buffer_source (__main__.ExportChangeDirectoryBufferTests.test_change_directory_keeps_editor_buffer_for_buffer_source) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_change_directory_omits_buffer_for_saved_source (__main__.ExportChangeDirectoryBufferTests.test_change_directory_omits_buffer_for_saved_source) ... ok
+test_action_exists_and_states_real_format (__main__.QuickExportUiTests.test_action_exists_and_states_real_format) ... ok
+test_present_report_offers_open_and_retry_buttons (__main__.QuickExportUiTests.test_present_report_offers_open_and_retry_buttons) ... ok
+test_quick_export_calls_service_and_presents_results (__main__.QuickExportUiTests.test_quick_export_calls_service_and_presents_results) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 5.969s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-changedir-63252-1\.proj.import-staging-63252-v8jut7th\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-changedir-63252-1\proj\.state\snapshots\20261002T095757-243fd5ab\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-changedir-63252-1\proj\.state\snapshots\20261002T095757-243fd5ab\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-changedir-63252-1\proj\.state\snapshots\20261002T095758-bce3f876\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-changedir-63252-1\proj\.state\snapshots\20261002T095758-bce3f876\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-export-63252-1\.proj.import-staging-63252-6n0lv4kb\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_export_snapshot.py" classname="scripts.tests" time="95.197"><system-out>test_cancel_keeps_completed_formats (__main__.ExportTests.test_cancel_keeps_completed_formats) ... ok
+test_invalid_destination_falls_back_and_keeps_settings (__main__.ExportTests.test_invalid_destination_falls_back_and_keeps_settings) ... ok
+test_multi_format_partial_success_keeps_usable_results (__main__.ExportTests.test_multi_format_partial_success_keeps_usable_results) ... ok
+test_retry_only_failed_format_reuses_original_round (__main__.ExportTests.test_retry_only_failed_format_reuses_original_round) ... ok
+test_same_name_uses_new_safe_name_instead_of_overwriting (__main__.ExportTests.test_same_name_uses_new_safe_name_instead_of_overwriting) ... ok
+test_scope_and_summary_report_actual_range (__main__.ExportTests.test_scope_and_summary_report_actual_range) ... ok
+test_source_package_is_portable_and_excludes_user_data (__main__.ExportTests.test_source_package_is_portable_and_excludes_user_data) ... ok
+test_source_package_keeps_assets_and_parent_body_when_moved (__main__.ExportTests.test_source_package_keeps_assets_and_parent_body_when_moved) ... ok
+test_source_package_reports_missing_resource (__main__.ExportTests.test_source_package_reports_missing_resource) ... ok
+test_action_items_are_direct_and_limited (__main__.ReadonlyAndActionTests.test_action_items_are_direct_and_limited) ... ok
+test_readonly_project_exports_to_external_dir_without_writing_inside (__main__.ReadonlyAndActionTests.test_readonly_project_exports_to_external_dir_without_writing_inside) ... ok
+test_buffer_edit_is_captured_without_touching_disk (__main__.SnapshotTests.test_buffer_edit_is_captured_without_touching_disk) ... ok
+test_cache_key_tracks_content_and_scope (__main__.SnapshotTests.test_cache_key_tracks_content_and_scope) ... ok
+test_saved_mode_ignores_buffer_edits (__main__.SnapshotTests.test_saved_mode_ignores_buffer_edits) ... ok
+test_scope_selects_chapters_in_project_order (__main__.SnapshotTests.test_scope_selects_chapters_in_project_order) ... ok
+test_snapshot_assets_use_manifest_resource_root (__main__.SnapshotTests.test_snapshot_assets_use_manifest_resource_root) ... ok
+test_snapshot_rejects_work_directory_over_source_project (__main__.SnapshotTests.test_snapshot_rejects_work_directory_over_source_project) ... ok
+test_source_updated_detection (__main__.SnapshotTests.test_source_updated_detection) ... ok
+test_preview_uses_same_snapshot_content_as_export (__main__.SnapshotViewTests.test_preview_uses_same_snapshot_content_as_export) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 92.568s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-47792-1\.proj.import-staging-47792-unzot9ve\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095805-206c34ab\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095805-206c34ab\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095807-9d71331e\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095807-9d71331e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095820-b43dca0d\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095820-b43dca0d\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095831-b0ae8c03\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095831-b0ae8c03\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095900-dc79ae09\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095900-dc79ae09\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095914-cf3c5b50\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-47792-1\proj\.state\snapshots\20261002T095914-cf3c5b50\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-47792-2\.proj.import-staging-47792-rhblxqe8\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\.doctool\snapshots\20261002T095929-273b5c71\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\.doctool\snapshots\20261002T095929-273b5c71\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-47792-3\.proj.import-staging-47792-tv20n5bm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-47792-4\.proj.import-staging-47792-wuwaljeu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_gui_loop.py" classname="scripts.tests" time="13.200"><system-out>test_loop_import_edit_export_open_without_word (__main__.GuiLoopTests.test_loop_import_edit_export_open_without_word)
+源已选 → 进入编辑 → 改一章 → 快速导出 → 打开结果：全程真实服务。 ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_loop_with_real_word_refresh_when_available (__main__.GuiLoopTests.test_loop_with_real_word_refresh_when_available)
+实机项：真实 Word 刷新闭环默认跳过，需显式开启 CORE_REAL_WORD=1。 ... skipped '真实 Word 刷新闭环为实机项：设置 CORE_REAL_WORD=1 后执行'
+test_u3_editor_reachable_and_preview_shared (__main__.GuiLoopTests.test_u3_editor_reachable_and_preview_shared)
+U-3：常用动作与章节编辑可达；预览基于同一份内容。 ... ok
+test_u8_cancel_without_running_task_is_safe (__main__.GuiLoopTests.test_u8_cancel_without_running_task_is_safe)
+U-8：没有运行中的任务时取消不报错、不弹阻断框。 ... ok
+test_u9_window_and_shortcuts (__main__.GuiLoopTests.test_u9_window_and_shortcuts)
+U-9：1280×720 逻辑窗口下主操作可达，快捷键不冲突。 ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 10.160s
+
+OK (skipped=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\.闭环.import-staging-68032-o5h7y9ko\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\闭环\.state\snapshots\20261002T095943-8ceb0aa6\output\.tmp-闭环(1.0).docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\闭环\.state\snapshots\20261002T095943-8ceb0aa6\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\.闭环.import-staging-68032-ojzdsaxw\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\.闭环.import-staging-68032-w3et2_dm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\.闭环.import-staging-68032-2ffyrexu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-68032-1\out\.闭环.import-staging-68032-i91ffxd1\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_action_positioning.py" classname="scripts.tests" time="3.543"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.817s
+
+OK
+</system-out></testcase><testcase name="test_branch_ui.py" classname="scripts.tests" time="2.833"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.This plugin does not support raise()
+This plugin does not support grabbing the keyboard
+.............
+----------------------------------------------------------------------
+Ran 14 tests in 0.456s
+
+OK
+</system-out></testcase><testcase name="test_command_palette.py" classname="scripts.tests" time="1.814"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+...This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.
+----------------------------------------------------------------------
+Ran 4 tests in 0.148s
+
+OK
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="18.818"><failure message="exit code 1" type="TestFailure">QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...............EThis plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...........E.QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............................................................F.....
+======================================================================
+ERROR: test_closed_content_docks_reopen_via_view_menu_and_search (__main__.MainWindowInteractionTests.test_closed_content_docks_reopen_via_view_menu_and_search)
+关闭章节树/工具面板 Dock 后可从「视图」菜单或 Ctrl+F 重新打开。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 1355, in test_closed_content_docks_reopen_via_view_menu_and_search
+    win._apply_workbench_state(state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1586, in _apply_workbench_state
+    if running or getattr(self, "_writing_layout_task_dock", True):
+       ^^^^^^^
+UnboundLocalError: cannot access local variable 'running' where it is not associated with a value
+
+======================================================================
+ERROR: test_project_switch_resets_persistent_result (__main__.MainWindowInteractionTests.test_project_switch_resets_persistent_result)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 1125, in test_project_switch_resets_persistent_result
+    window.show_project(summary)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1739, in show_project
+    self._refresh_interaction_state()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1662, in _refresh_interaction_state
+    self._apply_workbench_state(state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1586, in _apply_workbench_state
+    if running or getattr(self, "_writing_layout_task_dock", True):
+       ^^^^^^^
+UnboundLocalError: cannot access local variable 'running' where it is not associated with a value
+
+======================================================================
+FAIL: test_silent_preflight_updates_next_button_text_and_runner_gate (__main__.WizardUXOptimizationTests.test_silent_preflight_updates_next_button_text_and_runner_gate)
+静默预检运行中 NextButton 禁用防并发碰撞，完成时立即刷新按钮文案为下一步引导。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 3966, in test_silent_preflight_updates_next_button_text_and_runner_gate
+    self.assertEqual(next_btn.text(), "下一步：确认项目信息", "预检完成后 NextButton 文案应即时自适应")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '调整章节与样式映射（可选）' != '下一步：确认项目信息'
+- 调整章节与样式映射（可选）
++ 下一步：确认项目信息
+ : 预检完成后 NextButton 文案应即时自适应
+
+----------------------------------------------------------------------
+Ran 170 tests in 17.510s
+
+FAILED (failures=1, errors=2)
+</failure><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...............EThis plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...........E.QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............................................................F.....
+======================================================================
+ERROR: test_closed_content_docks_reopen_via_view_menu_and_search (__main__.MainWindowInteractionTests.test_closed_content_docks_reopen_via_view_menu_and_search)
+关闭章节树/工具面板 Dock 后可从「视图」菜单或 Ctrl+F 重新打开。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 1355, in test_closed_content_docks_reopen_via_view_menu_and_search
+    win._apply_workbench_state(state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1586, in _apply_workbench_state
+    if running or getattr(self, "_writing_layout_task_dock", True):
+       ^^^^^^^
+UnboundLocalError: cannot access local variable 'running' where it is not associated with a value
+
+======================================================================
+ERROR: test_project_switch_resets_persistent_result (__main__.MainWindowInteractionTests.test_project_switch_resets_persistent_result)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 1125, in test_project_switch_resets_persistent_result
+    window.show_project(summary)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1739, in show_project
+    self._refresh_interaction_state()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1662, in _refresh_interaction_state
+    self._apply_workbench_state(state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "D:\ai_develop_project_space\doc-tool\doc_tool\ui\main_window.py", line 1586, in _apply_workbench_state
+    if running or getattr(self, "_writing_layout_task_dock", True):
+       ^^^^^^^
+UnboundLocalError: cannot access local variable 'running' where it is not associated with a value
+
+======================================================================
+FAIL: test_silent_preflight_updates_next_button_text_and_runner_gate (__main__.WizardUXOptimizationTests.test_silent_preflight_updates_next_button_text_and_runner_gate)
+静默预检运行中 NextButton 禁用防并发碰撞，完成时立即刷新按钮文案为下一步引导。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_gui_services.py", line 3966, in test_silent_preflight_updates_next_button_text_and_runner_gate
+    self.assertEqual(next_btn.text(), "下一步：确认项目信息", "预检完成后 NextButton 文案应即时自适应")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '调整章节与样式映射（可选）' != '下一步：确认项目信息'
+- 调整章节与样式映射（可选）
++ 下一步：确认项目信息
+ : 预检完成后 NextButton 文案应即时自适应
+
+----------------------------------------------------------------------
+Ran 170 tests in 17.510s
+
+FAILED (failures=1, errors=2)
+</system-out></testcase></testsuite></testsuites>

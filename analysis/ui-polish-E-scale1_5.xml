@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="0" time="31.808"><testsuite name="doc-tool" tests="1" failures="0" time="31.808"><testcase name="test_ui_polish_acceptance.py" classname="scripts.tests" time="31.808"><system-out>test_real_entry_closed_loop (__main__.ClosedLoopAcceptanceTests.test_real_entry_closed_loop) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_long_chinese_name_keeps_actions_usable (__main__.GeometryThemeEvidenceTests.test_long_chinese_name_keeps_actions_usable) ... ok
+test_panel_expand_restore_and_reopen (__main__.GeometryThemeEvidenceTests.test_panel_expand_restore_and_reopen) ... ok
+test_three_window_sizes_and_themes (__main__.GeometryThemeEvidenceTests.test_three_window_sizes_and_themes) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 27.868s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-21268-1\.proj.import-staging-21268-nyab1wyf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-21268-1\proj\.state\snapshots\20261002T111553-79b31ff1\output\.tmp-proj(1.0).docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-21268-1\proj\.state\snapshots\20261002T111553-79b31ff1\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-geom52-21268-1\.proj.import-staging-21268-ga8xiipo\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

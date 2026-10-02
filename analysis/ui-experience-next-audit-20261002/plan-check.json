@@ -1,0 +1,15 @@
+{
+  "tasks": 26,
+  "implementation_tasks_completed": 0,
+  "capabilities": [
+    "desktop-continuation-navigation",
+    "desktop-export-configuration",
+    "desktop-panel-productivity",
+    "desktop-visual-consistency"
+  ],
+  "requirements": 18,
+  "scenarios": 30,
+  "local_links_checked": 54,
+  "errors": [],
+  "scope": "Planning structure only; not UI implementation or business acceptance"
+}

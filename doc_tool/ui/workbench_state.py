@@ -122,6 +122,7 @@ def derive_workbench_state(
                 "validate": disabled,
                 "merge": disabled,
                 "diag_build": disabled,
+                "quick_export": disabled,
                 "content": disabled,
                 "output": disabled,
                 "report": disabled,
@@ -176,6 +177,9 @@ def derive_workbench_state(
             merge_reason,
         ),
         "diag_build": ActionState(writable and not running, write_reason),
+        # 日常快速出稿只生成可读 DOCX，不写源码正文：不因缺少 Microsoft Word
+        # 或 Git 而不可用（正式刷新环境缺失时结果会标「待刷新」，可稍后补）。
+        "quick_export": ActionState(not running, write_reason),
         "content": ActionState(content_exists, "内容目录不存在"),
         "output": ActionState(output_exists, "尚未生成输出目录"),
         "report": ActionState(report_exists, "尚未生成校验报告"),

@@ -1,0 +1,221 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="9" failures="0" time="120.088"><testsuite name="doc-tool" tests="9" failures="0" time="120.088"><testcase name="test_ui_polish_advanced.py" classname="scripts.tests" time="13.582"><system-out>test_actions_preserved_across_pages (__main__.AssistPanelFirstUseTests.test_actions_preserved_across_pages) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_add_scope_is_a_real_action (__main__.AssistPanelFirstUseTests.test_add_scope_is_a_real_action) ... ok
+test_provider_actions_default_collapsed_in_label (__main__.AssistPanelFirstUseTests.test_provider_actions_default_collapsed_in_label) ... ok
+test_scope_cancel_keeps_state (__main__.AssistPanelFirstUseTests.test_scope_cancel_keeps_state) ... ok
+test_search_and_adopt_flow_keeps_insert_and_undo (__main__.AssistPanelFirstUseTests.test_search_and_adopt_flow_keeps_insert_and_undo) ... ok
+test_tabs_exist_and_switch (__main__.AssistPanelFirstUseTests.test_tabs_exist_and_switch) ... ok
+test_form_keeps_input_when_all_members_invalid (__main__.DeliveryFormTests.test_form_keeps_input_when_all_members_invalid) ... ok
+test_form_reports_member_problem_inline (__main__.DeliveryFormTests.test_form_reports_member_problem_inline) ... ok
+test_form_submit_writes_plan_and_accepts_with_valid_members (__main__.DeliveryFormTests.test_form_submit_writes_plan_and_accepts_with_valid_members) ... ok
+test_payload_is_original_batch_schema (__main__.DeliveryFormTests.test_payload_is_original_batch_schema) ... ok
+test_saved_plan_reparses_with_original_service (__main__.DeliveryFormTests.test_saved_plan_reparses_with_original_service) ... ok
+test_validation_splits_executable_and_invalid_members (__main__.DeliveryFormTests.test_validation_splits_executable_and_invalid_members) ... ok
+test_create_from_current_buffer_marks_source_and_publishes (__main__.ModuleFirstUseTests.test_create_from_current_buffer_marks_source_and_publishes) ... ok
+test_empty_library_gives_real_next_actions (__main__.ModuleFirstUseTests.test_empty_library_gives_real_next_actions) ... ok
+test_install_and_insert_reference_is_resolvable (__main__.ModuleFirstUseTests.test_install_and_insert_reference_is_resolvable) ... ok
+test_main_window_module_insert_is_single_undo (__main__.ModuleFirstUseTests.test_main_window_module_insert_is_single_undo) ... ok
+test_pick_existing_library_is_used_as_source (__main__.ModuleFirstUseTests.test_pick_existing_library_is_used_as_source) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 10.018s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-assist-50716-1\.proj.import-staging-50716-ne4_5srn\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-delivery-50716-1\.good.import-staging-50716-biy7fpt2\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-delivery-50716-1\.good2.import-staging-50716-l_2cjp3s\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-50716-1\.proj.import-staging-50716-qhxf9bgw\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-50716-1\.proj-2.import-staging-50716-cwetb5t3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-50716-1\.proj-3.import-staging-50716-6noq3xtt\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-50716-1\.proj-4.import-staging-50716-f401rttz\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-50716-1\.proj-5.import-staging-50716-_p4a0a15\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_v30_reuse_ui.py" classname="scripts.tests" time="6.377"><system-out>test_export_expanded_copy_into_chosen_directory (__main__.ReuseDialogTests.test_export_expanded_copy_into_chosen_directory) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_module_list_and_preview (__main__.ReuseDialogTests.test_module_list_and_preview) ... ok
+test_resolve_report_lists_chapter_and_source (__main__.ReuseDialogTests.test_resolve_report_lists_chapter_and_source) ... ok
+test_search_filters_modules (__main__.ReuseDialogTests.test_search_filters_modules) ... ok
+test_action_exists_and_requires_project (__main__.ReuseEntryTests.test_action_exists_and_requires_project) ... ok
+test_handler_opens_dialog_when_project_open (__main__.ReuseEntryTests.test_handler_opens_dialog_when_project_open) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 3.669s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\reuse-dialog-12216-1\.proj.import-staging-12216-za08v658\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_v32_delivery_ui.py" classname="scripts.tests" time="15.905"><system-out>test_entry_exists_and_uses_task_runner (__main__.DeliveryEntryUiTests.test_entry_exists_and_uses_task_runner) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_refresh_action_runs_with_word_refresh (__main__.DeliveryEntryUiTests.test_refresh_action_runs_with_word_refresh) ... ok
+test_result_page_offers_open_and_retry (__main__.DeliveryEntryUiTests.test_result_page_offers_open_and_retry) ... ok
+test_invalid_member_is_reported_not_executed (__main__.DeliveryTaskAdapterTests.test_invalid_member_is_reported_not_executed) ... ok
+test_plan_preview_lists_executable_members (__main__.DeliveryTaskAdapterTests.test_plan_preview_lists_executable_members) ... ok
+test_retry_unfinished_reuses_original_round (__main__.DeliveryTaskAdapterTests.test_retry_unfinished_reuses_original_round) ... ok
+test_run_plan_serially_keeps_useful_results (__main__.DeliveryTaskAdapterTests.test_run_plan_serially_keeps_useful_results) ... ok
+test_status_snapshot_has_batch_and_result_views (__main__.DeliveryTaskAdapterTests.test_status_snapshot_has_batch_and_result_views) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 11.985s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-ui-47468-1\members\.Alpha.import-staging-47468-cyagvttc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-ui-47468-1\members\Alpha\.state\snapshots\20261002T111434-3c9e040e\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-ui-47468-1\members\Alpha\.state\snapshots\20261002T111434-3c9e040e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-ui-47468-1\members\Alpha\.state\snapshots\20261002T111436-22f8e05f\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-ui-47468-1\members\Alpha\.state\snapshots\20261002T111436-22f8e05f\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\.Alpha.import-staging-47468-vuk3tzhv\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\.Beta.import-staging-47468-exe19_zm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Alpha\.state\snapshots\20261002T111439-dd3c90a5\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Alpha\.state\snapshots\20261002T111439-dd3c90a5\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Alpha\.state\snapshots\20261002T111440-48c53056\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Alpha\.state\snapshots\20261002T111440-48c53056\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Beta\.state\snapshots\20261002T111441-87b57a8e\output\.tmp-Beta(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\delivery-task-47468-1\members\Beta\.state\snapshots\20261002T111441-87b57a8e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v32_delivery_progress.py" classname="scripts.tests" time="16.003"><system-out>test_queue_progress_becomes_stage_events (__main__.DeliveryProgressTests.test_queue_progress_becomes_stage_events) ... ok
+test_retry_also_reports_progress (__main__.DeliveryProgressTests.test_retry_also_reports_progress) ... ok
+test_plan_preview_lists_members (__main__.DeliveryResultRenderingTests.test_plan_preview_lists_members) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_result_dialog_shows_member_format_status_path (__main__.DeliveryResultRenderingTests.test_result_dialog_shows_member_format_status_path) ... ok
+test_task_runner_injects_on_event_and_forwards_item_stages (__main__.TaskRunnerProgressInjectionTests.test_task_runner_injects_on_event_and_forwards_item_stages) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 13.090s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\.Alpha.import-staging-43356-tnfwzgdm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\.Beta.import-staging-43356-ba8lxaz1\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Alpha\.state\snapshots\20261002T111449-c7b5f966\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Alpha\.state\snapshots\20261002T111449-c7b5f966\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Beta\.state\snapshots\20261002T111450-0c3e68cc\output\.tmp-Beta(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Beta\.state\snapshots\20261002T111450-0c3e68cc\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Alpha\.state\snapshots\20261002T111452-d0fe9e07\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Alpha\.state\snapshots\20261002T111452-d0fe9e07\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Beta\.state\snapshots\20261002T111453-bb10b3ec\output\.tmp-Beta(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-43356-1\members\Beta\.state\snapshots\20261002T111453-bb10b3ec\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-render-43356-1\members\.Alpha.import-staging-43356-4a6zxkaf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-render-43356-1\members\Alpha\.state\snapshots\20261002T111455-9dfbcacd\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-render-43356-1\members\Alpha\.state\snapshots\20261002T111455-9dfbcacd\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-runner-43356-1\members\.Alpha.import-staging-43356-t1reg7ip\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-runner-43356-1\members\Alpha\.state\snapshots\20261002T111458-9ff292f6\output\.tmp-Alpha(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-progress-runner-43356-1\members\Alpha\.state\snapshots\20261002T111458-9ff292f6\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v33_panel_reachability.py" classname="scripts.tests" time="5.898"><system-out>test_background_index_is_polled_by_panel_timer (__main__.PanelReachabilityTests.test_background_index_is_polled_by_panel_timer) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_new_kind_keeps_display_order (__main__.PanelReachabilityTests.test_new_kind_keeps_display_order) ... ok
+test_panel_loads_suggestions_including_module_update (__main__.PanelReachabilityTests.test_panel_loads_suggestions_including_module_update) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 2.994s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-panel-reach-1812-1\.proj.import-staging-1812-09z2h1_p\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_v33_adoption_editor.py" classname="scripts.tests" time="7.584"><system-out>test_adopt_undo_and_save_through_editor (__main__.AdoptionEditorChainTests.test_adopt_undo_and_save_through_editor) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 4.895s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-adopt-editor-65912-1\.proj.import-staging-65912-t_ha_yot\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="19.384"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 17.590s
+
+OK
+</system-out></testcase><testcase name="test_command_palette.py" classname="scripts.tests" time="2.856"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+...This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.
+----------------------------------------------------------------------
+Ran 4 tests in 0.051s
+
+OK
+</system-out></testcase><testcase name="test_ui_polish_acceptance.py" classname="scripts.tests" time="32.501"><system-out>test_real_entry_closed_loop (__main__.ClosedLoopAcceptanceTests.test_real_entry_closed_loop) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_long_chinese_name_keeps_actions_usable (__main__.GeometryThemeEvidenceTests.test_long_chinese_name_keeps_actions_usable) ... ok
+test_panel_expand_restore_and_reopen (__main__.GeometryThemeEvidenceTests.test_panel_expand_restore_and_reopen) ... ok
+test_three_window_sizes_and_themes (__main__.GeometryThemeEvidenceTests.test_three_window_sizes_and_themes) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 28.726s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-55272-1\.proj.import-staging-55272-e67dtc8e\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-55272-1\proj\.state\snapshots\20261002T111542-042da13e\output\.tmp-proj(1.0).docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-55272-1\proj\.state\snapshots\20261002T111542-042da13e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-geom52-55272-1\.proj.import-staging-55272-tecq25n8\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

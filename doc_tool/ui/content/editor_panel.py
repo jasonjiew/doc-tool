@@ -36,11 +36,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTextBrowser,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -418,15 +421,34 @@ class EditorPanel(QWidget):
         md_layout.setContentsMargins(0, 0, 0, 0)
         md_layout.setSpacing(2)
 
+        self._md_actions: List[tuple] = []
+        self._md_buttons: List[QPushButton] = []
+
+        # 标题级别可选（H1～H6）：替代原来写死的 H2 单键，仍是同一个格式动作。
+        self._heading_btn = QToolButton(self._md_toolbar)
+        self._heading_btn.setText("标题 ▾")
+        self._heading_btn.setToolTip("设置当前行标题级别（H1～H6）")
+        self._heading_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._heading_menu = QMenu(self._heading_btn)
+        for level in range(1, 7):
+            action = self._heading_menu.addAction("H{0}  标题".format(level))
+            action.triggered.connect(
+                lambda _checked=False, lv=level: self.apply_heading_level(lv)
+            )
+        self._heading_btn.setMenu(self._heading_menu)
+        md_layout.addWidget(self._heading_btn)
+        self._md_actions.append(("标题级别 H1-H6", self._heading_btn))
+
         def md_btn(text: str, slot: Callable, tip: str) -> QPushButton:
             btn = QPushButton(text, self._md_toolbar)
             btn.setProperty("btnRole", "compact")
             btn.setToolTip(tip)
             btn.clicked.connect(slot)
             md_layout.addWidget(btn)
+            self._md_actions.append((text, btn))
+            self._md_buttons.append(btn)
             return btn
 
-        md_btn("H2", self._toolbar_heading, "标题（当前行前置 ## ）")
         md_btn("B", lambda: self.wrap_selection("**", "**"), "粗体 (**)")
         md_btn("I", lambda: self.wrap_selection("*", "*"), "斜体 (*)")
         md_btn("代码", lambda: self.wrap_selection("`", "`"), "行内代码 (`)")
@@ -441,6 +463,16 @@ class EditorPanel(QWidget):
         md_btn("批量转图", self.batch_convert_mermaid, "转换当前文档中的历史 Mermaid 源码")
         md_btn("片段", self.open_snippet_manager, "代码片段管理器")
 
+        # 窄窗口溢出：放不下的格式动作进入「更多 ▾」菜单，动作本身不丢失。
+        self._overflow_btn = QToolButton(self._md_toolbar)
+        self._overflow_btn.setText("更多 ▾")
+        self._overflow_btn.setToolTip("窗口较窄：未能同排显示的格式动作都在这里")
+        self._overflow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._overflow_menu = QMenu(self._overflow_btn)
+        self._overflow_btn.setMenu(self._overflow_menu)
+        self._overflow_btn.hide()
+        md_layout.addWidget(self._overflow_btn)
+
         layout.addWidget(self._md_toolbar)
 
         # 竖向微分隔线
@@ -449,10 +481,17 @@ class EditorPanel(QWidget):
         sep.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(sep)
 
-        # 中部：文件名/相对路径 + 未保存状态 + 结构摘要
+        # 中部：文件名/相对路径（省略显示，完整值在提示与右键复制）+ 未保存状态
         self._file_label = QLabel("未打开文件", bar)
         self._file_label.setObjectName("statusMuted")
-        layout.addWidget(self._file_label)
+        self._file_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self._file_label.setMinimumWidth(60)
+        self._file_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._file_label.customContextMenuRequested.connect(self._on_file_label_menu)
+        layout.addWidget(self._file_label, 1)
+        self._full_rel_path = ""
 
         self._dirty_label = QLabel("", bar)
         self._dirty_label.setProperty("statusTone", "warning")
@@ -473,6 +512,12 @@ class EditorPanel(QWidget):
         self._history_btn = QPushButton("本地历史", bar)
         self._history_btn.clicked.connect(self.open_local_history)
         layout.addWidget(self._history_btn)
+
+        self._outline_btn = QPushButton("显示目录", bar)
+        self._outline_btn.setProperty("btnRole", "compact")
+        self._outline_btn.setToolTip("显示/隐藏当前章的章节目录（默认收起，正文优先）")
+        self._outline_btn.clicked.connect(self.toggle_outline)
+        layout.addWidget(self._outline_btn)
 
         self._ext_btn = QPushButton("外部打开", bar)
         self._ext_btn.setProperty("btnRole", "compact")
@@ -592,11 +637,36 @@ class EditorPanel(QWidget):
         self._format_table_shortcut = QShortcut(
             QKeySequence("Ctrl+Alt+T"), self, self.format_table_at_cursor
         )
+        # UI 包 2.3：Ctrl+F/Ctrl+B/Ctrl+I 只在编辑器焦点内生效——作用域挂在编辑器
+        # 控件上（Qt.WidgetShortcut），其它输入框（查找/搜索面板）保持原编辑行为；
+        # 项目全文查找由主窗口的 Ctrl+Shift+F 承担。
+        self._editor.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
+        self._find_shortcut = QShortcut(
+            QKeySequence("Ctrl+F"), self._editor, self.focus_find
+        )
+        self._find_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self._bold_shortcut = QShortcut(
+            QKeySequence("Ctrl+B"), self._editor,
+            lambda: self.wrap_selection("**", "**"),
+        )
+        self._bold_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self._italic_shortcut = QShortcut(
+            QKeySequence("Ctrl+I"), self._editor,
+            lambda: self.wrap_selection("*", "*"),
+        )
+        self._italic_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self._escape_shortcut = QShortcut(
+            QKeySequence("Escape"), self, self._on_escape
+        )
+        self._escape_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self._highlighter = MarkdownHighlighter(self._editor.document())
         from doc_tool.ui.content.outline_panel import OutlinePanel
         self._outline_panel = OutlinePanel(self._editor, self.highlight_line, splitter)
         splitter.insertWidget(0, self._outline_panel)
         self._outline_panel.setMaximumWidth(260)
+        # UI 包 2.1/2.2：章节目录按需展开——默认收起，避免与左侧章节树重复
+        # 挤占正文空间；打开预览时一并展示（可用「显示目录/显示预览」找回）。
+        self._outline_panel.hide()
         self._find_selections: List[QTextEdit.ExtraSelection] = []
         self._spell_selections: List[QTextEdit.ExtraSelection] = []
         self._flash_selection: Optional[QTextEdit.ExtraSelection] = None
@@ -644,9 +714,7 @@ class EditorPanel(QWidget):
         self._draft_timer.stop()
         self._dirty = False
         self._draft_loaded = False
-        short_name = rel_path.split("/")[-1] if "/" in rel_path else rel_path
-        self._file_label.setText(short_name)
-        self._file_label.setToolTip("完整相对路径：" + rel_path)
+        self._set_file_label(rel_path)
         summary = preview_summary(text)
         self._status_label.setText(summary)
         self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
@@ -679,9 +747,7 @@ class EditorPanel(QWidget):
         self._dirty = True
         self._draft_loaded = True
         self._last_synced_heading = None
-        short_name = rel_path.split("/")[-1] if "/" in rel_path else rel_path
-        self._file_label.setText(short_name)
-        self._file_label.setToolTip("完整相对路径：" + rel_path)
+        self._set_file_label(rel_path)
         summary = preview_summary(text)
         self._status_label.setText(summary)
         self._status_label.setToolTip("当前文档：{0}\n统计：{1}".format(rel_path, summary))
@@ -915,6 +981,22 @@ class EditorPanel(QWidget):
     def hide_find(self) -> None:
         self._find_bar.hide()
         self._clear_highlights()
+
+    def _on_escape(self) -> None:
+        """Esc 关闭当前临时层（查找/替换）并把焦点还给编辑器。
+
+        只关闭临时层，不触发任务取消；没有临时层时把焦点交回编辑器。
+        """
+        closed = False
+        if not self._find_bar.isHidden():
+            self.hide_find()
+            closed = True
+        if not self._replace_bar.isHidden():
+            self.hide_replace()
+            closed = True
+        if closed:
+            self._status_label.setText("已关闭查找/替换，焦点回到正文")
+        self._editor.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def _find_text(self) -> str:
         return self._find_entry.text()
@@ -1261,7 +1343,140 @@ class EditorPanel(QWidget):
         cursor.endEditBlock()
 
     def _toolbar_heading(self) -> None:
-        self._prefix_lines("## ")
+        """兼容入口：默认按 H2 设置当前行标题（新入口见 :meth:`apply_heading_level`）。"""
+        self.apply_heading_level(2)
+
+    def apply_heading_level(self, level: int) -> None:
+        """把当前（或选中）行设为指定标题级别，替换已有前导 # 后再写入。
+
+        只走编辑器撤销栈，不改磁盘内容；非编辑器上下文不产生副作用。
+        """
+        level = max(1, min(6, int(level)))
+        prefix = "#" * level + " "
+        cursor = self._editor.textCursor()
+        cursor.beginEditBlock()
+        doc = self._editor.document()
+        start_block = doc.findBlock(cursor.selectionStart())
+        end_block = doc.findBlock(cursor.selectionEnd())
+        block = start_block
+        while True:
+            block_cursor = QTextCursor(block)
+            block_cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            block_cursor.movePosition(
+                QTextCursor.MoveOperation.EndOfBlock,
+                QTextCursor.MoveMode.KeepAnchor,
+            )
+            text = block_cursor.selectedText()
+            body = re.sub(r"^#{1,6}\s*", "", text)
+            block_cursor.insertText(prefix + body)
+            if block == end_block:
+                break
+            block = block.next()
+        cursor.endEditBlock()
+        self._heading_btn.setText("H{0} ▾".format(level))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._reflow_format_toolbar()
+
+    def _reflow_format_toolbar(self) -> None:
+        """窄窗口把放不下的格式动作移入「更多 ▾」菜单（动作本身不丢失）。
+
+        用真实控件宽度判定：可用宽度扣除右侧固定动作与标题选择器后从左到右
+        摆放，溢出的按钮隐藏并同步为菜单项；宽度恢复时按钮回到同排。
+        """
+        if not hasattr(self, "_overflow_menu") or not self._md_buttons:
+            return
+        # 溢出判定用本面板真实宽度：工具栏子部件的 sizeHint 在离屏布局下会返回
+        # 未受约束的理想宽度，不能代表屏幕上真正可用的宽度。
+        panel_width = self.width()
+        heading_width = self._heading_btn.sizeHint().width()
+        fixed = 0
+        for widget in (
+            getattr(self, "_file_label", None),
+            getattr(self, "_dirty_label", None),
+            getattr(self, "_status_label", None),
+            getattr(self, "_outline_btn", None),
+            getattr(self, "_rollback_btn", None),
+            getattr(self, "_history_btn", None),
+            getattr(self, "_ext_btn", None),
+            getattr(self, "_preview_btn", None),
+            getattr(self, "_save_btn", None),
+        ):
+            if widget is not None:
+                fixed += widget.sizeHint().width() + 8
+        available = max(0, panel_width - fixed - heading_width - 30)
+
+        used = 0
+        overflow = []
+        for name, button in self._md_actions[1:]:
+            need = button.sizeHint().width() + 2
+            if used + need <= available:
+                used += need
+                button.show()
+            else:
+                button.hide()
+                overflow.append((name, button))
+        self._overflow_menu.clear()
+        self._overflow_items = []
+        for name, button in overflow:
+            action = self._overflow_menu.addAction(name)
+            action.setToolTip(button.toolTip())
+            action.triggered.connect(button.click)
+            self._overflow_items.append((name, action, button))
+        self._overflow_btn.setVisible(bool(overflow))
+        self._overflow_btn.setText(
+            "更多 ▾（{0}）".format(len(overflow)) if overflow else "更多 ▾"
+        )
+
+    def _set_file_label(self, rel_path: str) -> None:
+        """文件标识：显示用文件名（长路径由 QLabel 省略号截断），完整值可复制。
+
+        完整相对路径同时写入提示与 ``_full_rel_path``，右键菜单可复制，
+        因此窄窗口下省略显示不会丢失信息。
+        """
+        self._full_rel_path = rel_path
+        short_name = rel_path.split("/")[-1] if "/" in rel_path else rel_path
+        self._file_label.setText(short_name)
+        self._file_label.setToolTip(
+            "完整相对路径：{0}\n（右键可复制完整路径）".format(rel_path)
+        )
+
+    def overflow_items(self):
+        """当前被收进「更多 ▾」的格式动作（名称, QAction, 原按钮）列表。"""
+        return list(getattr(self, "_overflow_items", []))
+
+    def format_actions(self):
+        """返回 14 个格式动作的 (名称, 当前可达控件) 列表。
+
+        同一动作只出现一次：同排可见时给出按钮，被收进溢出菜单时给出菜单项，
+        因此调用方可以直接核对「一个都没丢」以及溢出后仍能触发。
+        """
+        overflow = {
+            name: action
+            for name, action, button in getattr(self, "_overflow_items", [])
+            if button.isHidden()
+        }
+        items = []
+        for name, widget in self._md_actions:
+            if name in overflow:
+                items.append((name, overflow[name]))
+            elif widget.isHidden():
+                items.append((name, widget))
+            else:
+                items.append((name, widget))
+        return items
+
+    def _on_file_label_menu(self, _pos) -> None:
+        """长路径右键菜单：复制完整相对路径（显示省略但完整值可取）。"""
+        menu = QMenu(self)
+        copy_action = menu.addAction("复制完整相对路径")
+        copy_action.setEnabled(bool(self._full_rel_path))
+        menu.addAction("复制完整路径：{0}".format(self._full_rel_path or "—")).setEnabled(False)
+        chosen = menu.exec(self._file_label.mapToGlobal(_pos))
+        if chosen is copy_action and self._full_rel_path:
+            QGuiApplication.clipboard().setText(self._full_rel_path)
+            self._status_label.setText("已复制完整相对路径")
 
     def _insert_table(self) -> None:
         """插入管道表格骨架并定位到首单元格。"""
@@ -1579,10 +1794,25 @@ class EditorPanel(QWidget):
     # --- 预览折叠 / 同步滚动 ---
 
     def _toggle_preview(self) -> None:
-        """切换预览区显示/隐藏。"""
+        """切换预览区显示/隐藏；预览关闭时一并收起章节目录，正文优先。"""
         visible = self._preview_frame.isHidden()
         self._preview_frame.setVisible(visible)
+        if hasattr(self, "_outline_panel"):
+            self._outline_panel.setVisible(visible)
+        self._sync_outline_button()
         self._preview_btn.setText("隐藏预览" if visible else "显示预览")
+
+    def _sync_outline_button(self) -> None:
+        """章节目录显隐入口与预览同步（按钮文案反映当前真实状态）。"""
+        self._outline_btn.setText(
+            "隐藏目录" if not self._outline_panel.isHidden() else "显示目录"
+        )
+
+    def toggle_outline(self) -> None:
+        """切换章节目录（按需展开，不改变正文与未保存状态）。"""
+        visible = self._outline_panel.isHidden()
+        self._outline_panel.setVisible(visible)
+        self._sync_outline_button()
 
     def _sync_preview_scroll(self) -> None:
         """编辑滚动时按当前光标所在标题把预览滚动到对应源行（单向 best-effort）。"""
@@ -1659,6 +1889,77 @@ class EditorPanel(QWidget):
     def set_scroll_position(self, position: int) -> None:
         self._editor.verticalScrollBar().setValue(max(0, int(position)))
 
+    def cursor_position(self) -> int:
+        """当前光标字符偏移（UI2-B 2.3 会话偏好；只读位置，不改正文）。"""
+        try:
+            return int(self._editor.textCursor().position())
+        except Exception:  # noqa: BLE001 - 无光标时按 0 处理
+            return 0
+
+    def set_cursor_position(self, position: int) -> None:
+        """恢复光标位置（不选中、不改正文、不进撤销栈）。"""
+        try:
+            cursor = self._editor.textCursor()
+            limit = max(0, len(self._editor.toPlainText()))
+            cursor.setPosition(min(max(0, int(position)), limit))
+            self._editor.setTextCursor(cursor)
+        except Exception:  # noqa: BLE001 - 越界/坏值按原光标处理
+            pass
+
+    # --- UI2-C 3.3: 写作/对照/阅读视图与字号档位（不改正文/模板/撤销栈） ---
+
+    #: 字号档位（pt）：正文默认 10pt，放大/缩小按档位取整。
+    FONT_STEPS = (9.0, 10.0, 11.0, 12.0, 14.0, 16.0)
+    VIEW_WRITE = "write"
+    VIEW_COMPARE = "compare"
+    VIEW_READ = "read"
+
+    def set_view_mode(self, mode: str) -> str:
+        """切换写作/对照/阅读视图；返回实际采用模式。
+
+        只改显隐与字号，不修改 Markdown、正文格式或 Word 模板，也不进撤销栈。
+        """
+        target = str(mode or self.VIEW_WRITE)
+        if target not in (self.VIEW_WRITE, self.VIEW_COMPARE, self.VIEW_READ):
+            target = self.VIEW_WRITE
+        show_preview = target in (self.VIEW_COMPARE, self.VIEW_READ)
+        self.set_preview_enabled(show_preview)
+        if target == self.VIEW_READ and hasattr(self, "_outline_panel"):
+            # 阅读：优先单栏正文；章节目录仍可从工具条找回。
+            self._outline_panel.setVisible(False)
+            self._sync_outline_button()
+        self._view_mode = target
+        return target
+
+    def view_mode(self) -> str:
+        return getattr(self, "_view_mode", self.VIEW_WRITE)
+
+    def font_step(self) -> float:
+        return float(getattr(self, "_font_step", 1.0))
+
+    def set_font_step(self, step: float) -> float:
+        """设置字号档位索引（取整到最近档）；只改编辑器/预览字号。"""
+        index = int(round(float(step)))
+        index = max(0, min(len(self.FONT_STEPS) - 1, index))
+        size = self.FONT_STEPS[index]
+        self._font_step = float(index)
+        for widget in (self._editor, getattr(self, "_preview", None)):
+            if widget is None:
+                continue
+            font = widget.font()
+            font.setPointSizeF(size)
+            widget.setFont(font)
+        return size
+
+    def zoom_in(self) -> float:
+        return self.set_font_step(self.font_step() + 1)
+
+    def zoom_out(self) -> float:
+        return self.set_font_step(self.font_step() - 1)
+
+    def reset_zoom(self) -> float:
+        return self.set_font_step(1.0)
+
     def preview_enabled(self) -> bool:
         """预览区是否可见。"""
         return not self._preview_frame.isHidden()
@@ -1666,6 +1967,9 @@ class EditorPanel(QWidget):
     def set_preview_enabled(self, enabled: bool) -> None:
         visible = bool(enabled)
         self._preview_frame.setVisible(visible)
+        if hasattr(self, "_outline_panel"):
+            self._outline_panel.setVisible(visible)
+            self._sync_outline_button()
         self._preview_btn.setText("隐藏预览" if visible else "显示预览")
 
     def stop_autosave(self) -> None:
@@ -1675,6 +1979,8 @@ class EditorPanel(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.ensure_preview_rendered()
+        # 真实宽度只有显示后才确定：此时才做一次格式动作溢出重排。
+        self._reflow_format_toolbar()
         self._spell_timer.start(0)
         self._mermaid_timer.start(0)
     # --- 内部 ---

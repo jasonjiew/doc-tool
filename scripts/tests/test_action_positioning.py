@@ -41,26 +41,34 @@ class TestActionPositioningAndLogic(unittest.TestCase):
         self.assertEqual(bar._diag_btn.text(), "快速构建")
         self.assertEqual(bar._merge_btn.text(), "正式出稿")
 
-        # 检查主操作角色
+        # UI 包 1.2：日常主操作是顶部「导出 Word」，正式出稿降为次级动作。
+        self.assertEqual(bar._quick_export_btn.text(), "导出 Word")
+        self.assertEqual(bar._quick_export_btn.property("btnRole"), "primary")
         self.assertEqual(bar._validate_btn.property("btnRole"), "secondary")
         self.assertEqual(bar._diag_btn.property("btnRole"), "secondary")
-        self.assertEqual(bar._merge_btn.property("btnRole"), "primary")
+        self.assertEqual(bar._merge_btn.property("btnRole"), "secondary")
 
-        # 检查布局中的相对位置：项目检查在快速构建左侧，快速构建在正式出稿左侧
+        # 检查布局中的相对位置：日常快速导出最前，其后项目检查→快速构建→正式出稿
         main_layout = bar.layout().itemAt(0).layout()
+        idx_quick = -1
         idx_validate = -1
         idx_diag = -1
         idx_merge = -1
         for i in range(main_layout.count()):
             w = main_layout.itemAt(i).widget()
-            if w == bar._validate_btn:
+            if w == bar._quick_export_btn:
+                idx_quick = i
+            elif w == bar._validate_btn:
                 idx_validate = i
             elif w == bar._diag_btn:
                 idx_diag = i
             elif w == bar._merge_btn:
                 idx_merge = i
 
-        self.assertTrue(idx_validate != -1 and idx_diag != -1 and idx_merge != -1)
+        self.assertTrue(
+            idx_quick != -1 and idx_validate != -1 and idx_diag != -1 and idx_merge != -1
+        )
+        self.assertLess(idx_quick, idx_validate, "日常导出 Word 应排在项目检查之前")
         self.assertLess(idx_validate, idx_diag, "项目检查应排在快速构建之前")
         self.assertLess(idx_diag, idx_merge, "快速构建应排在正式出稿之前")
 

@@ -537,21 +537,33 @@ class _SourcePage(QWizardPage):
 
         if preview.has_heading1 and not has_block:
             self._smart_banner.setStyleSheet("color: #176b3a; font-weight: bold;")
-            self._smart_banner.setText(f"✓ 文档大纲就绪（已识别 {h1_count} 个一级章，共 {total_headings} 个标题）。点击「立即导入」直接构建进入工作台，也可点击「下一步」修改配置。")
+            # 普通有效源的主路径就是「开始导入」；细调章节/映射是可选副入口。
+            self._smart_banner.setText(
+                f"✓ 文档大纲就绪（已识别 {h1_count} 个一级章，共 {total_headings} 个标题）。"
+                "直接点「开始导入」即可建项进入工作台；需要时再选「调整章节与样式映射（可选）」。"
+            )
             self._quick_import_btn.show()
             self._tuning_check.show()
             self._tuning_check.setChecked(False)
             self._wants_tuning = False
         elif not preview.has_heading1:
             self._smart_banner.setStyleSheet("color: #8a5a00;")
-            self._smart_banner.setText("ℹ 未自动识别到标准 Heading 1 标题样式。点击「下一步」将引导您进入「样式映射」确认章节划分。")
+            self._smart_banner.setText(
+                "ℹ 未自动识别到标准 Heading 1 标题样式：将按单章接管先建项，"
+                "需要分章时可用「调整章节与样式映射（可选）」确认章节划分。"
+            )
             self._tuning_check.hide()
-            self._wants_tuning = True
+            self._quick_import_btn.show()
+            self._wants_tuning = False
         else:
             self._smart_banner.setStyleSheet("color: #a12622;")
-            self._smart_banner.setText("⛔ 文档中包含阻断特性，下一步将展示详细风险报告并需您确认。")
+            self._smart_banner.setText(
+                "⛔ 文档中包含阻断特性：仍可直接建项，风险项会集中显示在导入结果页，"
+                "也可选「调整章节与样式映射（可选）」先处理。"
+            )
             self._tuning_check.hide()
-            self._wants_tuning = True
+            self._quick_import_btn.show()
+            self._wants_tuning = False
 
         self.completeChanged.emit()
         if hasattr(self.wizard(), "_update_next_button_text"):
@@ -1714,8 +1726,10 @@ class ImportWizard(QWizard):
             current = self.startId()
         next_btn = self.button(QWizard.WizardButton.NextButton)
         if current == 0:
+            # 源页主路径是「开始导入」：普通有效源已选后 ≤2 次主要提交；
+            # 「下一步」承担可选的章节/映射细调入口。
             if self.nextId() == 3:
-                next_btn.setText("下一步：确认项目信息")
+                next_btn.setText("调整章节与样式映射（可选）")
             elif self.nextId() == 2:
                 next_btn.setText("下一步：配置样式映射")
             elif self.nextId() == 1:

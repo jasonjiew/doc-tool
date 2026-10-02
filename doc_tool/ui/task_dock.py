@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from doc_tool.ui.export_results_view import ExportResultsView
 from doc_tool.ui.work_detail_pane import LogStream, ResultCard
 from doc_tool.ui.work_step_list import StepListFooter, WorkStepList
 from doc_tool.ui.workbench_state import ResultState, StepItem
@@ -181,6 +182,13 @@ class TaskDock(QWidget):
         on_copy_path: Optional[Callable[[str], None]] = None,
         on_export_to: Optional[Callable[[str], None]] = None,
         on_locate_file: Optional[Callable[[str], None]] = None,
+        on_open_format: Optional[Callable[[str, str], None]] = None,
+        on_locate_format: Optional[Callable[[str], None]] = None,
+        on_retry_formats: Optional[Callable[[object], None]] = None,
+        on_regenerate_round: Optional[Callable[[object], None]] = None,
+        on_change_destination: Optional[Callable[[object], None]] = None,
+        on_open_settings: Optional[Callable[[object], None]] = None,
+        on_select_round: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -198,6 +206,7 @@ class TaskDock(QWidget):
         self._on_locate_file = on_locate_file
         self._dark = False
         self._has_result = False
+        self._on_select_round = on_select_round
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -217,6 +226,19 @@ class TaskDock(QWidget):
 
         # 三态页面
         self._stack = QStackedWidget(self)
+
+        # 非模态成果页（UI 包 3.1）：逐文件状态/路径/打开，不阻塞编辑。
+        self._results_view = ExportResultsView(
+            on_open_format=on_open_format,
+            on_locate_format=on_locate_format,
+            on_retry_formats=on_retry_formats,
+            on_regenerate_round=on_regenerate_round,
+            on_change_destination=on_change_destination,
+            on_open_settings=on_open_settings,
+            on_select_round=on_select_round,
+            parent=self,
+        )
+        self._stack.addWidget(self._results_view)
 
         self._idle_card = _IdleCard(
             on_validate=on_validate,
@@ -376,9 +398,23 @@ class TaskDock(QWidget):
         self._step_list.set_dark(dark)
         self._result_steps.set_dark(dark)
 
+    # --- 成果（非模态，逐文件） ---
+
+    def show_results(self, rounds, selected_round_id: str = "") -> None:
+        """展示成果页：本项目最近轮次 + 逐文件状态/路径/打开动作。"""
+        self._stack.setCurrentWidget(self._results_view)
+        self._title.setText("成果")
+        self._elapsed.setText("")
+        self._results_view.render(rounds, selected_round_id)
+        self._has_result = True
+
+    def results_view(self):
+        return self._results_view
+
     def clear_result(self) -> None:
         """项目切换后清除不属于当前项目的结果（结果归属校验）。"""
         self._has_result = False
+        self._results_view.clear()
         self.show_idle(None, project_open=False)
 
     def has_result(self) -> bool:

@@ -1,0 +1,36 @@
+{
+  "platform": "Qt offscreen",
+  "limitations": [
+    "synthetic project",
+    "no real Windows scaling/IME/Word trial",
+    "offscreen geometry is structural evidence only"
+  ],
+  "steps": [
+    "1 首页导入入口与新建项目共享 handler",
+    "2 打开项目并等待索引就绪",
+    "3 跳章后后退回原位置（未保存文本与撤销栈保持）",
+    "4 导出设置提交（1 次主要操作）→ 真实产物",
+    "5 成果页逐文件打开（1 次点击）",
+    "6 源文件未被写回（当前位置仍可打开）"
+  ],
+  "forcedDialogs": 0,
+  "importSubmissions": 1,
+  "exportSubmissions": 1,
+  "openClicks": 1,
+  "roundId": "r-d0d471f53c",
+  "captureId": "20261002T144829-7a5c43b9",
+  "sourceMode": "current-buffer",
+  "scope": "",
+  "artifacts": [
+    {
+      "format": "docx",
+      "status": "ready",
+      "path": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-26208-1\\proj\\output\\proj.docx"
+    },
+    {
+      "format": "html",
+      "status": "ready",
+      "path": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-26208-1\\proj\\output\\html\\preview\\20261002T144846352572Z-7b276367\\index.html"
+    }
+  ]
+}

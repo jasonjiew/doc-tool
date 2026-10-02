@@ -14,10 +14,11 @@ from __future__ import annotations
 
 from typing import List, Optional, Sequence
 
+from doc_tool.ui.flow_row import FlowRow
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+    QCheckBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QPlainTextEdit, QPushButton, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from doc_tool.application.assist.adoption import AdoptionOutcome
@@ -37,8 +38,18 @@ class AssistPanel(QWidget):
     status_message = Signal(str)
     buffers_changed = Signal(dict)           # 采纳/撤销后的全文缓冲（relPath -> 文本）
 
-    def __init__(self, assistant=None, *, project_root=None, parent=None) -> None:
+    def __init__(
+        self,
+        assistant=None,
+        *,
+        project_root=None,
+        on_scope_changed=None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
+        # UI 包 4.3：``on_scope_changed(roots)`` 让主窗口按新资料范围重装助手。
+        self._on_scope_changed = on_scope_changed
+        self._extra_module_roots: List[str] = []
         self._assistant = assistant
         self._project_root = project_root
         self._index_runner = None
@@ -158,7 +169,15 @@ class AssistPanel(QWidget):
         self._scope_label.setWordWrap(True)
         layout.addWidget(self._scope_label)
 
-        search_row = QHBoxLayout()
+        # UI 包 4.3：资料与建议切页；出处/差异详情为两页共用，放在切页下方。
+        self._tabs = QTabWidget(self)
+        self._tabs.setObjectName("assistTabs")
+
+        materials = QWidget(self._tabs)
+        materials_layout = QVBoxLayout(materials)
+        materials_layout.setContentsMargins(0, 4, 0, 0)
+
+        search_row = FlowRow(stack_below=380, parent=materials)
         self._query = QLineEdit()
         self._query.setPlaceholderText("在已加入的项目/模块/当前缓冲中搜索")
         self._query.returnPressed.connect(self.search)
@@ -166,18 +185,31 @@ class AssistPanel(QWidget):
         self._search_button.clicked.connect(self.search)
         self._include_buffer = QCheckBox("含当前缓冲")
         self._include_buffer.setChecked(True)
-        search_row.addWidget(self._query, 1)
-        search_row.addWidget(self._include_buffer)
-        search_row.addWidget(self._search_button)
-        layout.addLayout(search_row)
+        search_row.add(self._query)
+        search_row.add(self._include_buffer)
+        search_row.add(self._search_button)
+        self._search_row = search_row
+        materials_layout.addWidget(search_row)
+
+        # 无资料范围时的真实设置动作（不是说明性空状态）。
+        self._scope_actions = FlowRow(stack_below=380, parent=materials)
+        self._add_scope_button = QPushButton("添加资料范围…")
+        self._add_scope_button.setObjectName("assistAddScopeBtn")
+        self._add_scope_button.setToolTip(
+            "选择已有模块库目录作为资料范围；只读加入，不修改该库内容"
+        )
+        self._add_scope_button.clicked.connect(self.add_scope_manually)
+        self._scope_actions.add(self._add_scope_button)
+        self._scope_actions.add_stretch()
+        materials_layout.addWidget(self._scope_actions)
 
         self._summary = QLabel("")
         self._summary.setWordWrap(True)
-        layout.addWidget(self._summary)
+        materials_layout.addWidget(self._summary)
 
         self._results = QListWidget()
         self._results.currentRowChanged.connect(lambda _row: self._update_diff_preview())
-        layout.addWidget(self._results, 2)
+        materials_layout.addWidget(self._results, 2)
 
         hit_row = QHBoxLayout()
         self._cite_button = QPushButton("插入来源引用")
@@ -187,37 +219,41 @@ class AssistPanel(QWidget):
         hit_row.addWidget(self._cite_button)
         hit_row.addWidget(self._copy_button)
         hit_row.addStretch(1)
-        layout.addLayout(hit_row)
+        materials_layout.addLayout(hit_row)
+        self._tabs.addTab(materials, "资料")
 
-        group = QGroupBox("建议收件区（依据现有规则/术语/引用/复核/变更事实）")
-        group_layout = QVBoxLayout(group)
+        suggestions = QWidget(self._tabs)
+        suggestions_layout = QVBoxLayout(suggestions)
+        suggestions_layout.setContentsMargins(0, 4, 0, 0)
         suggest_row = QHBoxLayout()
         self._load_suggestions_button = QPushButton("刷新建议")
         self._load_suggestions_button.setToolTip("按当前规则/术语/引用/复核/变更事实与模块装配重新收集建议")
         self._load_suggestions_button.clicked.connect(lambda: self.load_suggestions())
         suggest_row.addWidget(self._load_suggestions_button)
         suggest_row.addStretch(1)
-        group_layout.addLayout(suggest_row)
+        suggestions_layout.addLayout(suggest_row)
         self._suggestions_list = QListWidget()
         self._suggestions_list.currentRowChanged.connect(lambda _row: self._update_diff_preview())
-        group_layout.addWidget(self._suggestions_list, 2)
-        adopt_row = QHBoxLayout()
+        suggestions_layout.addWidget(self._suggestions_list, 2)
+        adopt_row = FlowRow(stack_below=380, parent=suggestions)
         self._adopt_button = QPushButton("采纳所选")
         self._adopt_button.clicked.connect(self.adopt_selected)
         self._ignore_button = QPushButton("忽略所选")
         self._ignore_button.clicked.connect(self.ignore_selected)
+        self._undo_button = QPushButton("撤销上次采纳")
+        self._undo_button.clicked.connect(self.undo_last)
         self._export_button = QPushButton("导出建议…")
         self._export_button.setToolTip("把当前建议集合导出为审阅用文件（只读项目同样可用）")
         self._export_button.clicked.connect(self.export_suggestions_to_file)
-        self._undo_button = QPushButton("撤销上次采纳")
-        self._undo_button.clicked.connect(self.undo_last)
-        adopt_row.addWidget(self._adopt_button)
-        adopt_row.addWidget(self._ignore_button)
-        adopt_row.addWidget(self._undo_button)
-        adopt_row.addWidget(self._export_button)
-        adopt_row.addStretch(1)
-        group_layout.addLayout(adopt_row)
-        layout.addWidget(group, 3)
+        adopt_row.add(self._adopt_button)
+        adopt_row.add(self._ignore_button)
+        adopt_row.add(self._undo_button)
+        adopt_row.add(self._export_button)
+        adopt_row.add_stretch()
+        self._adopt_row = adopt_row
+        suggestions_layout.addWidget(adopt_row)
+        self._tabs.addTab(suggestions, "建议")
+        layout.addWidget(self._tabs, 3)
 
         self._diff_view = QPlainTextEdit()
         self._diff_view.setReadOnly(True)
@@ -236,6 +272,41 @@ class AssistPanel(QWidget):
         enhance_row.addWidget(self._enhance_term_button)
         layout.addLayout(enhance_row)
 
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        width = int(event.size().width()) - 12
+        for row in (
+            getattr(self, "_search_row", None),
+            getattr(self, "_scope_actions", None),
+            getattr(self, "_adopt_row", None),
+        ):
+            if row is not None:
+                row.apply_width(width)
+
+    def current_page(self) -> str:
+        """当前切页标识：``materials``（资料）或 ``suggestions``（建议）。"""
+        return "suggestions" if self._tabs.currentIndex() == 1 else "materials"
+
+    def show_page(self, page: str) -> None:
+        """切换资料/建议页；共用下方的出处/差异详情不随页面重置。"""
+        self._tabs.setCurrentIndex(1 if str(page) == "suggestions" else 0)
+
+    def add_scope_manually(self) -> None:
+        """无资料范围时的真实设置动作：选择一个已有模块库作为资料范围。"""
+        from PySide6.QtWidgets import QFileDialog
+
+        chosen = QFileDialog.getExistingDirectory(self, "选择资料范围（已有模块库目录）")
+        if not chosen:
+            self.set_status("已取消添加资料范围")
+            return
+        roots = list(getattr(self, "_extra_module_roots", []) or [])
+        if chosen not in roots:
+            roots.append(chosen)
+        self._extra_module_roots = roots
+        self.set_status("已加入资料范围：{0}".format(chosen))
+        if self._on_scope_changed is not None:
+            self._on_scope_changed(roots)
+        self.refresh_scope()
     # --- 装配 ---
 
     def load_all_suggestions(self) -> Optional[SuggestionSet]:

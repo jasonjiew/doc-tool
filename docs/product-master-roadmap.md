@@ -1,12 +1,14 @@
 # 产品总路线图与执行入口
 
-更新日期：2026-10-02。目标用户：企业研发文档团队。原2026-10-01代码盘点基准 `1cc28ca` / `2.9.0`；当前状态以实际工作树/各tasks为准，本次定稿页面交互规划。
+更新日期：2026-10-02。目标用户：企业研发文档团队。原2026-10-01代码盘点基准 `1cc28ca` / `2.9.0`；当前状态以实际工作树/各tasks为准。本次基于 `2e5be72` 工作树追加下一轮 UI2 规划。
 
 完整现状见 [功能总清单](product-function-catalog.md)，默认行为见 [流程与兜底](product-flow-fallback-policy.md)。本文负责统一产品方向和后续优先级；实际任务状态以各 change/tasks.md 为准，旧台账保留历史记录。
 
 2026-10-02 交互调研增补：[页面交互调研与优化方案](product-ui-interaction-research.md)。此时CORE/V3.0～V3.3读取进度已到151/157，后文2026-10-01的规划状态保留为历史快照。新增独立 `product-ui-interaction-polish` [5批/20项任务](../openspec/changes/product-ui-interaction-polish/tasks.md)，优先补入口一致、写作空间、非模态成果及高级能力首用路径；当前正在执行批次继续，随后可先UI-A/B/C再接RD/表格。原任务编号和勾选不改，规划累计范围变为60批/261项，并非当前剩余工作量。
 
 交互包已定稿：[最终实施计划](product-ui-interaction-final-plan.md)、[执行台账与持续指令](product-ui-interaction-execution.md)。包内A→B→C→D→E，真实实机缺项只影响对应验收，不要求先完成旧包归档；页面包执行指令范围限定本包20项。
+
+最新交互状态：用户已完成上一轮功能，读取旧UI任务为19/20，未勾选5.3仅为实机验证。新增独立 `product-ui-experience-next`：[UI2计划](product-ui-experience-next-plan.md)、[6批/26项任务](../openspec/changes/product-ui-experience-next/tasks.md)、[执行指令](product-ui-experience-next-execution.md)。下一轮关注项目条可读性、首页继续、位置返回/阅读、多格式导出设置和窄面板。旧计划/勾选保留；本轮不启动实施。规划累计范围66批/287项，包含历史已实现任务，并非剩余工作量。
 
 ## 1. 产品方向
 
@@ -54,7 +56,7 @@
 | P3 | V3.6 | 增量索引、后台视图、可复现大项目性能证据 | 5/20 | CORE；模块指纹集成依赖 V3.0 |
 | P3 | V3.3 | 本地证据检索、可撤销建议、可选模型 | 6/26 | 既有索引/检查/编辑器；可复用 V3.6 加速 |
 
-推荐新排程：**CORE → RD → V3.4 → V3.0 → V3.1 → V3.5 → V3.2 → V3.6 → V3.3**。表格与规范制作前移，模型辅助后置，更符合当前实用性要求。若另一任务已进入某个 V3 批次，继续当前工作，不通过本规划强制中断或回滚。
+原业务推荐排程：**CORE → RD → V3.4 → V3.0 → V3.1 → V3.5 → V3.2 → V3.6 → V3.3**。当前用户选择先继续 UI，新增排程为 **UI2-A→B→C→D→E→F**，随后接尚未开始的 RD/表格/其他业务包；CORE/V3已实现部分只核对差额。若另一任务已进入某个批次，继续当前工作，不通过本规划强制中断或回滚。
 
 CORE 先接通 A/B/C/E/F 的日常闭环，并随实现执行 H 的相关验证；D/G 补批量、范围和版式。RD 可先做已有服务的只读浏览；新成员出稿等待直接接口可用。某个动作缺依赖时记录并推进无依赖项，不把所有历史试点变成全局门禁。
 
@@ -151,6 +153,7 @@ CORE 先接通 A/B/C/E/F 的日常闭环，并随实现执行 H 的相关验证�
 |---|---|---|
 | 来源导入/留存、当前捕获、统一装配/出稿、基础版式 | CORE | 所有新 GUI/模块/队列/样例调用接口 |
 | 主流程入口、写作布局、非模态成果及高级首用交互 | UI | 扩展已有TaskDock/会话/报告适配，后续版本复用同样交互，不重写业务引擎 |
+| 视觉层级、继续工作、位置导航/阅读、导出设置和窄面板 | UI2 | 在已完成UI上增量改进，复用原服务；历史缓存不能替代业务报告/正式状态 |
 | 项目/工作区/关系/复核/集合的用户界面 | RD | V3.1 用原状态/入口，V3.2 用原集合和输出记录 |
 | 普通表格内容编辑 | V3.4 | 仍写 Markdown；版式用 CORE |
 | 正文模块与型号变体 | V3.0 | 底模/规范不是正文模块；V3.2 调用已解析内容 |
@@ -194,7 +197,7 @@ CORE 先接通 A/B/C/E/F 的日常闭环，并随实现执行 H 的相关验证�
 
 先核对实际 HEAD、工作树、当前任务勾选和最近验证。保留其他任务正在修改的文件和已完成实现，继续已经开始的批次；不重置 V2 归档，不凭旧台账把现成功能重写。
 
-先核对CORE/V3.0～V3.3实际已实现差额，不按旧台账重写。当前已开始批次完成直接验证后，未开始工作优先：product-ui-interaction-polish（A→B→C→D→E）→ product-rd-workspace-experience → product-v34-table-authoring → product-v35-standard-pack-authoring → product-v36-large-document-performance。CORE/V3.0～V3.3有代码差额按直接依赖补齐，归档授权/人工评价/实机缺环境仅影响对应项，不阻止UI及后续无依赖工作。页面包专用最终指令见docs/product-ui-interaction-execution.md；本段为整个产品队列的持续指令。
+先核对CORE/V3.0～V3.3实际已实现差额，不按旧台账重写。上一轮product-ui-interaction-polish已实现功能保留，缺失实机验收只影响对应项。当前已开始批次完成直接验证后，未开始工作优先：product-ui-experience-next（UI2-A→B→C→D→E→F）→ product-rd-workspace-experience → product-v34-table-authoring → product-v35-standard-pack-authoring → product-v36-large-document-performance。CORE/V3.0～V3.3有代码差额按直接依赖补齐，归档授权/人工评价/实机缺环境仅影响对应项，不阻止UI2及后续无依赖工作。新页面包专用指令见docs/product-ui-experience-next-execution.md；旧页面包指令保留供历史查阅，本段为整个产品队列的持续指令。
 
 每批从真实 GUI/CLI 入口跑通。默认尽力完成，缺图/坏可选配置/无 Word/单项失败/冲突项按既有兜底继续，结果标清自动处理、待完善、未执行。严格模式是显式选择；不能为了继续而丢数据、覆盖脏缓冲、伪造正式成功或跳过来源摘要。
 

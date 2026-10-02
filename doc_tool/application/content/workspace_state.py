@@ -29,10 +29,19 @@ class SessionState:
     dock_visibility: Dict[str, bool] = field(default_factory=dict)
     dock_state: str = ""  # QMainWindow.saveState() base64（Dock 排列）
     theme: str = DEFAULT_THEME
+    #: 用户是否已经对布局做过显式选择（打开/关闭面板或执行「恢复写作布局」）。
+    #: 为 True 时不再套用首用写作默认；为 False 且无可恢复的 Dock 状态时才用默认。
+    layout_chosen: bool = False
     open_tabs: List[str] = field(default_factory=list)
     current_file: Optional[str] = None
     preview_enabled: Dict[str, bool] = field(default_factory=dict)
     scroll_positions: Dict[str, int] = field(default_factory=dict)
+    #: UI2-B 2.3：每个标签的光标位置（字符偏移）。旧会话缺该字段时按 0 回退，
+    #: 坏值只影响该项，不影响标签/布局恢复。
+    cursor_positions: Dict[str, int] = field(default_factory=dict)
+    #: UI2-C 3.3：阅读视图与字号档位（个人偏好）。
+    view_mode: str = "write"
+    font_step: float = 1.0
 
     @property
     def empty(self) -> bool:
@@ -50,17 +59,30 @@ class SessionState:
             and self.theme == DEFAULT_THEME
             and not self.preview_enabled
             and not self.scroll_positions
+            and not self.cursor_positions
+            and (self.view_mode or "write") == "write"
+            and float(self.font_step or 1.0) == 1.0
+            and not self.layout_chosen
         )
+
+    @property
+    def has_layout_preference(self) -> bool:
+        """是否存在可恢复的布局偏好（显式选择过，或有 Dock 显隐/排列记录）。"""
+        return bool(self.layout_chosen or self.dock_visibility or self.dock_state)
 
     def to_dict(self) -> dict:
         return {
             "dockVisibility": self.dock_visibility,
             "dockState": self.dock_state,
             "theme": self.theme,
+            "layoutChosen": self.layout_chosen,
             "openTabs": self.open_tabs,
             "currentFile": self.current_file,
             "previewEnabled": self.preview_enabled,
             "scrollPositions": self.scroll_positions,
+            "cursorPositions": self.cursor_positions,
+            "viewMode": self.view_mode,
+            "fontStep": self.font_step,
         }
 
     @classmethod
@@ -72,10 +94,14 @@ class SessionState:
             dock_visibility=_str_bool_dict(data.get("dockVisibility")),
             dock_state=str(data.get("dockState") or ""),
             theme=str(data.get("theme") or DEFAULT_THEME),
+            layout_chosen=bool(data.get("layoutChosen", False)),
             open_tabs=_str_list(data.get("openTabs")),
             current_file=_opt_str(data.get("currentFile")),
             preview_enabled=_str_bool_dict(data.get("previewEnabled")),
             scroll_positions=_str_int_dict(data.get("scrollPositions")),
+            cursor_positions=_str_int_dict(data.get("cursorPositions")),
+            view_mode=str(data.get("viewMode") or "write"),
+            font_step=_coerce_float(data.get("fontStep"), 1.0),
         )
 
 
@@ -133,6 +159,17 @@ def _str_bool_dict(value) -> Dict[str, bool]:
     return {
         str(key): bool(val) for key, val in value.items() if isinstance(val, bool)
     }
+
+
+def _coerce_float(value, fallback: float) -> float:
+    """新增可选字段的安全回退：错型/缺失按默认。"""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float(fallback)
+    if number != number:  # NaN
+        return float(fallback)
+    return number
 
 
 def _str_int_dict(value) -> Dict[str, int]:

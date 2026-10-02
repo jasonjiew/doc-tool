@@ -1,0 +1,2354 @@
+{
+  "date": "2026-10-02",
+  "platform": "Qt offscreen",
+  "scale": 1,
+  "fonts": [
+    "Microsoft YaHei",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "Microsoft YaHei UI",
+    "Consolas",
+    "Segoe UI Emoji"
+  ],
+  "limitations": [
+    "synthetic project",
+    "no live desktop",
+    "explicit offscreen font registration",
+    "no real DPI/IME/Word trial"
+  ],
+  "views": [
+    {
+      "name": "home-1280",
+      "requested": [
+        1280,
+        720
+      ],
+      "actual": [
+        1280,
+        720
+      ],
+      "minimumHint": [
+        680,
+        200
+      ],
+      "screenshot": "home-1280.png",
+      "buttons": [
+        {
+          "text": "交付历史",
+          "enabled": true,
+          "bounds": [
+            32,
+            688,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "⌨ Ctrl+K 命令",
+          "enabled": true,
+          "bounds": [
+            1117,
+            132,
+            98,
+            21
+          ],
+          "minimumWidthHint": 98,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "＋  新建项目…",
+          "enabled": true,
+          "bounds": [
+            55,
+            288,
+            120,
+            36
+          ],
+          "minimumWidthHint": 120,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "📁  打开项目…",
+          "enabled": true,
+          "bounds": [
+            187,
+            288,
+            106,
+            36
+          ],
+          "minimumWidthHint": 106,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "📁",
+          "enabled": true,
+          "bounds": [
+            574,
+            383,
+            26,
+            24
+          ],
+          "minimumWidthHint": 25,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "📋",
+          "enabled": true,
+          "bounds": [
+            608,
+            383,
+            26,
+            24
+          ],
+          "minimumWidthHint": 25,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "✕",
+          "enabled": true,
+          "bounds": [
+            642,
+            383,
+            26,
+            24
+          ],
+          "minimumWidthHint": 19,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "editor-1280",
+      "requested": [
+        1280,
+        720
+      ],
+      "actual": [
+        1280,
+        720
+      ],
+      "minimumHint": [
+        1527,
+        339
+      ],
+      "screenshot": "editor-1280.png",
+      "buttons": [
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            139,
+            693,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "交付历史",
+          "enabled": true,
+          "bounds": [
+            230,
+            688,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            470,
+            33,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "导出 Word",
+          "enabled": true,
+          "bounds": [
+            679,
+            28,
+            74,
+            30
+          ],
+          "minimumWidthHint": 102,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "成果",
+          "enabled": true,
+          "bounds": [
+            763,
+            30,
+            80,
+            26
+          ],
+          "minimumWidthHint": 52,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "项目检查",
+          "enabled": true,
+          "bounds": [
+            853,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "快速构建",
+          "enabled": true,
+          "bounds": [
+            941,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "正式出稿",
+          "enabled": true,
+          "bounds": [
+            1029,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "关闭项目",
+          "enabled": true,
+          "bounds": [
+            1195,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "B",
+          "enabled": true,
+          "bounds": [
+            304,
+            201,
+            24,
+            21
+          ],
+          "minimumWidthHint": 24,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "I",
+          "enabled": true,
+          "bounds": [
+            330,
+            201,
+            20,
+            21
+          ],
+          "minimumWidthHint": 20,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "代码",
+          "enabled": true,
+          "bounds": [
+            352,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "•列表",
+          "enabled": true,
+          "bounds": [
+            394,
+            201,
+            45,
+            21
+          ],
+          "minimumWidthHint": 45,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "1.列表",
+          "enabled": true,
+          "bounds": [
+            441,
+            201,
+            48,
+            21
+          ],
+          "minimumWidthHint": 50,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "引用",
+          "enabled": true,
+          "bounds": [
+            491,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回滚",
+          "enabled": true,
+          "bounds": [
+            853,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "本地历史",
+          "enabled": true,
+          "bounds": [
+            899,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "显示目录",
+          "enabled": true,
+          "bounds": [
+            969,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "外部打开",
+          "enabled": true,
+          "bounds": [
+            1039,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "隐藏预览",
+          "enabled": true,
+          "bounds": [
+            1109,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "保存 (Ctrl+S)",
+          "enabled": false,
+          "bounds": [
+            1179,
+            201,
+            92,
+            21
+          ],
+          "minimumWidthHint": 92,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "展开全部",
+          "enabled": true,
+          "bounds": [
+            4,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "折叠全部",
+          "enabled": true,
+          "bounds": [
+            52,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "仅看改动",
+          "enabled": true,
+          "bounds": [
+            99,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "清除标记",
+          "enabled": true,
+          "bounds": [
+            146,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "刷新",
+          "enabled": true,
+          "bounds": [
+            193,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回收站（正文 / 资源）",
+          "enabled": true,
+          "bounds": [
+            0,
+            655,
+            240,
+            30
+          ],
+          "minimumWidthHint": 165,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ],
+      "editorBounds": [
+        250,
+        228,
+        613,
+        452
+      ]
+    },
+    {
+      "name": "editor-1024",
+      "requested": [
+        1024,
+        640
+      ],
+      "actual": [
+        1024,
+        640
+      ],
+      "minimumHint": [
+        1527,
+        339
+      ],
+      "screenshot": "editor-1024.png",
+      "buttons": [
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            139,
+            613,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "交付历史",
+          "enabled": true,
+          "bounds": [
+            230,
+            608,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            420,
+            33,
+            57,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "导出 Word",
+          "enabled": true,
+          "bounds": [
+            554,
+            28,
+            74,
+            30
+          ],
+          "minimumWidthHint": 102,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "成果",
+          "enabled": true,
+          "bounds": [
+            622,
+            30,
+            80,
+            26
+          ],
+          "minimumWidthHint": 52,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "项目检查",
+          "enabled": true,
+          "bounds": [
+            689,
+            30,
+            57,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "快速构建",
+          "enabled": true,
+          "bounds": [
+            756,
+            30,
+            58,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "正式出稿",
+          "enabled": true,
+          "bounds": [
+            824,
+            30,
+            57,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "关闭项目",
+          "enabled": true,
+          "bounds": [
+            958,
+            30,
+            58,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "回滚",
+          "enabled": true,
+          "bounds": [
+            598,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "本地历史",
+          "enabled": true,
+          "bounds": [
+            644,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "显示目录",
+          "enabled": true,
+          "bounds": [
+            714,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "外部打开",
+          "enabled": true,
+          "bounds": [
+            784,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "隐藏预览",
+          "enabled": true,
+          "bounds": [
+            854,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "保存 (Ctrl+S)",
+          "enabled": false,
+          "bounds": [
+            924,
+            201,
+            92,
+            21
+          ],
+          "minimumWidthHint": 92,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "展开全部",
+          "enabled": true,
+          "bounds": [
+            4,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "折叠全部",
+          "enabled": true,
+          "bounds": [
+            52,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "仅看改动",
+          "enabled": true,
+          "bounds": [
+            99,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "清除标记",
+          "enabled": true,
+          "bounds": [
+            146,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "刷新",
+          "enabled": true,
+          "bounds": [
+            193,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回收站（正文 / 资源）",
+          "enabled": true,
+          "bounds": [
+            0,
+            575,
+            240,
+            30
+          ],
+          "minimumWidthHint": 165,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ],
+      "editorBounds": [
+        249,
+        228,
+        460,
+        372
+      ]
+    },
+    {
+      "name": "editor-1920",
+      "requested": [
+        1920,
+        1080
+      ],
+      "actual": [
+        1920,
+        1080
+      ],
+      "minimumHint": [
+        1601,
+        339
+      ],
+      "screenshot": "editor-1920.png",
+      "buttons": [
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            139,
+            1053,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "交付历史",
+          "enabled": true,
+          "bounds": [
+            230,
+            1048,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            575,
+            33,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "导出 Word",
+          "enabled": true,
+          "bounds": [
+            1290,
+            28,
+            102,
+            30
+          ],
+          "minimumWidthHint": 102,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "成果",
+          "enabled": true,
+          "bounds": [
+            1402,
+            30,
+            80,
+            26
+          ],
+          "minimumWidthHint": 52,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "项目检查",
+          "enabled": true,
+          "bounds": [
+            1492,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "快速构建",
+          "enabled": true,
+          "bounds": [
+            1580,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "正式出稿",
+          "enabled": true,
+          "bounds": [
+            1668,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "关闭项目",
+          "enabled": true,
+          "bounds": [
+            1834,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "B",
+          "enabled": true,
+          "bounds": [
+            312,
+            201,
+            24,
+            21
+          ],
+          "minimumWidthHint": 24,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "I",
+          "enabled": true,
+          "bounds": [
+            338,
+            201,
+            20,
+            21
+          ],
+          "minimumWidthHint": 20,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "代码",
+          "enabled": true,
+          "bounds": [
+            360,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "•列表",
+          "enabled": true,
+          "bounds": [
+            402,
+            201,
+            45,
+            21
+          ],
+          "minimumWidthHint": 45,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "1.列表",
+          "enabled": true,
+          "bounds": [
+            449,
+            201,
+            50,
+            21
+          ],
+          "minimumWidthHint": 50,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "引用",
+          "enabled": true,
+          "bounds": [
+            501,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "表格",
+          "enabled": true,
+          "bounds": [
+            543,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "美化表",
+          "enabled": true,
+          "bounds": [
+            585,
+            201,
+            52,
+            21
+          ],
+          "minimumWidthHint": 52,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "链接",
+          "enabled": true,
+          "bounds": [
+            639,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "图片",
+          "enabled": true,
+          "bounds": [
+            681,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "Mermaid",
+          "enabled": true,
+          "bounds": [
+            723,
+            201,
+            69,
+            21
+          ],
+          "minimumWidthHint": 69,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "批量转图",
+          "enabled": true,
+          "bounds": [
+            794,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "片段",
+          "enabled": true,
+          "bounds": [
+            860,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回滚",
+          "enabled": true,
+          "bounds": [
+            1493,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "本地历史",
+          "enabled": true,
+          "bounds": [
+            1539,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "显示目录",
+          "enabled": true,
+          "bounds": [
+            1609,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "外部打开",
+          "enabled": true,
+          "bounds": [
+            1679,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "隐藏预览",
+          "enabled": true,
+          "bounds": [
+            1749,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "保存 (Ctrl+S)",
+          "enabled": false,
+          "bounds": [
+            1819,
+            201,
+            92,
+            21
+          ],
+          "minimumWidthHint": 92,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "展开全部",
+          "enabled": true,
+          "bounds": [
+            4,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "折叠全部",
+          "enabled": true,
+          "bounds": [
+            52,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "仅看改动",
+          "enabled": true,
+          "bounds": [
+            99,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "清除标记",
+          "enabled": true,
+          "bounds": [
+            146,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "刷新",
+          "enabled": true,
+          "bounds": [
+            193,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回收站（正文 / 资源）",
+          "enabled": true,
+          "bounds": [
+            0,
+            1015,
+            240,
+            30
+          ],
+          "minimumWidthHint": 165,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ],
+      "editorBounds": [
+        251,
+        228,
+        996,
+        812
+      ]
+    },
+    {
+      "name": "import-source",
+      "requested": [
+        760,
+        560
+      ],
+      "actual": [
+        760,
+        560
+      ],
+      "minimumHint": [
+        -1,
+        -1
+      ],
+      "screenshot": "import-source.png",
+      "buttons": [
+        {
+          "text": "调整章节与样式映射（可选）",
+          "enabled": true,
+          "bounds": [
+            465,
+            519,
+            203,
+            30
+          ],
+          "minimumWidthHint": 203,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "更换文件…",
+          "enabled": true,
+          "bounds": [
+            634,
+            91,
+            89,
+            26
+          ],
+          "minimumWidthHint": 89,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "🚀 立即一键导入并进入工作台 (推荐)",
+          "enabled": true,
+          "bounds": [
+            35,
+            249,
+            690,
+            36
+          ],
+          "minimumWidthHint": 243,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "Cancel",
+          "enabled": true,
+          "bounds": [
+            674,
+            519,
+            75,
+            30
+          ],
+          "minimumWidthHint": 75,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "reuse-empty",
+      "requested": [
+        980,
+        620
+      ],
+      "actual": [
+        980,
+        620
+      ],
+      "minimumHint": [
+        931,
+        198
+      ],
+      "screenshot": "reuse-empty.png",
+      "buttons": [
+        {
+          "text": "刷新",
+          "enabled": true,
+          "bounds": [
+            101,
+            11,
+            60,
+            30
+          ],
+          "minimumWidthHint": 60,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "生成展开副本…",
+          "enabled": true,
+          "bounds": [
+            167,
+            11,
+            123,
+            30
+          ],
+          "minimumWidthHint": 123,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "从当前章节创建模块…",
+          "enabled": true,
+          "bounds": [
+            296,
+            11,
+            162,
+            30
+          ],
+          "minimumWidthHint": 162,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "选择已有模块库…",
+          "enabled": true,
+          "bounds": [
+            464,
+            11,
+            136,
+            30
+          ],
+          "minimumWidthHint": 136,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "安装所选模块到项目",
+          "enabled": true,
+          "bounds": [
+            606,
+            11,
+            151,
+            30
+          ],
+          "minimumWidthHint": 151,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "插入所选模块",
+          "enabled": true,
+          "bounds": [
+            857,
+            11,
+            112,
+            30
+          ],
+          "minimumWidthHint": 112,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "解析本项目引用",
+          "enabled": true,
+          "bounds": [
+            844,
+            47,
+            125,
+            30
+          ],
+          "minimumWidthHint": 125,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "关闭",
+          "enabled": true,
+          "bounds": [
+            909,
+            579,
+            60,
+            30
+          ],
+          "minimumWidthHint": 60,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "assist-empty",
+      "requested": [
+        340,
+        640
+      ],
+      "actual": [
+        415,
+        640
+      ],
+      "minimumHint": [
+        415,
+        364
+      ],
+      "screenshot": "assist-empty.png",
+      "buttons": [
+        {
+          "text": "搜索",
+          "enabled": true,
+          "bounds": [
+            348,
+            58,
+            60,
+            30
+          ],
+          "minimumWidthHint": 60,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "添加资料范围…",
+          "enabled": true,
+          "bounds": [
+            7,
+            94,
+            123,
+            30
+          ],
+          "minimumWidthHint": 123,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "插入来源引用",
+          "enabled": true,
+          "bounds": [
+            7,
+            335,
+            112,
+            30
+          ],
+          "minimumWidthHint": 112,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "复制正文",
+          "enabled": true,
+          "bounds": [
+            125,
+            335,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "增强摘要",
+          "enabled": true,
+          "bounds": [
+            231,
+            604,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "增强术语",
+          "enabled": true,
+          "bounds": [
+            323,
+            604,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "results-340",
+      "requested": [
+        340,
+        560
+      ],
+      "actual": [
+        402,
+        560
+      ],
+      "minimumHint": [
+        402,
+        187
+      ],
+      "screenshot": "results-340.png",
+      "buttons": [
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            188,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            188,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            326,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            326,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "补这次成果（原轮）",
+          "enabled": true,
+          "bounds": [
+            4,
+            537,
+            128,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "按当前修改重新生成",
+          "enabled": true,
+          "bounds": [
+            138,
+            537,
+            128,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "换目录并重新导出…",
+          "enabled": true,
+          "bounds": [
+            272,
+            537,
+            126,
+            23
+          ],
+          "minimumWidthHint": 126,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "results-420",
+      "requested": [
+        420,
+        560
+      ],
+      "actual": [
+        420,
+        560
+      ],
+      "minimumHint": [
+        402,
+        187
+      ],
+      "screenshot": "results-420.png",
+      "buttons": [
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            188,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            188,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            326,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            326,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "补这次成果（原轮）",
+          "enabled": true,
+          "bounds": [
+            4,
+            537,
+            133,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "按当前修改重新生成",
+          "enabled": true,
+          "bounds": [
+            143,
+            537,
+            134,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "换目录并重新导出…",
+          "enabled": true,
+          "bounds": [
+            283,
+            537,
+            133,
+            23
+          ],
+          "minimumWidthHint": 126,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "results-700",
+      "requested": [
+        700,
+        560
+      ],
+      "actual": [
+        700,
+        560
+      ],
+      "minimumHint": [
+        402,
+        187
+      ],
+      "screenshot": "results-700.png",
+      "buttons": [
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            178,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            178,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "打开",
+          "enabled": true,
+          "bounds": [
+            13,
+            321,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "定位文件",
+          "enabled": true,
+          "bounds": [
+            59,
+            321,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "补这次成果（原轮）",
+          "enabled": true,
+          "bounds": [
+            4,
+            537,
+            227,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "按当前修改重新生成",
+          "enabled": true,
+          "bounds": [
+            237,
+            537,
+            226,
+            23
+          ],
+          "minimumWidthHint": 128,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "换目录并重新导出…",
+          "enabled": true,
+          "bounds": [
+            469,
+            537,
+            227,
+            23
+          ],
+          "minimumWidthHint": 126,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "delivery-form",
+      "requested": [
+        800,
+        560
+      ],
+      "actual": [
+        800,
+        560
+      ],
+      "minimumHint": [
+        410,
+        324
+      ],
+      "screenshot": "delivery-form.png",
+      "buttons": [
+        {
+          "text": "添加成员项目…",
+          "enabled": true,
+          "bounds": [
+            11,
+            369,
+            115,
+            26
+          ],
+          "minimumWidthHint": 115,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "移除所选",
+          "enabled": true,
+          "bounds": [
+            134,
+            370,
+            68,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "选择…",
+          "enabled": true,
+          "bounds": [
+            735,
+            463,
+            54,
+            23
+          ],
+          "minimumWidthHint": 54,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "保存并开始交付",
+          "enabled": true,
+          "bounds": [
+            452,
+            519,
+            125,
+            30
+          ],
+          "minimumWidthHint": 125,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "仅保存 batch.json",
+          "enabled": true,
+          "bounds": [
+            583,
+            519,
+            140,
+            30
+          ],
+          "minimumWidthHint": 140,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "取消",
+          "enabled": true,
+          "bounds": [
+            729,
+            519,
+            60,
+            30
+          ],
+          "minimumWidthHint": 60,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ]
+    },
+    {
+      "name": "editor-dark-1280",
+      "requested": [
+        1280,
+        720
+      ],
+      "actual": [
+        1280,
+        720
+      ],
+      "minimumHint": [
+        1527,
+        339
+      ],
+      "screenshot": "editor-dark-1280.png",
+      "buttons": [
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            139,
+            693,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "交付历史",
+          "enabled": true,
+          "bounds": [
+            230,
+            688,
+            86,
+            30
+          ],
+          "minimumWidthHint": 86,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "⎇ main (2) ▾",
+          "enabled": true,
+          "bounds": [
+            470,
+            33,
+            85,
+            20
+          ],
+          "minimumWidthHint": 85,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "导出 Word",
+          "enabled": true,
+          "bounds": [
+            679,
+            28,
+            74,
+            30
+          ],
+          "minimumWidthHint": 102,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "成果",
+          "enabled": true,
+          "bounds": [
+            763,
+            30,
+            80,
+            26
+          ],
+          "minimumWidthHint": 52,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "项目检查",
+          "enabled": true,
+          "bounds": [
+            853,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "快速构建",
+          "enabled": true,
+          "bounds": [
+            941,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "正式出稿",
+          "enabled": true,
+          "bounds": [
+            1029,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "关闭项目",
+          "enabled": true,
+          "bounds": [
+            1195,
+            30,
+            78,
+            26
+          ],
+          "minimumWidthHint": 78,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "B",
+          "enabled": true,
+          "bounds": [
+            304,
+            201,
+            24,
+            21
+          ],
+          "minimumWidthHint": 24,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "I",
+          "enabled": true,
+          "bounds": [
+            330,
+            201,
+            20,
+            21
+          ],
+          "minimumWidthHint": 20,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "代码",
+          "enabled": true,
+          "bounds": [
+            352,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "•列表",
+          "enabled": true,
+          "bounds": [
+            394,
+            201,
+            45,
+            21
+          ],
+          "minimumWidthHint": 45,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "1.列表",
+          "enabled": true,
+          "bounds": [
+            441,
+            201,
+            48,
+            21
+          ],
+          "minimumWidthHint": 50,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "引用",
+          "enabled": true,
+          "bounds": [
+            491,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回滚",
+          "enabled": true,
+          "bounds": [
+            853,
+            201,
+            40,
+            21
+          ],
+          "minimumWidthHint": 40,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "本地历史",
+          "enabled": true,
+          "bounds": [
+            899,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "显示目录",
+          "enabled": true,
+          "bounds": [
+            969,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "外部打开",
+          "enabled": true,
+          "bounds": [
+            1039,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "隐藏预览",
+          "enabled": true,
+          "bounds": [
+            1109,
+            201,
+            64,
+            21
+          ],
+          "minimumWidthHint": 64,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "保存 (Ctrl+S)",
+          "enabled": false,
+          "bounds": [
+            1179,
+            201,
+            92,
+            21
+          ],
+          "minimumWidthHint": 92,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "展开全部",
+          "enabled": true,
+          "bounds": [
+            4,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "折叠全部",
+          "enabled": true,
+          "bounds": [
+            52,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "仅看改动",
+          "enabled": true,
+          "bounds": [
+            99,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "清除标记",
+          "enabled": true,
+          "bounds": [
+            146,
+            52,
+            43,
+            23
+          ],
+          "minimumWidthHint": 68,
+          "compressed": true,
+          "insideWindow": true
+        },
+        {
+          "text": "刷新",
+          "enabled": true,
+          "bounds": [
+            193,
+            52,
+            44,
+            23
+          ],
+          "minimumWidthHint": 44,
+          "compressed": false,
+          "insideWindow": true
+        },
+        {
+          "text": "回收站（正文 / 资源）",
+          "enabled": true,
+          "bounds": [
+            0,
+            655,
+            240,
+            30
+          ],
+          "minimumWidthHint": 165,
+          "compressed": false,
+          "insideWindow": true
+        }
+      ],
+      "editorBounds": [
+        250,
+        228,
+        613,
+        452
+      ]
+    }
+  ]
+}

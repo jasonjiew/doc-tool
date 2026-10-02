@@ -1,0 +1,351 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="10" failures="0" time="342.362"><testsuite name="doc-tool" tests="10" failures="0" time="342.362"><testcase name="test_ui2_export_settings.py" classname="scripts.tests" time="81.345"><system-out>test_defaults_match_quick_word_safe_defaults (__main__.ExportRequestAdapterTests.test_defaults_match_quick_word_safe_defaults) ... ok
+test_saved_source_and_partial_scope_are_explicit (__main__.ExportRequestAdapterTests.test_saved_source_and_partial_scope_are_explicit) ... ok
+test_unknown_scope_and_format_fall_back (__main__.ExportRequestAdapterTests.test_unknown_scope_and_format_fall_back) ... ok
+test_advanced_is_collapsed_by_default_and_maps_layout (__main__.ExportSettingsDialogTests.test_advanced_is_collapsed_by_default_and_maps_layout) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_apply_request_prefills_previous_round (__main__.ExportSettingsDialogTests.test_apply_request_prefills_previous_round) ... ok
+test_basic_defaults_submit_in_one_action (__main__.ExportSettingsDialogTests.test_basic_defaults_submit_in_one_action) ... ok
+test_empty_selection_states_full_fallback (__main__.ExportSettingsDialogTests.test_empty_selection_states_full_fallback) ... ok
+test_scope_and_source_fields_map_to_request (__main__.ExportSettingsDialogTests.test_scope_and_source_fields_map_to_request) ... ok
+test_cancel_keeps_buffer_and_status (__main__.ExportSubmissionTests.test_cancel_keeps_buffer_and_status) ... ok
+test_dialog_accept_submits_with_original_task_runner (__main__.ExportSubmissionTests.test_dialog_accept_submits_with_original_task_runner) ... ok
+test_partial_failure_keeps_other_formats (__main__.ExportSubmissionTests.test_partial_failure_keeps_other_formats) ... ok
+test_quick_word_does_not_inherit_advanced_settings (__main__.ExportSubmissionTests.test_quick_word_does_not_inherit_advanced_settings) ... ok
+test_saved_source_excludes_dirty_buffer (__main__.ExportSubmissionTests.test_saved_source_excludes_dirty_buffer) ... ok
+test_selected_chapters_current_buffer_writes_real_files (__main__.ExportSubmissionTests.test_selected_chapters_current_buffer_writes_real_files) ... ok
+test_result_page_actionable_limit_and_locate (__main__.ImportSummaryTests.test_result_page_actionable_limit_and_locate) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 77.419s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-18212-1\.proj.import-staging-18212-1f6fwsk3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142615-3debe5c5\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142615-3debe5c5\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142619-ff066f25\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142619-ff066f25\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142653-cebf7c38\output\.tmp-proj(1.0).docx
+[general] 插入元素=5, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-export-case-18212-1\proj\.state\snapshots\20261002T142653-cebf7c38\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-import-summary-18212-1\.proj.import-staging-18212-flsj92lw\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_export_ui.py" classname="scripts.tests" time="4.333"><system-out /></testcase><testcase name="test_core_export_snapshot.py" classname="scripts.tests" time="101.532"><system-out>test_cancel_keeps_completed_formats (__main__.ExportTests.test_cancel_keeps_completed_formats) ... ok
+test_invalid_destination_falls_back_and_keeps_settings (__main__.ExportTests.test_invalid_destination_falls_back_and_keeps_settings) ... ok
+test_multi_format_partial_success_keeps_usable_results (__main__.ExportTests.test_multi_format_partial_success_keeps_usable_results) ... ok
+test_retry_only_failed_format_reuses_original_round (__main__.ExportTests.test_retry_only_failed_format_reuses_original_round) ... ok
+test_same_name_uses_new_safe_name_instead_of_overwriting (__main__.ExportTests.test_same_name_uses_new_safe_name_instead_of_overwriting) ... ok
+test_scope_and_summary_report_actual_range (__main__.ExportTests.test_scope_and_summary_report_actual_range) ... ok
+test_source_package_is_portable_and_excludes_user_data (__main__.ExportTests.test_source_package_is_portable_and_excludes_user_data) ... ok
+test_source_package_keeps_assets_and_parent_body_when_moved (__main__.ExportTests.test_source_package_keeps_assets_and_parent_body_when_moved) ... ok
+test_source_package_reports_missing_resource (__main__.ExportTests.test_source_package_reports_missing_resource) ... ok
+test_action_items_are_direct_and_limited (__main__.ReadonlyAndActionTests.test_action_items_are_direct_and_limited) ... ok
+test_readonly_project_exports_to_external_dir_without_writing_inside (__main__.ReadonlyAndActionTests.test_readonly_project_exports_to_external_dir_without_writing_inside) ... ok
+test_buffer_edit_is_captured_without_touching_disk (__main__.SnapshotTests.test_buffer_edit_is_captured_without_touching_disk) ... ok
+test_cache_key_tracks_content_and_scope (__main__.SnapshotTests.test_cache_key_tracks_content_and_scope) ... ok
+test_saved_mode_ignores_buffer_edits (__main__.SnapshotTests.test_saved_mode_ignores_buffer_edits) ... ok
+test_scope_selects_chapters_in_project_order (__main__.SnapshotTests.test_scope_selects_chapters_in_project_order) ... ok
+test_snapshot_assets_use_manifest_resource_root (__main__.SnapshotTests.test_snapshot_assets_use_manifest_resource_root) ... ok
+test_snapshot_rejects_work_directory_over_source_project (__main__.SnapshotTests.test_snapshot_rejects_work_directory_over_source_project) ... ok
+test_source_updated_detection (__main__.SnapshotTests.test_source_updated_detection) ... ok
+test_preview_uses_same_snapshot_content_as_export (__main__.SnapshotViewTests.test_preview_uses_same_snapshot_content_as_export) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 98.933s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-36104-1\.proj.import-staging-36104-gcjkbvj0\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142736-c9b1af84\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142736-c9b1af84\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142738-996f9c0b\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142738-996f9c0b\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142753-95a3ed30\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142753-95a3ed30\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142811-a3e7ce45\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142811-a3e7ce45\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142831-8eb7d4a6\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142831-8eb7d4a6\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142846-2066977d\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-36104-1\proj\.state\snapshots\20261002T142846-2066977d\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-36104-2\.proj.import-staging-36104-xmhmiidv\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\.doctool\snapshots\20261002T142905-f3936aa1\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\.doctool\snapshots\20261002T142905-f3936aa1\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-36104-3\.proj.import-staging-36104-4yi3j74y\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-36104-4\.proj.import-staging-36104-e_qoop0r\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_ui_polish_results.py" classname="scripts.tests" time="29.145"><system-out>test_busy_runner_does_not_start_second_export (__main__.MainWindowResultsTests.test_busy_runner_does_not_start_second_export) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_change_destination_cancel_keeps_results (__main__.MainWindowResultsTests.test_change_destination_cancel_keeps_results) ... ok
+test_change_destination_starts_new_round_in_new_directory (__main__.MainWindowResultsTests.test_change_destination_starts_new_round_in_new_directory) ... ok
+test_completion_is_nonmodal_and_results_stay_reachable (__main__.MainWindowResultsTests.test_completion_is_nonmodal_and_results_stay_reachable) ... ok
+test_invalid_path_is_not_opened_and_gives_next_step (__main__.MainWindowResultsTests.test_invalid_path_is_not_opened_and_gives_next_step) ... ok
+test_last_round_is_restored_from_existing_index (__main__.MainWindowResultsTests.test_last_round_is_restored_from_existing_index) ... ok
+test_project_switch_clears_other_project_results (__main__.MainWindowResultsTests.test_project_switch_clears_other_project_results) ... ok
+test_regenerate_creates_new_current_buffer_round (__main__.MainWindowResultsTests.test_regenerate_creates_new_current_buffer_round) ... ok
+test_retry_keeps_original_capture_and_ignores_new_buffer (__main__.MainWindowResultsTests.test_retry_keeps_original_capture_and_ignores_new_buffer) ... ok
+test_late_result_from_other_project_does_not_override_selection (__main__.RoundViewTests.test_late_result_from_other_project_does_not_override_selection) ... ok
+test_missing_path_is_marked_stale_not_openable (__main__.RoundViewTests.test_missing_path_is_marked_stale_not_openable) ... ok
+test_partial_success_keeps_each_format_state (__main__.RoundViewTests.test_partial_success_keeps_each_format_state) ... ok
+test_pending_refresh_is_retryable_but_usable (__main__.RoundViewTests.test_pending_refresh_is_retryable_but_usable) ... ok
+test_round_store_keeps_history_per_project (__main__.RoundViewTests.test_round_store_keeps_history_per_project) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 24.323s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-53352-1\.proj.import-staging-53352-ng60hhoh\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142923-e8d6d6ef\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142923-e8d6d6ef\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142926-3e1eeb6d\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142926-3e1eeb6d\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142928-145b626e\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142928-145b626e\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142930-c114b59a\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142930-c114b59a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142932-2fe4f475\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142932-2fe4f475\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142934-79d40add\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142934-79d40add\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142936-92e43fcf\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142936-92e43fcf\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142938-ab51c321\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142938-ab51c321\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142941-cd69fe1a\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-results-case-53352-1\proj\.state\snapshots\20261002T142941-cd69fe1a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_ui_polish_quick_export.py" classname="scripts.tests" time="11.156"><system-out>test_availability_ignores_missing_word_but_respects_running (__main__.ProjectBarQuickExportTests.test_availability_ignores_missing_word_but_respects_running) ... ok
+test_button_calls_injected_handler (__main__.ProjectBarQuickExportTests.test_button_calls_injected_handler) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_tooltip_reports_unsaved_source_and_count (__main__.ProjectBarQuickExportTests.test_tooltip_reports_unsaved_source_and_count) ... ok
+test_busy_runner_refuses_second_start_and_keeps_state (__main__.QuickExportWiringTests.test_busy_runner_refuses_second_start_and_keeps_state) ... ok
+test_button_menu_and_shortcut_share_one_handler (__main__.QuickExportWiringTests.test_button_menu_and_shortcut_share_one_handler) ... ok
+test_project_bar_tooltip_reflects_real_unsaved_count (__main__.QuickExportWiringTests.test_project_bar_tooltip_reflects_real_unsaved_count) ... ok
+test_quick_export_uses_daily_defaults_and_counts_unsaved (__main__.QuickExportWiringTests.test_quick_export_uses_daily_defaults_and_counts_unsaved) ... ok
+test_quick_export_without_buffers_falls_back_to_saved (__main__.QuickExportWiringTests.test_quick_export_without_buffers_falls_back_to_saved) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 7.185s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-19680-1\.proj.import-staging-19680-mu0yawut\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-19680-1\.proj.import-staging-19680-vjdk_lpc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-19680-1\.proj.import-staging-19680-e90bs_ff\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-19680-1\.proj.import-staging-19680-pltil8kf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-quick-export-19680-1\.proj.import-staging-19680-c08m8338\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_ui_polish_advanced.py" classname="scripts.tests" time="15.245"><system-out>test_actions_preserved_across_pages (__main__.AssistPanelFirstUseTests.test_actions_preserved_across_pages) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_add_scope_is_a_real_action (__main__.AssistPanelFirstUseTests.test_add_scope_is_a_real_action) ... ok
+test_provider_actions_default_collapsed_in_label (__main__.AssistPanelFirstUseTests.test_provider_actions_default_collapsed_in_label) ... ok
+test_scope_cancel_keeps_state (__main__.AssistPanelFirstUseTests.test_scope_cancel_keeps_state) ... ok
+test_search_and_adopt_flow_keeps_insert_and_undo (__main__.AssistPanelFirstUseTests.test_search_and_adopt_flow_keeps_insert_and_undo) ... ok
+test_tabs_exist_and_switch (__main__.AssistPanelFirstUseTests.test_tabs_exist_and_switch) ... ok
+test_form_keeps_input_when_all_members_invalid (__main__.DeliveryFormTests.test_form_keeps_input_when_all_members_invalid) ... ok
+test_form_reports_member_problem_inline (__main__.DeliveryFormTests.test_form_reports_member_problem_inline) ... ok
+test_form_submit_writes_plan_and_accepts_with_valid_members (__main__.DeliveryFormTests.test_form_submit_writes_plan_and_accepts_with_valid_members) ... ok
+test_payload_is_original_batch_schema (__main__.DeliveryFormTests.test_payload_is_original_batch_schema) ... ok
+test_saved_plan_reparses_with_original_service (__main__.DeliveryFormTests.test_saved_plan_reparses_with_original_service) ... ok
+test_validation_splits_executable_and_invalid_members (__main__.DeliveryFormTests.test_validation_splits_executable_and_invalid_members) ... ok
+test_create_from_current_buffer_marks_source_and_publishes (__main__.ModuleFirstUseTests.test_create_from_current_buffer_marks_source_and_publishes) ... ok
+test_empty_library_gives_real_next_actions (__main__.ModuleFirstUseTests.test_empty_library_gives_real_next_actions) ... ok
+test_install_and_insert_reference_is_resolvable (__main__.ModuleFirstUseTests.test_install_and_insert_reference_is_resolvable) ... ok
+test_main_window_module_insert_is_single_undo (__main__.ModuleFirstUseTests.test_main_window_module_insert_is_single_undo) ... ok
+test_pick_existing_library_is_used_as_source (__main__.ModuleFirstUseTests.test_pick_existing_library_is_used_as_source) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 11.942s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-assist-23776-1\.proj.import-staging-23776-l_215jeu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-delivery-23776-1\.good.import-staging-23776-0d214wec\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-delivery-23776-1\.good2.import-staging-23776-l4p7qsh6\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-23776-1\.proj.import-staging-23776-8dtrvc1c\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-23776-1\.proj-2.import-staging-23776-mzur_2qr\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-23776-1\.proj-3.import-staging-23776-qsenswva\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-23776-1\.proj-4.import-staging-23776-aiiy7hny\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-module-23776-1\.proj-5.import-staging-23776-y4vba2pa\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="17.899"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 16.617s
+
+OK
+</system-out></testcase><testcase name="test_core_scope_presets_batch.py" classname="scripts.tests" time="11.002"><system-out>test_batch_result_serializes_settings_for_retry (__main__.BatchTests.test_batch_result_serializes_settings_for_retry) ... ok
+test_markdown_batch_builds_single_project_in_order (__main__.BatchTests.test_markdown_batch_builds_single_project_in_order) ... ok
+test_word_batch_cancel_keeps_completed (__main__.BatchTests.test_word_batch_cancel_keeps_completed) ... ok
+test_word_batch_marks_doc_pending_when_word_missing (__main__.BatchTests.test_word_batch_marks_doc_pending_when_word_missing) ... ok
+test_word_batch_partial_success_and_safe_names (__main__.BatchTests.test_word_batch_partial_success_and_safe_names) ... ok
+test_damaged_preset_file_is_quarantined (__main__.PresetTests.test_damaged_preset_file_is_quarantined) ... ok
+test_save_resolve_and_partial_match (__main__.PresetTests.test_save_resolve_and_partial_match) ... ok
+test_unmatched_falls_back_and_is_reported (__main__.PresetTests.test_unmatched_falls_back_and_is_reported) ... ok
+test_directory_matching_tolerates_numbering_and_spaces (__main__.ScopeTests.test_directory_matching_tolerates_numbering_and_spaces) ... ok
+test_missing_title_is_reported_not_silently_ignored (__main__.ScopeTests.test_missing_title_is_reported_not_silently_ignored) ... ok
+test_prune_removes_unselected_and_notes_dangling (__main__.ScopeTests.test_prune_removes_unselected_and_notes_dangling) ... ok
+test_run_intake_with_selection_limits_chapters (__main__.ScopeTests.test_run_intake_with_selection_limits_chapters) ... ok
+test_selection_keeps_ancestors_and_source_order (__main__.ScopeTests.test_selection_keeps_ancestors_and_source_order) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 8.301s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\batch-30068-1\out\.c.import-staging-30068-usjc86r8\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\batch-30068-1\out\.a.import-staging-30068-hvi4ivjv\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\batch-30068-1\out\.good.import-staging-30068-zmhajx1u\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\batch-30068-1\out\.同名.import-staging-30068-a98t41y9\output\.trial-build.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\batch-30068-1\out\.同名-2.import-staging-30068-suhehjq5\output\.trial-build.docx
+[general] 插入元素=3, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\scope-run-30068-1\out\.范围.import-staging-30068-ekt76i4y\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\scope-run-30068-1\out\.范围项目.import-staging-30068-2xevei77\output\.trial-build.docx
+[general] 插入元素=2, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_core_cli_export.py" classname="scripts.tests" time="38.927"><system-out>test_current_buffer_is_rejected_without_ui (__main__.ProjectExportCliTests.test_current_buffer_is_rejected_without_ui) ... ok
+test_help_exposes_contract_options (__main__.ProjectExportCliTests.test_help_exposes_contract_options) ... ok
+test_no_usable_result_returns_one (__main__.ProjectExportCliTests.test_no_usable_result_returns_one) ... ok
+test_retry_of_reuses_original_round (__main__.ProjectExportCliTests.test_retry_of_reuses_original_round) ... ok
+test_saved_mode_exports_and_reports_json (__main__.ProjectExportCliTests.test_saved_mode_exports_and_reports_json) ... ok
+test_scope_chapters_only_outputs_selected (__main__.ProjectExportCliTests.test_scope_chapters_only_outputs_selected) ... ok
+test_strict_returns_nonzero_when_format_not_ready (__main__.ProjectExportCliTests.test_strict_returns_nonzero_when_format_not_ready) ... ok
+test_template_fill_output_still_means_docx_path (__main__.ProjectExportCliTests.test_template_fill_output_still_means_docx_path) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 36.696s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\cli-export-62536-1\.proj.import-staging-62536-dgv_k261\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_v32_batch_delivery.py" classname="scripts.tests" time="31.778"><system-out>test_formalize_registers_once_and_reprocess_is_idempotent (__main__.PackageTests.test_formalize_registers_once_and_reprocess_is_idempotent) ... ok
+test_invalid_package_and_hash_mismatch_are_rejected (__main__.PackageTests.test_invalid_package_and_hash_mismatch_are_rejected) ... ok
+test_package_is_self_contained_with_relative_paths_only (__main__.PackageTests.test_package_is_self_contained_with_relative_paths_only) ... ok
+test_package_moves_to_new_directory_and_formalizes_from_packaged_snapshot (__main__.PackageTests.test_package_moves_to_new_directory_and_formalizes_from_packaged_snapshot) ... ok
+test_package_requires_readable_docx (__main__.PackageTests.test_package_requires_readable_docx) ... ok
+test_registration_failure_keeps_new_docx_and_old_record (__main__.PackageTests.test_registration_failure_keeps_new_docx_and_old_record) ... ok
+test_source_change_only_notes_captured_snapshot (__main__.PackageTests.test_source_change_only_notes_captured_snapshot) ... ok
+test_real_export_partial_failure_keeps_other_members (__main__.QueueIntegrationTests.test_real_export_partial_failure_keeps_other_members) ... ok
+test_cancel_keeps_completed_members (__main__.QueueTests.test_cancel_keeps_completed_members) ... ok
+test_cancel_token_stops_after_current_member (__main__.QueueTests.test_cancel_token_stops_after_current_member) ... ok
+test_corrupt_store_is_quarantined_and_queue_still_usable (__main__.QueueTests.test_corrupt_store_is_quarantined_and_queue_still_usable) ... ok
+test_enqueue_dedupes_unfinished_and_skips_completed (__main__.QueueTests.test_enqueue_dedupes_unfinished_and_skips_completed) ... ok
+test_resume_in_new_instance_sees_results_and_continues (__main__.QueueTests.test_resume_in_new_instance_sees_results_and_continues) ... ok
+test_retry_unfinished_only_retries_failed_items (__main__.QueueTests.test_retry_unfinished_only_retries_failed_items) ... ok
+test_serial_run_keeps_failed_members_and_records_attempts (__main__.QueueTests.test_serial_run_keeps_failed_members_and_records_attempts) ... ok
+test_unknown_running_is_interrupted_and_can_continue (__main__.QueueTests.test_unknown_running_is_interrupted_and_can_continue) ... ok
+test_word_busy_turns_item_to_waiting_refresh (__main__.QueueTests.test_word_busy_turns_item_to_waiting_refresh) ... ok
+test_archive_can_take_results_out_of_package_zip (__main__.ResultIndexTests.test_archive_can_take_results_out_of_package_zip) ... C:\Users\18098\AppData\Local\Programs\Python\Python313\Lib\zipfile\__init__.py:1655: UserWarning: Duplicate name: 'selection-manifest.json'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+ok
+test_archive_lists_missing_selected_paths (__main__.ResultIndexTests.test_archive_lists_missing_selected_paths) ... ok
+test_archive_selection_marks_partial_range (__main__.ResultIndexTests.test_archive_selection_marks_partial_range) ... ok
+test_index_lists_member_variant_format_status_and_paths (__main__.ResultIndexTests.test_index_lists_member_variant_format_status_and_paths) ... ok
+test_missing_path_is_listed (__main__.ResultIndexTests.test_missing_path_is_listed) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 29.299s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-shared-66344-1\.proj.import-staging-66344-1dv7qzub\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-shared-66344-1\proj\.state\snapshots\20261002T143120-78d6efb7\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-shared-66344-1\proj\.state\snapshots\20261002T143120-78d6efb7\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-package-66344-4\.delivery-work\pkg-d46301932b\snapshot\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-package-66344-4\.delivery-work\pkg-d46301932b\snapshot\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-package-66344-7\.delivery-work\pkg-33f375e2e4\snapshot\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-package-66344-7\.delivery-work\pkg-33f375e2e4\snapshot\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-proj-66344-2\proj-1\.state\snapshots\20261002T143141-bc56133a\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-proj-66344-2\proj-1\.state\snapshots\20261002T143141-bc56133a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-proj-66344-3\proj-2\.state\snapshots\20261002T143142-8f2f4530\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v32-proj-66344-3\proj-2\.state\snapshots\20261002T143142-8f2f4530\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase></testsuite></testsuites>

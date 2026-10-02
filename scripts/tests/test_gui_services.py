@@ -3115,8 +3115,12 @@ class HomeTaskPageTests(unittest.TestCase):
             self.assertIs(captured["parent"], window)
             self.assertFalse(captured["busy_check"]())
 
-    def test_home_drop_hands_paths_to_convert_dialog(self):
-        """首页整页拖放：drop 后路径送进 ConvertDialog 并打开，互转卡还原。"""
+    def test_home_convert_card_drop_hands_paths_to_convert_dialog(self):
+        """互转卡自身拖放：drop 后路径送进 ConvertDialog 并打开，互转卡还原。
+
+        UI 包 1.1 后首页主区拖放改为导入建项路由，互转语义只保留在互转卡与
+        转换入口；本用例继续断言原业务/来源保护：路径必须真实交给转换服务。
+        """
         from unittest.mock import patch
 
         from doc_tool.ui.main_window import MainWindow
@@ -3143,7 +3147,7 @@ class HomeTaskPageTests(unittest.TestCase):
             with patch(
                 "doc_tool.ui.convert_dialog.ConvertDialog", _FakeDialog
             ):
-                home.dropEvent(self._fake_drag_event([docx]))
+                home._on_drop_convert([docx])
             self.assertEqual(captured["ingested"], [docx])
             self.assertTrue(captured["exec_called"])
             # drop 后高亮还原
@@ -3160,12 +3164,16 @@ class HomeTaskPageTests(unittest.TestCase):
         self.assertTrue(event.accepted)
         self.assertTrue(home._drag_over)
         self.assertEqual(home._convert_card.property("dragOver"), "true")
+        self.assertEqual(home._intake_card.property("dragOver"), "true")
         self.assertEqual(home._convert_title.text(), "松开鼠标，添加这些文件")
         self.assertEqual(home._convert_desc.text(), "已识别拖入的文件，进入互转窗口。")
+        self.assertEqual(home._intake_drop_hint.text(), "松开鼠标，按导入建项处理这些文件")
         home.dragLeaveEvent(QDragLeaveEvent())
         self.assertFalse(home._drag_over)
         self.assertEqual(home._convert_card.property("dragOver"), "false")
+        self.assertEqual(home._intake_card.property("dragOver"), "false")
         self.assertEqual(home._convert_title.text(), "文档互转")
+        self.assertEqual(home._intake_drop_hint.text(), "拖入此处 = 导入建项（等同「新建项目…」）")
 
     def test_drag_without_urls_is_ignored(self):
         home = self._home()
@@ -3217,12 +3225,16 @@ class HomeTaskPageTests(unittest.TestCase):
             self.assertIsNone(home._empty_label)  # 卡片与空态互斥
             texts_a = [c.text() for c in home._recent_cards[0].findChildren(QLabel)]
             self.assertIn("需求说明书（示例）", texts_a)
-            self.assertTrue(any("3 天前打开" in t and str(root_a) in t for t in texts_a))
+            # UI2-B 2.2：卡片只显示名称/类型/最近打开时间/当前位置（目录名），
+            # 完整路径进入提示，避免卡片堆叠技术细节。
+            self.assertTrue(any("3 天前打开" in t and root_a.name in t for t in texts_a))
+            self.assertIn(str(root_a), home._recent_cards[0].toolTip())
             self.assertIn("需求", texts_a)  # 类型徽章
             self.assertIn("打开 →", texts_a)
             # 第二张：无类型无时间戳（旧数据兼容）→ 无徽章、只显示路径
             texts_b = [c.text() for c in home._recent_cards[1].findChildren(QLabel)]
-            self.assertIn(str(root_b), texts_b)
+            self.assertIn(root_b.name, texts_b)
+            self.assertIn(str(root_b), home._recent_cards[1].toolTip())
             self.assertNotIn("需求", texts_b)
             # 点击卡片走现有打开项目链路
             self._click(home._recent_cards[0])
@@ -3955,7 +3967,10 @@ class WizardUXOptimizationTests(unittest.TestCase):
         source_page._on_silent_preflight_done((True, preview, "ok"))
         self.assertTrue(source_page.isComplete())
         next_btn = wizard.button(QWizard.WizardButton.NextButton)
-        self.assertEqual(next_btn.text(), "下一步：确认项目信息", "预检完成后 NextButton 文案应即时自适应")
+        # UI 包 1.3：源页主路径是「开始导入」，NextButton 承担可选的章节/映射细调入口。
+        self.assertEqual(
+            next_btn.text(), "调整章节与样式映射（可选）", "预检完成后 NextButton 文案应即时自适应"
+        )
 
     def test_project_info_conflict_naming_increments_cleanly(self):
         """已存在 my_project 与 my_project-v2 时，递增建议为 my_project-v3 而非层叠 -v2-v2。"""

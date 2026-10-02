@@ -146,7 +146,10 @@ class HomeExperienceIterationTests(unittest.TestCase):
         self.assertIn("路径失效", card1_pills)
 
         btns_card0 = home._recent_cards[0].findChildren(QPushButton)
-        copy_btn = next((b for b in btns_card0 if b.text() == "📋"), None)
+        # UI2-B 2.2：图标按钮带文字兜底，按文案或属性定位都仍可用。
+        copy_btn = next(
+            (b for b in btns_card0 if b.text() == "复制路径" or b.text() == "📋"), None
+        )
         self.assertIsNotNone(copy_btn)
         clipboard = QGuiApplication.clipboard()
         written: list = []
@@ -216,6 +219,11 @@ class HomeExperienceIterationTests(unittest.TestCase):
         self.assertEqual(window._stack.currentWidget(), window._empty_state)
         self.assertIsNone(window.project)
 
+        # UI2-A 1.2 后项目条按真实宽度自适应：窗口足够宽时「关闭项目」在原地，
+        # 窄窗口会进入「更多 ▾」。这里用足够宽度验证原地入口与点击行为不变。
+        window.resize(1400, 800)
+        window.show()
+        window._refresh_interaction_state()
         summary = type("FakeSummary", (), {
             "manifest": type("Manifest", (), {
                 "documentName": "测试文档",

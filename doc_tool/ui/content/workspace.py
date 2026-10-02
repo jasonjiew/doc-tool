@@ -140,6 +140,7 @@ class ContentWorkspace(QWidget):
         writable: bool = True,
         on_status: Optional[Callable[[str], None]] = None,
         on_open_file: Optional[Callable[[str], None]] = None,
+        on_navigate: Optional[Callable[[str, Optional[int], str], None]] = None,
         on_request_validate: Optional[Callable[[], None]] = None,
         on_index_ready: Optional[Callable[[], None]] = None,
         on_branch_changed: Optional[Callable[[str], None]] = None,
@@ -177,6 +178,7 @@ class ContentWorkspace(QWidget):
         self._writable = writable
         self._on_status = on_status
         self._on_open_file = on_open_file
+        self._on_navigate = on_navigate
         self._on_request_validate = on_request_validate
         self._on_index_ready = on_index_ready
         self._on_branch_changed = on_branch_changed
@@ -529,8 +531,12 @@ class ContentWorkspace(QWidget):
 
     # --- 打开文件 ---
 
-    def open_file(self, rel_path: str, line_no: Optional[int] = None) -> None:
-        """打开文件到编辑器并定位到行；文件不在索引中则尝试直接读取。"""
+    def open_file(self, rel_path: str, line_no: Optional[int] = None, *, source: str = "") -> None:
+        """打开文件到编辑器并定位到行；文件不在索引中则尝试直接读取。
+
+        ``source`` 说明导航来源（章节树/搜索/问题/资料…），供位置历史展示；
+        打开失败不产生历史记录。
+        """
         path = self._writer.resolve(rel_path)
         try:
             text = path.read_text(encoding="utf-8")
@@ -542,14 +548,30 @@ class ContentWorkspace(QWidget):
         # 先记录当前文件再定位树节点，避免树选中的延迟事件递归打开同一文件
         self._tree.set_current(rel_path)
         self._tree.select_file(rel_path)
+        if self._on_navigate is not None:
+            self._on_navigate(rel_path, line_no, source or "导航")
         if self._on_open_file is not None:
             self._on_open_file(rel_path)
 
     def _on_tree_open(self, rel_path: str) -> None:
-        self.open_file(rel_path)
+        self.open_file(rel_path, source="章节树")
 
     def _open_and_locate(self, rel_path: str, line_no: int) -> None:
-        self.open_file(rel_path, line_no)
+        self.open_file(rel_path, line_no, source="搜索结果")
+
+    def locate_from_issue(self, rel_path: str, line_no: Optional[int] = None) -> bool:
+        """问题/检查定位到章节（走同一导航历史）。"""
+        if not rel_path:
+            return False
+        self.open_file(rel_path, line_no, source="问题定位")
+        return True
+
+    def locate_from_evidence(self, rel_path: str, line_no: Optional[int] = None) -> bool:
+        """资料/来源定位到章节（走同一导航历史）。"""
+        if not rel_path:
+            return False
+        self.open_file(rel_path, line_no, source="资料定位")
+        return True
 
     def set_dark(self, dark: bool) -> None:
         """暗黑模式状态变更通知：广播给各子面板。"""
@@ -566,6 +588,38 @@ class ContentWorkspace(QWidget):
         panel = getattr(self, "_search_panel", None)
         if panel is not None:
             panel.focus_query()
+
+    def current_location(self):
+        """当前编辑器位置（相对路径/光标/滚动）；无编辑器返回 None。"""
+        editor = self.tabs_host.current_editor()
+        rel_path = self.tabs_host.current_rel_path()
+        if editor is None or not rel_path:
+            return None
+        from doc_tool.ui.navigation_history import NavLocation
+
+        cursor = editor.cursor_position() if hasattr(editor, "cursor_position") else 0
+        return NavLocation(
+            rel_path=rel_path,
+            cursor=int(cursor),
+            scroll=int(editor.scroll_position()),
+        )
+
+    def restore_location(self, location) -> bool:
+        """还原一个历史位置：复用已打开的 EditorPanel，不加载旧正文。"""
+        if location is None or not getattr(location, "rel_path", ""):
+            return False
+        editor = self.tabs_host.editor_for(location.rel_path)
+        if editor is None:
+            return False
+        self.tabs_host.activate(location.rel_path)
+        if hasattr(editor, "set_cursor_position"):
+            editor.set_cursor_position(location.cursor)
+        editor.set_scroll_position(location.scroll)
+        self._tree.set_current(location.rel_path)
+        self._tree.select_file(location.rel_path)
+        if self._on_open_file is not None:
+            self._on_open_file(location.rel_path)
+        return True
 
     def focus_in_editor_find(self) -> None:
         """编辑器聚焦时的 Ctrl+F：聚焦当前文件的文件内查找条。"""
@@ -1820,12 +1874,21 @@ class ContentWorkspace(QWidget):
         open_tabs = self.tabs_host.open_rel_paths()
         scroll = {}
         preview = {}
+        cursors = {}
+        view_mode = "write"
+        font_step = 1.0
         for rel in open_tabs:
             editor = self.tabs_host.editor_for(rel)
             if editor is None:
                 continue
             scroll[rel] = editor.scroll_position()
             preview[rel] = editor.preview_enabled()
+            if hasattr(editor, "cursor_position"):
+                cursors[rel] = editor.cursor_position()
+            if hasattr(editor, "view_mode"):
+                view_mode = editor.view_mode()
+            if hasattr(editor, "font_step"):
+                font_step = editor.font_step()
         return SessionState(
             dock_visibility=dict(dock_visibility),
             dock_state=dock_state,
@@ -1834,6 +1897,9 @@ class ContentWorkspace(QWidget):
             current_file=self.tabs_host.current_rel_path(),
             preview_enabled=preview,
             scroll_positions=scroll,
+            cursor_positions=cursors,
+            view_mode=view_mode,
+            font_step=font_step,
         )
 
     def _default_restore_drafts_choice(self, rels: List[str]) -> bool:
@@ -1917,6 +1983,22 @@ class ContentWorkspace(QWidget):
             editor = self.tabs_host.editor_for(rel)
             if editor is not None:
                 editor.set_preview_enabled(enabled)
+        # 顺序很重要：先放光标再恢复滚动。设置光标会让编辑器自动滚动到光标处，
+        # 反过来会把刚恢复的滚动位置顶掉（审计发现的真实回归）。
+        for rel, position in (session.cursor_positions or {}).items():
+            editor = self.tabs_host.editor_for(rel)
+            if editor is not None and hasattr(editor, "set_cursor_position"):
+                editor.set_cursor_position(position)
+        # UI2-C 3.3：阅读视图与字号是可选个人偏好；坏值只影响该项。
+        for rel in self.tabs_host.open_rel_paths():
+            editor = self.tabs_host.editor_for(rel)
+            if editor is None:
+                continue
+            if hasattr(editor, "set_font_step"):
+                editor.set_font_step(session.font_step or 1.0)
+            if hasattr(editor, "set_view_mode"):
+                editor.set_view_mode(session.view_mode or "write")
+        # 最后恢复滚动：切换视图/字号会触发重排，顺序反了会把滚动顶掉。
         for rel, position in session.scroll_positions.items():
             editor = self.tabs_host.editor_for(rel)
             if editor is not None:

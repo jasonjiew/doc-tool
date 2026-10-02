@@ -1,0 +1,13 @@
+# UI 包 5.1 真实入口闭环证据
+窗口：1280×720（离屏 Qt，实际 1280×720）
+步骤：
+  - 1 首页主区拖放（QDropEvent）
+  - 2 进入工作台并打开章节
+  - 3 未保存编辑（磁盘未改写）
+  - 4 顶部「导出 Word」（1 次点击，非模态结果）
+  - 5 成果页逐文件「打开」（1 次点击）
+强制弹窗数：0（结果以非模态成果页呈现）
+普通导入源已选后主要提交：1 次（首页拖放/导入入口）
+快速 Word 生成后打开主要操作：1 次（成果页「打开」）
+来源标识：captureId=20261002T152107-2cfc7afe / sourceMode=current-buffer
+实际产物：D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-67760-1\proj\output\proj.docx

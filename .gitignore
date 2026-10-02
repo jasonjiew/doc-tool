@@ -110,3 +110,9 @@ invoke_args.json
 /analysis/review-regressions-*.xml
 /analysis/ui-interaction-audit-20261002/
 /tools/mermaid-cli/probe.js
+analysis/ui-experience-next-audit-20261002/isolated-user/
+analysis/ui-experience-next-audit-20261002/sample-project/
+analysis/ui-experience-next-audit-20261002/sample-import.docx
+analysis/ui-experience-next-after-20261002/isolated-user/
+analysis/ui-experience-next-after-20261002/sample-project/
+analysis/ui-experience-next-after-20261002/sample-import.docx

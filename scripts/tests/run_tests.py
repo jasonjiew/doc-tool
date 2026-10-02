@@ -94,6 +94,22 @@ DEFAULT_TESTS = [
     "test_v32_real_word_formalize.py",
     "test_v32_cross_process_promote.py",
     "test_v32_delivery_entry.py",
+    # UI 包 product-ui-interaction-polish（20 项）新增控件/接线用例。
+    "test_ui_polish_entry_drop.py",
+    "test_ui2_visual_hierarchy.py",
+    "test_ui2_home_continue.py",
+    "test_ui2_navigation.py",
+    "test_ui2_reading_view.py",
+    "test_ui2_export_settings.py",
+    "test_ui2_panel_productivity.py",
+    "test_ui2_acceptance.py",
+    "test_ui_polish_quick_export.py",
+    "test_ui_polish_layout_session.py",
+    "test_ui_polish_toolbar.py",
+    "test_ui_polish_geometry.py",
+    "test_ui_polish_results.py",
+    "test_ui_polish_advanced.py",
+    "test_ui_polish_acceptance.py",
 ]
 
 
@@ -105,10 +121,15 @@ def parse_args():
     parser.add_argument("--coverage-xml", default=str(ROOT / "coverage.xml"))
     parser.add_argument("--coverage-json", default=str(ROOT / "coverage.json"))
     parser.add_argument("tests", nargs="*")
+    # 显式环境覆盖（如 UI 包 5.2 的离屏缩放证据需要 QT_SCALE_FACTOR）。
+    parser.add_argument(
+        "--env", action="append", default=[], metavar="KEY=VALUE",
+        help="在子进程中覆盖的环境变量，可重复",
+    )
     return parser.parse_args()
 
 
-def run_one(name: str, coverage: bool) -> dict:
+def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
     print("\n== {0} ==".format(name), flush=True)
     command = [sys.executable]
     if coverage:
@@ -134,6 +155,8 @@ def run_one(name: str, coverage: bool) -> dict:
         if candidate.is_dir() and str(candidate) not in paths:
             paths.append(str(candidate))
     env["PYTHONPATH"] = os.pathsep.join(paths)
+    for key, value in (extra_env or {}).items():
+        env[str(key)] = str(value)
     started = time.monotonic()
     completed = subprocess.run(
         command, cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
@@ -185,7 +208,12 @@ def finish_coverage(args) -> int:
 def main() -> int:
     args = parse_args()
     tests = args.tests or DEFAULT_TESTS
-    results = [run_one(name, args.coverage) for name in tests]
+    extra_env = {}
+    for item in args.env:
+        key, _, value = str(item).partition("=")
+        if key:
+            extra_env[key] = value
+    results = [run_one(name, args.coverage, extra_env) for name in tests]
     write_junit(Path(args.junit), results)
     test_code = 1 if any(result["code"] != 0 for result in results) else 0
     coverage_code = finish_coverage(args) if args.coverage else 0

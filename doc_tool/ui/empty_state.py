@@ -5,8 +5,8 @@
 - 标题行（品牌徽标 + 产品定位 + 版本徽章）与副标题；
 - Docs-as-Code 3 步流水线引导条（导入拆解 → 协同撰写 → 规范出稿）与全局命令面板快捷入口；
 - 主体双栏（左 6 右 4）：
-  * 左栏：新建/打开项目核心入口、最近项目列表（支持快速过滤、在文件夹定位、复制路径、从列表移除、失效检测；无条目时显示空态引导）；
-  * 右栏：文档互转卡片（支持拖放高亮、多格式独立直达胶囊）与 PDF 工具箱卡片（支持常用离线工具直达胶囊）；
+  * 左栏「项目出稿」：新建/打开项目核心入口、最近项目列表（支持快速过滤、在文件夹定位、复制路径、从列表移除、失效检测；无条目时显示空态引导），同时是主区拖放区（拖入即走导入建项路由）；
+  * 右栏：文档互转卡片（自身接收拖放、多格式独立直达胶囊）与 PDF 工具箱卡片（支持常用离线工具直达胶囊）；
 - 底部锚定行：离线安全提示、使用说明、快捷键速查与关于。
 
 整页支持滚动与响应式自适应，防范小屏幕截断；全部样式走 styles.py 全局 QSS 规则。
@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QBoxLayout,
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -52,9 +53,24 @@ _TYPE_BADGE_LABELS = {
 CONVERT_CARD_TITLE = "文档互转"
 CONVERT_DRAG_TITLE = "松开鼠标，添加这些文件"
 CONVERT_CARD_DESC = (
-    "把 Word / PDF / Markdown / HTML 文件拖到本窗口\n"
-    "任意位置即可互转；也可点击挑选文件批量处理。"
+    "把 Word / PDF / Markdown / HTML 文件拖到本卡片上即可互转；\n"
+    "拖到左侧「项目出稿」区则按导入建项处理。也可点击挑选文件批量处理。"
 )
+
+# 首页两个拖放区语义（用户可见文案，与 EmptyState.drop_zone_for 判定一致）：
+# 左侧「项目出稿」区 = 导入建项路由（与「新建项目…」同一服务）；
+# 右侧互转卡 = 文档互转路由。互转卡自身接收拖放，两类拖放不再混淆。
+INTAKE_DROP_TITLE = "项目出稿（拖入即导入建项）"
+INTAKE_DROP_DESC = (
+    "把 Word (.docx/.doc) 或 Markdown 文件拖到这里："
+    "DOCX 逐份进入导入向导，Markdown 按列表顺序组稿成一份项目。"
+)
+INTAKE_DROP_HINT = "拖入此处 = 导入建项（等同「新建项目…」）"
+INTAKE_DRAG_HINT = "松开鼠标，按导入建项处理这些文件"
+
+#: 拖放路由标识：主区导入建项 / 互转卡格式转换。
+DROP_ZONE_INTAKE = "intake"
+DROP_ZONE_CONVERT = "convert"
 CONVERT_DRAG_DESC = "已识别拖入的文件，进入互转窗口。"
 CONVERT_CARD_BADGE = "Word ↔ PDF ↔ Markdown · 支持整个文件夹拖入"
 PDF_TOOLBOX_CARD_TITLE = "PDF 工具箱"
@@ -181,6 +197,9 @@ class EmptyState(QWidget):
         on_convert: Optional[Callable[[Optional[str]], None]] = None,
         on_pdf_toolbox: Optional[Callable[[Optional[str]], None]] = None,
         on_drop_files: Optional[Callable[[List[Path]], None]] = None,
+        on_drop_intake: Optional[Callable[[List[Path]], None]] = None,
+        on_drop_convert: Optional[Callable[[List[Path]], None]] = None,
+        on_toggle_pin: Optional[Callable[[str, bool], None]] = None,
         on_show_help: Optional[Callable[[], None]] = None,
         on_about: Optional[Callable[[], None]] = None,
         on_command_palette: Optional[Callable[[], None]] = None,
@@ -197,6 +216,16 @@ class EmptyState(QWidget):
         self._on_convert = on_convert
         self._on_pdf_toolbox = on_pdf_toolbox
         self._on_drop_files = on_drop_files
+        # 主区「项目出稿」拖放 = 导入建项路由；互转卡拖放 = 格式转换路由。
+        # ``on_drop_files`` 保留为两条路由都未接线时的兜底（旧调用方兼容）。
+        self._on_toggle_pin = on_toggle_pin
+        self._on_drop_intake = on_drop_intake
+        self._on_drop_convert = on_drop_convert
+        if self._on_drop_convert is None and self._on_drop_files is not None:
+            self._on_drop_convert = on_drop_files
+        if self._on_drop_intake is None and on_drop_intake is None and on_drop_files is not None \
+                and on_drop_convert is None:
+            self._on_drop_intake = on_drop_files
         self._on_show_help = on_show_help
         self._on_about = on_about
         self._on_command_palette = on_command_palette
@@ -206,8 +235,10 @@ class EmptyState(QWidget):
         self._recent_cards: List[QFrame] = []
         self._empty_label: Optional[QLabel] = None
         self._all_recent_entries: List[RecentEntry] = []
+        self._type_filter = ""
 
-        # 仅首页视图接收拖放（工作台视图不设置）。
+        # 仅首页视图接收拖放（工作台视图不设置）。整页仍接收拖放：
+        # 实际路由按拖放落点判定（见 ``drop_zone_for``）。
         self.setAcceptDrops(True)
 
         # 外层布局：通过 QScrollArea 实现自适应防截断
@@ -343,12 +374,18 @@ class EmptyState(QWidget):
         return banner
 
     def _build_left_column(self) -> QWidget:
-        column = QWidget(self._content_widget)
+        # 本区既是「项目出稿」入口，也是首页主区拖放区：拖入有效 DOCX/Markdown
+        # 走与「新建项目…」按钮完全相同的导入建项服务（互转卡仍独立接收拖放）。
+        column = _ClickableCard(self._content_widget)
+        column.setObjectName("intakeDropCard")
+        column.setProperty("card", True)
+        column.setToolTip(INTAKE_DROP_HINT)
+        self._intake_card = column
         inner = QVBoxLayout(column)
-        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setContentsMargins(14, 12, 14, 12)
         inner.setSpacing(12)
 
-        section = QLabel("项目出稿", column)
+        section = QLabel("项目出稿（拖入即导入建项）", column)
         section.setObjectName("sectionTitle")
         inner.addWidget(section)
 
@@ -359,6 +396,12 @@ class EmptyState(QWidget):
         guide.setObjectName("homeMuted")
         guide.setWordWrap(True)
         inner.addWidget(guide)
+
+        # 拖放语义提示：普通拖放高亮时切换为「松开即导入建项」，与互转卡文案区分。
+        self._intake_drop_hint = QLabel(INTAKE_DROP_HINT, column)
+        self._intake_drop_hint.setObjectName("homeMuted")
+        self._intake_drop_hint.setWordWrap(True)
+        inner.addWidget(self._intake_drop_hint)
 
         actions = QHBoxLayout()
         actions.setSpacing(12)
@@ -391,11 +434,22 @@ class EmptyState(QWidget):
 
         self._search_input = QLineEdit(column)
         self._search_input.setObjectName("recentSearchInput")
-        self._search_input.setPlaceholderText("🔍 快速搜索项目…")
+        self._search_input.setPlaceholderText("搜索名称或路径…")
         self._search_input.setClearButtonEnabled(True)
-        self._search_input.textChanged.connect(self._filter_recent_cards)
+        # 搜索与类型筛选走同一实现：任一变化都同时作用（UI2-B 2.2）。
+        self._search_input.textChanged.connect(self._apply_recent_filter)
         self._search_input.setVisible(False)
         recent_header.addWidget(self._search_input, 1)
+
+        # UI2-B 2.2：类型筛选与已有搜索组合作用。
+        self._type_combo = QComboBox(column)
+        self._type_combo.setObjectName("recentTypeFilter")
+        self._type_combo.addItem("全部类型", "")
+        for type_key, label in (("requirement", "需求"), ("design", "设计"), ("general", "通用")):
+            self._type_combo.addItem(label, type_key)
+        self._type_combo.setToolTip("按文档类型筛选最近项目（与搜索组合生效）")
+        self._type_combo.currentIndexChanged.connect(self._on_type_filter_changed)
+        recent_header.addWidget(self._type_combo)
 
         inner.addLayout(recent_header)
 
@@ -608,13 +662,18 @@ class EmptyState(QWidget):
             self._recent_layout.addWidget(self._empty_box)
             return
 
-        # 实例化全部条目卡片（最多 10 条，默认展示前 MAX_VISIBLE_RECENT 条）
-        for idx, entry in enumerate(self._all_recent_entries[:10]):
+        # UI2-B 2.2：固定项置顶；其余保持最近打开顺序。
+        ordered = sorted(
+            self._all_recent_entries[:10],
+            key=lambda item: (0 if getattr(item, "pinned", False) else 1,),
+        )
+        for idx, entry in enumerate(ordered):
             card = self._build_recent_card(entry)
             card.setEnabled(enabled and self._enabled)
             card.setVisible(idx < MAX_VISIBLE_RECENT)
             self._recent_layout.addWidget(card)
             self._recent_cards.append(card)
+        self._apply_recent_filter()
 
     def _build_recent_card(self, entry: RecentEntry) -> QFrame:
         card = _ClickableCard(self._recent_frame)
@@ -639,12 +698,16 @@ class EmptyState(QWidget):
         name.setMinimumWidth(60)
         column.addWidget(name)
 
+        # 卡片只显示名称、类型、最近打开时间与当前位置（目录名）；
+        # 技术指纹与完整路径进入提示/右键，不在卡片里堆叠。
         meta = _format_last_opened(entry.last_opened)
-        meta_text = entry.path if not meta else "{0}   ·   {1}".format(meta, entry.path)
+        location = Path(entry.path).name or entry.path
+        meta_text = "{0}   ·   {1}".format(meta, location) if meta else location
         meta_label = QLabel(meta_text, card)
         meta_label.setObjectName("homeMuted")
         meta_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         meta_label.setMinimumWidth(60)
+        meta_label.setToolTip("完整路径：{0}".format(entry.path))
         column.addWidget(meta_label)
         row.addLayout(column, 1)
 
@@ -665,17 +728,33 @@ class EmptyState(QWidget):
         if badge_text:
             row.addWidget(_make_pill(badge_text, muted=True, parent=card))
 
-        # 快捷辅助操作：定位 / 复制路径 / 从列表移除 (固定小尺寸)
-        locate_btn = QPushButton("📁", card)
+        # 固定/取消固定（UI2-B 2.2）：只改个人记录，不移动/删除工程。
+        pin_btn = QPushButton("📌" if entry.pinned else "☆", card)
+        pin_btn.setProperty("recentAction", "pin")
+        pin_btn.setObjectName("recentPinBtn")
+        pin_btn.setText("已固定" if entry.pinned else "固定")
+        pin_btn.setToolTip(
+            "取消固定（仅修改个人最近记录）" if entry.pinned
+            else "固定到列表顶部（仅修改个人最近记录，不影响工程）"
+        )
+        pin_btn.setMinimumWidth(48)
+        pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        pin_btn.clicked.connect(
+            lambda _=False, p=entry.path, on=not entry.pinned: self._handle_toggle_pin(p, on)
+        )
+        row.addWidget(pin_btn)
+
+        # 快捷辅助操作：定位 / 复制路径 / 从列表移除（图标后带文字兜底，
+        # 环境缺字形时动作仍可理解）。
+        locate_btn = QPushButton("定位" if exists else "重新定位", card)
         locate_btn.setProperty("recentAction", "true")
-        locate_btn.setFixedSize(26, 24)
+        locate_btn.setMinimumWidth(56 if exists else 72)
         locate_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if exists:
             locate_btn.setToolTip("在文件资源管理器中定位目录")
             locate_btn.clicked.connect(lambda _=False, p=entry.path: self._handle_locate_project(p))
         else:
             # 规范 R9：失效条目要能“重新定位”，而不是只能移除（第二十七轮规范覆盖审计）
-            locate_btn.setText("🔍")
             locate_btn.setProperty("recentAction", "relocate")
             locate_btn.setToolTip("项目已移动：重新选择它的目录")
             locate_btn.clicked.connect(
@@ -683,10 +762,10 @@ class EmptyState(QWidget):
             )
         row.addWidget(locate_btn)
 
-        copy_btn = QPushButton("📋", card)
+        copy_btn = QPushButton("复制路径", card)
         copy_btn.setProperty("recentAction", "true")
         copy_btn.setToolTip("复制项目绝对路径")
-        copy_btn.setFixedSize(26, 24)
+        copy_btn.setMinimumWidth(68)
         copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         copy_btn.clicked.connect(lambda _=False, p=entry.path, b=copy_btn: self._handle_copy_path(p, b))
         row.addWidget(copy_btn)
@@ -705,8 +784,17 @@ class EmptyState(QWidget):
         row.addWidget(hint)
         return card
 
+    def _on_type_filter_changed(self, _index: int) -> None:
+        self.set_type_filter(str(self._type_combo.currentData() or ""))
+
     def _filter_recent_cards(self, query: str) -> None:
-        """最近项目输入过滤：支持实时搜索全量历史，并呈现未找到空态反馈。"""
+        """兼容入口：搜索文本变化即走统一的搜索+类型过滤。"""
+        if hasattr(self, "_search_input") and self._search_input.text() != query:
+            self._search_input.setText(query)
+        self._apply_recent_filter()
+
+    def _legacy_filter_recent_cards(self, query: str) -> None:
+        """旧实现保留为参考路径（当前不再接线）。"""
         q = query.strip().lower()
         if not q:
             if getattr(self, "_search_empty_label", None) is not None:
@@ -785,9 +873,75 @@ class EmptyState(QWidget):
             pass
 
     def _handle_remove_recent(self, path: str) -> None:
-        """从最近列表中移除该条目。"""
+        """从最近列表中移除该条目（只改个人记录，不删除工程）。"""
         if self._on_remove_recent is not None:
             self._on_remove_recent(path)
+
+    def _handle_toggle_pin(self, path: str, pinned: bool) -> None:
+        """固定/取消固定：只改个人最近记录，不移动或删除工程。"""
+        if self._on_toggle_pin is not None:
+            self._on_toggle_pin(path, bool(pinned))
+        else:
+            try:
+                from doc_tool.application.project_service import set_recent_pinned
+
+                set_recent_pinned(path, bool(pinned))
+                self.set_recent_projects(
+                    [
+                        item for item in self._all_recent_entries
+                    ],
+                    enabled=self._enabled,
+                )
+            except Exception:  # noqa: BLE001 - 固定失败不影响其他入口
+                QToolTip.showText(QCursor.pos(), "固定记录未保存")
+
+    # --- 过滤（搜索 + 类型） ---
+
+    def set_type_filter(self, document_type: str) -> None:
+        """设置类型筛选与已有搜索组合作用；空值表示全部类型。"""
+        self._type_filter = str(document_type or "")
+        self._apply_recent_filter()
+
+    def current_type_filter(self) -> str:
+        return getattr(self, "_type_filter", "")
+
+    def _apply_recent_filter(self) -> None:
+        """把搜索文本与类型筛选一起作用到卡片可见性。"""
+        query = self._search_input.text().strip().lower() if hasattr(self, "_search_input") else ""
+        type_filter = getattr(self, "_type_filter", "")
+        matched = 0
+        for card in self._recent_cards:
+            entry = getattr(card, "_entry_data", None)
+            if entry is None:
+                continue
+            name = (entry.document_name or entry.name or "").lower()
+            path = (entry.path or "").lower()
+            text_ok = (not query) or (query in name or query in path)
+            type_ok = (not type_filter) or (entry.document_type == type_filter)
+            visible = text_ok and type_ok and matched < MAX_VISIBLE_RECENT
+            card.setVisible(visible)
+            if text_ok and type_ok:
+                matched += 1
+        has_filter = bool(query or type_filter)
+        if has_filter and matched == 0:
+            if getattr(self, "_search_empty_label", None) is None:
+                self._search_empty_label = QLabel(self._recent_frame)
+                self._search_empty_label.setObjectName("homeMuted")
+                self._search_empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._recent_layout.addWidget(self._search_empty_label)
+            detail = []
+            if query:
+                detail.append("关键词「{0}」".format(query))
+            if type_filter:
+                detail.append("类型「{0}」".format(_type_badge_label(type_filter) or type_filter))
+            self._search_empty_label.setText(
+                "没有匹配的最近项目（{0}）：可清除筛选或改用「导入 / 新建项目」。".format(
+                    "，".join(detail)
+                )
+            )
+            self._search_empty_label.setVisible(True)
+        elif getattr(self, "_search_empty_label", None) is not None:
+            self._search_empty_label.setVisible(False)
 
     def set_enabled(self, enabled: bool) -> None:
         """任务运行中冻结本页全部可点击入口。"""
@@ -799,20 +953,71 @@ class EmptyState(QWidget):
         self._convert_card.setEnabled(self._enabled)
         if hasattr(self, "_pdf_card"):
             self._pdf_card.setEnabled(self._enabled)
+        if hasattr(self, "_intake_card"):
+            self._intake_card.setEnabled(self._enabled)
 
-    # --- 拖放（整页接收，高亮互转卡） ---
+    # --- 拖放（整页接收；按落点区分导入建项 / 互转） ---
+
+    def _reposition_widget(self, widget: QWidget) -> None:
+        style = widget.style()
+        style.unpolish(widget)
+        style.polish(widget)
 
     def set_drag_over(self, active: bool) -> None:
-        """拖放悬停高亮：互转卡虚线切实线 + accent 浅底 + 文案切换。"""
+        """拖放悬停高亮：两个拖放区各自给出准确文案与高亮。
+
+        整页接收拖放，所以悬停时两个目标都进入可投放态：左侧「项目出稿」
+        区提示按导入建项处理，互转卡保持原有虚线高亮与文案。
+        """
         if self._drag_over == active:
             return
         self._drag_over = active
-        self._convert_card.setProperty("dragOver", "true" if active else "false")
-        style = self._convert_card.style()
-        style.unpolish(self._convert_card)
-        style.polish(self._convert_card)
+        for card in (self._intake_card, self._convert_card):
+            card.setProperty("dragOver", "true" if active else "false")
+            self._reposition_widget(card)
         self._convert_title.setText(CONVERT_DRAG_TITLE if active else CONVERT_CARD_TITLE)
         self._convert_desc.setText(CONVERT_DRAG_DESC if active else CONVERT_CARD_DESC)
+        hint = getattr(self, "_intake_drop_hint", None)
+        if hint is not None:
+            hint.setText(INTAKE_DRAG_HINT if active else INTAKE_DROP_HINT)
+
+    def drop_zone_for(self, event) -> str:
+        """判定拖放落点属于哪个路由：``DROP_ZONE_INTAKE`` / ``DROP_ZONE_CONVERT``。
+
+        判定顺序（与用户可见文案一致）：
+        1. 真实 Qt 拖放事件：按鼠标位置取命中控件，落在左侧「项目出稿」区
+           即导入建项，其余（互转卡）走转换；
+        2. 事件既无全局位置也无法命中控件时（离屏/桩事件），退回「互转」
+           语义，保持既有调用方的默认行为不变。
+        """
+        point = None
+        getter = getattr(event, "position", None)
+        if callable(getter):
+            try:
+                # QDropEvent.position() 相对接收控件；需要换算成屏幕坐标才能和
+                # 两个拖放区的全局矩形比较。
+                point = self.mapToGlobal(getter().toPoint())
+            except Exception:  # noqa: BLE001 - 桩事件没有真实坐标
+                point = None
+        if point is not None:
+            inside_intake = self._contains_global(self._intake_card, point)
+            inside_convert = self._contains_global(self._convert_card, point)
+            # 窄窗口响应式布局下两区上下相邻且可能重叠：重叠处按文档流顺序
+            # 取更靠上的那个区，绝大多数布局下两者互斥、判定唯一。
+            if inside_intake and inside_convert:
+                intake_top = self._intake_card.mapToGlobal(self._intake_card.rect().topLeft()).y()
+                convert_top = self._convert_card.mapToGlobal(self._convert_card.rect().topLeft()).y()
+                return DROP_ZONE_INTAKE if intake_top <= convert_top else DROP_ZONE_CONVERT
+            if inside_intake:
+                return DROP_ZONE_INTAKE
+            if inside_convert:
+                return DROP_ZONE_CONVERT
+        return DROP_ZONE_CONVERT
+
+    def _contains_global(self, widget: QWidget, point) -> bool:
+        """控件全局矩形是否包含该点（命中测试不依赖窗口层叠）。"""
+        top_left = widget.mapToGlobal(widget.rect().topLeft())
+        return widget.rect().translated(top_left).contains(point)
 
     def dragEnterEvent(self, event) -> None:  # noqa: N802
         if event.mimeData().hasUrls():
@@ -830,9 +1035,19 @@ class EmptyState(QWidget):
             for url in event.mimeData().urls()
             if url.isLocalFile()
         ]
-        if paths and self._on_drop_files is not None:
+        if not paths:
+            return
+        if self.drop_zone_for(event) == DROP_ZONE_INTAKE and self._on_drop_intake is not None:
             event.acceptProposedAction()
-            self._on_drop_files(paths)
+            self._on_drop_intake(paths)
+            return
+        if self._on_drop_convert is not None:
+            event.acceptProposedAction()
+            self._on_drop_convert(paths)
+            return
+        if self._on_drop_intake is not None:
+            event.acceptProposedAction()
+            self._on_drop_intake(paths)
 
     # --- 事件转发 ---
 

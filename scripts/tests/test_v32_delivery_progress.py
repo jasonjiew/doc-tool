@@ -195,6 +195,8 @@ class DeliveryResultRenderingTests(unittest.TestCase):
         recent.start()
         try:
             window = MainWindow()
+            # 入口新增方式询问：本用例验证「打开已有计划」的预览明细。
+            window._ask_delivery_mode = lambda: "open"
             with patch("doc_tool.ui.main_window.QMessageBox", _Box), patch(
                 "doc_tool.ui.main_window.QFileDialog.getOpenFileName",
                 return_value=(str(self.plan_path), ""),

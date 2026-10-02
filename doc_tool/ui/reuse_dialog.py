@@ -29,13 +29,23 @@ from doc_tool.application.content import reuse_commands as reuse
 class ReuseDialog(QDialog):
     """模块库与引用解析对话框（只读展示 + 展开副本导出）。"""
 
-    def __init__(self, project_root, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        project_root,
+        parent: Optional[QWidget] = None,
+        *,
+        buffer_source=None,
+        on_insert_module=None,
+    ) -> None:
         super().__init__(parent)
         self.project_root = Path(project_root)
         self.setWindowTitle("正文模块库与引用解析")
         self.resize(980, 620)
         self._context = None
         self._rows: List[Dict[str, object]] = []
+        # UI 包 4.2：当前章节缓冲快照回调 / 插入回调（由主窗口接线到真实编辑器）。
+        self._buffer_source = buffer_source
+        self._on_insert_module = on_insert_module
         self._build_ui()
         self.reload()
 
@@ -55,6 +65,41 @@ class ReuseDialog(QDialog):
         self.copy_button.setToolTip("导出普通 Markdown 副本（不含模块引用标记），可搬目录打开")
         self.copy_button.clicked.connect(self.export_expanded_copy)
         top.addWidget(self.copy_button)
+
+        # 空模块库/首次使用闭环（UI 包 4.2）：从当前章节创建模块。
+        self.create_button = QPushButton("从当前章节创建模块…", self)
+        self.create_button.setObjectName("reuseCreateModuleBtn")
+        self.create_button.setToolTip(
+            "把当前章节提取为模块并发布进库；有未保存修改时用内存缓冲快照，不读旧磁盘内容"
+        )
+        self.create_button.clicked.connect(self.create_module_from_chapter)
+        top.addWidget(self.create_button)
+
+        # 库目录未配置时可选已有库；选中后把明确版本固定复制进项目。
+        self.library_button = QPushButton("选择已有模块库…", self)
+        self.library_button.setObjectName("reusePickLibraryBtn")
+        self.library_button.setToolTip("库目录未配置时选择一个已有模块库作为来源")
+        self.library_button.clicked.connect(self.pick_library)
+        top.addWidget(self.library_button)
+
+        self.install_button = QPushButton("安装所选模块到项目", self)
+        self.install_button.setObjectName("reuseInstallModuleBtn")
+        self.install_button.setToolTip("把所选模块的明确版本固定复制进项目 reuse/modules")
+        self.install_button.clicked.connect(self.install_selected_module)
+        top.addWidget(self.install_button)
+
+        self.insert_mode_combo = QComboBox(self)
+        self.insert_mode_combo.setObjectName("reuseInsertModeCombo")
+        self.insert_mode_combo.addItem("固定引用", "reference")
+        self.insert_mode_combo.addItem("复制正文", "copy")
+        self.insert_mode_combo.setToolTip("固定引用＝可解析来源；复制正文＝展开成普通 Markdown")
+        top.addWidget(self.insert_mode_combo)
+
+        self.insert_button = QPushButton("插入所选模块", self)
+        self.insert_button.setObjectName("reuseInsertModuleBtn")
+        self.insert_button.setToolTip("在当前章节插入固定引用或复制正文（一次撤销）")
+        self.insert_button.clicked.connect(self.insert_selected_module)
+        top.addWidget(self.insert_button)
         layout.addLayout(top)
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
@@ -93,13 +138,178 @@ class ReuseDialog(QDialog):
     # --- 数据 ---
 
     def _ensure_context(self):
+        """项目复用上下文；库目录未配置时回退到项目自己的模块库。
+
+        创建模块会写进项目库（``reuse/library``），安装明确版本也要能从项目库
+        复制，否则空库项目永远装不上自己的模块。用户显式选择的库优先。
+        """
         if self._context is None:
-            self._context = reuse.load_context(self.project_root)
+            override = self._library_override()
+            context = reuse.load_context(self.project_root, library_root=override)
+            if context.library is None and override is None:
+                from doc_tool.application.content import modules as module_lib
+
+                project_library_root = module_lib.project_module_root(self.project_root)
+                context = reuse.load_context(
+                    self.project_root, library_root=project_library_root
+                )
+            self._context = context
         return self._context
+
+    def _library_override(self):
+        """用户显式选择的已有库目录（未选择返回 None，沿用项目配置）。"""
+        value = getattr(self, "_library_root", "")
+        return Path(value) if value else None
+
+    def pick_library(self) -> None:
+        """库目录未配置时选择已有库；只影响本次会话的来源，不改项目配置。"""
+        chosen = QFileDialog.getExistingDirectory(self, "选择已有模块库目录")
+        if not chosen:
+            return
+        self._library_root = chosen
+        self._context = None
+        self.reload()
+        self.status_label.setText("已选择模块库：{0}".format(chosen))
+
+    def create_module_from_chapter(self) -> None:
+        """从当前章节创建模块：缓冲优先，标清来源；写入后刷新列表。"""
+        rel_path, buffer_text = ("", "")
+        if self._buffer_source is not None:
+            try:
+                rel_path, buffer_text = self._buffer_source()
+            except Exception:  # noqa: BLE001 - 无缓冲按已保存内容创建
+                rel_path, buffer_text = "", ""
+        if not rel_path:
+            rel_path = self._fallback_chapter()
+        if not rel_path:
+            self.status_label.setText("没有可用章节：请先打开一个章节再创建模块")
+            return
+        source_mode = "current-buffer" if str(buffer_text or "").strip() else "saved"
+        try:
+            context = self._ensure_context()
+            result = reuse.extract_chapter_module(
+                context, rel_path, buffer_text=buffer_text,
+                library_root=self._library_override(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "创建模块失败", str(exc))
+            return
+        if not result.get("ok"):
+            QMessageBox.warning(
+                self, "创建模块未完成",
+                str(result.get("message") or result.get("error") or "未知原因"),
+            )
+            return
+        module = result.get("module") or {}
+        module_id = str(module.get("moduleId") or result.get("moduleId") or "")
+        version = str(module.get("version") or result.get("version") or "1.0.0")
+        # 创建后必须让上下文重新解析库：缓存里的 library 对象看不到刚发布的模块，
+        # 「安装所选模块」会误报「模块不存在」。
+        self._context = None
+        self.reload()
+        self.status_label.setText(
+            "已创建模块 {0}@{1}（来源：{2}）".format(
+                module_id, version,
+                "当前未保存缓冲" if source_mode == "current-buffer" else "已保存章节",
+            )
+        )
+        QMessageBox.information(
+            self, "模块已创建",
+            "模块：{0}@{1}\n来源：{2}\n库：{3}".format(
+                module_id, version,
+                "当前未保存缓冲（未读旧磁盘内容）" if source_mode == "current-buffer" else "已保存章节",
+                module.get("directory") or self._library_override() or "项目库",
+            ),
+        )
+
+    def _fallback_chapter(self) -> str:
+        """无编辑器缓冲时用工作区当前章节，其次第一个章节（只读来源，仍标 saved）。"""
+        try:
+            context = self._ensure_context()
+            chapters = list(getattr(context, "chapters", None) or [])
+        except Exception:  # noqa: BLE001
+            return ""
+        return str(chapters[0]) if chapters else ""
+
+    def _selected_module(self):
+        row = self.module_list.currentRow()
+        if row < 0 or row >= len(self._rows):
+            return None
+        return self._rows[row]
+
+    def install_selected_module(self) -> None:
+        """把所选模块的明确版本固定复制进项目；只读项目给明确原因。"""
+        row = self._selected_module()
+        if row is None:
+            self.status_label.setText("请先在左侧选择一个模块版本")
+            return
+        module_id = str(row.get("moduleId") or "")
+        version = str(row.get("version") or "")
+        try:
+            context = (
+                self._ensure_context()
+                if self._library_override() is None
+                else self._context_with_library()
+            )
+            result = reuse.install_modules(context, [(module_id, version)])
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "安装模块失败", str(exc))
+            return
+        if not result.get("ok"):
+            QMessageBox.warning(
+                self, "安装模块未完成",
+                "；".join(result.get("problems") or []) or str(result.get("message") or "未知原因"),
+            )
+            return
+        installed = (result.get("installed") or [{}])[0]
+        installed_id = str(installed.get("moduleId") or module_id or "")
+        installed_version = str(installed.get("version") or version or "")
+        self.status_label.setText(
+            "已安装 {0}@{1} 到项目（固定引用）".format(installed_id, installed_version)
+        )
+
+    def _context_with_library(self):
+        """用用户选择的库重新加载上下文（不改项目配置，只影响本次会话）。"""
+        return reuse.load_context(self.project_root, library_root=self._library_override())
+
+    def insert_selected_module(self) -> None:
+        """插入所选模块：默认固定引用；按住 Shift 语义由下拉选择复制正文。"""
+        row = self._selected_module()
+        if row is None:
+            self.status_label.setText("请先在左侧选择一个模块版本")
+            return
+        if self._on_insert_module is None:
+            self.status_label.setText("当前没有可插入的编辑器：请先打开一个章节")
+            return
+        module_id = str(row.get("moduleId") or "")
+        version = str(row.get("version") or "")
+        mode = str((self.insert_mode_combo.currentData() if hasattr(self, "insert_mode_combo") else "reference") or "reference")
+        if mode == "copy":
+            payload_text = self._module_body_for_copy(module_id, version)
+        else:
+            payload_text = '```doc-module id={0} version={1} slot=s1\n```'.format(
+                module_id, version
+            )
+        if self._on_insert_module(payload_text, mode):
+            self.status_label.setText(
+                "已插入 {0}@{1}（{2}）".format(
+                    module_id, version, "固定引用" if mode == "reference" else "正文副本",
+                )
+            )
+
+    def _module_body_for_copy(self, module_id: str, version: str) -> str:
+        try:
+            library = reuse.load_library(self.project_root, library_root=self._library_override())
+            payload = reuse.show_module(library, module_id, version, with_body=True)
+        except Exception as exc:  # noqa: BLE001
+            return ""
+        return str(payload.get("body") or payload.get("preview") or "")
 
     def reload(self) -> None:
         try:
-            library = reuse.load_library(self.project_root)
+            library = reuse.load_library(
+                self.project_root, library_root=self._library_override()
+            )
             payload = reuse.list_modules(library, query=self.search_input.text().strip())
         except Exception as exc:  # noqa: BLE001 - 库不可用时给出明确说明
             self.status_label.setText("模块库不可用：{0}".format(exc))
@@ -111,8 +321,22 @@ class ReuseDialog(QDialog):
             label = "{0}（{1}）".format(row.get("title") or row.get("moduleId"), row.get("version"))
             item = QListWidgetItem(label, self.module_list)
             item.setToolTip(str(row.get("description") or ""))
+        if self._rows and self.module_list.currentRow() < 0:
+            # 刷新后默认选中首个模块，避免「安装/插入」需要用户额外点一次。
+            self.module_list.setCurrentRow(0)
         self.status_label.setText("共 {0} 个模块".format(len(self._rows)))
+        self._update_empty_state()
         self._reload_variants()
+
+    def _update_empty_state(self) -> None:
+        """空库说明：告诉用户下一步真实动作，而不是只显示「无数据」。"""
+        if self._rows:
+            return
+        hint = (
+            "当前库还没有模块。可点「从当前章节创建模块…」把正在写的章节存为模块；"
+            "或点「选择已有模块库…」指定一个已有库后再安装到项目。"
+        )
+        self.preview.setPlainText(hint)
 
     def _reload_variants(self) -> None:
         self.variant_combo.blockSignals(True)

@@ -145,7 +145,8 @@ class ReuseEntryTests(unittest.TestCase):
         opened = []
 
         class _FakeDialog:
-            def __init__(self, project_root, parent=None):
+            # UI 包 4.2 后入口还会传缓冲/插入回调；测试关心的是真实项目路径。
+            def __init__(self, project_root, parent=None, **kwargs):
                 opened.append(str(project_root))
 
             def exec(self):

@@ -1,0 +1,181 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="10" failures="0" time="99.730"><testsuite name="doc-tool" tests="10" failures="0" time="99.730"><testcase name="test_ui2_home_continue.py" classname="scripts.tests" time="8.237"><system-out>test_cursor_position_is_stored_and_restored (__main__.ContinueWorkSessionTests.test_cursor_position_is_stored_and_restored) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_old_session_without_cursor_field_still_restores_tabs (__main__.ContinueWorkSessionTests.test_old_session_without_cursor_field_still_restores_tabs) ... ok
+test_missing_project_entry_offers_relocate_or_remove (__main__.HomeContinueTests.test_missing_project_entry_offers_relocate_or_remove) ... This plugin does not support propagateSizeHints()
+ok
+test_pin_button_invokes_callback_and_keeps_engineering_dir (__main__.HomeContinueTests.test_pin_button_invokes_callback_and_keeps_engineering_dir) ... This plugin does not support propagateSizeHints()
+ok
+test_pinned_entries_sort_first (__main__.HomeContinueTests.test_pinned_entries_sort_first) ... This plugin does not support propagateSizeHints()
+ok
+test_type_filter_combines_with_search (__main__.HomeContinueTests.test_type_filter_combines_with_search) ... This plugin does not support propagateSizeHints()
+ok
+test_missing_or_bad_pinned_field_falls_back (__main__.RecentStoreTests.test_missing_or_bad_pinned_field_falls_back) ... ok
+test_pin_roundtrip_keeps_project_dir (__main__.RecentStoreTests.test_pin_roundtrip_keeps_project_dir) ... ok
+test_pin_unknown_path_reports_miss (__main__.RecentStoreTests.test_pin_unknown_path_reports_miss) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 4.901s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-home-session-58096-1\.proj.import-staging-58096-mbmc6ijq\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_ui2_visual_hierarchy.py" classname="scripts.tests" time="29.653"><system-out>test_name_is_elided_but_full_value_is_reachable (__main__.LongNameInformationTests.test_name_is_elided_but_full_value_is_reachable) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_more_menu_trigger_uses_the_same_handler (__main__.ProjectBarOverflowTests.test_more_menu_trigger_uses_the_same_handler) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_primary_actions_keep_full_width_and_never_clip (__main__.ProjectBarOverflowTests.test_primary_actions_keep_full_width_and_never_clip) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_secondary_actions_move_into_more_menu (__main__.ProjectBarOverflowTests.test_secondary_actions_move_into_more_menu) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_wide_bar_has_no_overflow (__main__.ProjectBarOverflowTests.test_wide_bar_has_no_overflow) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_dialog_close_returns_focus_to_editor (__main__.SharedActionAndFocusTests.test_dialog_close_returns_focus_to_editor) ... This plugin does not support propagateSizeHints()
+ok
+test_normal_completion_does_not_steal_editor_focus (__main__.SharedActionAndFocusTests.test_normal_completion_does_not_steal_editor_focus) ... ok
+test_quick_export_shortcut_binding_is_declared_once (__main__.SharedActionAndFocusTests.test_quick_export_shortcut_binding_is_declared_once)
+Ctrl+E 只在菜单 QAction 声明一次；项目条按钮不再另设快捷键。 ... ok
+test_quick_export_submits_exactly_once_per_user_action (__main__.SharedActionAndFocusTests.test_quick_export_submits_exactly_once_per_user_action) ... ok
+test_status_tone_labels_have_text_not_only_colour (__main__.SharedActionAndFocusTests.test_status_tone_labels_have_text_not_only_colour) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 26.275s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-33320-1\.proj.import-staging-33320-_aivrux4\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-33320-1\proj\.state\snapshots\20261002T140229-b0aaefa4\output\.tmp-企业研发系统软件需求说明书（超长中文名称用于窄窗口验收）(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-33320-1\proj\.state\snapshots\20261002T140229-b0aaefa4\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-33320-1\proj\.state\snapshots\20261002T140229-b0aaefa4\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_home_experience_iteration.py" classname="scripts.tests" time="3.825"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+..........This plugin does not support propagateSizeHints()
+.This plugin does not support raise()
+......This plugin does not support propagateSizeHints()
+..
+----------------------------------------------------------------------
+Ran 19 tests in 1.702s
+
+OK
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="17.597"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 16.332s
+
+OK
+</system-out></testcase><testcase name="test_core_entries_ui.py" classname="scripts.tests" time="5.151"><system-out>test_docx_import_goes_to_wizard_with_selected_file (__main__.EntryWiringTests.test_docx_import_goes_to_wizard_with_selected_file) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_home_new_project_button_uses_import_entry (__main__.EntryWiringTests.test_home_new_project_button_uses_import_entry) ... ok
+test_markdown_entry_uses_selected_files_in_order (__main__.EntryWiringTests.test_markdown_entry_uses_selected_files_in_order) ... ok
+test_markdown_import_creates_project_and_opens_it (__main__.EntryWiringTests.test_markdown_import_creates_project_and_opens_it) ... ok
+test_open_project_docx_routes_to_reimport_not_new_project (__main__.EntryWiringTests.test_open_project_docx_routes_to_reimport_not_new_project) ... ok
+test_pack_entry_calls_real_pack_service (__main__.EntryWiringTests.test_pack_entry_calls_real_pack_service) ... ok
+test_unsupported_input_warns_without_service_call (__main__.EntryWiringTests.test_unsupported_input_warns_without_service_call) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.295s
+
+OK
+</system-out></testcase><testcase name="test_ui_polish_layout_session.py" classname="scripts.tests" time="11.635"><system-out>test_default_layout_collapses_idle_docks (__main__.WritingLayoutDefaultsTests.test_default_layout_collapses_idle_docks) ... ok
+test_session_roundtrip_keeps_layout_choice (__main__.WritingLayoutDefaultsTests.test_session_roundtrip_keeps_layout_choice) ... ok
+test_should_apply_default_only_without_preference (__main__.WritingLayoutDefaultsTests.test_should_apply_default_only_without_preference) ... ok
+test_corrupt_session_falls_back_to_default (__main__.WritingLayoutWindowTests.test_corrupt_session_falls_back_to_default) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_first_use_default_layout_gives_body_space (__main__.WritingLayoutWindowTests.test_first_use_default_layout_gives_body_space) ... ok
+test_restore_layout_only_touches_layout (__main__.WritingLayoutWindowTests.test_restore_layout_only_touches_layout) ... ok
+test_restored_layout_is_persisted_for_next_open (__main__.WritingLayoutWindowTests.test_restored_layout_is_persisted_for_next_open) ... ok
+test_valid_old_session_wins_over_default (__main__.WritingLayoutWindowTests.test_valid_old_session_wins_over_default) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 7.828s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-layout-50720-1\.proj.import-staging-50720-_afdj56i\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_ui_polish_entry_drop.py" classname="scripts.tests" time="6.511"><system-out>test_convert_card_drop_uses_convert_route (__main__.HomeDropRoutingTests.test_convert_card_drop_uses_convert_route) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+ok
+test_drop_without_urls_is_ignored (__main__.HomeDropRoutingTests.test_drop_without_urls_is_ignored) ... This plugin does not support propagateSizeHints()
+ok
+test_intake_area_drop_uses_intake_route (__main__.HomeDropRoutingTests.test_intake_area_drop_uses_intake_route) ... This plugin does not support propagateSizeHints()
+ok
+test_intake_route_and_import_button_share_one_handler (__main__.HomeDropRoutingTests.test_intake_route_and_import_button_share_one_handler)
+主区拖放接线必须就是「新建项目…」按钮使用的同一 handler。 ... ok
+test_positionless_event_keeps_legacy_convert_route (__main__.HomeDropRoutingTests.test_positionless_event_keeps_legacy_convert_route) ... This plugin does not support propagateSizeHints()
+ok
+test_convert_card_drop_of_docx_enters_convert (__main__.MainWindowIntakeDropTests.test_convert_card_drop_of_docx_enters_convert) ... ok
+test_main_area_drop_of_docx_opens_import_wizard_once (__main__.MainWindowIntakeDropTests.test_main_area_drop_of_docx_opens_import_wizard_once) ... ok
+test_main_area_drop_of_markdown_builds_one_project (__main__.MainWindowIntakeDropTests.test_main_area_drop_of_markdown_builds_one_project) ... ok
+test_unsupported_source_on_intake_keeps_file_untouched (__main__.MainWindowIntakeDropTests.test_unsupported_source_on_intake_keeps_file_untouched) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 1.169s
+
+OK
+</system-out></testcase><testcase name="test_safety_recovery.py" classname="scripts.tests" time="8.223"><system-out>............QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.........................................
+----------------------------------------------------------------------
+Ran 53 tests in 7.077s
+
+OK
+</system-out></testcase><testcase name="test_recovery_entries.py" classname="scripts.tests" time="4.187"><system-out>.QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+...
+----------------------------------------------------------------------
+Ran 4 tests in 1.294s
+
+OK
+</system-out></testcase><testcase name="test_v26_ui_workflows.py" classname="scripts.tests" time="4.710"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+..
+----------------------------------------------------------------------
+Ran 2 tests in 1.959s
+
+OK
+</system-out></testcase></testsuite></testsuites>

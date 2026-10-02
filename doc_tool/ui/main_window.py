@@ -34,8 +34,10 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QComboBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -168,6 +170,14 @@ class MainWindow(QMainWindow):
         self._word_available: Optional[bool] = None
         self._workbench_state = derive_workbench_state(None, running=False)
         self._result_state = ResultState()
+        # UI 包 UI-C：本项目最近轮次（只保留引用，不复制文件，不提升正式状态）。
+        from doc_tool.ui.export_rounds import RoundStore
+
+        self._export_rounds = RoundStore()
+        self._selected_round_id = ""
+        self._last_export_round = None
+        # 批量交付：表单校验后的预览缓存（新建批次路径直接复用，不重复解析）。
+        self._last_delivery_preview = None
         self._current_task = ""
         self._stage_progress_enabled = False
         self._progress_recent_stage = ""
@@ -180,6 +190,9 @@ class MainWindow(QMainWindow):
         self._dark = False
         self._zen_mode = False
         self._zen_prev_state: dict[str, bool] = {}
+        # 2.2：首用默认布局是否已套用 / 用户是否已显式选择布局（用于会话持久化）。
+        self._writing_layout_default_applied = False
+        self._writing_layout_chosen = False
 
         # 阶段事件累积（供 derive_step_list 派生步骤清单）
         self._stage_events: List[tuple] = []
@@ -274,9 +287,13 @@ class MainWindow(QMainWindow):
             on_open_recent=self._on_open_recent,
             on_remove_recent=self._on_remove_recent,
             on_relocate_recent=self._on_relocate_recent,
+            on_toggle_pin=self._on_toggle_recent_pin,
             on_convert=self._on_convert_documents,
             on_pdf_toolbox=self._on_pdf_toolbox,
-            on_drop_files=self._on_convert_documents,
+            # 主区拖放 = 导入建项路由（与「新建项目…」同一服务）；
+            # 互转卡自身拖放才进入文档互转，两类语义不再混淆。
+            on_drop_intake=self._on_import_document,
+            on_drop_convert=self._on_convert_documents,
             on_show_help=self._on_open_help,
             on_about=self._on_about,
             on_command_palette=self.open_command_palette,
@@ -291,10 +308,13 @@ class MainWindow(QMainWindow):
             on_merge=self._on_merge,
             on_diag_build=self._on_diag_build,
             on_validate=self._on_validate,
+            on_quick_export=self._on_quick_export_word,
+            on_show_results=self._on_show_results,
             on_switch_branch=self._on_switch_branch_clicked,
             on_close_project=self.close_project,
         )
         ide_layout.addWidget(self._project_bar)
+        ide_layout.addWidget(self._build_nav_bar())
         self._ide_center_host = QWidget(self._ide_page)
         ide_layout.addWidget(self._ide_center_host, 1)
         self._stack.addWidget(self._ide_page)
@@ -316,6 +336,13 @@ class MainWindow(QMainWindow):
             on_copy_path=self._copy_output_path,
             on_export_to=self._export_output_to_external,
             on_locate_file=self._locate_file,
+            on_open_format=self._on_open_export_format,
+            on_locate_format=self._locate_file,
+            on_retry_formats=self._on_retry_export_round,
+            on_regenerate_round=self._on_regenerate_round,
+            on_change_destination=self._on_change_export_destination,
+            on_open_settings=self._on_export_settings_for_round,
+            on_select_round=self._on_select_export_round,
         )
         self._task_dock_widget.setWidget(self._task_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._task_dock_widget)
@@ -336,6 +363,133 @@ class MainWindow(QMainWindow):
 
         self._loading_overlay = ProjectLoadingOverlay(self, dark=self._dark)
 
+    def _build_nav_bar(self) -> QWidget:
+        """路径导航条（UI2-C 3.1/3.4）：后退/前进 + 真实章节路径 + 定位当前章。
+
+        复用已有章节树/标签联动；长路径省略显示，完整值在提示与右键复制里。
+        """
+        bar = QWidget(self._ide_page)
+        bar.setObjectName("editorNavBar")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(8, 2, 8, 2)
+        layout.setSpacing(6)
+
+        self._nav_back_btn = QPushButton("←", bar)
+        self._nav_back_btn.setObjectName("navBackBtn")
+        self._nav_back_btn.setProperty("btnRole", "compact")
+        self._nav_back_btn.setText("← 后退")
+        self._nav_back_btn.setToolTip("回到上一个位置 (Alt+←)")
+        self._nav_back_btn.setEnabled(False)
+        self._nav_back_btn.clicked.connect(self._on_nav_back)
+        layout.addWidget(self._nav_back_btn)
+
+        self._nav_forward_btn = QPushButton("前进 →", bar)
+        self._nav_forward_btn.setObjectName("navForwardBtn")
+        self._nav_forward_btn.setProperty("btnRole", "compact")
+        self._nav_forward_btn.setToolTip("前进到下一个位置 (Alt+→)")
+        self._nav_forward_btn.setEnabled(False)
+        self._nav_forward_btn.clicked.connect(self._on_nav_forward)
+        layout.addWidget(self._nav_forward_btn)
+
+        self._nav_location_label = QLabel("未打开章节", bar)
+        self._nav_location_label.setObjectName("navLocationLabel")
+        self._nav_location_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self._nav_location_label.setMinimumWidth(80)
+        self._nav_location_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._nav_location_label.customContextMenuRequested.connect(
+            lambda pos: self._on_copy_current_path()
+        )
+        layout.addWidget(self._nav_location_label, 1)
+
+        locate_btn = QPushButton("定位当前章", bar)
+        locate_btn.setObjectName("navLocateBtn")
+        locate_btn.setProperty("btnRole", "compact")
+        locate_btn.setToolTip("在章节树中选中当前章并给出完整路径")
+        locate_btn.clicked.connect(self._on_locate_current_chapter)
+        layout.addWidget(locate_btn)
+
+        copy_btn = QPushButton("复制路径", bar)
+        copy_btn.setObjectName("navCopyPathBtn")
+        copy_btn.setProperty("btnRole", "compact")
+        copy_btn.setToolTip("复制当前章的完整相对路径")
+        copy_btn.clicked.connect(self._on_copy_current_path)
+        layout.addWidget(copy_btn)
+
+        # UI2-C 3.3/3.4：写作/对照/阅读 + 字号档位（复用原预览/目录）。
+        self._view_mode_combo = QComboBox(bar)
+        self._view_mode_combo.setObjectName("viewModeCombo")
+        self._view_mode_combo.addItem("写作", "write")
+        self._view_mode_combo.addItem("对照", "compare")
+        self._view_mode_combo.addItem("阅读", "read")
+        self._view_mode_combo.setToolTip("切换写作/对照/阅读视图（不改正文与模板）")
+        self._view_mode_combo.currentIndexChanged.connect(self._on_view_mode_changed)
+        layout.addWidget(self._view_mode_combo)
+
+        for text, slot, tip in (
+            ("A-", self._on_zoom_out, "缩小正文与预览字号 (Ctrl+-)"),
+            ("A+", self._on_zoom_in, "放大正文与预览字号 (Ctrl+=)"),
+            ("A0", self._on_zoom_reset, "重置字号到默认 (Ctrl+0)"),
+        ):
+            btn = QPushButton(text, bar)
+            btn.setProperty("btnRole", "compact")
+            btn.setToolTip(tip)
+            btn.clicked.connect(slot)
+            layout.addWidget(btn)
+        return bar
+
+    def _active_panel(self):
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return None
+        try:
+            return workspace.current_editor()
+        except Exception:  # noqa: BLE001 - 编辑器不可用时按无编辑器处理
+            return None
+
+    def _on_view_mode_changed(self, _index: int) -> None:
+        mode = str(self._view_mode_combo.currentData() or "write")
+        editor = self._active_panel()
+        if editor is None or not hasattr(editor, "set_view_mode"):
+            self._show_status_message("请先打开一个章节再切换视图")
+            return
+        applied = editor.set_view_mode(mode)
+        labels = {"write": "写作", "compare": "对照", "read": "阅读"}
+        self._status_label.setText(
+            "已切换到{0}视图（正文与模板未改变）".format(labels.get(applied, applied))
+        )
+        self._persist_workspace_session()
+
+    def _on_zoom_in(self) -> None:
+        editor = self._active_panel()
+        if editor is None or not hasattr(editor, "zoom_in"):
+            return
+        size = editor.zoom_in()
+        self._status_label.setText("字号已放大到 {0:g}pt".format(size))
+        self._persist_workspace_session()
+
+    def _on_zoom_out(self) -> None:
+        editor = self._active_panel()
+        if editor is None or not hasattr(editor, "zoom_out"):
+            return
+        size = editor.zoom_out()
+        self._status_label.setText("字号已缩小到 {0:g}pt".format(size))
+        self._persist_workspace_session()
+
+    def _on_zoom_reset(self) -> None:
+        editor = self._active_panel()
+        if editor is None or not hasattr(editor, "reset_zoom"):
+            return
+        size = editor.reset_zoom()
+        self._status_label.setText("字号已重置为默认 {0:g}pt".format(size))
+        self._persist_workspace_session()
+
+    def _set_view_mode(self, mode: str) -> None:
+        index = self._view_mode_combo.findData(mode)
+        if index >= 0:
+            self._view_mode_combo.setCurrentIndex(index)
+
     def _build_menu(self) -> None:
         from PySide6.QtGui import QAction, QKeySequence
 
@@ -343,16 +497,15 @@ class MainWindow(QMainWindow):
 
         # 文件
         file_menu = menubar.addMenu("文件")
-        self._import_action = QAction("导入文档（Word / Markdown）…", self)
+        # 1.4：导入与新建是同一件事（同一 intake 路由），合并为一个可发现入口。
+        self._import_action = QAction("导入 / 新建项目（Word / Markdown）…", self)
         self._import_action.setShortcut(QKeySequence("Ctrl+N"))
         self._import_action.setToolTip(
-            "自动识别 Word / Markdown 并调用对应建项服务；Markdown 多文件按列表顺序建一份项目"
+            "自动识别 Word / Markdown 并调用对应建项服务：DOCX 逐份进向导，"
+            "Markdown 多文件按列表顺序组稿成一份项目"
         )
         self._import_action.triggered.connect(self._on_import_document)
         file_menu.addAction(self._import_action)
-        self._new_action = QAction("新建项目（导入向导）…", self)
-        self._new_action.triggered.connect(self._on_new_project)
-        file_menu.addAction(self._new_action)
         self._open_action = QAction("打开项目…", self)
         self._open_action.setShortcut(QKeySequence("Ctrl+O"))
         self._open_action.triggered.connect(self._on_open_project)
@@ -396,6 +549,11 @@ class MainWindow(QMainWindow):
         self._quick_export_action.setToolTip("默认整份文档 + 当前编辑内容 + Word + 项目导出目录")
         self._quick_export_action.triggered.connect(self._on_quick_export_word)
         ops_menu.addAction(self._quick_export_action)
+        # UI2-D 4.2：导出设置与快速 Word 并列，共享同一提交链路。
+        self._export_settings_action = QAction("导出设置…", self)
+        self._export_settings_action.setToolTip("按格式/范围/来源/目录/版式提交一次导出（默认值可直接提交）")
+        self._export_settings_action.triggered.connect(self._on_export_settings)
+        ops_menu.addAction(self._export_settings_action)
         # V3.2 32-E：批量交付（持久队列，可续跑/只补未完成项）
         self._delivery_action = QAction("批量交付（持久队列）…", self)
         self._delivery_action.setShortcut(QKeySequence("Ctrl+Alt+B"))
@@ -416,10 +574,20 @@ class MainWindow(QMainWindow):
             pass
 
         content_menu = menubar.addMenu("内容")
-        self._search_action = QAction("全文搜索", self)
+        # UI 包 2.3：Ctrl+F 在当前章内查找（编辑器有焦点），
+        # Ctrl+Shift+F 始终查项目全文；两者提示与实际作用域一致。
+        self._search_action = QAction("查找（当前章 Ctrl+F / 全文 Ctrl+Shift+F）", self)
         self._search_action.setShortcut(QKeySequence("Ctrl+F"))
+        self._search_action.setToolTip(
+            "编辑器有焦点时查当前章；焦点在别处时打开项目全文搜索面板 (Ctrl+F)"
+        )
         self._search_action.triggered.connect(self._on_content_search)
         content_menu.addAction(self._search_action)
+        self._search_project_action = QAction("项目全文搜索", self)
+        self._search_project_action.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        self._search_project_action.setToolTip("在整份项目的所有章节中检索 (Ctrl+Shift+F)")
+        self._search_project_action.triggered.connect(self._on_content_search_project)
+        content_menu.addAction(self._search_project_action)
         self._references_action = QAction("引用分析…", self)
         self._references_action.triggered.connect(self._on_content_references)
         content_menu.addAction(self._references_action)
@@ -454,8 +622,11 @@ class MainWindow(QMainWindow):
 
         # 版本控制 (Git)
         git_menu = menubar.addMenu("版本控制")
-        self._switch_branch_action = QAction("切换分支…", self)
+        self._switch_branch_action = QAction("切换分支…（编辑器外 Ctrl+B）", self)
         self._switch_branch_action.setShortcut(QKeySequence("Ctrl+B"))
+        self._switch_branch_action.setToolTip(
+            "切换 Git 分支；编辑器聚焦时 Ctrl+B 是加粗，分支入口仍可从本菜单或命令面板使用"
+        )
         self._switch_branch_action.triggered.connect(self._on_switch_branch_clicked)
         git_menu.addAction(self._switch_branch_action)
 
@@ -514,12 +685,53 @@ class MainWindow(QMainWindow):
         self._quick_open_action.triggered.connect(self.open_quick_open)
         self.addAction(self._quick_open_action)
 
+        # UI2-C 3.2：位置后退/前进（Alt+←/→）；与导航条按钮同一 handler。
+        self._nav_back_action = QAction("后退", self)
+        self._nav_back_action.setShortcut(QKeySequence("Alt+Left"))
+        self._nav_back_action.triggered.connect(self._on_nav_back)
+        self.addAction(self._nav_back_action)
+        self._nav_forward_action = QAction("前进", self)
+        self._nav_forward_action.setShortcut(QKeySequence("Alt+Right"))
+        self._nav_forward_action.triggered.connect(self._on_nav_forward)
+        self.addAction(self._nav_forward_action)
+
+        self._restore_layout_action = QAction("恢复写作布局", self)
+        self._restore_layout_action.setToolTip(
+            "只重置面板显隐与尺寸：正文、未保存修改、主题、标签与滚动位置保持不变"
+        )
+        self._restore_layout_action.triggered.connect(self._on_restore_writing_layout)
+        self.addAction(self._restore_layout_action)
+
         self._zen_mode_action = QAction("专注写作模式", self)
         self._zen_mode_action.setShortcut(QKeySequence("F11"))
         self._zen_mode_action.setCheckable(True)
         self._zen_mode_action.setChecked(False)
         self._zen_mode_action.triggered.connect(self.toggle_zen_mode)
         self.addAction(self._zen_mode_action)
+
+        # UI2-C 3.3：写作/对照/阅读与字号档位（菜单/工具条同一 handler）。
+        self._view_write_action = QAction("写作视图", self)
+        self._view_write_action.triggered.connect(lambda: self._set_view_mode("write"))
+        self.addAction(self._view_write_action)
+        self._view_compare_action = QAction("对照视图", self)
+        self._view_compare_action.triggered.connect(lambda: self._set_view_mode("compare"))
+        self.addAction(self._view_compare_action)
+        self._view_read_action = QAction("阅读视图", self)
+        self._view_read_action.triggered.connect(lambda: self._set_view_mode("read"))
+        self.addAction(self._view_read_action)
+
+        self._zoom_in_action = QAction("放大字号", self)
+        self._zoom_in_action.setShortcut(QKeySequence("Ctrl+="))
+        self._zoom_in_action.triggered.connect(self._on_zoom_in)
+        self.addAction(self._zoom_in_action)
+        self._zoom_out_action = QAction("缩小字号", self)
+        self._zoom_out_action.setShortcut(QKeySequence("Ctrl+-"))
+        self._zoom_out_action.triggered.connect(self._on_zoom_out)
+        self.addAction(self._zoom_out_action)
+        self._zoom_reset_action = QAction("重置字号", self)
+        self._zoom_reset_action.setShortcut(QKeySequence("Ctrl+0"))
+        self._zoom_reset_action.triggered.connect(self._on_zoom_reset)
+        self.addAction(self._zoom_reset_action)
         self._rebuild_view_menu()
 
         # 工具
@@ -597,6 +809,23 @@ class MainWindow(QMainWindow):
             self._view_menu.addAction(self._cmd_palette_action)
         if hasattr(self, "_quick_open_action"):
             self._view_menu.addAction(self._quick_open_action)
+        for action in (
+            getattr(self, "_view_write_action", None),
+            getattr(self, "_view_compare_action", None),
+            getattr(self, "_view_read_action", None),
+        ):
+            if action is not None:
+                self._view_menu.addAction(action)
+        self._view_menu.addSeparator()
+        for action in (
+            getattr(self, "_zoom_in_action", None),
+            getattr(self, "_zoom_out_action", None),
+            getattr(self, "_zoom_reset_action", None),
+        ):
+            if action is not None:
+                self._view_menu.addAction(action)
+        if hasattr(self, "_restore_layout_action"):
+            self._view_menu.addAction(self._restore_layout_action)
         self._view_menu.addSeparator()
         if hasattr(self, "_zen_mode_action"):
             self._view_menu.addAction(self._zen_mode_action)
@@ -846,7 +1075,9 @@ class MainWindow(QMainWindow):
                     pass
             return
         rel_path = action.relPath
-        if rel_path and self._open_chapter_in_workspace(rel_path, action.line):
+        if rel_path and self._open_chapter_in_workspace(
+            rel_path, action.line, source="导入结果定位"
+        ):
             self._show_status_message("已定位到章节：{0}".format(rel_path))
         else:
             self._show_status_message(
@@ -920,7 +1151,9 @@ class MainWindow(QMainWindow):
         has_selection = False
         has_buffer = False
         try:
-            editor = self._current_editor()
+            # UI 包 4.2 修复：此前调用的是不存在的 _current_editor，异常被下面的
+            # except 吞掉，导致「选区/缓冲」上下文恒为假（命令可用性判定失真）。
+            editor = self._active_editor()
             if editor is not None:
                 cursor = editor.textCursor()
                 has_selection = bool(cursor.hasSelection())
@@ -1200,10 +1433,11 @@ class MainWindow(QMainWindow):
         # 文件 / 项目操作
         items.append(
             PaletteItem(
-                title="新建项目…",
+                title="导入 / 新建项目（Word / Markdown）…",
                 category="文件",
                 shortcut="Ctrl+N",
-                callback=self._on_new_project,
+                description="与「导出」入口同一 intake 路由：自动识别源类型并真实建项",
+                callback=self._on_import_document,
             )
         )
         items.append(
@@ -1357,17 +1591,9 @@ class MainWindow(QMainWindow):
         )
         items.append(
             PaletteItem(
-                title="接管现有 Word 建项…",
-                category="新建",
-                description="复用预检/样式映射/往返门禁，先预览差异再导入",
-                callback=lambda: self._on_intake_word(),
-            )
-        )
-        items.append(
-            PaletteItem(
                 title="以 Markdown 起步建项（按文件顺序）…",
                 category="新建",
-                description="按文件顺序生成章节，适合 Docs-as-Code 内容",
+                description="显式选定多个 Markdown 并按列表顺序组稿成一份项目",
                 callback=lambda: self._on_create_from_markdown(),
             )
         )
@@ -1564,6 +1790,7 @@ class MainWindow(QMainWindow):
     def _apply_workbench_state(self, state) -> None:
         """把纯状态快照渲染进菜单、项目条、中央区与右侧 Dock。"""
         self._workbench_state = state
+        running = bool(self.runner.is_running)
         if state.view == WorkView.EMPTY:
             self._stack.setCurrentWidget(self._empty_state)
             self._task_dock_widget.hide()
@@ -1573,8 +1800,21 @@ class MainWindow(QMainWindow):
             self._set_git_menu_enabled(False)
         else:
             self._stack.setCurrentWidget(self._ide_page)
-            # 离开空状态后重新显示右侧任务/结果 Dock（空状态会隐藏它）。
-            self._task_dock_widget.show()
+            # 任务/结果 Dock 只在确有任务或用户主动要求时展开：首用默认布局下
+            # 空闲工作台不再强迫大面板占据正文空间（可随时从视图菜单找回）。
+            if running or getattr(self, "_writing_layout_task_dock", True):
+                self._task_dock_widget.show()
+            else:
+                self._task_dock_widget.hide()
+            # 顶部快速导出提示必须反映真实未保存数量，不由菜单/按钮各自猜测。
+            self._project_bar.set_pending_edits(len(self._collect_buffer_texts()))
+            self._project_bar.set_round_count(
+                len(
+                    self._export_rounds.for_project(
+                        getattr(self._project_summary, "project_root", "")
+                    )
+                )
+            )
             self._project_bar.render(self._project_summary, state)
             # 右侧 Dock 内容由任务生命周期驱动，不在此覆盖 running/result
             if state.view == WorkView.IDLE and not self.runner.is_running:
@@ -1583,13 +1823,22 @@ class MainWindow(QMainWindow):
                     project_open=True,
                 )
 
-        running = bool(self.runner.is_running)
-        self._new_action.setEnabled(not running)
+        # 导入/新建合并为同一入口后，运行中统一禁用该入口（保持原保护）。
+        self._import_action.setEnabled(not running)
         self._open_action.setEnabled(not running)
         if hasattr(self, "_open_new_action"):
             self._open_new_action.setEnabled(not running)
         self._validate_action.setEnabled(state.actions["validate"].enabled)
         self._merge_action.setEnabled(state.actions["merge"].enabled)
+        # 按钮/菜单/Ctrl+E 共用同一 quick_export 可用性（删旧高级轮次不改变默认）。
+        quick_export = state.actions.get("quick_export")
+        self._quick_export_action.setEnabled(bool(quick_export and quick_export.enabled))
+        if quick_export is not None and not quick_export.enabled and quick_export.reason:
+            self._quick_export_action.setToolTip(quick_export.reason)
+        else:
+            self._quick_export_action.setToolTip(
+                "默认整份文档 + 当前编辑内容 + Word + 项目导出目录 (Ctrl+E)"
+            )
         self._diag_action.setEnabled(state.actions["diag_build"].enabled)
         self._report_action.setEnabled(state.actions["report"].enabled)
         self._content_action.setEnabled(state.actions["content"].enabled)
@@ -1600,6 +1849,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_close_action"):
             self._close_action.setEnabled(bool(self._project_summary) and not running)
 
+        if hasattr(self, "_search_project_action"):
+            self._search_project_action.setEnabled(
+                self._content_workspace_available() and not running
+            )
         self._refresh_content_menu_state(running)
         if hasattr(self, "_empty_state"):
             self._empty_state.set_enabled(not running)
@@ -1691,6 +1944,11 @@ class MainWindow(QMainWindow):
         self._result_state = ResultState(project_root=summary.project_root)
         self._stage_events = []
         self._pending_session = self._load_session_state(summary)
+        # UI2-C 3.2：项目隔离的历史栈（切换项目即清空，不跨项目回放）。
+        from doc_tool.ui.navigation_history import NavigationHistory
+
+        self._nav_history = NavigationHistory(str(summary.project_root))
+        self._refresh_navigation_ui()
 
         m = summary.manifest
         if summary.lock_info:
@@ -1712,6 +1970,9 @@ class MainWindow(QMainWindow):
         self._restore_window_session()
         self._refresh_recent_projects()
         self._task_dock.show_idle(None, project_open=True)
+        # UI 包 3.1：重开项目时沿用既有报告索引恢复最近一轮成果（只存引用）。
+        self._last_export_round = None
+        self._load_last_export_round()
         self._refresh_interaction_state()
         def _check_source_reimport():
             try:
@@ -1827,6 +2088,7 @@ class MainWindow(QMainWindow):
             on_open_file=self._on_content_open_file,
             on_request_validate=self._on_content_request_validate,
             on_index_ready=self._on_content_index_ready,
+            on_navigate=self._on_content_navigate,
             on_branch_changed=self._on_branch_changed,
             on_stage=lambda s: self._loading_overlay.show_stage(s) if hasattr(self, "_loading_overlay") else None,
             unsaved_resolver=self._unsaved_resolver,
@@ -1885,6 +2147,172 @@ class MainWindow(QMainWindow):
     def _on_content_open_file(self, rel_path: str) -> None:
         self._content_current_file = rel_path
         self._refresh_interaction_state()
+        self._sync_view_controls()
+
+    def _sync_view_controls(self) -> None:
+        """把当前编辑器的视图/字号同步到工具条（不回写正文）。"""
+        editor = self._active_panel()
+        if editor is None:
+            return
+        combo = getattr(self, "_view_mode_combo", None)
+        if combo is not None and hasattr(editor, "view_mode"):
+            index = combo.findData(editor.view_mode())
+            if index >= 0:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(index)
+                combo.blockSignals(False)
+
+    # --- UI2-C 3.1/3.2：章节路径、定位当前章与位置后退/前进 ---
+
+    def _on_content_navigate(self, rel_path: str, line_no, source: str) -> None:
+        """记录一次主动导航（不回放正文；同一位置合并）。"""
+        from doc_tool.ui.navigation_history import NavLocation
+
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None or not rel_path:
+            return
+        from doc_tool.ui.navigation_history import NavigationHistory
+
+        if not isinstance(getattr(self, "_nav_history", None), NavigationHistory):
+            self._nav_history = NavigationHistory(
+                str(getattr(self._project_summary, "project_root", "") or "")
+            )
+        location = NavLocation(
+            rel_path=rel_path,
+            cursor=0,
+            scroll=0,
+            source=str(source or "导航"),
+            project_root=str(getattr(self._project_summary, "project_root", "") or ""),
+        )
+        current = workspace.current_location()
+        if current is not None and current.rel_path == rel_path:
+            location.cursor = current.cursor
+            location.scroll = current.scroll
+        self._nav_history.record(location)
+        self._refresh_navigation_ui()
+
+    def _nav_record_current(self, source: str) -> None:
+        """把当前编辑器位置登记为一条导航记录（跳转前调用）。"""
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return
+        location = workspace.current_location()
+        if location is None:
+            return
+        from doc_tool.ui.navigation_history import NavigationHistory
+
+        if not isinstance(getattr(self, "_nav_history", None), NavigationHistory):
+            self._nav_history = NavigationHistory(
+                str(getattr(self._project_summary, "project_root", "") or "")
+            )
+        location.source = str(source or "当前位置")
+        location.project_root = str(
+            getattr(self._project_summary, "project_root", "") or ""
+        )
+        self._nav_history.record(location)
+        self._refresh_navigation_ui()
+
+    def _refresh_navigation_ui(self) -> None:
+        history = getattr(self, "_nav_history", None)
+        back_btn = getattr(self, "_nav_back_btn", None)
+        forward_btn = getattr(self, "_nav_forward_btn", None)
+        if history is None or back_btn is None or forward_btn is None:
+            return
+        back_btn.setEnabled(history.can_back())
+        forward_btn.setEnabled(history.can_forward())
+        back_btn.setToolTip(
+            "回到上一个位置（{0}）".format(
+                history.entries()[history._index - 1].describe()
+            ) if history.can_back() else "没有可后退的位置"
+        )
+        forward_btn.setToolTip(
+            "前进到下一个位置（{0}）".format(
+                history.entries()[history._index + 1].describe()
+            ) if history.can_forward() else "没有可前进的位置"
+        )
+        label = getattr(self, "_nav_location_label", None)
+        if label is not None:
+            current = history.current()
+            label.setText(current.rel_path if current is not None else "未打开章节")
+            if current is not None:
+                label.setToolTip(
+                    "完整路径：{0}\n来源：{1}\n（右键可复制完整路径）".format(
+                        current.rel_path, current.source or "导航"
+                    )
+                )
+
+    def _on_nav_back(self) -> None:
+        history = getattr(self, "_nav_history", None)
+        if history is None:
+            return
+        step = history.back()
+        if step is None:
+            self._show_status_message("已到最早的位置")
+            return
+        target, message = step
+        self._replay_navigation(target, message)
+
+    def _on_nav_forward(self) -> None:
+        history = getattr(self, "_nav_history", None)
+        if history is None:
+            return
+        step = history.forward()
+        if step is None:
+            self._show_status_message("已到最新的位置")
+            return
+        target, message = step
+        self._replay_navigation(target, message)
+
+    def _replay_navigation(self, target, message: str) -> None:
+        """重放历史位置：只在原 EditorPanel 上还原光标/滚动，不加载旧正文。"""
+        workspace = getattr(self, "_content_workspace", None)
+        history = getattr(self, "_nav_history", None)
+        if workspace is None or history is None or target is None:
+            return
+        editor = workspace.tabs_host.editor_for(target.rel_path)
+        if editor is None:
+            self._show_status_message(
+                "该位置对应文件已不再打开或已删除：{0}（可继续后退到有效位置）".format(
+                    target.rel_path
+                )
+            )
+            self._refresh_navigation_ui()
+            return
+        history.suppress_next()
+        # 只在真的重放时消耗一次抑制标记：失败路径不得留悬挂标记，
+        # 否则后续主动导航会被误判为重放而不入栈（审计发现的真实回归）。
+        if not workspace.restore_location(target):
+            self._show_status_message("无法还原位置：{0}".format(target.rel_path))
+            return
+        self._refresh_navigation_ui()
+        self._status_label.setText(message)
+
+    def _on_locate_current_chapter(self) -> None:
+        """定位当前章：选中章节树中的真实节点并给出完整路径。"""
+        rel_path = self._content_current_file or (
+            self._content_workspace.current_file()
+            if getattr(self, "_content_workspace", None) is not None
+            and hasattr(self._content_workspace, "current_file")
+            else None
+        )
+        if not rel_path:
+            self._show_status_message("当前没有打开的章节")
+            return
+        try:
+            self._content_workspace.tree_host.select_file(rel_path)
+        except Exception:  # noqa: BLE001 - 树未就绪时只给文字
+            pass
+        self._status_label.setText("已定位当前章：{0}".format(rel_path))
+
+    def _on_copy_current_path(self) -> None:
+        rel_path = self._content_current_file
+        if not rel_path:
+            self._show_status_message("当前没有打开的章节")
+            return
+        from PySide6.QtGui import QGuiApplication
+
+        QGuiApplication.clipboard().setText(rel_path)
+        self._status_label.setText("已复制完整章节路径：{0}".format(rel_path))
 
     def _on_content_request_validate(self) -> None:
         """替换/重命名写回后自动跑校验管线（复用现有校验任务）。"""
@@ -1922,6 +2350,13 @@ class MainWindow(QMainWindow):
         # 编辑器聚焦时 Ctrl+F 走文件内查找，否则走全局搜索
         if self._content_editor_has_focus():
             self._content_workspace.focus_in_editor_find()
+            return
+        self._show_panels_dock()
+        self._content_workspace.focus_search()
+
+    def _on_content_search_project(self) -> None:
+        """Ctrl+Shift+F：始终打开项目全文搜索面板（不受编辑器焦点影响）。"""
+        if not self._content_workspace_available():
             return
         self._show_panels_dock()
         self._content_workspace.focus_search()
@@ -1984,7 +2419,7 @@ class MainWindow(QMainWindow):
     def _on_content_open_from_dialog(self, rel_path: str, line_no: int) -> None:
         workspace = self._content_workspace
         if workspace is not None:
-            workspace.open_file(rel_path, line_no)
+            workspace.open_file(rel_path, line_no, source="引用/搜索结果")
 
     # --- 菜单回调：新建 / 打开 ---
 
@@ -3049,25 +3484,28 @@ class MainWindow(QMainWindow):
         return lines
 
     def _on_delivery_batch(self) -> None:
-        """选择批次计划 → 预览 → 通过既有 TaskRunner 串行执行。"""
+        """批量交付首用入口：新建表单或打开已有计划，再走既有 TaskRunner 串行执行。
+
+        UI 包 4.1：没有 batch.json 也能从按钮完成首次交付，不再要求先手写 JSON。
+        """
         if self.runner.is_running:
             self._show_status_message("已有任务正在运行，本次批量交付未开始")
             return
         from doc_tool.application.delivery import gui_tasks
 
         default_dir = str(getattr(self, "_last_delivery_dir", "") or "")
-        plan_path, _selected = QFileDialog.getOpenFileName(
-            self, "选择批次计划（batch.json）", default_dir,
-            "批次计划 (*.json);;所有文件 (*)",
-        )
+        plan_path = self._choose_delivery_plan(default_dir)
         if not plan_path:
             return
         self._last_delivery_dir = str(Path(plan_path).parent)
-        try:
-            preview = gui_tasks.plan_preview(plan_path)
-        except Exception as exc:  # noqa: BLE001 - 计划非法给明确原因
-            self._show_error("批次计划不可用", str(exc))
-            return
+        if self._last_delivery_preview is not None:
+            preview = self._last_delivery_preview
+        else:
+            try:
+                preview = gui_tasks.plan_preview(plan_path)
+            except Exception as exc:  # noqa: BLE001 - 计划非法给明确原因
+                self._show_error("批次计划不可用", str(exc))
+                return
         lines = list(preview.get("summary") or [])
         invalid = preview.get("invalid") or []
         if invalid:
@@ -3105,6 +3543,74 @@ class MainWindow(QMainWindow):
         )
         self._status_label.setText("批量交付进行中…")
         self._start_task(spec, on_done=self._on_delivery_done)
+
+    def _ask_delivery_mode(self) -> str:
+        """询问交付方式：``new`` 新建批次表单 / ``open`` 打开已有计划 / ``""`` 取消。
+
+        抽成独立方法便于测试与复用；GUI 上仍是原生按钮对话框。
+        """
+        box = QMessageBox(self)
+        box.setWindowTitle("批量交付")
+        box.setText(
+            "新建批次：填写成员/格式/目录后生成 batch.json 并开始交付。\n"
+            "打开已有计划：选择已有 batch.json（保持原有高级路径）。"
+        )
+        new_button = box.addButton("新建批次…", QMessageBox.ButtonRole.AcceptRole)
+        open_button = box.addButton("打开已有计划…", QMessageBox.ButtonRole.ActionRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is new_button:
+            return "new"
+        if clicked is open_button:
+            return "open"
+        return ""
+
+    def _choose_delivery_plan(self, default_dir: str) -> str:
+        """让用户选择「新建批次表单」或「打开已有 batch.json」；返回计划路径。
+
+        保留高级包文件入口；新建路径生成原 batch 格式并经过原服务校验。
+        无计划且未选择时默认走「打开已有计划」，兼容旧入口的主要提交路径。
+        """
+        from doc_tool.ui.delivery_form_dialog import DeliveryFormDialog
+
+        self._last_delivery_preview = None
+        mode = self._ask_delivery_mode()
+        if mode == "new":
+            dialog = DeliveryFormDialog(default_dir=default_dir, parent=self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self._show_status_message("已取消新建批次")
+                return ""
+            plan_path = dialog.plan_path()
+            if plan_path is None or not Path(plan_path).is_file():
+                self._show_status_message("批次表单已关闭，未生成计划")
+                return ""
+            self._last_delivery_preview = self._delivery_preview_from_plan(
+                dialog.validated()
+            )
+            self._show_status_message("已生成批次计划：{0}".format(plan_path))
+            return str(plan_path)
+        if mode in ("open", ""):
+            chosen, _selected = QFileDialog.getOpenFileName(
+                self, "选择批次计划（batch.json）", default_dir,
+                "批次计划 (*.json);;所有文件 (*)",
+            )
+            return chosen or ""
+        return ""
+
+    def _delivery_preview_from_plan(self, plan) -> dict:
+        """把已校验的表单计划转成既有预览结构（与 gui_tasks.plan_preview 同形）。"""
+        from doc_tool.application.delivery import gui_tasks
+
+        try:
+            return gui_tasks.plan_preview(plan.planPath)
+        except Exception:  # noqa: BLE001 - 预览失败时回退为计划摘要
+            return {
+                "summary": plan.summary_lines(),
+                "executable": bool(plan.executable_entries()),
+                "invalid": [entry.to_dict() for entry in plan.invalid_entries()],
+                "view": {"rows": []},
+            }
 
     def _on_delivery_done(self, payload) -> None:
         """结果页：成员/格式状态 + 打开产物 / 只重试未完成项。"""
@@ -3182,11 +3688,64 @@ class MainWindow(QMainWindow):
             return
         from doc_tool.ui.reuse_dialog import ReuseDialog
 
-        dialog = ReuseDialog(self._project_summary.project_root, self)
+        dialog = ReuseDialog(
+            self._project_summary.project_root,
+            self,
+            buffer_source=self._module_buffer_source,
+            on_insert_module=self._on_module_insert_requested,
+        )
         try:
             dialog.exec()
         finally:
             dialog.deleteLater()
+
+    def _module_buffer_source(self):
+        """当前章节的内存缓冲快照（relPath, text）；无脏缓冲返回 ("", "")。
+
+        明确区分缓冲/保存来源：只有编辑器里有未保存修改时才提供字符串快照，
+        避免「当前正文为空时拿旧磁盘内容冒充创建来源」。
+        """
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return "", ""
+        rel = workspace.tabs_host.current_rel_path()
+        if not rel:
+            return "", ""
+        editor = workspace.tabs_host.editor_for(rel)
+        if editor is None or not editor.is_dirty():
+            return "", ""
+        text = editor.plain_text()
+        document_type = ""
+        try:
+            document_type = str(self._project_summary.manifest.documentType or "")
+        except Exception:  # noqa: BLE001
+            document_type = ""
+        key = str(rel).replace("\\", "/")
+        if document_type and key.startswith(document_type + "/"):
+            key = key[len(document_type) + 1:]
+        return key, text
+
+    def _active_editor(self):
+        """当前活动编辑器（工作区未就绪时返回 None，不抛异常）。"""
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            return None
+        try:
+            return workspace.current_editor()
+        except Exception:  # noqa: BLE001 - 编辑器不可用时按无编辑器处理
+            return None
+
+    def _on_module_insert_requested(self, text: str, mode: str) -> bool:
+        """把模块引用/正文一次插入当前编辑器（可一次撤销）；无编辑器返回 False。"""
+        editor = self._active_editor()
+        if editor is None:
+            self._show_status_message("请先打开一个章节，再插入模块")
+            return False
+        editor.insert_template(text)
+        self._show_status_message(
+            "已插入模块{0}（可一次撤销）".format("固定引用" if mode == "reference" else "正文副本")
+        )
+        return True
 
     # --- V3.3 5.1：资料搜索与建议面板接线 ---
 
@@ -3219,12 +3778,14 @@ class MainWindow(QMainWindow):
         panel = AssistPanel(
             assistant,
             project_root=getattr(self._project_summary, "project_root", None),
+            on_scope_changed=self._on_assist_scope_changed,
             parent=self,
         )
         panel.insert_requested.connect(self._on_assist_insert_requested)
         panel.summary_candidate.connect(self._on_assist_summary_candidate)
         panel.buffers_changed.connect(self._on_assist_buffers_changed)
         panel.status_message.connect(lambda message: self._show_status_message(message))
+        self._assist_scope_roots = []
         dock = QDockWidget("资料搜索与建议", self)
         dock.setObjectName("assistDock")
         dock.setWidget(panel)
@@ -3240,8 +3801,39 @@ class MainWindow(QMainWindow):
         if not overview.scope:
             self._show_status_message("资料范围为空：可先在项目中打开或保存章节")
 
-    def _open_chapter_in_workspace(self, rel_path: str, line: Optional[int] = None) -> bool:
-        """在编辑器中打开章节：工作区 relPath 带文档类型前缀（如 ``general/第1章 …``）。"""
+    def _on_assist_scope_changed(self, roots) -> None:
+        """资料范围变更：用新范围重装助手（旧的检索结果不覆盖新范围）。"""
+        self._assist_scope_roots = [str(item) for item in (roots or [])]
+        panel = None
+        dock = getattr(self, "_assist_dock", None)
+        if dock is not None:
+            panel = dock.widget()
+        if panel is None:
+            return
+        try:
+            from doc_tool.application.assist.service import build_assistant
+
+            assistant = build_assistant(
+                str(self._project_summary.project_root),
+                module_roots=self._assist_scope_roots,
+            )
+            buffers = self._collect_buffer_texts()
+            if buffers:
+                assistant.set_buffers(buffers)
+            panel.set_assistant(assistant)
+            self._show_status_message(
+                "资料范围已更新：{0} 个来源".format(len(self._assist_scope_roots) + 1)
+            )
+        except Exception as exc:  # noqa: BLE001 - 范围更新失败不阻断本地检索
+            self._show_status_message("资料范围更新未生效：{0}".format(exc))
+
+    def _open_chapter_in_workspace(
+        self, rel_path: str, line: Optional[int] = None, *, source: str = "章节"
+    ) -> bool:
+        """在编辑器中打开章节：工作区 relPath 带文档类型前缀（如 ``general/第1章 …``）。
+
+        ``source`` 会进入位置历史（章节树/搜索/问题/资料），用于后退说明。
+        """
         workspace = getattr(self, "_content_workspace", None)
         if workspace is None or not rel_path:
             return False
@@ -3255,8 +3847,8 @@ class MainWindow(QMainWindow):
             candidates.insert(0, "{0}/{1}".format(document_type, rel_path))
         for candidate in candidates:
             try:
-                workspace.open_file(candidate, line)
-            except TypeError:  # 旧签名（无行号）
+                workspace.open_file(candidate, line, source=source)
+            except TypeError:  # 旧签名（无行号/无来源）
                 workspace.open_file(candidate)
             except Exception:  # noqa: BLE001 - 打不开时尝试下一种写法
                 continue
@@ -3338,7 +3930,7 @@ class MainWindow(QMainWindow):
                 if editor is not None:
                     break
             if editor is None and workspace is not None:
-                if self._open_chapter_in_workspace(rel_path):
+                if self._open_chapter_in_workspace(rel_path, source="资料面板"):
                     for key in keys:
                         editor = tabs.editor_for(key)
                         if editor is not None:
@@ -3490,29 +4082,133 @@ class MainWindow(QMainWindow):
             buffers[key] = text
         return buffers
 
-    def _on_quick_export_word(self) -> None:
-        """快速导出 Word：整份 + 当前内容 + 项目导出目录（默认值，可再调整）。"""
-        if self._project_summary is None or self.runner.is_running:
-            return
-        from doc_tool.application.intake_contract import (
-            FORMAT_DOCX, SOURCE_MODE_CURRENT_BUFFER, SOURCE_MODE_SAVED, ExportRequest,
-        )
-        from doc_tool.application.project_export import run_project_export
+    def _quick_export_defaults(self, buffers: Dict[str, str]):
+        """快速出稿的日常默认：整份 + 当前缓冲优先 + 项目导出目录。
 
-        buffers = self._collect_buffer_texts()
-        request = ExportRequest(
+        每次都从零构造请求，因此**不会**继承上一轮的部分章节范围、saved 来源
+        或 strict 策略；旧高级决定只影响旧轮次本身。``refresh`` 保持默认，
+        本机没有 Microsoft Word 时仍会产出可读 DOCX（结果标「待刷新」）。
+        """
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX,
+            SCOPE_PROJECT,
+            SOURCE_MODE_CURRENT_BUFFER,
+            SOURCE_MODE_SAVED,
+            ExportRequest,
+            ExportScope,
+        )
+
+        return ExportRequest(
             project_root=str(self._project_summary.project_root),
             formats=[FORMAT_DOCX],
+            scope=ExportScope(kind=SCOPE_PROJECT),
             source_mode=SOURCE_MODE_CURRENT_BUFFER if buffers else SOURCE_MODE_SAVED,
             destination=str(self._project_summary.paths.output_dir),
         )
+
+    def _export_settings_context(self) -> dict:
+        """导出设置需要的真实上下文：章节、当前章、未保存数、目录、变体。"""
+        from doc_tool.application.effective_snapshot import discover_chapters
+
+        summary = self._project_summary
+        chapters = []
+        variants = []
+        if summary is not None:
+            try:
+                content_root = summary.paths.resolve(
+                    summary.manifest.relative_content_root()
+                )
+                chapters = [rel for rel, _path in discover_chapters(content_root)]
+            except Exception:  # noqa: BLE001 - 索引不可用时按整份
+                chapters = []
+            try:
+                variants = [
+                    item.get("variantId") or item.get("name")
+                    for item in (
+                        self._preview_text_resolver() or []
+                    )
+                ] if False else []
+            except Exception:  # noqa: BLE001
+                variants = []
+            if not variants:
+                try:
+                    from doc_tool.application.content.variants import VariantsConfig
+
+                    variants = list(VariantsConfig.load(summary.project_root).ids())
+                except Exception:  # noqa: BLE001 - 无变体配置时留空
+                    variants = []
+        return {
+            "project_root": str(getattr(summary, "project_root", "") or ""),
+            "destination": str(summary.paths.output_dir) if summary is not None else "",
+            "chapters": chapters,
+            "current_chapter": self._content_current_file or "",
+            "unsaved_count": len(self._collect_buffer_texts()),
+            "variants": variants,
+        }
+
+    def _on_export_settings(self, preset_request=None) -> None:
+        """打开导出设置；一次“开始导出”即提交原服务。"""
+        from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+
+        if self._project_summary is None:
+            self._show_status_message("请先打开项目后再使用导出设置")
+            return
+        context = self._export_settings_context()
+        dialog = ExportSettingsDialog(
+            project_root=context["project_root"],
+            destination=context["destination"],
+            chapters=context["chapters"],
+            current_chapter=context["current_chapter"],
+            unsaved_count=context["unsaved_count"],
+            variants=context["variants"],
+            parent=self,
+        )
+        if preset_request is not None:
+            dialog.apply_request(preset_request)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self._status_label.setText("已取消导出设置：编辑缓冲与原有成果保持不变")
+            return
+        request = dialog.submitted_request()
+        if request is None:
+            return
+        self._submit_export_request(request)
+
+    def _submit_export_request(self, request) -> None:
+        """用原 TaskRunner 提交一次导出；当前缓冲在 UI 线程采集后传入后台。"""
+        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
+        from doc_tool.application.project_export import run_project_export
+
+        buffers = (
+            self._collect_buffer_texts()
+            if request.source_mode == SOURCE_MODE_CURRENT_BUFFER
+            else {}
+        )
+        self._run_export_task(
+            name="project-export",
+            target=run_project_export,
+            args=(request,),
+            kwargs={"buffer_texts": buffers},
+            message="正在按导出设置生成（{0}）…".format(
+                "、".join(request.formats)
+            ),
+        )
+
+    def _on_quick_export_word(self) -> None:
+        """快速导出 Word：整份 + 当前内容 + 项目导出目录（默认值，可再调整）。"""
+        if self._project_summary is None:
+            return
+        if self.runner.is_running:
+            # 忙时只拒绝重复启动：运行中的任务/轮次保持，编辑与成果查看不受影响。
+            self._status_label.setText("已有任务正在运行，本次导出未开始；可继续编辑或查看已有成果")
+            return
+        from doc_tool.application.project_export import run_project_export
+
+        buffers = self._collect_buffer_texts()
+        request = self._quick_export_defaults(buffers)
         # 出稿在既有 TaskRunner 后台线程执行：界面可继续编辑，任务 Dock 可取消，
         # 重复点击由 runner.is_running 与动作禁用共同防重。
         from doc_tool.ui.task_bridge import TaskSpec
 
-        if self.runner.is_running:
-            self._status_label.setText("已有任务正在运行，本次导出未开始")
-            return
         spec = TaskSpec(
             name="project-export",
             target=run_project_export,
@@ -3520,7 +4216,11 @@ class MainWindow(QMainWindow):
             kwargs={"buffer_texts": buffers},
             timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
         )
-        self._status_label.setText("正在生成 Word…")
+        self._status_label.setText(
+            "正在生成 Word…（{0}）".format(
+                "含 {0} 章未保存修改".format(len(buffers)) if buffers else "整份已保存内容"
+            )
+        )
         self._start_task(spec, on_done=self._on_export_task_done)
 
     def _on_export_task_done(self, report) -> None:
@@ -3536,12 +4236,285 @@ class MainWindow(QMainWindow):
             return
         self._present_export_report(report)
 
+    # --- UI 包 UI-C：非模态成果（逐文件、按轮次） ---
+
+    def _record_export_round(self, report) -> object:
+        """把一轮真实报告登记到成果视图，并刷新入口计数（只存引用）。"""
+        from doc_tool.ui.export_rounds import round_view_from_report
+
+        view = round_view_from_report(report)
+        self._export_rounds.record(view)
+        self._selected_round_id = view.round_id
+        return view
+
+    def _refresh_export_results(self, report=None) -> None:
+        """按项目刷新成果页；有报告时先登记该轮，再展示本项目最近轮次。"""
+        if report is not None:
+            self._record_export_round(report)
+        root = getattr(self._project_summary, "project_root", "")
+        rounds = self._export_rounds.for_project(root)
+        self._task_dock.show_results(rounds, self._selected_round_id)
+        self._project_bar.set_round_count(len(rounds))
+
+    def _on_show_results(self) -> None:
+        """「成果」入口：找回本项目最近结果（关闭面板后仍可用）。"""
+        if self._project_summary is None:
+            self._show_status_message("请先打开项目，再查看出稿成果")
+            return
+        rounds = self._export_rounds.for_project(
+            getattr(self._project_summary, "project_root", "")
+        )
+        if not rounds and self._last_export_round is None:
+            self._load_last_export_round()
+            rounds = self._export_rounds.for_project(
+                getattr(self._project_summary, "project_root", "")
+            )
+        self._task_dock_widget.show()
+        self._task_dock_widget.raise_()
+        self._refresh_export_results()
+        self._status_label.setText(
+            "本项目有 {0} 轮出稿成果".format(len(rounds))
+            if rounds
+            else "本项目还没有出稿成果；可先用顶部「导出 Word」生成一轮"
+        )
+
+    def _load_last_export_round(self, *, force: bool = False) -> None:
+        """重开项目时从既有报告索引恢复最近一轮（沿用索引，不另建状态）。"""
+        summary = self._project_summary
+        if summary is None:
+            return
+        root = str(getattr(summary, "project_root", "") or "")
+        if not force and self._export_rounds.latest(root) is not None:
+            return
+        try:
+            output_dir = summary.paths.output_dir
+        except Exception:  # noqa: BLE001 - 缺少输出目录时不恢复
+            return
+        from doc_tool.ui.export_rounds import load_round_from_index
+
+        view = load_round_from_index(output_dir)
+        if view is None:
+            return
+        self._export_rounds.record(view)
+        self._selected_round_id = view.round_id
+        self._last_export_round = view
+
+    def _on_select_export_round(self, round_id: str) -> None:
+        self._selected_round_id = str(round_id or "")
+
+    def _on_open_export_format(self, fmt: str, path: str) -> None:
+        """逐格式打开：只打开本轮真实路径，失效时给重新定位/重新生成建议。"""
+        if path and Path(path).is_file():
+            self._on_open_result_output(path)
+            return
+        self._show_status_message(
+            "{0} 产物路径已失效（{1}）：可重新定位或按当前修改重新生成".format(
+                fmt or "该格式", path or "未记录路径"
+            )
+        )
+
+    def _round_request(self, view):
+        """由成果轮次重建出稿请求（原轮范围/来源/目录，不读新正文）。"""
+        from doc_tool.application.intake_contract import ExportRequest
+
+        return ExportRequest(
+            project_root=view.project_root or str(self._project_summary.project_root),
+            formats=[item.format for item in view.formats] or ["docx"],
+            source_mode=view.source_mode or "saved",
+            destination=view.destination,
+        )
+
+    def _run_export_task(self, *, name: str, target, args, kwargs, message: str) -> None:
+        """走既有 TaskRunner 的后台出稿（Word 仍串行；忙时不覆盖当前任务）。"""
+        if self._project_summary is None:
+            return
+        if self.runner.is_running:
+            self._status_label.setText(
+                "已有任务正在运行，本次未开始；可继续编辑或查看已有成果"
+            )
+            return
+        from doc_tool.ui.task_bridge import TaskSpec
+
+        spec = TaskSpec(
+            name=name,
+            target=target,
+            args=args,
+            kwargs=kwargs,
+            timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
+        )
+        self._status_label.setText(message)
+        self._start_task(spec, on_done=self._on_export_task_done)
+
+    def _on_retry_export_round(self, view) -> None:
+        """补这次成果：用旧捕获与原范围只补缺失/失败格式，不读当前新正文。"""
+        from doc_tool.application.intake_contract import ExportRequest
+        from doc_tool.application.project_export import retry_export_formats
+
+        report = self._report_for_round(view)
+        if report is None:
+            self._show_status_message("原轮报告不可用：请按当前修改重新生成一轮")
+            return
+        pending = [
+            item.format for item in view.formats
+            if item.status in ("failed", "pending-convert", "pending-refresh")
+        ]
+        if not pending:
+            self._show_status_message("本轮没有需要补的格式")
+            return
+        self._status_label.setText(
+            "正在用原轮捕获补 {0}…".format("、".join(pending))
+        )
+        self._run_export_task(
+            name="project-export",
+            target=retry_export_formats,
+            args=(report, pending),
+            kwargs={"request": self._round_request(view)},
+            message="正在补本轮缺失格式（沿用原捕获）…",
+        )
+
+    def _report_for_round(self, view):
+        """取回该轮真实报告，并校验 roundId/captureId 身份。
+
+        同目录 ``export-result.json`` 会被新轮覆盖：若读到的报告不是所选轮，
+        必须返回 None（宁可不补也不能拿最新索引冒充旧轮）。
+        """
+        from doc_tool.application.project_export import read_export_index
+
+        candidates = []
+        if view.index_path and Path(view.index_path).is_file():
+            candidates.append(Path(view.index_path))
+        summary = self._project_summary
+        if summary is not None:
+            try:
+                candidates.append(Path(summary.paths.output_dir))
+            except Exception:  # noqa: BLE001 - 缺输出目录时只用已知索引
+                pass
+        for candidate in candidates:
+            report = read_export_index(candidate)
+            if report is None:
+                continue
+            if self._round_identity_matches(view, report):
+                return report
+        return None
+
+    @staticmethod
+    def _round_identity_matches(view, report) -> bool:
+        """轮次身份校验：roundId 必须相等；两边都有 captureId 时也必须相等。
+
+        历史引用只保存了 roundId 时不得因缺少 captureId 而误判失配。
+        """
+        wanted_round = str(getattr(view, "round_id", "") or "")
+        got_round = str(getattr(report, "roundId", "") or "")
+        if not wanted_round or not got_round or wanted_round != got_round:
+            return False
+        wanted_capture = str(getattr(view, "capture_id", "") or "")
+        got_capture = str(getattr(report, "captureId", "") or "")
+        if wanted_capture and got_capture and wanted_capture != got_capture:
+            return False
+        return True
+
+    def _on_regenerate_round(self, view) -> None:
+        """按当前修改重新生成：UI 线程收集缓冲，后台建立新 current-buffer 轮次。"""
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX, ExportRequest, ExportScope, SCOPE_PROJECT,
+        )
+        from doc_tool.application.project_export import run_project_export
+
+        if self._project_summary is None:
+            return
+        buffers = self._collect_buffer_texts()
+        request = ExportRequest(
+            project_root=str(self._project_summary.project_root),
+            formats=[item.format for item in view.formats] or [FORMAT_DOCX],
+            scope=ExportScope(kind=SCOPE_PROJECT),
+            source_mode="current-buffer" if buffers else "saved",
+            destination=view.destination or str(self._project_summary.paths.output_dir),
+        )
+        self._run_export_task(
+            name="project-export",
+            target=run_project_export,
+            args=(request,),
+            kwargs={"buffer_texts": buffers},
+            message="正在按当前修改建立新一轮（含 {0} 章未保存修改）…".format(
+                len(buffers)
+            ) if buffers else "正在按当前修改建立新一轮…",
+        )
+
+    def _on_export_settings_for_round(self, view) -> None:
+        """从旧轮打开导出设置：带入可解析的原范围/格式/目录，提交产生新轮。
+
+        原范围从真实报告读取（不从 scope_text 反解析）；读不到原报告时只带入格式/目录，
+        范围回到默认整份并在表单里可见。
+        """
+        from doc_tool.application.intake_contract import ExportRequest
+
+        if view is None or self._project_summary is None:
+            return
+        report = self._report_for_round(view)
+        scope = getattr(report, "scope", None) if report is not None else None
+        preset = ExportRequest(
+            project_root=view.project_root or str(self._project_summary.project_root),
+            formats=[item.format for item in view.formats] or ["docx"],
+            scope=scope if scope is not None else ExportRequest().scope,
+            source_mode=view.source_mode or "current-buffer",
+            destination=view.destination or str(self._project_summary.paths.output_dir),
+            strict=False,
+        )
+        self._on_export_settings(preset)
+
+    def _on_change_export_destination(self, view) -> None:
+        """换目录并重新导出：明示来源/范围，建立新轮，旧成果保留。"""
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX, SOURCE_MODE_CURRENT_BUFFER, ExportRequest, ExportScope,
+            SCOPE_PROJECT,
+        )
+        from doc_tool.application.project_export import run_project_export
+
+        if self._project_summary is None:
+            return
+        chosen = QFileDialog.getExistingDirectory(
+            self, "选择新的导出目录（默认按当前内容建立新轮）", view.destination or ""
+        )
+        if not chosen:
+            self._status_label.setText("已取消换目录：原成果保持不变")
+            return
+        buffers = self._collect_buffer_texts()
+        request = ExportRequest(
+            project_root=view.project_root or str(self._project_summary.project_root),
+            formats=[item.format for item in view.formats] or [FORMAT_DOCX],
+            scope=ExportScope(kind=SCOPE_PROJECT),
+            source_mode=SOURCE_MODE_CURRENT_BUFFER if buffers else "saved",
+            destination=chosen,
+        )
+        self._run_export_task(
+            name="project-export",
+            target=run_project_export,
+            args=(request,),
+            kwargs={"buffer_texts": buffers},
+            message="正在导出到新目录（新轮次；旧成果保留）…",
+        )
+
     def _present_export_report(self, report, *, allow_retry: bool = True) -> None:
-        """结果页：先给可打开产物与目录，再给“补失败格式/更换目录”等直接动作。
+        """出稿结果：先登记非模态成果，再给可打开产物与恢复动作。
 
         使用模块级 ``QMessageBox``（不在函数内重新导入），这样离屏测试可以
         整体替换为记录器而不会弹出真模态框。
         """
+        self._refresh_export_results(report)
+        try:
+            usable = len(report.usable_results())
+        except Exception:  # noqa: BLE001 - 报告形态异常时不给假成功
+            usable = 0
+        rounds = len(
+            self._export_rounds.for_project(
+                getattr(self._project_summary, "project_root", "")
+            )
+        )
+        self._status_label.setText(
+            "本轮已生成 {0} 个可用格式；成果（共 {1} 轮）可从顶部「成果」再次查看".format(
+                usable, rounds
+            )
+        )
         box = QMessageBox(self)
         box.setWindowTitle("出稿结果")
         box.setText("\n".join(report.summary_lines()))
@@ -3562,56 +4535,22 @@ class MainWindow(QMainWindow):
         elif clicked is dir_button:
             self._on_open_result_directory(report.destination)
         elif retry_button is not None and clicked is retry_button:
-            from doc_tool.application.project_export import retry_export_formats
-
-            retried = retry_export_formats(report, report.failed_formats())
-            self._present_export_report(retried, allow_retry=False)
+            # 补缺同样走后台 TaskRunner，不再在 UI 线程里同步重跑。
+            view = self._record_export_round(report)
+            self._on_retry_export_round(view)
         elif clicked is regenerate_button:
-            # 明确开新一轮：重新捕获当前内容（新 captureId），不复用旧轮快照。
-            from doc_tool.application.intake_contract import ExportRequest
-            from doc_tool.application.project_export import run_project_export
-
-            if self._project_summary is None:
-                return
-            request = ExportRequest(
-                project_root=str(self._project_summary.project_root),
-                formats=[item.format for item in report.results] or ["docx"],
-                scope=report.scope,
-                source_mode=report.sourceMode,
-                destination=report.destination,
-            )
-            self._present_export_report(
-                run_project_export(request, buffer_texts=self._collect_buffer_texts()),
-                allow_retry=False,
-            )
+            # 明确开新一轮：收集当前缓冲后交给后台（新 captureId，不复用旧轮快照）。
+            self._on_regenerate_round(self._record_export_round(report))
         elif clicked is change_button:
-            chosen = QFileDialog.getExistingDirectory(self, "选择导出目录", report.destination)
-            if not chosen:
-                return
-            from doc_tool.application.intake_contract import (
-                SOURCE_MODE_CURRENT_BUFFER, ExportRequest,
-            )
-            from doc_tool.application.project_export import run_project_export
-
-            request = ExportRequest(
-                project_root=report.projectRoot or str(self._project_summary.project_root),
-                formats=[item.format for item in report.results] or ["docx"],
-                scope=report.scope,
-                source_mode=report.sourceMode,
-                destination=chosen,
-            )
-            # 上一轮可能是“当前编辑内容”来源：这里必须同样带上编辑器缓冲，
-            # 否则会导出磁盘内容却在报告里仍标注“当前编辑内容”（审计发现的真实不一致）。
-            buffer_texts = (
-                self._collect_buffer_texts()
-                if report.sourceMode == SOURCE_MODE_CURRENT_BUFFER
-                else None
-            )
-            self._present_export_report(
-                run_project_export(request, buffer_texts=buffer_texts), allow_retry=False,
-            )
+            self._on_change_export_destination(self._record_export_round(report))
         else:
-            self._status_label.setText("已生成 {0} 个可用结果".format(len(report.usable_results())))
+            try:
+                usable = len(report.usable_results())
+            except Exception:  # noqa: BLE001 - 报告形态异常时不给假成功
+                usable = 0
+            self._status_label.setText(
+                "已生成 {0} 个可用结果；可从顶部「成果」逐文件打开或补缺".format(usable)
+            )
 
     def _on_reimport_source(self) -> None:
         if not self._project_summary or not self._project_summary.is_writable:
@@ -3718,11 +4657,22 @@ class MainWindow(QMainWindow):
                 dialog.deleteLater()
 
     def _on_remove_recent(self, path: str) -> None:
-        """从最近项目列表中移除条目并刷新界面。"""
+        """从最近项目列表中移除条目并刷新界面（不删除工程目录）。"""
         from doc_tool.application.project_service import remove_recent_project
 
         remove_recent_project(path)
         self._refresh_recent_projects()
+
+    def _on_toggle_recent_pin(self, path: str, pinned: bool) -> None:
+        """固定/取消固定最近项目：只改个人记录，不动工程。"""
+        from doc_tool.application.project_service import set_recent_pinned
+
+        hit = set_recent_pinned(path, bool(pinned))
+        self._refresh_recent_projects()
+        self._show_status_message(
+            ("已固定：{0}" if pinned else "已取消固定：{0}").format(Path(path).name)
+            if hit else "该记录已不在最近列表，未保存固定状态"
+        )
 
     def _on_relocate_recent(self, old_path: str, new_path: str) -> None:
         """把失效的最近项目重新定位到新目录（规范 R9）：改列表、保留元信息并刷新首页。"""
@@ -4170,6 +5120,12 @@ class MainWindow(QMainWindow):
                 dock_visibility=self._dock_visibility(),
                 dock_state=self._dock_state(),
             )
+            # 用户是否动过布局要一并持久化：否则下次打开会把首用默认重新套到
+            # 用户已习惯的布局上（复核发现的旧偏好覆盖风险）。
+            session.layout_chosen = bool(
+                getattr(self, "_writing_layout_chosen", False)
+                or (self._pending_session is not None and self._pending_session.layout_chosen)
+            )
             ws.session_store().save(session)
         except Exception:  # noqa: BLE001  # 会话写入失败不影响关闭
             pass
@@ -4181,10 +5137,71 @@ class MainWindow(QMainWindow):
             return SessionState()
 
     def _restore_window_session(self) -> None:
-        """恢复主题与 Dock 布局/显隐（会话标签由工作区在索引就绪后恢复）。"""
-        session = self._pending_session or SessionState()
-        self._restore_theme(session.theme)
-        self._restore_dock_state(session)
+        """恢复主题与 Dock 布局/显隐（会话标签由工作区在索引就绪后恢复）。
+
+        有效旧会话优先：只有缺失/损坏（无任何布局偏好）时才套用首用写作默认，
+        避免覆盖用户已经习惯的布局。
+        """
+        session = self._pending_session
+        self._restore_theme(session.theme if session is not None else "light")
+        from doc_tool.ui.writing_layout import DOCK_TASK, should_apply_default_layout
+
+        if should_apply_default_layout(session):
+            self._apply_default_writing_layout()
+        else:
+            self._restore_dock_state(session)
+            # 有效旧会话：按用户偏好决定空闲时是否展开任务/结果 Dock。
+            self._writing_layout_task_dock = bool(
+                session.dock_visibility.get(DOCK_TASK, True)
+            )
+
+    def _apply_default_writing_layout(self) -> None:
+        """套用首用写作布局：正文优先，工具/空闲任务 Dock 收起，章节树收窄。"""
+        from doc_tool.ui.writing_layout import default_writing_layout
+
+        self._apply_dock_layout(default_writing_layout())
+        self._writing_layout_default_applied = True
+        self._writing_layout_chosen = False
+        # 默认收起任务/结果 Dock；用户手动展开或恢复旧会话后置 True。
+        self._writing_layout_task_dock = False
+
+    def _apply_dock_layout(self, layout) -> None:
+        """按布局定义设置 Dock 显隐与宽度（只动布局，不动文档/会话内容）。"""
+        for name, dock in self._dock_widgets():
+            if dock is None:
+                continue
+            target = layout.docks.get(name)
+            if target is None:
+                continue
+            if target.minimum_width is not None:
+                dock.setMinimumWidth(target.minimum_width)
+            if target.maximum_width is not None:
+                dock.setMaximumWidth(target.maximum_width)
+            if target.visible:
+                dock.show()
+            else:
+                dock.hide()
+
+    def _mark_layout_chosen(self) -> None:
+        """记录用户已经显式选择过布局（下次打开不再套用首用默认）。"""
+        session = self._pending_session
+        if session is None:
+            session = SessionState()
+            self._pending_session = session
+        session.layout_chosen = True
+        session.dock_visibility = self._dock_visibility()
+
+    def _on_restore_writing_layout(self) -> None:
+        """「恢复写作布局」：只重设 Dock 显隐/尺寸，保留正文、草稿、主题与滚动。"""
+        from doc_tool.ui.writing_layout import default_writing_layout
+
+        layout = default_writing_layout()
+        self._apply_dock_layout(layout)
+        self._writing_layout_chosen = True
+        self._writing_layout_task_dock = False
+        self._mark_layout_chosen()
+        self._rebuild_view_menu()
+        self._status_label.setText(layout.describe_restored())
 
     def _restore_theme(self, theme: str) -> None:
         target_dark = theme == "dark"

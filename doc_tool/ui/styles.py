@@ -377,6 +377,10 @@ QLabel#recentFileIcon {{ font-size: 13pt; background: {panel_alt}; border-radius
 QFrame#convertCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}
 QFrame#convertCard:hover {{ border-color: {accent}; }}
 QFrame#convertCard[dragOver="true"] {{ border: 2px dashed {accent}; background: {accent_soft}; }}
+/* 首页左侧「项目出稿」拖放区：拖入即走导入建项路由，与互转卡视觉区分 */
+QFrame#intakeDropCard {{ border: 1px dashed {border}; background: {panel}; border-radius: 8px; }}
+QFrame#intakeDropCard:hover {{ border-color: {accent}; }}
+QFrame#intakeDropCard[dragOver="true"] {{ border: 2px dashed {accent}; background: {accent_soft}; }}
 QFrame#pdfCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}
 QFrame#pdfCard:hover {{ border-color: {accent}; }}
 QFrame#recentCard {{ border: 1px solid {border}; background: {panel}; border-radius: 8px; }}

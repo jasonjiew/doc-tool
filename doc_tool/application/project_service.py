@@ -90,6 +90,9 @@ class RecentEntry:
     # 再次打开项目时由 add_recent_project 补写（向后兼容迁移）。
     document_type: str = ""
     last_opened: str = ""
+    #: UI2-B 2.2：用户固定（置顶）的个人偏好；只影响个人记录顺序与展示，
+    #: 不移动、不删除工程。旧记录缺该字段时按未固定回退。
+    pinned: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -99,10 +102,12 @@ class RecentEntry:
             "documentNo": self.document_no,
             "documentType": self.document_type,
             "lastOpened": self.last_opened,
+            "pinned": bool(self.pinned),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "RecentEntry":
+        pinned = data.get("pinned", False)
         return cls(
             path=str(data.get("path", "")),
             name=str(data.get("name", "")),
@@ -110,6 +115,7 @@ class RecentEntry:
             document_no=str(data.get("documentNo", "")),
             document_type=str(data.get("documentType", "")),
             last_opened=str(data.get("lastOpened", "")),
+            pinned=bool(pinned) if isinstance(pinned, bool) else False,
         )
 
 
@@ -353,6 +359,23 @@ def add_recent_project(project_root: str, manifest: ProjectManifest) -> None:
     entries.insert(0, entry)
     entries = entries[:MAX_RECENT_PROJECTS]
     _save_recent_projects(entries)
+
+
+def set_recent_pinned(project_root: str, pinned: bool) -> bool:
+    """固定/取消固定一条最近记录（只改个人偏好，不动工程目录）。
+
+    返回是否命中了记录；命中的记录会保留原有名称/类型/时间等元信息。
+    """
+    target = os.path.normcase(os.path.normpath(str(project_root)))
+    entries = load_recent_projects()
+    hit = False
+    for entry in entries:
+        if os.path.normcase(os.path.normpath(entry.path)) == target:
+            entry.pinned = bool(pinned)
+            hit = True
+    if hit:
+        _save_recent_projects(entries)
+    return hit
 
 
 def remove_recent_project(project_root: str) -> None:

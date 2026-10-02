@@ -177,11 +177,12 @@ class QuickExportUiTests(unittest.TestCase):
         self.assertIn("按最新内容重新生成", buttons)
 
 
-class ExportChangeDirectoryBufferTests(unittest.TestCase):
-    """审计补测：结果页「更换目录…」在“当前编辑内容”来源下必须带上编辑器缓冲。
+class ChangeDirectoryActionTests(unittest.TestCase):
+    """更换目录动作（UI 包 3.2）：当前内容来源必须继续带上编辑器缓冲。
 
-    此前该分支未传 buffer_texts，会在报告仍标注“当前编辑内容”的同时导出磁盘内容
-    （静默丢失未保存编辑）。本用例锁定修复后的行为。
+    审计补测：此前该分支未传 buffer_texts，会在报告仍标注“当前编辑内容”的同时
+    导出磁盘内容（静默丢失未保存编辑）。本用例锁定修复后的行为，并改为直接驱动
+    「换目录并重新导出」动作（不再依赖模态结果框的按钮点击）。
     """
 
     @classmethod
@@ -189,7 +190,7 @@ class ExportChangeDirectoryBufferTests(unittest.TestCase):
         from PySide6.QtWidgets import QApplication
 
         cls._app = QApplication.instance() or QApplication([])
-        cls.work = fixtures.scratch_dir("export-changedir")
+        cls.work = fixtures.scratch_dir("export-changedir-direct")
         cls.project = fixtures.two_chapter_project(cls.work / "proj")
 
     @classmethod
@@ -208,131 +209,72 @@ class ExportChangeDirectoryBufferTests(unittest.TestCase):
             skip_word_refresh=True,
         )
 
-    def test_change_directory_keeps_editor_buffer_for_buffer_source(self):
+    def _drive_change_directory(self, source_mode: str, *, destination: str):
         from unittest.mock import patch
 
-        from PySide6.QtWidgets import QMessageBox
-
-        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
         from doc_tool.ui.main_window import MainWindow
 
-        report = self._report(SOURCE_MODE_CURRENT_BUFFER)
+        report = self._report(source_mode)
         captured: dict = {}
         buffers = {"content/general/第1章 引言/1.1 目的.md": "编辑器里的未保存内容"}
-
-        state = {"clicks": 0}
-
-        class _Box:
-            ButtonRole = QMessageBox.ButtonRole
-
-            def __init__(self, parent=None):
-                self._buttons = {}
-
-            def setWindowTitle(self, value):
-                pass
-
-            def setText(self, value):
-                pass
-
-            def addButton(self, text, role=None):
-                self._buttons[text] = {"text": text}
-                return self._buttons[text]
-
-            def exec(self):
-                return 0
-
-            def clickedButton(self):
-                # 只在第一次点击“更换目录…”，随后关闭，避免结果页递归重开
-                state["clicks"] += 1
-                if state["clicks"] == 1:
-                    return self._buttons.get("更换目录…")
-                return self._buttons.get("关闭")
 
         def _fake_export(request, **kwargs):
             captured["kwargs"] = kwargs
             captured["destination"] = request.destination
+            captured["source_mode"] = request.source_mode
             return report
 
-        recent = patch("doc_tool.application.project_service.load_recent_projects", return_value=[])
+        recent = patch(
+            "doc_tool.application.project_service.load_recent_projects", return_value=[]
+        )
         recent.start()
         try:
             window = MainWindow()
-            window._project_summary = type("S", (), {"project_root": self.project, "is_writable": True})()
+            self.addCleanup(window.close)
+            window._project_summary = _FakeSummary(self.project)
             window._collect_buffer_texts = lambda: dict(buffers)
-            with patch("doc_tool.ui.main_window.QMessageBox", _Box), patch(
+            view = window._record_export_round(report)
+            with patch(
                 "doc_tool.ui.main_window.QFileDialog.getExistingDirectory",
-                return_value=str(self.work / "另一目录"),
-            ), patch("doc_tool.application.project_export.run_project_export", _fake_export):
-                window._present_export_report(report, allow_retry=False)
-            window.close()
+                return_value=destination,
+            ), patch(
+                "doc_tool.application.project_export.run_project_export", _fake_export
+            ):
+                window._on_change_export_destination(view)
+                import time
+
+                from PySide6.QtWidgets import QApplication
+
+                deadline = time.monotonic() + 30
+                while window.runner.is_running and time.monotonic() < deadline:
+                    QApplication.processEvents()
+                    time.sleep(0.02)
         finally:
             recent.stop()
+        return captured, buffers
 
+    def test_change_directory_keeps_editor_buffer_for_buffer_source(self):
+        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
+
+        captured, buffers = self._drive_change_directory(
+            SOURCE_MODE_CURRENT_BUFFER, destination=str(self.work / "另一目录")
+        )
         self.assertTrue(captured, "更换目录分支应调用统一出稿")
-        self.assertEqual(captured["kwargs"].get("buffer_texts"), buffers,
-                         "当前编辑内容来源必须继续携带编辑器缓冲，不能用磁盘内容顶替")
+        self.assertEqual(
+            captured["kwargs"].get("buffer_texts"), buffers,
+            "当前编辑内容来源必须继续携带编辑器缓冲，不能用磁盘内容顶替",
+        )
         self.assertIn("另一目录", str(captured.get("destination")))
 
     def test_change_directory_omits_buffer_for_saved_source(self):
-        from unittest.mock import patch
-
-        from PySide6.QtWidgets import QMessageBox
-
         from doc_tool.application.intake_contract import SOURCE_MODE_SAVED
-        from doc_tool.ui.main_window import MainWindow
 
-        report = self._report(SOURCE_MODE_SAVED)
-        captured: dict = {}
-
-        state = {"clicks": 0}
-
-        class _Box:
-            ButtonRole = QMessageBox.ButtonRole
-
-            def __init__(self, parent=None):
-                self._buttons = {}
-
-            def setWindowTitle(self, value):
-                pass
-
-            def setText(self, value):
-                pass
-
-            def addButton(self, text, role=None):
-                self._buttons[text] = {"text": text}
-                return self._buttons[text]
-
-            def exec(self):
-                return 0
-
-            def clickedButton(self):
-                # 只在第一次点击“更换目录…”，随后关闭，避免结果页递归重开
-                state["clicks"] += 1
-                if state["clicks"] == 1:
-                    return self._buttons.get("更换目录…")
-                return self._buttons.get("关闭")
-
-        def _fake_export(request, **kwargs):
-            captured["kwargs"] = kwargs
-            return report
-
-        recent = patch("doc_tool.application.project_service.load_recent_projects", return_value=[])
-        recent.start()
-        try:
-            window = MainWindow()
-            window._project_summary = type("S", (), {"project_root": self.project, "is_writable": True})()
-            with patch("doc_tool.ui.main_window.QMessageBox", _Box), patch(
-                "doc_tool.ui.main_window.QFileDialog.getExistingDirectory",
-                return_value=str(self.work / "第三目录"),
-            ), patch("doc_tool.application.project_export.run_project_export", _fake_export):
-                window._present_export_report(report, allow_retry=False)
-            window.close()
-        finally:
-            recent.stop()
-
+        captured, _buffers = self._drive_change_directory(
+            SOURCE_MODE_SAVED, destination=str(self.work / "第三目录")
+        )
         self.assertTrue(captured)
-        self.assertIsNone(captured["kwargs"].get("buffer_texts"), "已保存来源不应注入编辑器缓冲")
-
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+        self.assertEqual(
+            captured["kwargs"].get("buffer_texts"), {},
+            "已保存来源不应注入编辑器缓冲内容",
+        )
+        self.assertEqual(captured["source_mode"], SOURCE_MODE_SAVED)

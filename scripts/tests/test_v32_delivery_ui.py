@@ -179,6 +179,9 @@ class DeliveryEntryUiTests(unittest.TestCase):
 
         _Box.ButtonRole = QMessageBox.ButtonRole
         self.window._start_task = _fake_start
+        # UI 包 4.1 入口先询问「新建批次 / 打开已有计划」；这里明确选择打开已有计划，
+        # 后续的预览对话框与确认语义保持与旧入口一致。
+        self.window._ask_delivery_mode = lambda: "open"
         with patch("doc_tool.ui.main_window.QFileDialog.getOpenFileName",
                    return_value=(str(self.plan_path), "")), patch(
             "doc_tool.ui.main_window.QMessageBox", _Box
