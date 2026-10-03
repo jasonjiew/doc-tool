@@ -1,6 +1,6 @@
 # V3 / CORE 最终交接报告
 
-生成时间：2026-10-03T02:58:08Z（UTC）
+生成时间：2026-10-03T05:28:58Z（UTC）
 生成方式：`python scripts\release\report_final_handover.py`（数字取自 tasks.md 与最新 JUnit，不手写）
 
 ## 1. 结论摘要

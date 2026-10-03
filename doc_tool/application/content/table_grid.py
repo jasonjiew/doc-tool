@@ -397,6 +397,22 @@ def preview_rows(rows: Sequence[Sequence[str]], *, limit: int = PREVIEW_ROW_LIMI
     return shown, total > len(shown), total
 
 
+def preview_page(
+    rows: Sequence[Sequence[str]], *, page: int = 0, limit: int = PREVIEW_ROW_LIMIT
+) -> Tuple[List[List[str]], int, int, int]:
+    """返回 ``(当页行, 页码, 总页数, 总行数)``；只影响预览，不改完整数据。
+
+    38-A 1.1：大表格（如 1000×20）需要翻页查看，插入时仍使用完整 ``rows``。
+    """
+    data = [list(row) for row in (rows or [])]
+    size = max(1, int(limit))
+    total = len(data)
+    pages = max(1, (total + size - 1) // size)
+    index = max(0, min(int(page), pages - 1))
+    start = index * size
+    return data[start:start + size], index, pages, total
+
+
 def table_at_line(text: str, line_idx: int, *, rel_path: str = "") -> TableParseResult:
     """按 1-based 行号嗅探并解析所在普通表格。"""
     from doc_tool.application.content.table_format import find_table_range_at_line

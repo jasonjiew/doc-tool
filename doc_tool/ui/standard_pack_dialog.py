@@ -428,6 +428,23 @@ class StandardPackDialog(QDialog):
         self._draft_dir = directory
         self._load_or_create_draft()
 
+    def _ask_include_body(self) -> bool:
+        """询问骨架是否包含业务正文；默认（含非交互场景）为「只含标题」。
+
+        对话框不可见时（离屏/非交互）不弹模态框，直接按推荐值「仅标题层级」，
+        既不会阻塞，也不会把业务正文悄悄装进规范包。
+        """
+        if not self.isVisible():
+            return False
+        answer = QMessageBox.question(
+            self,
+            "骨架内容",
+            "是否把所选章节的业务正文一并复制进规范包？\n\n"
+            "否（推荐）：只生成标题层级骨架，正文留在原项目。\n"
+            "是：复制正文副本，规范包里会包含来源项目的业务内容。",
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
     def _on_new_from_project(self) -> None:
         project_root = self._project_root or str(self._host_call("sp_project_root") or "")
         if not project_root or not Path(project_root).is_dir():
@@ -436,8 +453,11 @@ class StandardPackDialog(QDialog):
         directory = QFileDialog.getExistingDirectory(self, "选择草稿目录（可与项目不同）")
         if not directory:
             return
+        include_body = self._ask_include_body()
         try:
-            draft = authoring.draft_from_project(project_root, directory)
+            draft = authoring.draft_from_project(
+                project_root, directory, include_body=include_body,
+            )
         except Exception as exc:  # noqa: BLE001 - 来源不可读时保留原草稿
             self.set_status("从项目创建草稿失败：{0}".format(exc))
             return
@@ -446,7 +466,12 @@ class StandardPackDialog(QDialog):
         self.draft_dir_edit.setText(directory)
         self._fill_form(draft)
         self._refresh_file_listing()
-        self.set_status("已从项目创建草稿：{0}（源项目未修改）".format(directory))
+        self.set_status(
+            "已从项目创建草稿：{0}（源项目未修改；骨架模式：{1}）".format(
+                directory,
+                "含业务正文副本" if include_body else "仅标题层级",
+            )
+        )
 
     def _on_new_from_pack(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, "选择已有规范包目录")

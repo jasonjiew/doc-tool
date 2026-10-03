@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-10-03T12:36:58",
+  "chapters": 120,
+  "samples": 5,
+  "coldFullScanMs": [
+    170.2860000077635,
+    44.28319999715313,
+    41.36540001491085,
+    41.070899984333664,
+    44.4990000105463
+  ],
+  "hotIncrementalMs": [
+    38.28959999373183,
+    37.667500029783696,
+    38.928300025872886,
+    36.266200011596084,
+    38.729799969587475
+  ],
+  "coldIndexOnlyMs": [
+    46.76699999254197,
+    36.845099995844066,
+    36.341400002129376,
+    35.925199976190925,
+    40.427900035865605
+  ],
+  "hotIndexOnlyMs": [
+    38.709199987351894,
+    31.65869996882975,
+    30.099200026597828,
+    35.428799979854375,
+    29.321699985302985
+  ],
+  "singleChapterChangeMs": [
+    30.034099996555597,
+    32.28019998641685,
+    32.044899999164045,
+    31.45890001906082,
+    30.23659996688366
+  ],
+  "corruptedCacheRebuildMs": [
+    64.54540003323928,
+    39.271999965421855,
+    38.842500012833625,
+    44.36990001704544,
+    44.62010000133887
+  ],
+  "summary": {
+    "coldMedianMs": 44.28,
+    "hotMedianMs": 38.29,
+    "changeMedianMs": 31.46,
+    "corruptMedianMs": 44.37,
+    "speedupHotVsCold": 1.16,
+    "coldIndexOnlyMedianMs": 36.85,
+    "hotIndexOnlyMedianMs": 31.66,
+    "speedupIndexOnly": 1.16
+  },
+  "assertions": {
+    "issueCountCold": 0,
+    "issueCountHot": 0,
+    "issueCountCorrupt": 0,
+    "issueCountBaseline": 0,
+    "sameIssuesHotAsBaseline": true,
+    "sameIssuesCorruptAsCold": true,
+    "cacheCorrupted": true,
+    "lastRefreshStats": {
+      "parseCount": 1,
+      "reuseCount": 119,
+      "files": 120,
+      "captureId": "",
+      "captureFiles": 0,
+      "cache": {
+        "enabled": true,
+        "path": "C:\\Users\\18098\\AppData\\Local\\Temp\\main-d-perf-eu262l2n\\项目\\.state\\cache\\content-index-v1.json",
+        "entries": 120,
+        "hits": 1795,
+        "misses": 125,
+        "warnings": []
+      }
+    }
+  }
+}

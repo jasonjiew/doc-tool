@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -97,9 +97,20 @@ class IssuesPanel(QWidget):
         self._tree.itemDoubleClicked.connect(self._activate)
         outer.addWidget(self._tree, 1)
 
+        state_row = QHBoxLayout()
+        state_row.setContentsMargins(0, 0, 0, 0)
         self._state = QLabel("无当前项目数据", self)
         self._state.setObjectName("statusMuted")
-        outer.addWidget(self._state)
+        state_row.addWidget(self._state, 1)
+        # 37-C 3.1：空/无结果状态就地给出下一步——清除筛选回到输入，
+        # 而不是让用户自己找哪个下拉框把结果筛没了。
+        self._clear_filters_btn = QPushButton("清除筛选", self)
+        self._clear_filters_btn.setProperty("btnRole", "compact")
+        self._clear_filters_btn.setToolTip("清空类型/严重度/文件与搜索关键词，恢复全部问题")
+        self._clear_filters_btn.clicked.connect(self.reset_filters)
+        self._clear_filters_btn.setVisible(False)
+        state_row.addWidget(self._clear_filters_btn)
+        outer.addLayout(state_row)
 
     def _new_filter(self, label: str, layout: QHBoxLayout, *, visible: bool = True) -> QComboBox:
         label_widget = QLabel(label, self)
@@ -178,6 +189,58 @@ class IssuesPanel(QWidget):
         self._reset_options(self._file, (i.rel_path for i in self._issues))
         self._render()
 
+    def view_state(self) -> Dict[str, str]:
+        """可还原的筛选状态（37-B 2.1：跳转返回后恢复原筛选与选中行）。"""
+        state = {
+            "type": self._selected(self._type),
+            "severity": self._selected(self._severity),
+            "file": self._selected(self._file),
+            "keyword": self._search_input.text() if hasattr(self, "_search_input") else "",
+        }
+        if self._show_document_type:
+            state["documentType"] = self._selected(self._document_type)
+        item = self._tree.currentItem() if hasattr(self, "_tree") else None
+        issue = item.data(0, Qt.ItemDataRole.UserRole) if item is not None else None
+        if isinstance(issue, IssueRecord):
+            state["selected"] = "{0}:{1}:{2}".format(
+                issue.rel_path, issue.line_no or 0, issue.issue_type,
+            )
+        return state
+
+    def restore_view_state(self, state: Dict[str, str]) -> None:
+        """恢复筛选与选中行；缺失/过期值退回默认，不抛异常。"""
+        if not state:
+            return
+        pairs = [
+            (self._type, state.get("type", "")),
+            (self._severity, state.get("severity", "")),
+            (self._file, state.get("file", "")),
+        ]
+        if self._show_document_type:
+            pairs.append((self._document_type, state.get("documentType", "")))
+        for combo, value in pairs:
+            combo.blockSignals(True)
+            index = combo.findData(value) if value else 0
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
+        if hasattr(self, "_search_input"):
+            self._search_input.blockSignals(True)
+            self._search_input.setText(state.get("keyword", ""))
+            self._search_input.blockSignals(False)
+        self._render()
+        wanted = state.get("selected", "")
+        if not wanted:
+            return
+        for index in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(index)
+            issue = item.data(0, Qt.ItemDataRole.UserRole)
+            if not isinstance(issue, IssueRecord):
+                continue
+            key = "{0}:{1}:{2}".format(issue.rel_path, issue.line_no or 0, issue.issue_type)
+            if key == wanted:
+                self._tree.setCurrentItem(item)
+                break
+
     def filtered_issues(self) -> List[IssueRecord]:
         kw = self._search_input.text().strip() if hasattr(self, "_search_input") else ""
         return filter_issues(
@@ -213,16 +276,31 @@ class IssuesPanel(QWidget):
             message_col = 5 if self._show_document_type else 4
             item.setToolTip(message_col, issue.suggested_action)
             self._tree.addTopLevelItem(item)
+        filters_active = self._filters_active()
         if not self._has_project:
-            self._state.setText("无当前项目数据")
+            self._state.setText("无当前项目数据：打开或导入项目后这里会列出问题")
         elif self._issues and not visible:
-            self._state.setText("无匹配结果")
+            self._state.setText(
+                "无匹配结果：当前筛选条件下没有命中，可清除筛选或修改关键词"
+                if filters_active else "无匹配结果"
+            )
         elif not self._issues:
-            self._state.setText("当前项目未发现问题")
+            self._state.setText("当前项目未发现问题，可继续编辑或运行检查")
         else:
             latest = max((i.generated_at for i in visible), default="")
             sources = "、".join(sorted(set(i.source for i in visible)))
             self._state.setText("共 {0} 项 · 来源 {1} · {2}".format(len(visible), sources, latest))
+        if hasattr(self, "_clear_filters_btn"):
+            self._clear_filters_btn.setVisible(bool(filters_active and self._issues and not visible))
+
+    def _filters_active(self) -> bool:
+        """当前是否有生效的筛选条件（决定「清除筛选」是否作为下一步动作出现）。"""
+        combos = [self._type, self._severity, self._file]
+        if self._show_document_type:
+            combos.append(self._document_type)
+        if any(self._selected(combo) for combo in combos):
+            return True
+        return bool(getattr(self, "_search_input", None) and self._search_input.text().strip())
 
     def _activate(self, item: QTreeWidgetItem, _column: int = 0) -> None:
         issue = item.data(0, Qt.ItemDataRole.UserRole) if item else None

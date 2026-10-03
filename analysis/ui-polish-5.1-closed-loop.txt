@@ -9,5 +9,5 @@
 强制弹窗数：0（结果以非模态成果页呈现）
 普通导入源已选后主要提交：1 次（首页拖放/导入入口）
 快速 Word 生成后打开主要操作：1 次（成果页「打开」）
-来源标识：captureId=20261003T031113-b4c1bf9c / sourceMode=current-buffer
-实际产物：D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-32840-1\proj\output\proj.docx
+来源标识：captureId=20261003T054526-69b9650d / sourceMode=current-buffer
+实际产物：D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-loop-case-43852-1\proj\output\proj.docx

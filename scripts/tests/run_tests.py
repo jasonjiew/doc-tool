@@ -114,6 +114,7 @@ DEFAULT_TESTS = [
     "test_ui_polish_results.py",
     "test_ui_polish_advanced.py",
     "test_ui_polish_acceptance.py",
+    "test_code_review_regressions.py",
 ]
 
 

@@ -1236,6 +1236,10 @@ def make_table_from_md(
             edge.set(qn("type"), "dxa")
 
     header_rows = {int(value) for value in extra.get("hdr", "").split(",") if value.isdigit()}
+    if len(rows) > 1:
+        # Markdown 管道表首行即表头：长表跨页时由 Word 自动重复表头
+        # （MAIN-E 5.2 长表表头）。只影响表格首行的 trPr，不改任何单元格内容。
+        header_rows.add(0)
     no_split_rows = {int(value) for value in extra.get("cs", "").split(",") if value.isdigit()}
     tc_margin_values = extra.get("tcm", "").split(",") if extra.get("tcm") else None
     vertical_align = extra.get("va")

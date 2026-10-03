@@ -516,6 +516,8 @@ class TablePasteDialog(QDialog):
         self.setMinimumSize(640, 460)
         self._result = result
         self.mode = ""
+        #: 38-A 1.1：预览页码（只影响预览；插入始终使用完整数据）。
+        self._page = 0
         self._build_ui()
         self._load(result)
 
@@ -545,10 +547,22 @@ class TablePasteDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self.table, 2)
 
+        pager = QHBoxLayout()
+        self.prev_btn = QPushButton("上一页")
+        self.prev_btn.setProperty("btnRole", "compact")
+        self.prev_btn.setToolTip("查看上一页预览（不影响插入的完整行数）")
+        self.prev_btn.clicked.connect(lambda: self._turn_page(-1))
+        pager.addWidget(self.prev_btn)
         self.page_label = QLabel("")
         self.page_label.setObjectName("tablePastePageLabel")
         self.page_label.setWordWrap(True)
-        layout.addWidget(self.page_label)
+        pager.addWidget(self.page_label, 1)
+        self.next_btn = QPushButton("下一页")
+        self.next_btn.setProperty("btnRole", "compact")
+        self.next_btn.setToolTip("查看下一页预览（不影响插入的完整行数）")
+        self.next_btn.clicked.connect(lambda: self._turn_page(1))
+        pager.addWidget(self.next_btn)
+        layout.addLayout(pager)
 
         self.warning_text = QPlainTextEdit()
         self.warning_text.setReadOnly(True)
@@ -581,11 +595,17 @@ class TablePasteDialog(QDialog):
             self.hint.setText("{0}；可用“插入原文”或直接 Ctrl+V 保留内容。".format(result.error))
         self._refresh_preview()
 
+    def _turn_page(self, delta: int) -> None:
+        """翻页只改预览窗口，不动 ``self._result`` 里的完整表格数据。"""
+        self._page = max(0, self._page + int(delta))
+        self._refresh_preview()
+
     def _refresh_preview(self) -> None:
         result = self._result
         rows = [list(row) for row in (result.rows or [])]
         has_header = bool(self.header_check.isChecked())
-        shown, truncated, total = grid.preview_rows(rows)
+        shown, page, pages, total = grid.preview_page(rows, page=self._page)
+        self._page = page
         columns = max((len(row) for row in rows), default=0)
         self.table.setRowCount(len(shown))
         self.table.setColumnCount(max(1, columns))
@@ -593,15 +613,21 @@ class TablePasteDialog(QDialog):
             for column in range(columns):
                 value = row[column] if column < len(row) else ""
                 item = QTableWidgetItem(value)
-                if has_header and row_index == 0:
+                # 只有第一页的第一行是真实表头；翻页后的首行是高亮定位用的普通行。
+                if has_header and page == 0 and row_index == 0:
                     font = item.font()
                     font.setBold(True)
                     item.setFont(font)
                 self.table.setItem(row_index, column, item)
+        start = page * grid.PREVIEW_ROW_LIMIT + 1
+        end = start + len(shown) - 1 if shown else 0
         self.page_label.setText(
-            "预览显示前 {0} 行 / 共 {1} 行（应用后完整插入，不截断）".format(len(shown), total)
-            if truncated else "共 {0} 行，已全部显示".format(total)
+            "第 {0}/{1} 页 · 显示第 {2}-{3} 行 / 共 {4} 行（应用后完整插入，不截断）".format(
+                page + 1, pages, start, end, total
+            )
         )
+        self.prev_btn.setEnabled(page > 0)
+        self.next_btn.setEnabled(page + 1 < pages)
         if not self.hint.text():
             self.hint.setText("数值、日期与 =公式 都按文本保留；引号内换行转为 {0}。".format(grid.MULTILINE_MARKER))
 

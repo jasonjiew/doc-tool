@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 #: 会话内最多保留的位置数。
 MAX_HISTORY = 50
@@ -26,13 +26,21 @@ MERGE_CURSOR_TOLERANCE = 3
 
 @dataclass
 class NavLocation:
-    """一个可还原的位置。"""
+    """一个可还原的位置（含来源页面/筛选/选中行）。
+
+    37-B 2.1：从问题或研发视图跳转后返回，除了章节与光标，还要回到原来的
+    页面、筛选条件与选中行，否则用户会被丢回一个「干净」的界面而失去上下文。
+    """
 
     rel_path: str
     cursor: int = 0
     scroll: int = 0
     source: str = ""
     project_root: str = ""
+    #: 来源页面标识（如 ``issues`` / ``rd`` / ``editor``）。
+    panel: str = ""
+    #: 页面级可还原状态（筛选值、选中行键等，纯文本键值，便于比较与测试）。
+    view: Dict[str, str] = field(default_factory=dict)
 
     def same_place(self, other: "NavLocation") -> bool:
         return (
@@ -167,6 +175,8 @@ class NavigationHistory:
             scroll=location.scroll,
             source=location.source,
             project_root=location.project_root,
+            panel=location.panel,
+            view=dict(location.view or {}),
         )
 
     def back(self) -> Optional[Tuple[NavLocation, str]]:

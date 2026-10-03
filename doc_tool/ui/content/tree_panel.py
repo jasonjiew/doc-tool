@@ -271,6 +271,7 @@ class ChapterTree(QWidget):
         on_create_file: Optional[Callable[[str], None]] = None,
         on_delete_file: Optional[Callable[[str], None]] = None,
         on_rename_file: Optional[Callable[[str], None]] = None,
+        on_copy_file: Optional[Callable[[str], None]] = None,
         on_renumber_dir: Optional[Callable[[str], None]] = None,
         on_move_node: Optional[Callable[[str, str, Optional[str]], bool]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
@@ -287,6 +288,7 @@ class ChapterTree(QWidget):
         self._on_create_file = on_create_file
         self._on_delete_file = on_delete_file
         self._on_rename_file = on_rename_file
+        self._on_copy_file = on_copy_file
         self._on_renumber_dir = on_renumber_dir
         self._on_move_node = on_move_node
         self._on_clear_markers = on_clear_markers
@@ -488,6 +490,28 @@ class ChapterTree(QWidget):
         rel_path = self._model.data(index, Qt.ItemDataRole.UserRole)
         return rel_path if rel_path else None
 
+    def selected_files(self) -> List[str]:
+        """当前多选的文件节点（MAIN-B 2.1「所选章」范围）。
+
+        只返回真实文件节点，按树中顺序去重；目录节点与未选中的文件不包含。
+        无多选时返回当前项的单个文件，便于范围下拉复用同一入口。
+        """
+        index = self._tree.currentIndex()
+        if not index.isValid():
+            return []
+        try:
+            indexes = list(self._tree.selectionModel().selectedIndexes())
+        except Exception:  # noqa: BLE001 - 无选择模型时退回当前项
+            indexes = [index]
+        if index not in indexes:
+            indexes.append(index)
+        files: List[str] = []
+        for item in indexes:
+            rel_path = self._model.data(item, Qt.ItemDataRole.UserRole)
+            if rel_path and rel_path not in files:
+                files.append(rel_path)
+        return files
+
     def _on_current_changed(self, current: QModelIndex, _previous: QModelIndex) -> None:
         if not current.isValid() or self._on_open is None:
             return
@@ -589,6 +613,13 @@ class ChapterTree(QWidget):
                     and self._on_rename_file(rel_path)
                 )
                 menu.addAction(rename_action)
+                # MAIN-B 2.3：复制章节（新文件 + 新条目身份，原章不变）
+                copy_action = QAction("复制章节…", menu)
+                copy_action.triggered.connect(
+                    lambda: self._on_copy_file
+                    and self._on_copy_file(rel_path)
+                )
+                menu.addAction(copy_action)
                 delete_action = QAction("删除", menu)
                 delete_action.triggered.connect(
                     lambda: self._on_delete_file

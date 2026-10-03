@@ -19,6 +19,8 @@ from doc_tool.application.project_from_markdown import (  # noqa: E402
     describe_entry_point,
 )
 from doc_tool.application.standard_pack import STANDARDS_DIR, load_project_pack  # noqa: E402
+from doc_tool.application.content.index import ContentIndexService  # noqa: E402
+from doc_tool.application.content.references import ReferenceScanner  # noqa: E402
 from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
 
 NL = chr(10)
@@ -90,8 +92,9 @@ class MarkdownProjectTests(unittest.TestCase):
             [self.sources / "1 概述.md"], self.project, asset_roots=[self.assets]
         )
         self.assertTrue(result.ok, result.errors)
-        self.assertTrue((self.project / "assets" / "fig-1.png").is_file())
-        self.assertTrue((self.project / "assets" / "sub" / "t.csv").is_file())
+        # MAIN-A 1.3：资源根目录与 assets_dir()/扫描/粘贴写入一致（assets/<类型>/）。
+        self.assertTrue((self.project / "assets" / "general" / "fig-1.png").is_file())
+        self.assertTrue((self.project / "assets" / "general" / "sub" / "t.csv").is_file())
         self.assertIn("fig-1.png", result.copied_resources)
 
     def test_template_optional_with_warning(self):
@@ -162,6 +165,139 @@ class MarkdownProjectTests(unittest.TestCase):
         self.assertIn("instantTemplateFill", text)
         self.assertIn("不建项目", text["instantTemplateFill"])
         self.assertIn("从规范包起步", text["fromPack"])
+
+
+    # --- MAIN-A 1.3 多来源资源身份与引用映射 ---
+
+    def _png(self, path, marker):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32 + marker)
+
+    def test_same_name_in_different_dirs_both_kept(self):
+        """a/logo.png 与 b/logo.png 各自保留，不按 basename 丢弃后到者。"""
+        source = self.sources / "1 概述.md"
+        source.write_text(
+            "# 概述" + NL + NL + "![](a/logo.png)" + NL + NL + "![](b/logo.png)" + NL,
+            encoding="utf-8",
+        )
+        self._png(self.assets / "a" / "logo.png", b"A")
+        self._png(self.assets / "b" / "logo.png", b"B")
+        result = create_project_from_markdown([source], self.project, asset_roots=[self.assets])
+        self.assertTrue(result.ok, result.errors)
+        asset_root = self.project / "assets" / "general"
+        self.assertTrue((asset_root / "a" / "logo.png").is_file())
+        self.assertTrue((asset_root / "b" / "logo.png").is_file())
+        self.assertNotEqual(
+            (asset_root / "a" / "logo.png").read_bytes(),
+            (asset_root / "b" / "logo.png").read_bytes(),
+        )
+        self.assertFalse(
+            [item for item in result.warnings if "同名资源已存在" in item],
+            "同名不同目录资源不应再被判为重名丢弃",
+        )
+
+    def test_two_sources_image_png_not_crossed(self):
+        """两个来源各自的 image.png 保留为不同文件，只有冲突章节的引用被改写。"""
+        first = self.sources / "1 概述.md"
+        first.write_text("# 概述" + NL + NL + "![](image.png)" + NL, encoding="utf-8")
+        other = self.tmp / "other-src"
+        other.mkdir()
+        second = other / "2 设计.md"
+        second.write_text("# 设计" + NL + NL + "![](image.png)" + NL, encoding="utf-8")
+        self._png(self.sources / "image.png", b"FIRST")
+        self._png(other / "image.png", b"SECOND")
+
+        result = create_project_from_markdown(
+            [first, second], self.project, asset_roots=[self.sources, other]
+        )
+        self.assertTrue(result.ok, result.errors)
+        asset_root = self.project / "assets" / "general"
+        marker = len(b"\x89PNG\r\n\x1a\n") + 32
+        self.assertEqual((asset_root / "image.png").read_bytes()[marker:], b"FIRST")
+        self.assertEqual((asset_root / "image-2.png").read_bytes()[marker:], b"SECOND")
+        first_text = (self.project / "content" / "1 概述.md").read_text(encoding="utf-8")
+        second_text = (self.project / "content" / "2 设计.md").read_text(encoding="utf-8")
+        self.assertIn("![](image.png)", first_text)
+        self.assertIn("![](image-2.png)", second_text)
+        # 原来源文件不被改写
+        self.assertIn("![](image.png)", first.read_text(encoding="utf-8"))
+        self.assertIn("![](image.png)", second.read_text(encoding="utf-8"))
+
+    def test_identical_resource_content_reused(self):
+        """同内容资源只保留一份，两个章节共用同一路径。"""
+        first = self.sources / "1 概述.md"
+        first.write_text("# 概述" + NL + NL + "![](pic.png)" + NL, encoding="utf-8")
+        other = self.tmp / "dup-src"
+        other.mkdir()
+        second = other / "2 设计.md"
+        second.write_text("# 设计" + NL + NL + "![](pic.png)" + NL, encoding="utf-8")
+        self._png(self.sources / "pic.png", b"SAME")
+        self._png(other / "pic.png", b"SAME")
+        result = create_project_from_markdown(
+            [first, second], self.project, asset_roots=[self.sources, other]
+        )
+        self.assertTrue(result.ok, result.errors)
+        asset_root = self.project / "assets" / "general"
+        self.assertEqual(sorted(path.name for path in asset_root.glob("*.png")), ["pic.png"])
+        for name in ("1 概述.md", "2 设计.md"):
+            self.assertIn(
+                "![](pic.png)",
+                (self.project / "content" / name).read_text(encoding="utf-8"),
+            )
+
+    def test_referenced_resource_copied_without_explicit_asset_root(self):
+        """未显式指定资源目录时，来源同级目录里被引用的资源仍会带入项目。"""
+        source = self.sources / "1 概述.md"
+        source.write_text("# 概述" + NL + NL + "![](images/a.png)" + NL, encoding="utf-8")
+        self._png(self.sources / "images" / "a.png", b"ONLY")
+        result = create_project_from_markdown([source], self.project)
+        self.assertTrue(result.ok, result.errors)
+        self.assertTrue((self.project / "assets" / "general" / "images" / "a.png").is_file())
+        index = ContentIndexService(self.project / "content").build()
+        ReferenceScanner(index, assets_root=self.project / "assets").scan_all()
+        dangling = [
+            ref.target
+            for refs in index.references.values()
+            for ref in refs
+            if ref.kind == "image" and ref.dangling
+        ]
+        self.assertEqual(dangling, [])
+
+    def test_chapter_links_are_not_copied_as_resources(self):
+        """章节之间的 .md 链接不进入资源目录，只处理真实资源。"""
+        first = self.sources / "1 概述.md"
+        first.write_text("# 概述" + NL + NL + "见[设计](2 设计.md)" + NL, encoding="utf-8")
+        second = self.sources / "2 设计.md"
+        second.write_text("# 设计" + NL, encoding="utf-8")
+        result = create_project_from_markdown(
+            [first, second], self.project, asset_roots=[self.sources]
+        )
+        self.assertTrue(result.ok, result.errors)
+        asset_root = self.project / "assets" / "general"
+        self.assertFalse((asset_root / "2 设计.md").exists())
+        self.assertFalse((asset_root / "1 概述.md").exists())
+
+    def test_project_copy_offline_keeps_resources_readable(self):
+        """项目副本离开来源目录后，合法资源仍可读（清单不写来源目录）。"""
+        source = self.sources / "1 概述.md"
+        source.write_text("# 概述" + NL + NL + "![](a/logo.png)" + NL, encoding="utf-8")
+        self._png(self.assets / "a" / "logo.png", b"COPY")
+        result = create_project_from_markdown([source], self.project, asset_roots=[self.assets])
+        self.assertTrue(result.ok, result.errors)
+        moved = self.tmp / "moved-project"
+        shutil.copytree(self.project, moved)
+        shutil.rmtree(self.sources)
+        shutil.rmtree(self.assets)
+        index = ContentIndexService(moved / "content").build()
+        ReferenceScanner(index, assets_root=moved / "assets").scan_all()
+        dangling = [
+            ref.target
+            for refs in index.references.values()
+            for ref in refs
+            if ref.kind == "image" and ref.dangling
+        ]
+        self.assertEqual(dangling, [])
+        self.assertNotIn(str(self.tmp), (moved / "project.yml").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

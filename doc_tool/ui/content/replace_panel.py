@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -42,6 +42,16 @@ _TYPE_FILTERS = (
     ("需求文档（旧版专用）", "requirement"),
     ("详细设计文档（旧版专用）", "design"),
     ("通用大文档", "general"),
+)
+
+#: MAIN-B 2.1 替换范围：范围是用户显式动作，默认整份文档（与既有行为一致）。
+SCOPE_DOCUMENT = "document"
+SCOPE_CURRENT = "current"
+SCOPE_SELECTED = "selected"
+_SCOPE_LABELS = (
+    ("整份文档", SCOPE_DOCUMENT),
+    ("当前章", SCOPE_CURRENT),
+    ("所选章", SCOPE_SELECTED),
 )
 
 
@@ -86,6 +96,9 @@ class ReplacePanel(QWidget):
         on_applied: Optional[Callable[[], None]] = None,
         writable: bool = True,
         show_type_filter: bool = True,
+        scope_provider: Optional[Callable[[], Tuple[str, Optional[str], List[str]]]] = None,
+        live_text_provider: Optional[Callable[[str], Optional[str]]] = None,
+        buffer_applier: Optional[Callable[[str, str], bool]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -93,6 +106,16 @@ class ReplacePanel(QWidget):
         self._writer = writer
         self._on_applied = on_applied
         self._writable = writable
+        # MAIN-B 2.1：范围与活缓冲接入。
+        # - ``scope_provider`` 返回 (范围种类, 当前章, 所选章)；
+        # - ``live_text_provider`` 返回某章未保存的缓冲正文（None 表示无缓冲）；
+        # - ``buffer_applier`` 把替换结果写回活缓冲（失败时保留磁盘与缓冲）。
+        self._scope_provider = scope_provider
+        self._live_text_provider = live_text_provider
+        self._buffer_applier = buffer_applier
+        self._scope_paths: Optional[List[str]] = None
+        self._text_overrides: Dict[str, str] = {}
+        self._scope_note = "整份文档"
         # 通用单项目不展示需求/设计类型筛选；仅旧版多类型布局保留兼容过滤。
         self._show_type_filter = show_type_filter
         self._matches: List[ReplaceMatch] = []
@@ -142,6 +165,14 @@ class ReplacePanel(QWidget):
         row2.addWidget(self._regex_cb)
         row2.addWidget(self._case_cb)
         row2.addWidget(self._word_cb)
+        row2.addWidget(QLabel("范围：", inputs))
+        self._scope_box = QComboBox(inputs)
+        for label, value in _SCOPE_LABELS:
+            self._scope_box.addItem(label, value)
+        self._scope_box.setToolTip(
+            "查找替换范围；当前章/所选章包含未保存正文，替换落在编辑缓冲（可撤销）"
+        )
+        row2.addWidget(self._scope_box)
         self._type_box = QComboBox(inputs)
         self._type_box.addItems([label for label, _ in _TYPE_FILTERS])
         self._type_box.setVisible(self._show_type_filter)
@@ -225,18 +256,72 @@ class ReplacePanel(QWidget):
         self._writable = writable
         self._update_action_state()
 
+    def _resolve_scope(self) -> Tuple[Optional[List[str]], Dict[str, str], str]:
+        """空的章节范围保持为空；整份范围也读取已打开的活缓冲。"""
+        kind = self._scope_box.currentData() if hasattr(self, "_scope_box") else SCOPE_DOCUMENT
+        current, selected = None, []
+        if self._scope_provider is not None and kind != SCOPE_DOCUMENT:
+            try:
+                _kind, current, selected = self._scope_provider()
+            except Exception as exc:
+                raise ValueError("无法读取章节范围：{0}".format(exc)) from exc
+        if kind == SCOPE_DOCUMENT:
+            scope_paths, paths, note = None, self._service.all_files(), "整份文档"
+        elif kind == SCOPE_CURRENT:
+            paths = [current] if current else []
+            scope_paths, note = paths, "当前章"
+        else:
+            paths = [item for item in (selected or []) if item]
+            scope_paths, note = paths, "所选章"
+        overrides = {}
+        if self._live_text_provider is not None:
+            for rel_path in paths:
+                try:
+                    text = self._live_text_provider(rel_path)
+                except Exception as exc:
+                    raise ValueError("无法读取编辑缓冲：{0}".format(exc)) from exc
+                if text is not None:
+                    overrides[rel_path] = text
+        return scope_paths, overrides, note
+
+    def _sync_live_overrides(self, paths) -> None:
+        """应用时重新读取活缓冲，避免查找后的编辑被旧快照覆盖。"""
+        if self._live_text_provider is None:
+            return
+        for rel_path in set(paths):
+            try:
+                text = self._live_text_provider(rel_path)
+            except Exception as exc:
+                raise ValueError("无法读取编辑缓冲，请重新查找：{0}".format(exc)) from exc
+            if text is None:
+                self._text_overrides.pop(rel_path, None)
+            else:
+                self._text_overrides[rel_path] = text
+
+    def _apply_buffer_replacement(self, rel_path: str, text: str) -> bool:
+        if self._buffer_applier is None or not self._buffer_applier(rel_path, text):
+            return False
+        self._text_overrides[rel_path] = text
+        return True
+
     def find_all(self) -> None:
         try:
+            scope_paths, overrides, note = self._resolve_scope()
             preview = self._service.build_preview(
                 self._find_entry.text().strip(),
                 regex=self._regex_cb.isChecked(),
                 case_sensitive=self._case_cb.isChecked(),
                 whole_word=self._word_cb.isChecked(),
                 document_types=self._selected_types(),
+                scope_paths=scope_paths,
+                text_overrides=overrides,
             )
         except ValueError as exc:
             self._set_status("查询无效：{0}".format(exc))
             return
+        self._scope_paths = scope_paths
+        self._text_overrides = overrides
+        self._scope_note = note
         self._preview = preview
         self._matches = list(preview.matches)
         # 重扫用本次成功的查询参数：用户随后修改查找框（含改成非法正则）
@@ -254,12 +339,13 @@ class ReplacePanel(QWidget):
         self._rollback_armed = True
         self._replaced_files = set()
         self._render_matches()
+        buffer_note = "，含未保存正文" if overrides else ""
         if preview.total == 0:
-            self._set_status("无匹配")
+            self._set_status("无匹配（范围：{0}）".format(note + buffer_note))
         else:
             self._set_status(
-                "共 {0} 处（{1} 个文件），逐项确认后写回".format(
-                    preview.total, preview.file_count
+                "共 {0} 处（{1} 个文件），范围：{2}，逐项确认后写回".format(
+                    preview.total, preview.file_count, note + buffer_note
                 )
             )
 
@@ -268,8 +354,11 @@ class ReplacePanel(QWidget):
         if match is None:
             return
         try:
+            self._sync_live_overrides([match.rel_path])
             results = self._service.apply_matches(
-                [match], self._replace_entry.text(), self._writer
+                [match], self._replace_entry.text(), self._writer,
+                text_overrides=self._text_overrides,
+                buffer_applier=self._apply_buffer_replacement,
             )
         except (OSError, ValueError, KeyError, IndexError, UnicodeError) as exc:
             # 写回中途异常（如文件在预览后被外部改动）：清空命中要求重新
@@ -289,7 +378,13 @@ class ReplacePanel(QWidget):
             self._update_action_state()
             return
         self._matches.remove(match)
-        self._replaced_files.add(match.rel_path)
+        # 落在活缓冲的替换不进改动清单：它的恢复走编辑器撤销栈，
+        # 记进 _replaced_files 只会让「回滚本次替换」找不到条目而误报。
+        if any(
+            getattr(r, "written", False) and getattr(r, "backup_path", None)
+            for r in results
+        ):
+            self._replaced_files.add(match.rel_path)
         # 先触发上层写后联动（索引同步刷新），再重扫受影响文件：逐项替换后
         # 同一文件其余命中仍基于旧内容的列偏移，直接复用会把后续替换写错位。
         self._after_applied(results)
@@ -328,8 +423,11 @@ class ReplacePanel(QWidget):
         if confirmed != QMessageBox.StandardButton.Yes:
             return
         try:
+            self._sync_live_overrides(m.rel_path for m in self._matches)
             results = self._service.apply_matches(
-                self._matches, replacement, self._writer
+                self._matches, replacement, self._writer,
+                text_overrides=self._text_overrides,
+                buffer_applier=self._apply_buffer_replacement,
             )
         except (OSError, ValueError, KeyError, IndexError, UnicodeError) as exc:
             # 批量写回中途异常：失败文件保持未写状态，清空命中要求重新查找，
@@ -340,10 +438,13 @@ class ReplacePanel(QWidget):
             self._set_status("批量替换失败：文件已变化，请重新查找。{0}".format(exc))
             return
         self._replaced_files.update(
-            r.rel_path for r in results if getattr(r, "written", False)
+            r.rel_path for r in results
+            if getattr(r, "written", False) and getattr(r, "backup_path", None)
         )
         failed = [r for r in results if not getattr(r, "written", False)]
         if failed:
+            if any(getattr(r, "written", False) for r in results):
+                self._after_applied(results)
             errors = "；".join(
                 r.error for r in failed if getattr(r, "error", None)
             ) or "写回失败"
@@ -466,6 +567,12 @@ class ReplacePanel(QWidget):
         value = next((v for l, v in _TYPE_FILTERS if l == label), None)
         return [value] if value else None
 
+    def refresh_live_text(self, rel_path: str) -> None:
+        """编辑器缓冲变化后刷新该章命中（保持范围与缓冲口径一致）。"""
+        if not self._matches:
+            return
+        self._refresh_file_matches(rel_path)
+
     def _refresh_file_matches(self, rel_path: str) -> None:
         """用当前内容重扫已写回文件，替换该文件的陈旧命中。
 
@@ -482,12 +589,14 @@ class ReplacePanel(QWidget):
             self._word_cb.isChecked(),
         )
         try:
+            self._sync_live_overrides([rel_path])
             fresh = self._service.find_in_file(
                 rel_path,
                 query[0],
                 regex=query[1],
                 case_sensitive=query[2],
                 whole_word=query[3],
+                text_overrides=self._text_overrides,
             )
         except ValueError:
             # 查询参数已失效：保留该文件其余命中并提示重新查找，

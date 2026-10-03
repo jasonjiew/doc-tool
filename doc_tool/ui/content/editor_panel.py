@@ -11,6 +11,9 @@ from __future__ import annotations
 import os
 import re
 import time
+
+#: 围栏代码块起始行（三个反引号或三个波浪线开头）：标题/列表工具据此跳过代码。
+_FENCE_LINE_RE = re.compile(r"^(?:\x60{3,}|~{3,})")
 from typing import Callable, List, Optional
 
 from dataclasses import dataclass
@@ -1345,8 +1348,34 @@ class EditorPanel(QWidget):
         cursor.endEditBlock()
         editor.setTextCursor(cursor)
 
+    def _code_fence_lines(self, start_block, end_block) -> set:
+        """返回选区里落在围栏代码块内的块号（MAIN-B 2.2）。
+
+        代码围栏内的行不是 Markdown 结构，给它们加标题/列表/引用前缀会直接改写
+        代码内容。这里按三个反引号 / 三个波浪线成对标记算出「属于代码」的块号，
+        供标题与列表工具跳过；围栏行本身也跳过，避免把围栏改成 ``- \x60\x60\x60``。
+        """
+        protected: set = set()
+        in_code = False
+        block = start_block
+        while block is not None:
+            is_fence = bool(_FENCE_LINE_RE.match(block.text().lstrip()))
+            if is_fence:
+                in_code = not in_code
+                protected.add(block.blockNumber())
+            elif in_code:
+                protected.add(block.blockNumber())
+            if block == end_block:
+                break
+            block = block.next()
+        return protected
+
     def _prefix_lines(self, prefix: str) -> None:
-        """给选区覆盖的每一行（无选区则当前行）行首加前缀。"""
+        """给选区覆盖的每一行（无选区则当前行）行首加前缀。
+
+        保留空值：空白行不加列表/引用前缀（避免把段落间距变成空列表项）；
+        围栏代码块内的行与围栏行整体跳过，代码内容与缩进保持原样。
+        """
         if not self._writable:
             return
         editor = self._editor
@@ -1354,15 +1383,19 @@ class EditorPanel(QWidget):
         doc = editor.document()
         start_block = doc.findBlock(cursor.selectionStart())
         end_block = doc.findBlock(cursor.selectionEnd())
+        protected = self._code_fence_lines(start_block, end_block)
         cursor.beginEditBlock()
         block = start_block
-        while True:
-            block_cursor = QTextCursor(block)
-            block_cursor.insertText(prefix)
-            if block == end_block:
-                break
-            block = block.next()
-        cursor.endEditBlock()
+        try:
+            while True:
+                if block.blockNumber() not in protected and block.text().strip():
+                    block_cursor = QTextCursor(block)
+                    block_cursor.insertText(prefix)
+                if block == end_block:
+                    break
+                block = block.next()
+        finally:
+            cursor.endEditBlock()
 
     def _toolbar_heading(self) -> None:
         """兼容入口：默认按 H2 设置当前行标题（新入口见 :meth:`apply_heading_level`）。"""
@@ -1380,21 +1413,25 @@ class EditorPanel(QWidget):
         doc = self._editor.document()
         start_block = doc.findBlock(cursor.selectionStart())
         end_block = doc.findBlock(cursor.selectionEnd())
+        protected = self._code_fence_lines(start_block, end_block)
         block = start_block
-        while True:
-            block_cursor = QTextCursor(block)
-            block_cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
-            block_cursor.movePosition(
-                QTextCursor.MoveOperation.EndOfBlock,
-                QTextCursor.MoveMode.KeepAnchor,
-            )
-            text = block_cursor.selectedText()
-            body = re.sub(r"^#{1,6}\s*", "", text)
-            block_cursor.insertText(prefix + body)
-            if block == end_block:
-                break
-            block = block.next()
-        cursor.endEditBlock()
+        try:
+            while True:
+                if block.blockNumber() not in protected and block.text().strip():
+                    block_cursor = QTextCursor(block)
+                    block_cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+                    block_cursor.movePosition(
+                        QTextCursor.MoveOperation.EndOfBlock,
+                        QTextCursor.MoveMode.KeepAnchor,
+                    )
+                    text = block_cursor.selectedText()
+                    body = re.sub(r"^#{1,6}\s*", "", text)
+                    block_cursor.insertText(prefix + body)
+                if block == end_block:
+                    break
+                block = block.next()
+        finally:
+            cursor.endEditBlock()
         self._heading_btn.setText("H{0} ▾".format(level))
 
     def resizeEvent(self, event) -> None:  # noqa: N802
@@ -2107,6 +2144,34 @@ class EditorPanel(QWidget):
         """当前编辑器文本（供缓冲收集/出稿使用；不写盘、不清脏标记）。"""
         return self._editor.toPlainText()
 
+    def apply_buffer_text(self, text: str) -> bool:
+        """把整篇新文本替换进编辑缓冲（MAIN-B 2.1）。
+
+        用于「当前章/选章」查找替换：命中基于未保存缓冲，替换也落在缓冲，
+        一次动作进撤销栈（用户可 Ctrl+Z 恢复），不隐式保存该章。
+        返回 False 表示当前不可写或未打开任何章节，调用方应退回磁盘写回。
+        """
+        if not self._writable or self._rel_path is None:
+            return False
+        try:
+            from PySide6.QtGui import QTextCursor
+
+            cursor = self._editor.textCursor()
+            cursor.beginEditBlock()
+            try:
+                cursor.select(QTextCursor.SelectionType.Document)
+                cursor.insertText(str(text))
+            finally:
+                cursor.endEditBlock()
+            self._editor.setTextCursor(cursor)
+        except Exception:  # noqa: BLE001 - 缓冲写入失败由调用方退回磁盘写
+            return False
+        self._dirty = True
+        self._update_dirty()
+        self._preview_dirty = True
+        self._schedule_preview()
+        return True
+
     # --- 会话状态读写（供会话快照/恢复） ---
 
     def scroll_position(self) -> int:
@@ -2203,6 +2268,21 @@ class EditorPanel(QWidget):
         """停止待触发的草稿写入（标签关闭/清理时调用，防止对已销毁控件写入）。"""
         self._draft_timer.stop()
 
+    def stop_pending_work(self) -> None:
+        """停止全部待触发的去抖任务（预览/拼写/Mermaid/草稿）。
+
+        MAIN-D 4.3：视图关闭或切章时，挂起的定时器不得在之后触发——否则旧正文
+        的预览/诊断会写进已经切走的页面，用户看到与当前章节不符的内容。
+        """
+        for name in ("_preview_timer", "_spell_timer", "_mermaid_timer", "_draft_timer"):
+            timer = getattr(self, name, None)
+            if timer is not None:
+                timer.stop()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt 命名约定
+        self.stop_pending_work()
+        super().closeEvent(event)
+
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.ensure_preview_rendered()
@@ -2220,6 +2300,7 @@ class EditorPanel(QWidget):
             self._update_highlights()
         self._preview_timer.stop()
         self._preview_timer.start(_PREVIEW_DEBOUNCE_MS)
+        # 切章/关闭时由 stop_pending_work() 统一停止，避免旧章节的预览落到新页面。
         # 拼写检查独立去抖（只扫可见行，控制大文档开销）。
         self._spell_timer.stop()
         self._spell_timer.start(_SPELL_DEBOUNCE_MS)

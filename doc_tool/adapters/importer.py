@@ -440,6 +440,7 @@ def extract_content(
         if tag == "p":
             st = _para_style(el)
             txt = _para_text(el)
+            raw_txt = _para_text_raw(el)
             lvl = _para_level(el, heading_style_map, offset=offset)
             has_img = _para_has_image(el)
 
@@ -460,7 +461,9 @@ def extract_content(
                         el, rel_map, media_files, images_dir,
                         img_counter, img_map, cur_chapter, document_type, cur_lines,
                     )
-                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
+                _emit_unsupported(
+                    el, txt, cur_chapter, element_index, cur_lines, unsupported_map, 1,
+                )
                 continue
             if cur_file is None:
                 pre_title_objects = _unsupported_features(el)
@@ -488,14 +491,17 @@ def extract_content(
             elif has_img:
                 # 同一段落同时含文本和图片时，至少保留全部业务文本；图片仍按
                 # 源段落中的关系顺序紧随其后，禁止因 ``elif`` 静默丢掉文本。
+                para_line = len(cur_lines) + 1
                 if txt:
-                    _emit_paragraph(el, txt, cur_lines)
+                    _emit_paragraph(el, txt, cur_lines, raw_txt)
                     cur_lines.append("")
                 img_counter, img_map = _emit_images(
                     el, rel_map, media_files, images_dir,
                     img_counter, img_map, cur_chapter, document_type, cur_lines,
                 )
-                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
+                _emit_unsupported(
+                    el, txt, cur_chapter, element_index, cur_lines, unsupported_map, para_line,
+                )
             elif txt == "":
                 if cur_lines and cur_lines[-1] != "<EMPTY_PAR/>":
                     cur_lines.append("<EMPTY_PAR/>")
@@ -503,9 +509,12 @@ def extract_content(
                 # 这里同样记录事实并在需要时插入可见占位（CORE 3.2）。
                 _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
             else:
-                _emit_paragraph(el, txt, cur_lines)
+                para_line = len(cur_lines) + 1
+                _emit_paragraph(el, txt, cur_lines, raw_txt)
                 cur_lines.append("")
-                _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
+                _emit_unsupported(
+                    el, txt, cur_chapter, element_index, cur_lines, unsupported_map, para_line,
+                )
         elif tag == "tbl":
             if cur_file is None:
                 cur_chapter = pre_title_chapter or "正文"
@@ -572,6 +581,16 @@ def _para_style(p) -> Optional[str]:
 
 
 def _para_text(p) -> str:
+    return _para_text_raw(p).strip()
+
+
+def _para_text_raw(p) -> str:
+    """段落原始文本（保留前导缩进/制表符）：代码与预格式文本的身份信息。
+
+    ``_para_text`` 仍返回 strip 后的文本，供标题判定、空段落判定与样式识别使用；
+    正文落盘时用本函数的「仅去掉行尾空白」版本，避免把代码缩进当作噪声清掉
+    （MAIN-A 1.1：代码缩进与文字含义同属读回事实）。
+    """
     parts: List[str] = []
     for node in p.iter():
         tag = etree.QName(node).localname
@@ -581,7 +600,7 @@ def _para_text(p) -> str:
             parts.append("\t")
         elif tag in ("br", "cr"):
             parts.append("\n")
-    return "".join(parts).strip()
+    return "".join(parts)
 
 
 def _para_has_image(p) -> bool:
@@ -650,6 +669,8 @@ def _emit_images(
     if not image_infos:
         return img_counter, img_map
     for info in image_infos:
+        # MAIN-A 1.2：记录图片/占位在章节里的落地行，结果页「定位」才能落到真实位置。
+        line_no = len(cur_lines) + 1
         relation = rel_map.get(info["rid"])
         if relation is None:
             # 关系缺失：正文保留可见占位，位置可定位（CORE 2.4/C 3.2）。
@@ -663,6 +684,8 @@ def _emit_images(
                 "missing": True,
                 "target": "",
                 "source_part": "word/document.xml",
+                "line": line_no,
+                "marker": _placeholder_marker("图片", info["rid"]),
             })
             cur_lines.append(_placeholder_marker("图片", info["rid"]))
             cur_lines.append("")
@@ -698,6 +721,8 @@ def _emit_images(
                     "missing": True,
                     "target": target,
                     "source_part": "word/document.xml",
+                    "line": line_no,
+                    "marker": _placeholder_marker("图片", target),
                 })
                 cur_lines.append(_placeholder_marker("图片", target))
                 cur_lines.append("")
@@ -722,6 +747,7 @@ def _emit_images(
             "source_index": img_counter,
             "width_px": w_px,
             "height_px": h_px,
+            "line": line_no,
         })
     return img_counter, img_map
 
@@ -748,7 +774,7 @@ def _unsupported_features(el) -> List[str]:
 
 
 def _emit_unsupported(
-    el, txt, cur_chapter, source_index, cur_lines, unsupported_map,
+    el, txt, cur_chapter, source_index, cur_lines, unsupported_map, text_line=None,
 ) -> None:
     """正文可见占位 + 事实记录（CORE 3.2）。
 
@@ -767,6 +793,8 @@ def _emit_unsupported(
         # 不能因为“同段还有别的文字”就宣称文本降级（复核发现）。
         degradable = feature in ("formula", "textbox")
         has_text = bool(paragraph_text and degradable)
+        # MAIN-A 1.2：文本降级记录正文行；占位记录即将写入的占位行。
+        line_no = (text_line or len(cur_lines)) if has_text else len(cur_lines) + 1
         unsupported_map.append({
             "feature": feature,
             "label": label,
@@ -776,6 +804,9 @@ def _emit_unsupported(
             "source_part": "word/document.xml",
             "handling": "text-degraded" if has_text else "placeholder",
             "has_text": has_text,
+            "line": line_no,
+            "text": str(txt or "").strip(),
+            "marker": "" if has_text else _placeholder_marker(label, sample),
         })
         if not has_text:
             cur_lines.append(_placeholder_marker(label, sample))
@@ -789,7 +820,12 @@ def _placeholder_marker(feature: str, source: str) -> str:
     return placeholder_text(feature, source)
 
 
-def _emit_paragraph(el, txt, cur_lines) -> None:
+def _emit_paragraph(el, txt, cur_lines, raw: Optional[str] = None) -> None:
+    """写入正文段落；``raw`` 给出未 strip 的原文，用于保留代码缩进。
+
+    ``txt`` 仍参与项目符号/编号识别与空段落判定；只有「确有前导空白」时才改用
+    ``raw``，普通段落行为完全不变（避免把偶然的尾随空格写进正文）。
+    """
     txt = re.sub(r"\r\n|\r|\n", "<br>", txt)
     numPr = el.find(_qn("pPr") + "/" + _qn("numPr"))
     is_bullet = numPr is not None or (
@@ -817,7 +853,12 @@ def _emit_paragraph(el, txt, cur_lines) -> None:
         pf = _para_fmt_marker(el)
         if pf:
             cur_lines.append(pf)
-        cur_lines.append(txt)
+        body = txt
+        if raw is not None and raw.strip():
+            candidate = re.sub(r"\r\n|\r|\n", "<br>", raw.rstrip())
+            if candidate.lstrip() != candidate:
+                body = candidate
+        cur_lines.append(body)
 
 
 def _para_fmt_marker(el) -> Optional[str]:
@@ -850,6 +891,7 @@ def qn_attr(tag: str) -> str:
 
 def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type, cur_lines):
     tbl_counter += 1
+    line_no = len(cur_lines) + 1
     if _table_is_simple(el):
         md = _table_to_md(el)
         if md:
@@ -890,6 +932,8 @@ def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type
                 "trh": trh,
                 "fmt": {k: v for k, v in fm.items() if v not in (None, [], "")},
                 "chapter": cur_chapter or "",
+                "line": line_no,
+                "marker": "<!-- TBL:",
             })
             return tbl_counter, tbl_map, cur_lines
 
@@ -904,8 +948,96 @@ def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type
         "kind": "xml",
         "file": document_type + "/tables/" + xml_name,
         "chapter": cur_chapter or "",
+        "line": line_no,
+        "marker": "<!-- TABLE:{0}:{1} -->".format(tbl_counter, xml_name),
     })
     return tbl_counter, tbl_map, cur_lines
+
+
+def locate_extraction_lines(extraction, content_dir: Union[str, Path]) -> int:
+    """拆分后把「章节内行号」细化为「真实章节文件 + 文件内行号」（MAIN-A 1.2）。
+
+    原因：``extract_content`` 按「一份大 Markdown」记录行号，``split_into_tree``
+    随后会把标题行与首尾空行剥离，并把内容分散到 ``第N章 .../`` 目录与
+    ``N.M 小节.md``。仅记顶层章节标题会让「定位正文」落到错误的文件或偏移
+    若干行的位置。
+
+    这里按内容锚点（占位标记 / 降级文本 / 表格标记）在拆分后的真实文件里回查，
+    命中则写入 ``rel_path`` 与 ``line``；回查不到时保留章节标题与原始行号，
+    不猜位置（宁可粗定位，也不指错行）。
+
+    返回成功细化的条目数。
+    """
+    base = Path(content_dir)
+    if not base.is_dir():
+        return 0
+    files: List[Tuple[str, List[str]]] = []
+    for path in sorted(base.rglob("*.md")):
+        # ``_index.md`` 是父章节正文本体，必须参与定位；只排除非正文的
+        # 修订记录等元数据文件。
+        if path.name == "_revision_record.md":
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").split("\n")
+        except (OSError, UnicodeError):
+            continue
+        files.append((path.relative_to(base).as_posix(), lines))
+    if not files:
+        return 0
+
+    located = 0
+    claimed: set = set()
+    for key in ("unsupported_map", "image_map", "table_map"):
+        for entry in getattr(extraction, key, ()) or ():
+            if not isinstance(entry, dict) or not entry.get("line"):
+                continue
+            anchor = str(entry.get("marker") or "")
+            if not anchor:
+                text = str(entry.get("text") or "")
+                anchor = text.split("\n")[0].strip()
+            if not anchor:
+                continue
+            chapter = str(entry.get("chapter") or "")
+            for rel_path, lines in _prefer_chapter_files(files, chapter):
+                used = {index for path, index in claimed if path == rel_path}
+                index = _find_anchor_line(lines, anchor, used)
+                if index is None:
+                    continue
+                claimed.add((rel_path, index))
+                entry["rel_path"] = rel_path
+                entry["line"] = index + 1
+                located += 1
+                break
+    return located
+
+
+def _prefer_chapter_files(files, chapter: str):
+    """章节标题匹配的文件优先，其余按原顺序兜底（同标题重复时不串）。"""
+    wanted = re.sub(r"\s+", "", str(chapter or ""))
+    if wanted:
+        preferred = [
+            item for item in files
+            if wanted in re.sub(r"\s+", "", item[0])
+        ]
+        if preferred:
+            return preferred + [item for item in files if item not in preferred]
+    return files
+
+
+def _find_anchor_line(lines, anchor: str, claimed: set):
+    """在文件行里定位锚点；跳过已被占用的行，返回 0 基行号或 None。
+
+    ``claimed`` 用 ``(rel_path, index)`` 记录已定位的行，保证同一段文字/同一
+    占位标记出现多次时逐条对应到不同行，而不是全部指向第一处。
+    """
+    fallback = None
+    for index, text in enumerate(lines):
+        if anchor in text:
+            if index not in claimed:
+                return index
+            if fallback is None:
+                fallback = index
+    return fallback
 
 
 def _table_is_simple(tbl) -> bool:

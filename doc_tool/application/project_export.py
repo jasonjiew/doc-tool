@@ -630,32 +630,44 @@ def run_project_export(
                         format=fmt, status=STATUS_CANCELLED, message="已取消，其它已完成格式保留",
                     ))
                 continue
-        if snapshot is None and (fmt != FORMAT_PDF or not docx_path):
-            result = _unavailable_original_result(fmt, previous)
-        elif fmt == FORMAT_DOCX:
-            result, new_docx_path = _run_docx(
-                snapshot, request, destination, report.outputName,
-                refresh=bool(request.refresh) and not skip_word_refresh,
-                cancel_token=cancel_token, progress=progress,
-                word_available=word_available,
-            )
-            docx_path = new_docx_path or docx_path
-        elif fmt == FORMAT_HTML:
-            result = _run_html(snapshot, destination, cancel_token=cancel_token, progress=progress)
-        elif fmt == FORMAT_PDF:
-            if prior is not None and not docx_path:
+        try:
+            if snapshot is None and (fmt != FORMAT_PDF or not docx_path):
                 result = _unavailable_original_result(fmt, previous)
-            else:
-                result = _run_pdf(
-                    docx_path, destination, report.outputName,
+            elif fmt == FORMAT_DOCX:
+                result, new_docx_path = _run_docx(
+                    snapshot, request, destination, report.outputName,
+                    refresh=bool(request.refresh) and not skip_word_refresh,
                     cancel_token=cancel_token, progress=progress,
+                    word_available=word_available,
                 )
-        elif fmt == FORMAT_SOURCE_ZIP:
-            result = _run_source_zip(snapshot, request, destination, report.outputName)
-        else:
+                docx_path = new_docx_path or docx_path
+            elif fmt == FORMAT_HTML:
+                result = _run_html(snapshot, destination, cancel_token=cancel_token, progress=progress)
+            elif fmt == FORMAT_PDF:
+                if prior is not None and not docx_path:
+                    result = _unavailable_original_result(fmt, previous)
+                else:
+                    result = _run_pdf(
+                        docx_path, destination, report.outputName,
+                        cancel_token=cancel_token, progress=progress,
+                    )
+            elif fmt == FORMAT_SOURCE_ZIP:
+                result = _run_source_zip(snapshot, request, destination, report.outputName)
+            else:
+                result = FormatResult(
+                    format=fmt, status=STATUS_SKIPPED, message="未知格式：{0}".format(fmt),
+                )
+        except Exception as exc:  # noqa: BLE001 - 单格式异常不得丢掉其它已完成成果
+            # MAIN-E 5.4：一个格式的实现异常（磁盘/编码/第三方库）之前会中断整轮，
+            # 已生成的 DOCX/HTML 结果连同报告一起丢失。这里转成该格式的失败结果，
+            # 其余格式继续生成，已有可读成果与真实状态都保留。
             result = FormatResult(
-                format=fmt, status=STATUS_SKIPPED, message="未知格式：{0}".format(fmt),
+                format=fmt, status=STATUS_FAILED, error_code="E9001",
+                message="该格式生成异常：{0}".format(exc),
+                warnings=[str(exc)],
             )
+            if fmt == FORMAT_DOCX:
+                docx_path = docx_path or (prior.docxPath if prior else "")
         if prior is not None and previous is not None and previous.usable and not result.usable and Path(previous.path).is_file():
             message = "本次补格式未完成：{0}；已有文件保留。".format(result.message or result.label())
             result = replace(

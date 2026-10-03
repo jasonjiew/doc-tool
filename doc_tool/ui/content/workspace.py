@@ -284,6 +284,7 @@ class ContentWorkspace(QWidget):
             on_create_file=self._on_create_file,
             on_delete_file=self._on_delete_file,
             on_rename_file=self._on_rename_file,
+            on_copy_file=self._on_copy_file,
             on_renumber_dir=self._on_renumber_dir,
             on_move_node=self._on_move_node,
             on_clear_markers=self._on_clear_markers,
@@ -482,7 +483,12 @@ class ContentWorkspace(QWidget):
             writable=self._writable,
             # 通用单项目不展示类型筛选；仅旧版多类型布局保留兼容过滤（任务 6.3）。
             show_type_filter=len(self._index.document_types) > 1,
+            # MAIN-B 2.1：当前章/所选章范围 + 未保存缓冲。
+            scope_provider=self._replace_scope,
+            live_text_provider=self._live_buffer_text,
+            buffer_applier=self._apply_buffer_text,
         )
+        self._replace_panel = replace
         self._panels.addTab(replace, "替换")
         self._remove_placeholder("替换")
 
@@ -512,7 +518,13 @@ class ContentWorkspace(QWidget):
             writable=self._writable,
             writer=self._writer,
             on_applied=self._after_write,
+            # MAIN-D 4.1/4.2：检查范围 + 未保存缓冲 + 差异确认 + 撤销。
+            scope_provider=self._replace_scope,
+            live_text_provider=self._live_buffer_text,
+            scoped_linter_provider=self._scoped_linter,
+            buffer_applier=self._apply_buffer_text,
         )
+        self._lint_panel = lint
         self._panels.addTab(lint, "格式检查")
         self._remove_placeholder("格式检查")
 
@@ -667,7 +679,7 @@ class ContentWorkspace(QWidget):
             panel.focus_query()
 
     def current_location(self):
-        """当前编辑器位置（相对路径/光标/滚动）；无编辑器返回 None。"""
+        """当前编辑器位置（相对路径/光标/滚动 + 来源页面状态）；无编辑器返回 None。"""
         editor = self.tabs_host.current_editor()
         rel_path = self.tabs_host.current_rel_path()
         if editor is None or not rel_path:
@@ -679,7 +691,32 @@ class ContentWorkspace(QWidget):
             rel_path=rel_path,
             cursor=int(cursor),
             scroll=int(editor.scroll_position()),
+            panel=self.active_panel_name(),
+            view=self.view_state(),
         )
+
+    def active_panel_name(self) -> str:
+        """当前前台工具面板名（问题/搜索/替换…）；无面板时返回空串。"""
+        try:
+            return str(self._panels.tabText(self._panels.currentIndex()))
+        except Exception:  # noqa: BLE001 - 面板未就绪时按无面板
+            return ""
+
+    def view_state(self) -> dict:
+        """采集当前前台面板的可还原状态（37-B 2.1）。
+
+        问题面板给筛选与选中行；编辑器面板给章节树选中文件。采集失败一律
+        返回空状态，绝不让「返回」因为状态采集出错而失败。
+        """
+        state: dict = {}
+        try:
+            if self.active_panel_name() == "问题":
+                panel = getattr(self, "_issues_panel", None)
+                if panel is not None and hasattr(panel, "view_state"):
+                    state = dict(panel.view_state())
+        except Exception:  # noqa: BLE001 - 采集失败按无状态
+            state = {}
+        return state
 
     def restore_location(self, location) -> bool:
         """还原一个历史位置：复用已打开的 EditorPanel，不加载旧正文。"""
@@ -696,6 +733,17 @@ class ContentWorkspace(QWidget):
         self._tree.select_file(location.rel_path)
         if self._on_open_file is not None:
             self._on_open_file(location.rel_path)
+        # 37-B 2.1：回到原来的工具面板并恢复其筛选/选中行（坏值退回默认）。
+        panel = str(getattr(location, "panel", "") or "")
+        if panel:
+            self._select_panel(panel)
+            if panel == "问题":
+                issues = getattr(self, "_issues_panel", None)
+                if issues is not None and hasattr(issues, "restore_view_state"):
+                    try:
+                        issues.restore_view_state(dict(getattr(location, "view", {}) or {}))
+                    except Exception:  # noqa: BLE001 - 恢复失败不阻断返回正文位置
+                        pass
         return True
 
     def focus_in_editor_find(self) -> None:
@@ -1373,6 +1421,61 @@ class ContentWorkspace(QWidget):
             if self._on_status is not None:
                 self._on_status("刷新索引失败：{0}".format(exc))
 
+    # --- MAIN-B 2.1：替换面板的范围与活缓冲接入 ---
+
+    def _replace_scope(self):
+        """返回 ``(范围种类, 当前章, 所选章)``：范围来自编辑器与章节树真实状态。"""
+        current = None
+        try:
+            editor = self.tabs_host.current_editor()
+        except Exception:  # noqa: BLE001 - 编辑器未就绪时按无当前章
+            editor = None
+        if editor is not None:
+            try:
+                current = editor.current_rel_path()
+            except Exception:  # noqa: BLE001 - 编辑器状态不可读时按无当前章
+                current = None
+        selected: List[str] = []
+        try:
+            selected = list(self._tree.selected_files())
+        except Exception:  # noqa: BLE001 - 树未就绪时按无多选
+            selected = []
+        return ("current", current, selected)
+
+    def _live_buffer_text(self, rel_path: str) -> Optional[str]:
+        """按路径读取任意已打开标签的未保存正文。"""
+        editor = self.tabs_host.editor_for(rel_path)
+        if editor is None or not editor.is_dirty():
+            return None
+        return editor.plain_text()
+
+    def _apply_buffer_text(self, rel_path: str, new_text: str) -> bool:
+        """按路径写回活缓冲；未打开或不可写时由调用方报告失败。"""
+        editor = self.tabs_host.editor_for(rel_path)
+        if editor is None:
+            return False
+        return bool(editor.apply_buffer_text(new_text))
+
+    def _scoped_linter(self, scope_paths, overrides):
+        """按范围与未保存缓冲建立检查器（MAIN-D 4.1）。
+
+        复用同一份索引服务（含派生缓存），只对命中缓冲的章节改用内存文本，
+        因此「当前章/所选章」检查看到的是真实当前内容，且不写盘、不改脏状态。
+        """
+        service = _index_service_for(self._content_root, state_dir=self._state_dir)
+        index = service.build(
+            save_cache=False, override_texts=dict(overrides or {})
+        )
+        if scope_paths is not None:
+            allowed = set(scope_paths)
+            for mapping in (index.files, index.lines, index.headings, index.references):
+                for key in [key for key in mapping if key not in allowed]:
+                    mapping.pop(key, None)
+        rules = QualityRulesConfig(
+            self._state_dir, next(iter(self._index.document_types), "general")
+        )
+        return ContentLinter(index, rules)
+
     def _on_file_saved(self, rel_path: str) -> None:
         """编辑器保存后失效并重建该文件索引，增量刷新徽标（不重建树模型）。"""
         self._vcs.invalidate_cache()
@@ -1417,6 +1520,43 @@ class ContentWorkspace(QWidget):
         self._tree.set_items(items)
         self._apply_status_map()
         self.open_file(rel_path)
+
+    def _on_copy_file(self, rel_path: str) -> None:
+        """复制章节为同目录新文件（MAIN-B 2.3）。
+
+        复制出的章节是独立条目身份：正文里的 ``DOC-ITEM`` 标记全部生成新 ID，
+        原章节与其它文件不被改写。重命名/移动仍保持原 ID（见 refactor 服务）。
+        """
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from doc_tool.application.content.refactor import copy_chapter
+
+        default_title = Path(rel_path).stem + "（副本）"
+        title, ok = QInputDialog.getText(
+            self, "复制章节", "新章节标题：", text=default_title,
+        )
+        if not ok:
+            return
+        title = (title or "").strip() or default_title
+        try:
+            result = copy_chapter(self._index, rel_path, self._writer, title=title)
+        except Exception as exc:  # noqa: BLE001 - 复制失败给出可读原因，不改动原章
+            QMessageBox.warning(self, "复制失败", str(exc))
+            return
+        if not result.ok:
+            QMessageBox.warning(self, "复制失败", result.message or "写入失败")
+            return
+        self._vcs.invalidate_cache()
+        try:
+            self._index_service.rebuild_file(self._index, result.target)
+        except Exception:  # noqa: BLE001 - 索引刷新失败不改变复制结果
+            pass
+        items = build_tree(self._index.all_files())
+        self._tree.set_items(items)
+        self._apply_status_map()
+        if self._on_status is not None:
+            self._on_status(result.summary_line())
+        self.open_file(result.target)
 
     def _on_delete_file(self, rel_path: str) -> None:
         """确认后把文件移入回收站并刷新树与索引。"""

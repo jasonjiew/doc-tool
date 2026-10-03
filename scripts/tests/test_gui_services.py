@@ -72,7 +72,9 @@ class IssuesPanelTests(unittest.TestCase):
         self.assertEqual(opened[-1], ("missing.md", None))
         panel.clear_project()
         self.assertEqual(panel._tree.topLevelItemCount(), 0)
-        self.assertEqual(panel._state.text(), "无当前项目数据")
+        # 37-C 3.1：空状态文案给出下一步（打开/导入项目），不再是干巴巴一句
+        self.assertIn("无当前项目数据", panel._state.text())
+        self.assertFalse(panel._clear_filters_btn.isVisible())
 
 
 class NeutralWorkbenchBehaviorTests(unittest.TestCase):

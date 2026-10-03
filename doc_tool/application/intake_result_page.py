@@ -169,7 +169,11 @@ def build_result_page(project_root, *, limit: int = DEFAULT_ACTIONABLE_LIMIT) ->
         elif kind == "view-original" and feature != "image":
             kind = ACTION_VIEW_ORIGINAL
         title = str(action.get("chapter") or "")
-        rel_path = resolve_chapter_rel_path(project_root, title) if title else ""
+        # MAIN-A 1.2：优先用拆分后回查到的真实章节文件（含小节），
+        # 只有缺失时才退回按章节标题解析。
+        rel_path = str(action.get("relPath") or "")
+        if not rel_path and title:
+            rel_path = resolve_chapter_rel_path(project_root, title)
         page.actions.append(ResultAction(
             kind=kind,
             label=str(action.get("action") or _LABELS.get(kind, kind)),

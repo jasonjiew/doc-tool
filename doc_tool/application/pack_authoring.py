@@ -314,9 +314,29 @@ def _read_draft_resources(base: Path) -> dict:
     return result
 
 
+def skeleton_outline(text: str) -> str:
+    """只保留标题行的骨架正文（38-B 2.1）。
+
+    规范包骨架描述**结构**，不应默认携带来源项目的业务正文；需要正文副本时
+    由调用方显式选择 ``include_body=True``，两种情况在草稿里明确区分。
+    """
+    lines: List[str] = []
+    for line in str(text or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            lines.append(stripped)
+    return ("\n".join(lines) + "\n") if lines else ""
+
+
 def draft_from_project(project_root, directory, *, chapters: Optional[Sequence[str]] = None,
-                       pack_id: str = "", version: str = "", document_kind: str = "") -> PackDraft:
-    """从用户选定项目资源复制草稿：底模、章节骨架、变量/术语/规则。"""
+                       pack_id: str = "", version: str = "", document_kind: str = "",
+                       include_body: bool = False) -> PackDraft:
+    """从用户选定项目资源复制草稿：底模、章节骨架、变量/术语/规则。
+
+    ``include_body`` 默认 **False**：只把选定章节的标题层级写成空骨架，
+    不把整份业务正文装进规范包；显式传入 True 时才复制正文副本（草稿里记为
+    ``skeletonMode=full``，界面与清单都能区分两种骨架）。
+    """
     from doc_tool.domain.manifest import ProjectManifest
 
     source = Path(project_root)
@@ -345,6 +365,7 @@ def draft_from_project(project_root, directory, *, chapters: Optional[Sequence[s
             path.relative_to(content_root).as_posix()
             for path in content_root.glob("*/_index.md")
         )
+    copied_body = 0
     for rel_path in selected:
         origin = content_root / rel_path
         if not origin.is_file():
@@ -352,8 +373,19 @@ def draft_from_project(project_root, directory, *, chapters: Optional[Sequence[s
         name = "skeleton/{0}".format(Path(rel_path).parent.name or Path(rel_path).stem)
         destination = target / (name + ".md")
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(origin.read_text(encoding="utf-8"), encoding="utf-8")
+        text = origin.read_text(encoding="utf-8")
+        if include_body:
+            destination.write_text(text, encoding="utf-8")
+            copied_body += 1
+        else:
+            destination.write_text(skeleton_outline(text), encoding="utf-8")
         draft.skeleton.append(destination.relative_to(target).as_posix())
+    draft.extra["skeletonMode"] = "full" if include_body else "headings"
+    draft.extra["skeletonBodyCopies"] = copied_body
+    if not include_body:
+        draft.extra["skeletonNote"] = (
+            "骨架只含标题层级；如需正文副本请在制作时显式选择「包含所选章节正文」。"
+        )
     resources = read_project_resources(source)
     draft.variables = dict(resources["variables"])
     draft.terms = list(resources["terms"])

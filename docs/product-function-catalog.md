@@ -211,4 +211,17 @@ RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（�
 
 本次已修正真实表格按钮、空行列与一次撤销、表格来源锚点及草稿继续；规范清空资源/当前冻结、未知字段及资源保留、ZIP清单、独立样例/旧轮重试、关闭保存；小窗口工具栏/滚动表单/深色主题；历史交接报告按实际JUnit计数。详见 [审查与证据](product-post-implementation-review-20261003.md)。当前默认测试172文件；本次运行27文件/552用例相关检查和最终规范/报告专项，没有声称重跑完整默认清单。
 
-下一轮新规划：[MAIN主功能](product-main-workflow-optimization.md)导入质量/当前编辑/资源引用/检查预览/Word出稿24项，V3.7 日常入口/导航/反馈/视觉键盘，V3.8 表格/规范表单/导入导出，V3.9 研发筛选详情/关系复核/成果集合/后台性能。共21批/84项、0/84实施；[产品与交互方案](product-v37-v39-roadmap.md)、[任务台账](product-v37-v39-execution.md)、[完整指令](product-execution-confirmed-prompt.md)。正常首项MAIN-A 1.1，已有执行先完成当前批次再插入，不重新执行已完成旧队列。
+下一轮新规划：[MAIN主功能](product-main-workflow-optimization.md)导入质量/当前编辑/资源引用/检查预览/Word出稿24项，V3.7 日常入口/导航/反馈/视觉键盘，V3.8 表格/规范表单/导入导出，V3.9 研发筛选详情/关系复核/成果集合/后台性能。共21批/84项；[产品与交互方案](product-v37-v39-roadmap.md)、[任务台账](product-v37-v39-execution.md)、[完整指令](product-execution-confirmed-prompt.md)。
+
+## 15. 2026-10-03 MAIN + V3.7～V3.9 实施结果
+
+四包 21 批 84 项已完成可执行部分 **75/84**，剩余 9 项全部依赖真实外部条件（Word/企业底模/中文 IME/Excel 剪贴板/真实多成员工程/多缩放显示器）。
+
+- MAIN 23/24：导入代码缩进、保留对象精确到章节文件与行号、多来源同名资源身份与引用映射、替换范围与活缓冲、围栏代码保护、章节复制新身份、预览后内容变化的跳过、检查范围与活内容、差异预览与撤销、关闭生命周期、长表表头、整份出稿补齐父章节正文、单格式失败隔离。唯一剩余：6.3 真实企业底模/Word/IME/Excel 试点。
+- V3.7 17/20：跳转返回恢复原页面/筛选/选中行、问题面板无结果时的清除筛选下一步；其余由既有套件固定。剩余：三成员实机、真实截屏、真实桌面/IME/缩放。
+- V3.8 19/20：粘贴预览分页（1000×20 末页→完整插入）、规范包骨架默认只含标题层级。剩余：真实 Excel/Word 剪贴板、IME、企业底模。
+- V3.9 16/20：矩阵真实分母/N/A 与分页统计口径一致（新增实测）。剩余：三成员实机闭环、50/300/1000 章对象释放、真实大工程试点。
+
+新增/变更能力位置：`doc_tool/adapters/importer.py`（段落原文与定位行）、`doc_tool/application/project_from_markdown.py`（资源身份、章节标题提取）、`doc_tool/application/effective_snapshot.py`（整份补齐父章节正文）、`doc_tool/application/project_export.py`（单格式失败隔离）、`doc_tool/application/content/{replace,refactor,table_grid}.py`、`doc_tool/application/pack_authoring.py`、`doc_tool/ui/navigation_history.py`、`doc_tool/ui/content/{replace_panel,lint_panel,issues_panel,editor_panel,table_grid_dialog,workspace,tree_panel}.py`、`scripts/build_docx.py`。
+
+测试覆盖与证据：分块回归 180 文件 **2860 passed / 4 failed / 15 skipped / 1 timeout**（失败项均为既有环境问题，见台账第 5 节）；本轮新增 11 个测试文件、59 个用例；性能实测见 `analysis/main-d/measure-check-hotpath.json`。详见 [任务台账](product-v37-v39-execution.md)。

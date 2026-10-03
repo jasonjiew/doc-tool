@@ -409,6 +409,7 @@ class PreservationFinding:
     element_index: Optional[int] = None
     retained_path: str = ""           #: 原件位置（项目相对路径优先）
     target_chapter: str = ""          #: 能映射到的目标章节
+    target_path: str = ""             #: 目标章节文件（相对 contentRoot，精确定位用）
     target_line: Optional[int] = None
     detail: str = ""
     action: str = ""                  #: 直接动作提示（定位/查原件/替换图片）

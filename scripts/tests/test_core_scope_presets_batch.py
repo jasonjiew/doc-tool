@@ -27,6 +27,7 @@ from doc_tool.application.intake_entries import run_intake  # noqa: E402
 from doc_tool.application.intake_presets import (  # noqa: E402
     IntakePresets, preset_file,
 )
+from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
 from doc_tool.application.intake_scope import (  # noqa: E402
     chapter_dir_matches, prune_content_tree, selection_from_ids,
     selection_from_titles,
@@ -232,7 +233,11 @@ class BatchTests(unittest.TestCase):
         root = Path(result.succeeded[0].project_root)
         manifest_text = (root / "project.yml").read_text(encoding="utf-8")
         self.assertLess(manifest_text.index("1 概述.md"), manifest_text.index("2 设计.md"))
-        self.assertTrue((root / "assets" / "images" / "a.png").is_file())
+        # MAIN-A 1.3：Markdown 建项的资源根目录统一为 assets/<文档类型>/。
+        self.assertTrue((root / "assets" / "general" / "images" / "a.png").is_file())
+        self.assertEqual(
+            ProjectManifest.load(root).paths.get("assetRoot"), "assets/general"
+        )
 
     def test_batch_result_serializes_settings_for_retry(self):
         source = fixtures.standard_docx(self.work / "c.docx")

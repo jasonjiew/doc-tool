@@ -143,6 +143,7 @@ class ImportRecord:
                 "feature": item.feature,
                 "label": "{0}：{1}".format(item.kind_label, item.handling_label),
                 "chapter": item.target_chapter,
+                "relPath": item.target_path,
                 "line": item.target_line,
                 "retainedPath": item.retained_path,
                 "action": item.action or {
@@ -383,6 +384,8 @@ def findings_from_extraction(
             element_index=entry.get("source_index"),
             retained_path=retained_path,
             target_chapter=str(entry.get("chapter") or ""),
+            target_path=str(entry.get("rel_path") or ""),
+            target_line=entry.get("line"),
             detail="图片资源不可读，正文保留占位（来源：{0}）".format(
                 entry.get("original_rid") or entry.get("target") or "原件"
             ),
@@ -402,6 +405,8 @@ def findings_from_extraction(
             element_index=entry.get("source_index"),
             retained_path=retained_path,
             target_chapter=str(entry.get("chapter") or ""),
+            target_path=str(entry.get("rel_path") or ""),
+            target_line=entry.get("line"),
             detail=(
                 "{0}已降级为纯文本保留（可编辑），原对象仍在原件：{1}".format(
                     label, entry.get("sample") or ""
@@ -424,6 +429,8 @@ def findings_from_extraction(
             source_part="word/document.xml",
             retained_path=retained_path,
             target_chapter=str(entry.get("chapter") or ""),
+            target_path=str(entry.get("rel_path") or ""),
+            target_line=entry.get("line"),
             detail="复杂表格以原有 OOXML 资源保留，可原样出稿",
             action="",
         ))

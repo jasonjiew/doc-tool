@@ -341,6 +341,14 @@ def import_first_time(
         _check_cancel()
         _record(result, STAGE_SPLIT_CONTENT, "started")
         split_result = split_into_tree(paths.content_dir(request.document_type))
+        # MAIN-A 1.2：拆分后把章节内行号细化为「真实章节文件 + 文件内行号」，
+        # 结果页「定位正文/替换图片」才能落到实际位置。
+        try:
+            from doc_tool.adapters.importer import locate_extraction_lines
+
+            locate_extraction_lines(extraction, paths.content_dir(request.document_type))
+        except Exception:  # noqa: BLE001 - 定位失败不影响导入结果，仅退回章节级定位
+            pass
         _record(result, STAGE_SPLIT_CONTENT, "succeeded", metrics={
             "dirs": split_result.dirs,
             "mds": split_result.mds,

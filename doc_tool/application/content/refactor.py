@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -61,6 +62,100 @@ class RenamePlan:
     @property
     def can_apply(self) -> bool:
         return not self.conflicts
+
+
+@dataclass
+class ChapterCopyResult:
+    """章节复制结果（MAIN-B 2.3）。"""
+
+    ok: bool
+    source: str = ""
+    target: str = ""
+    #: 旧条目 ID -> 新条目 ID（复制出的章节必须是独立身份）
+    item_ids: Dict[str, str] = field(default_factory=dict)
+    message: str = ""
+    written: bool = False
+
+    def summary_line(self) -> str:
+        if not self.ok:
+            return "复制未完成：{0}".format(self.message or "未知原因")
+        return "已复制为 {0}（{1} 个条目重新生成身份）".format(
+            self.target, len(self.item_ids)
+        )
+
+
+def copy_chapter_markdown(text: str, *, title: str = "", project_id: str = "") -> Tuple[str, Dict[str, str]]:
+    """生成章节副本的 Markdown：标题可换，条目标记全部换成新 ID。
+
+    身份契约（``traceable_items``）：移动/重命名保持原 ID，**复制**必须产生新 ID，
+    否则两份正文共用同一 ``(projectId, itemId)``，追溯矩阵与关系端点会把它们当成
+    同一个条目。``project_id`` 非空时可同时把条目标记迁到目标项目。
+    """
+    from doc_tool.application.content.traceable_items import (
+        DOC_ITEM_RE, ItemRef, parse_marker,
+    )
+
+    mapping: Dict[str, str] = {}
+    content = str(text or "")
+
+    def _rebuild(match: "re.Match") -> str:
+        ref, _error = parse_marker(match.group(0))
+        if ref is None:
+            return match.group(0)
+        new_ref = ItemRef(
+            project_id=project_id or ref.project_id,
+            item_id=str(uuid.uuid4()),
+            kind=ref.kind,
+            alias=ref.alias,
+        )
+        mapping[ref.item_id] = new_ref.item_id
+        return new_ref.render()
+
+    content = DOC_ITEM_RE.sub(_rebuild, content)
+    if title:
+        lines = content.splitlines()
+        replaced = False
+        for index, line in enumerate(lines):
+            match = re.match(r"^(\s{0,3}#{1,6}\s+)(\S.*?)\s*$", line)
+            if match:
+                lines[index] = match.group(1) + title
+                replaced = True
+                break
+        if replaced:
+            content = "\n".join(lines) + ("\n" if str(text or "").endswith("\n") else "")
+    return content, mapping
+
+
+def copy_chapter(index: ContentIndex, rel_path: str, writer, *, title: str = "") -> ChapterCopyResult:
+    """把一章复制为同目录下的新章节：新路径 + 新条目身份 + 不覆盖任何现有文件。"""
+    rel_path = str(rel_path or "").replace("\\", "/")
+    if not rel_path:
+        return ChapterCopyResult(ok=False, message="未指定要复制的章节。")
+    files = list(index.all_files())
+    if rel_path not in files:
+        return ChapterCopyResult(ok=False, source=rel_path, message="章节不在当前索引中。")
+    source_text = "\n".join(index.lines.get(rel_path, []))
+    if source_text and not source_text.endswith("\n"):
+        source_text += "\n"
+    stem = Path(rel_path).stem
+    new_title = str(title or "").strip() or (stem + "（副本）")
+    from doc_tool.application.content.tree import next_chapter_rel_path
+
+    directory = Path(rel_path).parent.as_posix()
+    directory = "" if directory == "." else directory
+    # 顶层目录（contentRoot 根）时目录前缀为空，next_chapter_rel_path 会带出
+    # 前导 "/"，这里归一成真实相对路径。
+    target = next_chapter_rel_path(directory, files, new_title).lstrip("/")
+    new_text, mapping = copy_chapter_markdown(source_text, title=new_title)
+    result = writer.create_file(target, new_text)
+    if not result.written:
+        return ChapterCopyResult(
+            ok=False, source=rel_path, target=target,
+            message=result.error or "写入失败",
+        )
+    return ChapterCopyResult(
+        ok=True, source=rel_path, target=target, item_ids=mapping, written=True,
+    )
 
 
 def _replace_all_boundary(line: str, old: str, new: str) -> str:

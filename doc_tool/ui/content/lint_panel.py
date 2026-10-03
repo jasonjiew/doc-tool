@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
@@ -42,6 +42,9 @@ from doc_tool.application.content.lint import (
     can_quick_fix,
     filter_lint_issues,
 )
+
+#: 差异预览里的换行（面板不依赖平台默认换行）。
+NL = chr(10)
 
 _RULE_LABELS = RULE_LABELS
 _SEVERITY_LABELS = SEVERITY_LABELS
@@ -93,6 +96,11 @@ class LintPanel(QWidget):
         writable: bool = True,
         writer=None,
         on_applied: Optional[Callable[[], None]] = None,
+        scope_provider: Optional[Callable[[], tuple]] = None,
+        live_text_provider: Optional[Callable[[str], Optional[str]]] = None,
+        scoped_linter_provider: Optional[Callable[[object, dict], object]] = None,
+        buffer_applier: Optional[Callable[[str, str], bool]] = None,
+        confirm_fix: Optional[Callable[[str, str, str], bool]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -104,6 +112,18 @@ class LintPanel(QWidget):
         self._writer = writer
         self._on_applied = on_applied
         self._issues: List[LintIssue] = []
+        # MAIN-D 4.1/4.2：范围（当前章/所选章/整份）、活缓冲内容、
+        # 确定性修复的差异确认与撤销。
+        self._scope_provider = scope_provider
+        self._live_text_provider = live_text_provider
+        self._scoped_linter_provider = scoped_linter_provider
+        self._buffer_applier = buffer_applier
+        self._confirm_fix = confirm_fix
+        self._scope_paths: Optional[List[str]] = None
+        self._text_overrides: Dict[str, str] = {}
+        self._scope_note = "整份文档"
+        #: 本次检查会话内已应用的修复（rel_path → 修复前正文），用于「撤销上次修复」。
+        self._fix_history: List[tuple] = []
 
         # 唯一外层布局：术语卡片 + 结果表 + 状态行。原先各 _build_*
         # 各自创建 QVBoxLayout(self)，只有第一个会被安装，结果表因此不可见。
@@ -215,6 +235,20 @@ class LintPanel(QWidget):
         self._severity_combo.currentIndexChanged.connect(self._on_filter_changed)
         layout.addWidget(self._severity_combo)
 
+        lbl_scope = QLabel("范围：", filter_frame)
+        layout.addWidget(lbl_scope)
+        self._scope_combo = QComboBox(filter_frame)
+        self._scope_combo.addItem("整份文档", "document")
+        self._scope_combo.addItem("当前章", "current")
+        self._scope_combo.addItem("所选章", "selected")
+        self._scope_combo.setToolTip(
+            "检查范围；当前章/所选章使用未保存的编辑器正文，结果按实际内容给出"
+        )
+        layout.addWidget(self._scope_combo)
+        self._scope_label = QLabel("范围：整份文档", filter_frame)
+        self._scope_label.setObjectName("statusMuted")
+        layout.addWidget(self._scope_label)
+
         lbl_fix = QLabel("状态：", filter_frame)
         layout.addWidget(lbl_fix)
         self._fixable_combo = QComboBox(filter_frame)
@@ -224,6 +258,13 @@ class LintPanel(QWidget):
         self._fixable_combo.setToolTip("按是否支持一键自动修复筛选")
         self._fixable_combo.currentIndexChanged.connect(self._on_filter_changed)
         layout.addWidget(self._fixable_combo)
+
+        self._undo_fix_btn = QPushButton("撤销上次修复", filter_frame)
+        self._undo_fix_btn.setProperty("btnRole", "compact")
+        self._undo_fix_btn.setToolTip("回到最近一次格式修复前的正文（按文件逐个恢复）")
+        self._undo_fix_btn.clicked.connect(self.undo_last_fix)
+        self._undo_fix_btn.setEnabled(False)
+        layout.addWidget(self._undo_fix_btn)
 
         self._search_input = QLineEdit(filter_frame)
         self._search_input.setPlaceholderText("搜索文件、行号、说明或规则关键词...")
@@ -468,16 +509,72 @@ class LintPanel(QWidget):
         self._writable = writable
         self._remove_btn.setEnabled(writable)
 
+    def _resolve_scope(self) -> Tuple[Optional[List[str]], Dict[str, str], str]:
+        """空的章节范围保持为空，整份检查也纳入活缓冲。"""
+        kind = self._scope_combo.currentData() if hasattr(self, "_scope_combo") else "document"
+        current, selected = None, []
+        if self._scope_provider is not None and kind != "document":
+            _kind, current, selected = self._scope_provider()
+        if kind == "document":
+            scope_paths, note = None, "整份文档"
+            paths = self._linter._index.all_files() if self._live_text_provider is not None else []
+        elif kind == "current":
+            paths = [current] if current else []
+            scope_paths, note = paths, "当前章"
+        else:
+            paths = [item for item in (selected or []) if item]
+            scope_paths, note = paths, "所选章"
+        overrides = {}
+        if self._live_text_provider is not None:
+            for rel_path in paths:
+                text = self._live_text_provider(rel_path)
+                if text is not None:
+                    overrides[rel_path] = text
+        return scope_paths, overrides, note
+
     def run_check(self) -> None:
         terms = self._current_terms()
         persist_error = self._terms.save(terms)
-        issues = self._linter.check_all(terms)
+        try:
+            scope_paths, overrides, note = self._resolve_scope()
+        except Exception as exc:  # noqa: BLE001 - 缓冲不可读时不使用旧磁盘代替
+            self._issues = []
+            self._render_results()
+            self._status_label.setText("检查失败：无法读取章节范围或编辑缓冲：{0}".format(exc))
+            return
+        self._scope_paths = scope_paths
+        self._text_overrides = overrides
+        self._scope_note = note
+        linter = self._linter
+        scoped_used = False
+        if self._scoped_linter_provider is not None and (
+            scope_paths is not None or overrides
+        ):
+            try:
+                scoped = self._scoped_linter_provider(scope_paths, overrides)
+            except Exception:  # noqa: BLE001 - 作用域索引不可用退回原索引
+                scoped = None
+            if scoped is not None:
+                linter = scoped
+                scoped_used = True
+        issues = linter.check_all(terms)
+        if overrides and not scoped_used:
+            # 无法按活缓冲建立作用域检查时，绝不拿旧磁盘正文冒充当前结果：
+            # 有未保存正文的章节本次不报告（状态行明确说明）。
+            issues = [issue for issue in issues if issue.rel_path not in overrides]
+        if scope_paths is not None:
+            allowed = set(scope_paths)
+            issues = [issue for issue in issues if issue.rel_path in allowed]
         self._issues = list(issues)
         self._page_size = ISSUE_PAGE_SIZE
         if self._on_issues is not None:
             self._on_issues(issues)
         self._refresh_category_combo()
         self._render_results()
+        if hasattr(self, "_scope_label"):
+            self._scope_label.setText(
+                "范围：{0}{1}".format(note, "（含未保存正文）" if overrides else "")
+            )
         if persist_error:
             # 术语未持久化必须提示：否则用户以为已保存、重启后消失。
             self._status_label.setText(
@@ -603,6 +700,139 @@ class LintPanel(QWidget):
     def _on_quick_fix_all_clicked(self) -> None:
         self.quick_fix_all_in_project()
 
+    # --- MAIN-D 4.2：确定性修复的读取 / 差异确认 / 应用 / 撤销 ---
+
+    def _read_current_text(self, rel_path: str) -> Tuple[str, bool]:
+        if self._live_text_provider is not None:
+            text = self._live_text_provider(rel_path)
+            if text is not None:
+                return str(text), True
+        elif rel_path in self._text_overrides:
+            return str(self._text_overrides[rel_path]), True
+        return self._writer.resolve(rel_path).read_text(encoding="utf-8"), False
+
+    def _current_text(self, rel_path: str) -> str:
+        """检查后的编辑需重新检查，避免按陈旧问题位置修复。"""
+        content, from_buffer = self._read_current_text(rel_path)
+        expected = self._text_overrides.get(rel_path)
+        if expected is not None and content != expected:
+            raise ValueError("正文已变化，请重新检查后修复")
+        if expected is None and from_buffer:
+            raise ValueError("正文已变化，请重新检查后修复")
+        if from_buffer:
+            self._text_overrides[rel_path] = content
+        else:
+            self._text_overrides.pop(rel_path, None)
+        return content
+
+    def _write_fixed_text(self, rel_path: str, updated: str, *, expected: Optional[str] = None) -> bool:
+        """确认后再次核对正文，缓冲不可写时不退回磁盘写入。"""
+        if expected is not None:
+            current, from_buffer = self._read_current_text(rel_path)
+            if current != expected:
+                self._status_label.setText("正文已变化，请重新检查后修复")
+                return False
+            if from_buffer:
+                self._text_overrides[rel_path] = current
+            else:
+                self._text_overrides.pop(rel_path, None)
+        if rel_path in self._text_overrides:
+            try:
+                applied = self._buffer_applier is not None and self._buffer_applier(rel_path, updated)
+            except Exception as exc:  # noqa: BLE001 - 缓冲不可写时报告失败
+                self._status_label.setText("编辑缓冲写入失败：{0}".format(exc))
+                return False
+            if not applied:
+                self._status_label.setText("编辑缓冲不可写，请重新打开章节后检查")
+                return False
+            self._text_overrides[rel_path] = updated
+            return True
+        res = self._writer.write_text(rel_path, updated)
+        if not res.written:
+            self._status_label.setText(
+                "修复写入失败：{0}".format(res.error or "无法写入文件")
+            )
+            return False
+        return True
+
+    @staticmethod
+    def _diff_excerpt(before: str, after: str, line_no: int) -> Tuple[str, str]:
+        """给出修复前后差异片段（以命中行为中心的 3 行窗口）。"""
+        before_lines = before.splitlines()
+        after_lines = after.splitlines()
+        index = max(0, int(line_no or 1) - 1)
+        start = max(0, index - 1)
+        before_part = before_lines[start:index + 2]
+        after_part = after_lines[start:index + 2]
+        return NL.join(before_part), NL.join(after_part)
+
+    def _confirm(self, rel_path: str, before: str, after: str, line_no: int) -> bool:
+        if self._confirm_fix is not None:
+            return bool(self._confirm_fix(rel_path, before, after))
+        if not self.isVisible():
+            # 面板不可见（非交互上下文/离屏检查）：不弹模态框，直接按当前差异应用。
+            # 按钮只有面板可见时才可点，因此交互路径始终会看到差异确认。
+            return True
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QPlainTextEdit, QVBoxLayout
+
+        before_text, after_text = self._diff_excerpt(before, after, line_no)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("确认修复：{0}".format(rel_path))
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("修复前：", dialog))
+        before_view = QPlainTextEdit(before_text, dialog)
+        before_view.setReadOnly(True)
+        layout.addWidget(before_view)
+        layout.addWidget(QLabel("修复后：", dialog))
+        after_view = QPlainTextEdit(after_text, dialog)
+        after_view.setReadOnly(True)
+        layout.addWidget(after_view)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Apply | QDialogButtonBox.StandardButton.Cancel,
+            dialog,
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.resize(640, 360)
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _remember_fix(self, rel_path: str, before: str, after: str) -> None:
+        self._fix_history.append((rel_path, before, after))
+        if hasattr(self, "_undo_fix_btn"):
+            self._undo_fix_btn.setEnabled(True)
+
+    def undo_last_fix(self) -> bool:
+        """仅在正文仍对应修复结果时撤销，保留修复后的手工编辑。"""
+        if not self._writable or self._writer is None or not self._fix_history:
+            return False
+        rel_path, before, after = self._fix_history[-1]
+        try:
+            current, from_buffer = self._read_current_text(rel_path)
+            if current != after:
+                self._status_label.setText("正文已变化，未撤销修复；请使用编辑器撤销")
+                return False
+            if from_buffer:
+                self._text_overrides[rel_path] = current
+            else:
+                self._text_overrides.pop(rel_path, None)
+            if not self._write_fixed_text(rel_path, before, expected=after):
+                return False
+        except Exception as exc:  # noqa: BLE001 - 保留失败的撤销历史以便重试
+            self._status_label.setText("撤销失败：{0}".format(exc))
+            return False
+        self._fix_history.pop()
+        self._after_fix_applied()
+        self._status_label.setText("已撤销 {0} 的本次修复".format(rel_path))
+        return True
+
+    def _after_fix_applied(self) -> None:
+        if self._on_applied is not None:
+            self._on_applied()
+        self.run_check()
+        if hasattr(self, "_undo_fix_btn"):
+            self._undo_fix_btn.setEnabled(bool(self._fix_history))
+
     def quick_fix_issue(self, issue: LintIssue) -> bool:
         if not self._writable or self._writer is None:
             return False
@@ -610,19 +840,18 @@ class LintPanel(QWidget):
             return False
         try:
             rel_path = issue.rel_path
-            abs_path = self._writer.resolve(rel_path)
-            content = abs_path.read_text(encoding="utf-8")
+            content = self._current_text(rel_path)
             updated, success, msg = apply_quick_fix(content, issue)
-            if success:
-                res = self._writer.write_text(rel_path, updated)
-                if not res.written:
-                    self._status_label.setText("修复写入失败：{0}".format(res.error or "无法写入文件"))
-                    return False
-                if self._on_applied is not None:
-                    self._on_applied()
-                self.run_check()
-                self._status_label.setText("✓ {0}".format(msg))
-                return True
+            if not success:
+                return False
+            if not self._confirm(rel_path, content, updated, issue.line_no):
+                return False
+            if not self._write_fixed_text(rel_path, updated, expected=content):
+                return False
+            self._remember_fix(rel_path, content, updated)
+            self._after_fix_applied()
+            self._status_label.setText("✓ {0}".format(msg))
+            return True
         except Exception as exc:
             self._status_label.setText("修复失败：{0}".format(exc))
         return False
@@ -634,62 +863,86 @@ class LintPanel(QWidget):
         if not file_issues:
             return 0
         try:
-            abs_path = self._writer.resolve(rel_path)
-            content = abs_path.read_text(encoding="utf-8")
+            content = self._current_text(rel_path)
             updated, count = apply_all_quick_fixes(content, file_issues)
-            if count > 0:
-                res = self._writer.write_text(rel_path, updated)
-                if not res.written:
-                    self._status_label.setText("批量修复写入失败：{0}".format(res.error or "无法写入文件"))
-                    return 0
-                if self._on_applied is not None:
-                    self._on_applied()
-                self.run_check()
-                self._status_label.setText(
-                    "✓ 已自动修复 {0} 中的 {1} 个格式问题".format(rel_path, count)
-                )
-                return count
+            if count <= 0:
+                return 0
+            first_line = min(
+                (i.line_no for i in file_issues if can_quick_fix(i)), default=1
+            )
+            if not self._confirm(rel_path, content, updated, first_line):
+                return 0
+            if not self._write_fixed_text(rel_path, updated, expected=content):
+                return 0
+            self._remember_fix(rel_path, content, updated)
+            self._after_fix_applied()
+            self._status_label.setText(
+                "✓ 已自动修复 {0} 中的 {1} 个格式问题".format(rel_path, count)
+            )
+            return count
         except Exception as exc:
             self._status_label.setText("批量修复失败：{0}".format(exc))
         return 0
 
     def quick_fix_all_in_project(self) -> int:
-        """自动批量修复整个项目中所有支持自动修复的问题。"""
+        """批量修复当前检查范围内的全部可修复问题。
+
+        MAIN-D 4.1/4.2：只处理本次检查范围（整份/当前章/所选章）内的章节；
+        有未保存正文的章节按缓冲内容修复并写回缓冲，普通章节走可回滚磁盘写；
+        应用前给出差异确认，应用后可用「撤销上次修复」逐文件恢复。
+        """
         if not self._writable or self._writer is None:
             return 0
         fixable = [i for i in self._issues if can_quick_fix(i)]
+        if self._scope_paths is not None:
+            allowed = set(self._scope_paths)
+            fixable = [i for i in fixable if i.rel_path in allowed]
         if not fixable:
             return 0
         by_file: dict = {}
         for issue in fixable:
             by_file.setdefault(issue.rel_path, []).append(issue)
 
-        total_fixed = 0
+        pending: List[tuple] = []
         for rel_path, file_issues in by_file.items():
             try:
-                abs_path = self._writer.resolve(rel_path)
-                content = abs_path.read_text(encoding="utf-8")
+                content = self._current_text(rel_path)
                 updated, count = apply_all_quick_fixes(content, file_issues)
-                if count > 0:
-                    res = self._writer.write_text(rel_path, updated)
-                    if res.written:
-                        total_fixed += count
             except Exception:
                 continue
+            if count > 0:
+                pending.append((rel_path, file_issues, content, updated, count))
+        if not pending:
+            return 0
+        rel_path, file_issues, content, updated, _count = pending[0]
+        first_line = min((i.line_no for i in file_issues if can_quick_fix(i)), default=1)
+        if not self._confirm(rel_path, content, updated, first_line):
+            return 0
+
+        total_fixed = 0
+        touched = 0
+        for rel_path, _issues, content, updated, count in pending:
+            if not self._write_fixed_text(rel_path, updated, expected=content):
+                continue
+            self._remember_fix(rel_path, content, updated)
+            total_fixed += count
+            touched += 1
 
         if total_fixed > 0:
-            if self._on_applied is not None:
-                self._on_applied()
-            self.run_check()
+            self._after_fix_applied()
             self._status_label.setText(
-                "✓ 已自动修复全项目 {0} 个文件中的 {1} 处格式问题".format(
-                    len(by_file), total_fixed
+                "✓ 已自动修复 {0} 个文件中的 {1} 处格式问题（范围：{2}）".format(
+                    touched, total_fixed, self._scope_note
                 )
             )
         return total_fixed
 
     def quick_fix_all_in_filtered(self) -> int:
-        """自动批量修复当前筛选结果中所有支持自动修复的问题。"""
+        """自动批量修复当前筛选结果中所有支持自动修复的问题。
+
+        MAIN-D 4.2：与单条/文件/整份修复共用同一条路径——按当前（含未保存）
+        正文计算差异、应用前确认、写回可撤销，并记录撤销历史。
+        """
         if not self._writable or self._writer is None:
             return 0
         indices = self._filtered_issue_indices()
@@ -700,20 +953,30 @@ class LintPanel(QWidget):
         for issue in fixable:
             by_file.setdefault(issue.rel_path, []).append(issue)
 
-        total_fixed = 0
-        successful_files = 0
+        pending: List[tuple] = []
         for rel_path, file_issues in by_file.items():
             try:
-                abs_path = self._writer.resolve(rel_path)
-                content = abs_path.read_text(encoding="utf-8")
+                content = self._current_text(rel_path)
                 updated, count = apply_all_quick_fixes(content, file_issues)
-                if count > 0:
-                    res = self._writer.write_text(rel_path, updated)
-                    if res.written:
-                        total_fixed += count
-                        successful_files += 1
             except Exception:
                 continue
+            if count > 0:
+                pending.append((rel_path, file_issues, content, updated, count))
+        if not pending:
+            return 0
+        rel_path, file_issues, content, updated, _count = pending[0]
+        first_line = min((i.line_no for i in file_issues if can_quick_fix(i)), default=1)
+        if not self._confirm(rel_path, content, updated, first_line):
+            return 0
+
+        total_fixed = 0
+        successful_files = 0
+        for rel_path, _issues, content, updated, count in pending:
+            if not self._write_fixed_text(rel_path, updated, expected=content):
+                continue
+            self._remember_fix(rel_path, content, updated)
+            total_fixed += count
+            successful_files += 1
 
         if total_fixed > 0:
             if self._on_applied is not None:

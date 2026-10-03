@@ -48,7 +48,7 @@ _IGNORED_FILES = {"_revision_record.md", "_meta.yml", "_index.md"}
 _RESOURCE_RE = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 
 #: 解析/渲染版本：进入缓存 key，解析规则变化时旧缓存自然失效。
-SNAPSHOT_PARSE_VERSION = "core-e-1"
+SNAPSHOT_PARSE_VERSION = "core-e-2"
 
 
 @dataclass
@@ -94,6 +94,8 @@ class EffectiveSnapshot:
     #: V3.6 36-C 3.1：本轮捕获各章真实内容摘要（relPath → sha256）。
     #: 派生索引按它判定复用，缓冲章节不会读到磁盘旧内容。
     captureIndex: Dict[str, str] = field(default_factory=dict)
+    #: 父章节正文的磁盘摘要；不改变可勾选章节列表，但参与资源/缓存/更新检测。
+    indexDiskHashes: Dict[str, str] = field(default_factory=dict)
     readonlyProject: bool = False
     externalDestination: str = ""
     sourceUpdated: bool = False
@@ -183,7 +185,11 @@ def discover_chapters(content_root: Path) -> List[Tuple[str, Path]]:
 def count_unsaved(content_root: Path, buffer_texts: Dict[str, str]) -> List[str]:
     """返回与磁盘内容不一致的章节相对路径（不写回、不清脏）。"""
     unsaved: List[str] = []
-    for rel_path, path in discover_chapters(content_root):
+    paths = discover_chapters(content_root) + [
+        (path.relative_to(content_root).as_posix(), path)
+        for path in sorted(content_root.rglob("_index.md"))
+    ]
+    for rel_path, path in paths:
         text = (buffer_texts or {}).get(rel_path)
         if text is None:
             continue
@@ -391,6 +397,31 @@ def capture_snapshot(
         if progress is not None:
             progress(rel_path)
 
+    # _index.md 是实际出稿正文：在捕获阶段固定其文本及资源，不在物化时再读源。
+    if snapshot.scope.kind == SCOPE_PROJECT and not snapshot.variantApplied:
+        index_paths = set(content_root.rglob("_index.md"))
+    else:
+        index_paths = set()
+        for chapter in snapshot.chapters:
+            for parent in Path(chapter.rel_path).parents:
+                path = content_root / parent / "_index.md"
+                if path.is_file():
+                    index_paths.add(path)
+    for path in sorted(index_paths):
+        if cancel_token is not None:
+            cancel_token.check_cancel()
+        rel_path = path.relative_to(content_root).as_posix()
+        disk_text = path.read_text(encoding="utf-8")
+        from_buffer = effective_mode == SOURCE_MODE_CURRENT_BUFFER and rel_path in buffers
+        text = buffers[rel_path] if from_buffer else disk_text
+        snapshot.indexDiskHashes[rel_path] = sha256_text(disk_text)
+        if from_buffer and text != disk_text:
+            snapshot.unsavedChapters.append(rel_path)
+        text = _expand_modules(snapshot, rel_path, text)
+        captured_texts[rel_path] = text
+        snapshot.captureIndex[rel_path] = sha256_text(text)
+        texts.append(text)
+
     snapshot.textHash = sha256_text("".join(texts))
     snapshot.resources = collect_resource_paths(texts)
     snapshot._resolvedResources = dict(getattr(getattr(snapshot, "_reuseResolver", None), "resources", {}))
@@ -526,21 +557,14 @@ def _materialize(
     (root / "template").mkdir(parents=True, exist_ok=True)
     (root / "output").mkdir(parents=True, exist_ok=True)
 
-    copied_index: set = set()
+    for rel_path in snapshot.indexDiskHashes:
+        target = root / "content" / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(buffers[rel_path], encoding="utf-8")
     for chapter in snapshot.chapters:
         text = buffers.get(chapter.rel_path)
         target = root / "content" / chapter.rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
-        # 章节自身正文（同目录 _index.md）随章节一起复制，避免丢正文。
-        index_source = content_root / Path(chapter.rel_path).parent / "_index.md"
-        index_key = index_source.as_posix()
-        if index_key not in copied_index and index_source.is_file():
-            index_target = root / "content" / Path(chapter.rel_path).parent / "_index.md"
-            try:
-                shutil.copy2(str(index_source), str(index_target))
-                copied_index.add(index_key)
-            except OSError:
-                pass
         if text is None:
             try:
                 read_text = (content_root / chapter.rel_path).read_text(encoding="utf-8")
@@ -679,6 +703,15 @@ def mark_source_updated(snapshot: EffectiveSnapshot) -> bool:
         if digest and chapter.diskHash and digest != chapter.diskHash:
             updated = True
             break
+    if not updated:
+        for rel_path, disk_hash in snapshot.indexDiskHashes.items():
+            try:
+                current = sha256_text((Path(content_root) / rel_path).read_text(encoding="utf-8"))
+            except (OSError, UnicodeError):
+                current = ""
+            if current != disk_hash:
+                updated = True
+                break
     snapshot.sourceUpdated = bool(updated)
     return snapshot.sourceUpdated
 
