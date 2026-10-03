@@ -1,6 +1,6 @@
 # 当前产品功能总清单
 
-盘点日期：2026-10-01。基准提交：`1cc28ca`，应用版本 `2.9.0`，项目 schema 2。盘点期间 CORE 导入/导出及既有服务修复正在其他执行任务中新增代码；文末已补本轮末次读取的变化，未将这些未提交代码视为已全面验收。实时实施状态以对应 change/tasks.md 和实际验证为准。
+初始盘点日期：2026-10-01。基准提交：`1cc28ca`，应用版本 `2.9.0`，项目 schema 2。下方详细清单保留当时状态；最新2026-10-03实施增补见文末第13节，审查修复与下一步见第14节，核对提交为 `d68b514`。实时实施状态以对应 change/tasks.md 和实际验证为准。
 
 产品定位：面向企业研发文档团队，用 Markdown 维护结构化内容，以 Word 模板完成正式文档交付，逐步接通需求、设计和测试的关系管理。
 
@@ -99,13 +99,13 @@
 | 命名文档基线、冻结及副本恢复 | 服务；部分已有工作区基线入口 | `content/baselines.py`；不能笼统宣称版本中心全部接通 |
 | 评审意见、筛选、状态、章节定位 | 界面 | `review_panel.py` 和 ReviewStore |
 | 评审 Word 草稿、Word 批注导入、证据/纪要 | 界面 + 服务 | review export、extract_comments 等；不冒充外部审批或电子签名 |
-| 绑定内容摘要的版本化评审生命周期 | 服务；当前评审面板仍主要使用基础 ReviewStore | `versioned_review.py`；RD-D 适配现有记录，不另建一套状态 |
-| 需求/设计/测试成员工作区 | 服务；角色是通用项目元数据 | `workspace.py`；缺少完整 GUI 管理入口，RD-B 接通 |
-| 稳定条目 ID、复制/重编号语义 | 服务 | `traceable_items.py`、`item_actions.py`；RD-C 提供用户入口 |
-| 显式满足/验证/依赖关系 | 服务 | `relations.py`；RD-C 选择实际双端条目，不按相同编号自动猜关联 |
-| 覆盖矩阵、孤立条目、分页定位 | 命令 + 服务；GUI 未接通 | `trace_matrix.py`、`trace`；只统计显式声明需求，无需求为 N/A |
-| 变更影响、语义摘要、待复核记录 | 命令 + 服务；GUI 未接通 | `impact.py`、`impact`；RD-D 接通受控复核 |
-| 版本集合捕获、清单、比较、导出包、恢复副本 | 服务；完整 GUI 及成员出稿串接未接通 | `collection.py`、`collection_ops.py`；RD-E 接通，缺失成员保留部分结果 |
+| 绑定内容摘要的版本化评审生命周期 | 服务 + RD-D 界面；复核绑定已保存摘要，内容再变标为待重检 | `versioned_review.py`、`impact.ReviewRecordStore`；`ui/rd_workspace.py` 只显示与请求重检，不自动升级为通过 |
+| 需求/设计/测试成员工作区 | 服务 + RD-B 界面；角色是通用项目元数据 | `workspace.py`、`ui/rd_workspace.py`；引用/复制加入、移除、重新定位、只读成员禁写 |
+| 稳定条目 ID、复制/重编号语义 | 服务 + RD-C 界面；写回编辑缓冲一次撤销 | `traceable_items.py`、`item_actions.py`；显示编号不取代稳定身份 |
+| 显式满足/验证/依赖关系 | 服务 + RD-C 界面；双端检索显示成员/章节/来源 | `relations.py`；未落盘端点保留草稿并可“仅保存相关两端”，不按编号猜关联 |
+| 覆盖矩阵、孤立条目、分页定位 | 命令 + 服务 + RD-D 界面 | `trace_matrix.py`、`trace`、`ui/rd_workspace.py`；只统计显式声明需求，无需求为 N/A |
+| 变更影响、语义摘要、待复核记录 | 命令 + 服务 + RD-D 界面；标明已保存/缓冲来源 | `impact.py`、`impact`；界面与 CLI 复用同一收集与报告实现 |
+| 版本集合捕获、清单、比较、导出包、恢复副本 | 服务 + RD-E 界面；成员出稿复用既有批量交付 | `collection.py`、`collection_ops.py`、`ui/rd_workspace.py`；缺成员/单成员失败保留其他结果，恢复只出新副本 |
 | 跨文件版本内容复用、变量变体 | 规划 | V3.0，独立于当前片段插入 |
 | 章节负责人、三方交接、冲突跳过 | 规划 | V3.1，独立于当前 Git/SVN 功能 |
 
@@ -190,3 +190,25 @@
 | 本地证据检索、可撤销建议、可选模型 | V3.3 |
 
 下一步的优先级、完整版本规划及可复制执行指令统一见 [产品总路线图](product-master-roadmap.md)；本文件是能力清单，不维护实时任务勾选。
+
+## 13. 2026-10-03 现状增补
+
+CORE/V3.0～V3.3已勾选151/157，默认导入、当前缓冲捕获、统一多格式出稿、模块复用、交接、持久队列和辅助写作代码已存在；初始清单中的“执行中/规划”不得据此作为重新开发这些服务的理由。UI已19/20、UI2已25/26，日常入口、非模态成果、项目条溢出、继续工作、导航/阅读、导出设置和窄面板已提交。
+
+复核发现的三处导出差额已修复：原捕获丢失时保留旧成果，不改读新正文；已知捕获身份必须匹配；选章/当前章再生成及换目录保留范围，失效时回到可见设置。可核验的旧 Word 仍能补 PDF，新增断言回归和实际 HTML 内容检查见 [复核与修正记录](product-execution-review-20261003.md)。RD/V3.4～V3.6 已实施80/84，后续开发从 MAIN 主功能优化接续，再进入 V3.7～V3.9，实机和人工验收仍单列。
+
+RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（薄适配与统一来源定位）与 `ui/rd_workspace.py`（成员/概览/设置、条目/关系、矩阵/影响、集合/成果），主窗口新增「内容 → 研发工作区…」(Ctrl+Alt+D) 入口与宿主适配，顺带补齐设置分组名称写入、关系端点草稿判定、集合导出包目录与过期复核标注。证据见 [RD 执行台账](product-rd-workspace-execution.md)；6.3 真实桌面/Word 试点待验收。
+
+普通表格编辑（V3.4）已实施 19/20：`application/content/table_grid.py` 提供表格模型/转义往返/片段身份，`ui/content/table_grid_dialog.py` 提供网格编辑（行列增删移动、对齐、Tab 导航、网格内撤销）与「粘贴为表格」预览，编辑器工具栏/菜单/命令面板接入，未保存表格进入 CORE 同源出稿；5.2 真实 IME/剪贴板待验收。
+
+规范包制作（V3.5）已实施 19/20：`application/pack_authoring.py` 提供草稿、资源映射、冻结（schema 1 + 实际摘要）、ZIP 导出与隔离样例验证，`ui/standard_pack_dialog.py` 提供制作界面，菜单「内容 → 规范包制作…」接入；既有加载器可消费导出包；企业模板/真实 Word 试点待验收。
+
+大文档性能（V3.6）已实施 19/20：`application/content/incremental_index.py` + `content/index.py` 提供按内容摘要/解析器版本/配置指纹失效的派生缓存与增量刷新，`scripts/perf/v36_benchmark.py` 提供同机基准；实测重复刷新解析次数 -100%，1,000 章节 p95 改善 31.7%、300 章节 13.7% 未达标。检索视图已接入请求代次、渐进扫描与取消（部分结果如实标注）；`EffectiveSnapshot.captureIndex` 记录本轮捕获真实摘要，捕获作用域索引按 captureId 隔离且缓冲内容只用内存摘要；`chapter_assembly_fingerprints` 让模块变化只失效引用它的章节；章节首屏、问题列表分页与对象释放测量已补齐。**未完成**：36-E 5.3 真实大项目与 Word 试用量测。
+
+各包台账：[RD](product-rd-workspace-execution.md)、[V3.4](product-v34-table-execution.md)、[V3.5](product-v35-standard-pack-execution.md)、[V3.6](product-v36-large-document-execution.md)。旧实机、人工试点与归档收尾单列，缺依赖仅影响对应动作。
+
+## 14. 实施后修复与下一轮功能
+
+本次已修正真实表格按钮、空行列与一次撤销、表格来源锚点及草稿继续；规范清空资源/当前冻结、未知字段及资源保留、ZIP清单、独立样例/旧轮重试、关闭保存；小窗口工具栏/滚动表单/深色主题；历史交接报告按实际JUnit计数。详见 [审查与证据](product-post-implementation-review-20261003.md)。当前默认测试172文件；本次运行27文件/552用例相关检查和最终规范/报告专项，没有声称重跑完整默认清单。
+
+下一轮新规划：[MAIN主功能](product-main-workflow-optimization.md)导入质量/当前编辑/资源引用/检查预览/Word出稿24项，V3.7 日常入口/导航/反馈/视觉键盘，V3.8 表格/规范表单/导入导出，V3.9 研发筛选详情/关系复核/成果集合/后台性能。共21批/84项、0/84实施；[产品与交互方案](product-v37-v39-roadmap.md)、[任务台账](product-v37-v39-execution.md)、[完整指令](product-execution-confirmed-prompt.md)。正常首项MAIN-A 1.1，已有执行先完成当前批次再插入，不重新执行已完成旧队列。

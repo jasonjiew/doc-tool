@@ -133,7 +133,7 @@
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
         460,
-        371
+        369
       ],
       "navBarRect": [
         238,
@@ -152,8 +152,8 @@
       "overflowKeys": [
         "diag_build",
         "merge",
-        "toggle_summary",
-        "close"
+        "branch",
+        "toggle_summary"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -175,7 +175,7 @@
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
         460,
-        371
+        369
       ],
       "navBarRect": [
         238,
@@ -194,8 +194,8 @@
       "overflowKeys": [
         "diag_build",
         "merge",
-        "toggle_summary",
-        "close"
+        "branch",
+        "toggle_summary"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -217,7 +217,7 @@
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
         925,
-        451
+        449
       ],
       "navBarRect": [
         393,
@@ -258,7 +258,7 @@
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
         925,
-        451
+        449
       ],
       "navBarRect": [
         393,
@@ -298,11 +298,11 @@
       "logicalDpi": 96.0,
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
-        1565,
-        811
+        1564,
+        809
       ],
       "navBarRect": [
-        1033,
+        1032,
         24
       ],
       "quickExport": [
@@ -335,11 +335,11 @@
       "logicalDpi": 96.0,
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
-        1565,
-        811
+        1564,
+        809
       ],
       "navBarRect": [
-        1033,
+        1032,
         24
       ],
       "quickExport": [

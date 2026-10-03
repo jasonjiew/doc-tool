@@ -58,6 +58,13 @@ class SearchResult:
     hits: List[SearchHit] = field(default_factory=list)
     truncated: bool = False
     file_count: int = 0
+    # --- V3.6 36-D：渐进扫描与请求代次（旧调用方默认不受影响）---
+    scanned_files: int = 0
+    total_files: int = 0
+    partial: bool = False  # 取消或未扫完时置位：不得当成完整结果
+    generation: int = 0
+    project_id: str = ""
+    capture_id: str = ""
 
 
 def compile_pattern(
@@ -86,11 +93,74 @@ class SearchService:
     def __init__(self, index: ContentIndex) -> None:
         self._index = index
 
-    def search(
-        self,
-        options: SearchOptions,
-        cancel_token=None,
+    def search_progressive(
+        self, options: SearchOptions, *, cancel_token=None, on_event=None,
+        generation: int = 0, project_id: str = "", capture_id: str = "",
+        batch_files: int = 25,
     ) -> SearchResult:
+        """与 ``search`` 同源的分批扫描：报告已扫描/总数与已找到数量，可取消。
+
+        扫描中只报告“已找到”而不谎报完整总数；取消时返回已获得的部分结果并
+        置 ``partial=True``，界面据此标明部分结果而不是“无问题”。
+        """
+        query = options.query.strip()
+        base = dict(
+            query=query, generation=int(generation),
+            project_id=str(project_id or ""), capture_id=str(capture_id or ""),
+        )
+        if not query:
+            return SearchResult(total=0, **base)
+        pattern = compile_pattern(
+            query, regex=options.regex, case_sensitive=options.case_sensitive,
+            whole_word=options.whole_word,
+        )
+        allowed = set(options.document_types or [])
+        files = self._index.all_files()
+        hits: List[SearchHit] = []
+        file_count = 0
+        scanned = 0
+        partial = False
+        interval = max(1, int(batch_files))
+        for rel_path in files:
+            if cancel_token is not None and cancel_token.is_cancelled:
+                partial = True
+                break
+            entry = self._index.files.get(rel_path)
+            if entry is None:
+                continue
+            if allowed and entry.document_type not in allowed:
+                scanned += 1
+                continue
+            lines = self._index.lines.get(rel_path, [])
+            file_hits = [
+                SearchHit(rel_path=rel_path, line_no=index, text=line)
+                for index, line in enumerate(lines, start=1)
+                if pattern.search(line)
+            ]
+            if file_hits:
+                file_count += 1
+                hits.extend(file_hits)
+            scanned += 1
+            if on_event is not None and (scanned % interval == 0 or scanned >= len(files)):
+                on_event(SearchProgress(
+                    status="running" if scanned < len(files) else "done",
+                    detail="已扫描 {0}/{1} 个文件，已找到 {2} 处".format(
+                        scanned, len(files), len(hits),
+                    ),
+                    metrics={
+                        "scanned": scanned, "totalFiles": len(files),
+                        "found": len(hits), "complete": scanned >= len(files),
+                    },
+                ))
+        total = len(hits)
+        truncated = total > options.limit
+        return SearchResult(
+            total=total, hits=hits[: options.limit], truncated=truncated,
+            file_count=file_count, scanned_files=scanned,
+            total_files=len(files), partial=partial, **base,
+        )
+
+    def search(self, options: SearchOptions, cancel_token=None) -> SearchResult:
         """执行搜索，按文档类型过滤并应用命中上限。
 
         ``cancel_token`` 为可选 ``CancellationToken``，在文件边界检查，
@@ -140,6 +210,16 @@ class SearchService:
         )
 
 
+@dataclass
+class SearchProgress:
+    """渐进搜索进度事件（只含计数，不含正文）。"""
+
+    stage: str = "search"
+    status: str = "running"
+    detail: str = ""
+    metrics: dict = field(default_factory=dict)
+
+
 def run_search(
     service: SearchService,
     options: SearchOptions,
@@ -147,3 +227,22 @@ def run_search(
 ) -> SearchResult:
     """后台任务包装：供 TaskRunner 执行，接受取消令牌注入。"""
     return service.search(options, cancel_token=cancel_token)
+
+
+def run_progressive_search(
+    service: SearchService,
+    options: SearchOptions,
+    cancel_token=None,
+    on_event=None,
+    *,
+    generation: int = 0,
+    project_id: str = "",
+    capture_id: str = "",
+    batch_files: int = 25,
+) -> SearchResult:
+    """后台任务包装：渐进搜索 + 取消 + 代次标记（V3.6 36-D）。"""
+    return service.search_progressive(
+        options, cancel_token=cancel_token, on_event=on_event,
+        generation=generation, project_id=project_id, capture_id=capture_id,
+        batch_files=batch_files,
+    )

@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="0" time="34.922"><testsuite name="doc-tool" tests="3" failures="0" time="34.922"><testcase name="test_v36_large_document.py" classname="scripts.tests" time="11.328"><system-out>test_benchmark_script_produces_report_with_counts (__main__.BenchmarkHarnessTests.test_benchmark_script_produces_report_with_counts) ... ok
+test_add_delete_and_move_are_handled (__main__.CacheBehaviourTests.test_add_delete_and_move_are_handled) ... ok
+test_cache_disabled_matches_direct_scan_and_writes_nothing (__main__.CacheBehaviourTests.test_cache_disabled_matches_direct_scan_and_writes_nothing) ... ok
+test_cache_write_failure_keeps_results (__main__.CacheBehaviourTests.test_cache_write_failure_keeps_results) ... ok
+test_capacity_prune_keeps_recent_entries (__main__.CacheBehaviourTests.test_capacity_prune_keeps_recent_entries) ... ok
+test_capture_index_isolates_unsaved_buffer_from_disk_cache (__main__.CacheBehaviourTests.test_capture_index_isolates_unsaved_buffer_from_disk_cache) ... ok
+test_config_change_invalidates_cache (__main__.CacheBehaviourTests.test_config_change_invalidates_cache) ... ok
+test_corrupted_cache_falls_back_to_source (__main__.CacheBehaviourTests.test_corrupted_cache_falls_back_to_source) ... ok
+test_first_build_parses_and_second_build_reuses_cache (__main__.CacheBehaviourTests.test_first_build_parses_and_second_build_reuses_cache) ... ok
+test_parser_version_change_invalidates_cache (__main__.CacheBehaviourTests.test_parser_version_change_invalidates_cache) ... ok
+test_same_size_content_change_invalidates_by_digest (__main__.CacheBehaviourTests.test_same_size_content_change_invalidates_by_digest) ... ok
+test_repeat_refresh_parses_nothing_and_matches_direct_scan (__main__.IndexConsistencyTests.test_repeat_refresh_parses_nothing_and_matches_direct_scan) ... ok
+test_search_results_match_between_cache_and_direct (__main__.IndexConsistencyTests.test_search_results_match_between_cache_and_direct) ... ok
+test_stats_expose_counts_without_content (__main__.IndexConsistencyTests.test_stats_expose_counts_without_content) ... ok
+test_workspace_index_service_uses_project_cache (__main__.IndexConsistencyTests.test_workspace_index_service_uses_project_cache) ... ok
+test_cancelled_search_is_partial_and_keeps_found_hits (__main__.ProgressiveViewTests.test_cancelled_search_is_partial_and_keeps_found_hits) ... ok
+test_progressive_search_reports_progress_and_matches_plain_search (__main__.ProgressiveViewTests.test_progressive_search_reports_progress_and_matches_plain_search) ... ok
+test_search_panel_shows_progress_and_preserves_partial_results (__main__.ProgressiveViewTests.test_search_panel_shows_progress_and_preserves_partial_results) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_stale_generation_result_is_ignored_by_panel (__main__.ProgressiveViewTests.test_stale_generation_result_is_ignored_by_panel) ... ok
+test_cached_index_does_not_change_preview_check_or_export_content (__main__.SameRoundConsistencyTests.test_cached_index_does_not_change_preview_check_or_export_content) ... ok
+test_cancelled_build_keeps_partial_and_can_retry (__main__.SameRoundConsistencyTests.test_cancelled_build_keeps_partial_and_can_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 8.810s
+
+OK
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="20.813"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 19.290s
+
+OK
+</system-out></testcase><testcase name="test_format_check_search.py" classname="scripts.tests" time="2.781"><system-out>.......QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+....
+----------------------------------------------------------------------
+Ran 11 tests in 0.327s
+
+OK
+</system-out></testcase></testsuite></testsuites>

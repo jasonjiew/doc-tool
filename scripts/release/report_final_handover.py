@@ -88,6 +88,11 @@ def junit_summary(path: Path | None) -> dict:
         return {}
     tree = ET.parse(path)
     suites = list(tree.getroot().iter("testsuite"))
+    # 仓库 runner 用一个 testsuite 汇总，每个 testcase 对应一个 Python 文件。
+    test_files = {
+        case.get("name", "") for case in tree.getroot().iter("testcase")
+        if case.get("classname") == "scripts.tests" and case.get("name", "").endswith(".py")
+    }
     failed = []
     for suite in suites:
         for case in suite.iter("testcase"):
@@ -95,7 +100,7 @@ def junit_summary(path: Path | None) -> dict:
                 failed.append(case.get("name", ""))
     return {
         "file": path.name,
-        "files": len(suites),
+        "files": len(test_files) if test_files else "?",
         "tests": sum(int(suite.get("tests", 0) or 0) for suite in suites),
         "failures": sum(int(suite.get("failures", 0) or 0) for suite in suites),
         "errors": sum(int(suite.get("errors", 0) or 0) for suite in suites),
@@ -138,10 +143,11 @@ def build_report(junit_path: Path | None = None) -> str:
         "## 1. 结论摘要",
         "",
         "- 五个 change 的**本地实现、测试、修复与交接物**已完成：进度 **{0}/{1}**".format(total_done, total),
-        "- 全量回归（{0}）：**{1} 个测试文件 / {2} 项失败 / {3} 项错误**".format(
-            summary.get("file", "未找到证据"), registered_test_files(),
+        "- 已保存的回归证据（{0}）：**{1} 个测试文件 / {2} 项失败 / {3} 项错误**".format(
+            summary.get("file", "未找到证据"), summary.get("files", "?"),
             summary.get("failures", "?"), summary.get("errors", "?"),
         ),
+        "- 当前默认测试清单：{0} 文件；清单增长不代表历史报告已覆盖新增测试。".format(registered_test_files()),
         "- 剩余 {0} 项任务全部为**授权/人工/实机**门：执行步骤见 `docs/product-v3-acceptance-runbook.md`".format(
             total - total_done
         ),
@@ -162,9 +168,9 @@ def build_report(junit_path: Path | None = None) -> str:
         "",
         "## 3. 验证证据",
         "",
-        "- 全量回归：`{0}`".format(summary.get("file", "（未找到）")),
+        "- 已保存的回归证据：`{0}`".format(summary.get("file", "（未找到）")),
         "  - 测试文件数 {0}／JUnit 用例数 {1}／失败 {2}／错误 {3}".format(
-            registered_test_files(), summary.get("tests", "?"),
+            summary.get("files", "?"), summary.get("tests", "?"),
             summary.get("failures", "?"), summary.get("errors", "?"),
         ),
     ]

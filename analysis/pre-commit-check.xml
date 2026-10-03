@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="2" failures="0" time="14.704"><testsuite name="doc-tool" tests="2" failures="0" time="14.704"><testcase name="test_product_post_implementation_review.py" classname="scripts.tests" time="12.641"><system-out>test_anchored_grid_does_not_modify_another_identical_table (__main__.GuiReviewTests.test_anchored_grid_does_not_modify_another_identical_table) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_anchored_grid_tracks_external_edit_and_undo_restores_table_only (__main__.GuiReviewTests.test_anchored_grid_tracks_external_edit_and_undo_restores_table_only) ... ok
+test_cancelled_grid_draft_reopens_and_applies (__main__.GuiReviewTests.test_cancelled_grid_draft_reopens_and_applies) ... ok
+test_column_move_is_one_undo_transaction (__main__.GuiReviewTests.test_column_move_is_one_undo_transaction) ... ok
+test_export_uses_current_form_after_previous_freeze (__main__.GuiReviewTests.test_export_uses_current_form_after_previous_freeze) ... ok
+test_grid_rejects_file_switch (__main__.GuiReviewTests.test_grid_rejects_file_switch) ... ok
+test_insert_delete_column_preserves_alignment_identity (__main__.GuiReviewTests.test_insert_delete_column_preserves_alignment_identity) ... ok
+test_invalid_input_is_restored_after_save_and_reopen (__main__.GuiReviewTests.test_invalid_input_is_restored_after_save_and_reopen) ... ok
+test_normal_close_button_saves_edits (__main__.GuiReviewTests.test_normal_close_button_saves_edits) ... ok
+test_pack_small_window_keeps_readable_editors_and_dark_scroll_background (__main__.GuiReviewTests.test_pack_small_window_keeps_readable_editors_and_dark_scroll_background) ... ok
+test_real_table_grid_and_paste_buttons_pass_no_click_boolean (__main__.GuiReviewTests.test_real_table_grid_and_paste_buttons_pass_no_click_boolean) ... ok
+test_replacing_emoji_table_keeps_no_partial_source (__main__.GuiReviewTests.test_replacing_emoji_table_keeps_no_partial_source) ... ok
+test_row_move_is_one_undo_transaction (__main__.GuiReviewTests.test_row_move_is_one_undo_transaction) ... ok
+test_sample_work_does_not_block_gui_and_busy_form_is_stable (__main__.GuiReviewTests.test_sample_work_does_not_block_gui_and_busy_form_is_stable) ... ok
+test_selected_rows_move_together_without_reversing_order (__main__.GuiReviewTests.test_selected_rows_move_together_without_reversing_order) ... ok
+test_toolbar_really_fits_and_labels_do_not_overlap_after_resize (__main__.GuiReviewTests.test_toolbar_really_fits_and_labels_do_not_overlap_after_resize) ... This plugin does not support propagateSizeHints()
+ok
+test_clear_resource_does_not_leave_old_terms_in_pack (__main__.PackFilesReviewTests.test_clear_resource_does_not_leave_old_terms_in_pack) ... ok
+test_copy_pack_keeps_unknown_metadata_and_declared_resources (__main__.PackFilesReviewTests.test_copy_pack_keeps_unknown_metadata_and_declared_resources) ... ok
+test_export_exclusions_keep_zip_consumable_and_existing_zip_unchanged (__main__.PackFilesReviewTests.test_export_exclusions_keep_zip_consumable_and_existing_zip_unchanged) ... ok
+test_latest_sample_preserves_previous_project_and_artifacts (__main__.PackFilesReviewTests.test_latest_sample_preserves_previous_project_and_artifacts) ... ok
+test_metadata_changes_are_not_reused_as_old_pack (__main__.PackFilesReviewTests.test_metadata_changes_are_not_reused_as_old_pack) ... ok
+test_missing_sample_record_does_not_capture_latest_source (__main__.PackFilesReviewTests.test_missing_sample_record_does_not_capture_latest_source) ... ok
+test_optional_template_empty_value_roundtrips_without_false_staleness (__main__.PackFilesReviewTests.test_optional_template_empty_value_roundtrips_without_false_staleness) ... ok
+test_retry_sample_uses_original_capture_after_draft_changes (__main__.PackFilesReviewTests.test_retry_sample_uses_original_capture_after_draft_changes) ... ok
+test_same_freeze_identity_cannot_reuse_corrupted_artifact (__main__.PackFilesReviewTests.test_same_freeze_identity_cannot_reuse_corrupted_artifact) ... ok
+test_same_second_freezes_keep_each_previous_artifact (__main__.PackFilesReviewTests.test_same_second_freezes_keep_each_previous_artifact) ... ok
+test_ambiguous_fragment_does_not_pick_by_distance (__main__.TableDataReviewTests.test_ambiguous_fragment_does_not_pick_by_distance) ... ok
+test_grid_multiline_serializes_as_supported_break (__main__.TableDataReviewTests.test_grid_multiline_serializes_as_supported_break) ... ok
+test_tsv_entire_empty_selection_keeps_dimensions (__main__.TableDataReviewTests.test_tsv_entire_empty_selection_keeps_dimensions) ... ok
+test_tsv_keeps_trailing_empty_and_whitespace_rows (__main__.TableDataReviewTests.test_tsv_keeps_trailing_empty_and_whitespace_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 8.351s
+
+OK
+</system-out></testcase><testcase name="test_final_handover_report.py" classname="scripts.tests" time="2.063"><system-out>test_artifact_paths_listed_actually_exist (__main__.FinalHandoverReportTests.test_artifact_paths_listed_actually_exist) ... ok
+test_junit_counts_runner_files_in_one_shared_suite (__main__.FinalHandoverReportTests.test_junit_counts_runner_files_in_one_shared_suite) ... ok
+test_report_covers_all_changes_and_counts (__main__.FinalHandoverReportTests.test_report_covers_all_changes_and_counts) ... ok
+test_report_is_linked_from_handoff_and_readiness (__main__.FinalHandoverReportTests.test_report_is_linked_from_handoff_and_readiness) ... ok
+test_report_matches_current_state (__main__.FinalHandoverReportTests.test_report_matches_current_state) ... ok
+test_report_states_uncommitted_status (__main__.FinalHandoverReportTests.test_report_states_uncommitted_status) ... ok
+test_saved_report_count_does_not_grow_with_default_test_list (__main__.FinalHandoverReportTests.test_saved_report_count_does_not_grow_with_default_test_list) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.261s
+
+OK
+</system-out></testcase></testsuite></testsuites>

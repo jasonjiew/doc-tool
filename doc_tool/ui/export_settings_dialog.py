@@ -144,6 +144,7 @@ class ExportSettingsDialog(QDialog):
         current_chapter: str = "",
         unsaved_count: int = 0,
         variants: Optional[Sequence[str]] = None,
+        notice: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -157,6 +158,10 @@ class ExportSettingsDialog(QDialog):
         self._request: Optional[ExportRequest] = None
 
         layout = QVBoxLayout(self)
+        self._recovery_notice = QLabel(str(notice), self)
+        self._recovery_notice.setWordWrap(True)
+        self._recovery_notice.setVisible(bool(notice))
+        layout.addWidget(self._recovery_notice)
         layout.setSpacing(8)
 
         # --- 导出什么 ---
@@ -466,6 +471,12 @@ class ExportSettingsDialog(QDialog):
         index = self._scope_combo.findData(request.scope.kind)
         if index >= 0:
             self._scope_combo.setCurrentIndex(index)
+        if request.scope.kind == SCOPE_CURRENT_CHAPTER:
+            self._current_chapter = request.scope.current if request.scope.current in self._chapters else ""
+            index = self._scope_combo.findData(SCOPE_CURRENT_CHAPTER)
+            self._scope_combo.setItemText(
+                index, "当前章：{0}".format(Path(self._current_chapter).name or "（原章节已不可用，可改选范围）"),
+            )
         chosen = set(request.scope.chapters or [])
         if chosen:
             for row in range(self._chapter_list.count()):
@@ -515,6 +526,8 @@ class ExportSettingsDialog(QDialog):
                         "、".join(missing[:3])
                     )
                 )
+        elif request.scope.kind == SCOPE_CURRENT_CHAPTER and not self._current_chapter:
+            self._chapter_hint.setText("原请求的当前章已不可用：请改选章节或整份；直接提交将按整份文档回退。")
 
     def submitted_request(self) -> Optional[ExportRequest]:
         return self._request

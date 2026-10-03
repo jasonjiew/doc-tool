@@ -1,0 +1,153 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="15" failures="0" time="90.906"><testsuite name="doc-tool" tests="15" failures="0" time="90.906"><testcase name="test_rd_workspace_surface.py" classname="scripts.tests" time="39.234"><system-out>test_missing_template_and_word_still_allows_workspace_views (__main__.RdClosedLoopTests.test_missing_template_and_word_still_allows_workspace_views) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_open_artifact_uses_real_path (__main__.RdClosedLoopTests.test_open_artifact_uses_real_path) ... ok
+test_review_confirm_uses_saved_hashes_and_detects_later_change (__main__.RdClosedLoopTests.test_review_confirm_uses_saved_hashes_and_detects_later_change) ... ok
+test_three_member_closed_loop_relation_matrix_impact_collection (__main__.RdClosedLoopTests.test_three_member_closed_loop_relation_matrix_impact_collection) ... ok
+test_single_project_reports_no_workspace_but_keeps_views_usable (__main__.RdSingleDocumentTests.test_single_project_reports_no_workspace_but_keeps_views_usable) ... ok
+test_collection_rows_and_recover_copy_keep_source_intact (__main__.RdSurfaceTests.test_collection_rows_and_recover_copy_keep_source_intact) ... ok
+test_documents_with_buffers_marks_actual_source (__main__.RdSurfaceTests.test_documents_with_buffers_marks_actual_source) ... ok
+test_endpoint_options_show_member_chapter_and_source (__main__.RdSurfaceTests.test_endpoint_options_show_member_chapter_and_source) ... ok
+test_high_schema_member_is_readonly_but_other_members_work (__main__.RdSurfaceTests.test_high_schema_member_is_readonly_but_other_members_work)
+真实更高模式版本：只读可读，其他成员不受影响（不通过 save 伪造）。 ... ok
+test_item_action_helpers_run_on_buffer_text (__main__.RdSurfaceTests.test_item_action_helpers_run_on_buffer_text) ... ok
+test_locate_sources_uses_real_identity_and_reports_unknown_items (__main__.RdSurfaceTests.test_locate_sources_uses_real_identity_and_reports_unknown_items) ... ok
+test_matrix_view_matches_service_report_rows (__main__.RdSurfaceTests.test_matrix_view_matches_service_report_rows) ... ok
+test_matrix_view_reports_na_instead_of_fake_coverage (__main__.RdSurfaceTests.test_matrix_view_reports_na_instead_of_fake_coverage) ... ok
+test_member_rows_expose_identity_role_and_availability (__main__.RdSurfaceTests.test_member_rows_expose_identity_role_and_availability) ... ok
+test_missing_member_keeps_others_available (__main__.RdSurfaceTests.test_missing_member_keeps_others_available) ... ok
+test_overview_view_uses_service_truth (__main__.RdSurfaceTests.test_overview_view_uses_service_truth) ... ok
+test_review_rows_without_store_is_explicit (__main__.RdSurfaceTests.test_review_rows_without_store_is_explicit) ... ok
+test_collection_compare_and_export_package (__main__.RdWorkspaceGuiTests.test_collection_compare_and_export_package) ... ok
+test_collection_detail_lists_real_files_and_recover_copy (__main__.RdWorkspaceGuiTests.test_collection_detail_lists_real_files_and_recover_copy) ... ok
+test_collection_recover_reports_partial_when_a_file_is_missing (__main__.RdWorkspaceGuiTests.test_collection_recover_reports_partial_when_a_file_is_missing) ... ok
+test_copy_item_generates_new_id_in_buffer (__main__.RdWorkspaceGuiTests.test_copy_item_generates_new_id_in_buffer) ... ok
+test_declare_item_writes_single_editor_transaction (__main__.RdWorkspaceGuiTests.test_declare_item_writes_single_editor_transaction) ... ok
+test_dialog_lists_members_overview_and_settings_groups (__main__.RdWorkspaceGuiTests.test_dialog_lists_members_overview_and_settings_groups) ... ok
+test_impact_view_reports_buffer_source_and_review_state (__main__.RdWorkspaceGuiTests.test_impact_view_reports_buffer_source_and_review_state) ... ok
+test_locate_item_opens_real_source (__main__.RdWorkspaceGuiTests.test_locate_item_opens_real_source) ... ok
+test_matrix_covers_explicit_requirement_and_locates_source (__main__.RdWorkspaceGuiTests.test_matrix_covers_explicit_requirement_and_locates_source) ... ok
+test_matrix_reports_orphans_and_dangling_relations (__main__.RdWorkspaceGuiTests.test_matrix_reports_orphans_and_dangling_relations)
+孤立条目与悬空关系必须显式列出，而不是静默忽略。 ... ok
+test_matrix_without_requirements_shows_na (__main__.RdWorkspaceGuiTests.test_matrix_without_requirements_shows_na) ... ok
+test_member_delivery_reuses_existing_batch_entry (__main__.RdWorkspaceGuiTests.test_member_delivery_reuses_existing_batch_entry) ... ok
+test_narrow_window_keeps_controls_readable_and_keyboard_reachable (__main__.RdWorkspaceGuiTests.test_narrow_window_keeps_controls_readable_and_keyboard_reachable) ... ok
+test_open_member_delegates_to_project_window (__main__.RdWorkspaceGuiTests.test_open_member_delegates_to_project_window) ... ok
+test_relation_add_is_idempotent_and_uses_real_endpoints (__main__.RdWorkspaceGuiTests.test_relation_add_is_idempotent_and_uses_real_endpoints) ... ok
+test_settings_invalid_value_keeps_input_and_locates_field (__main__.RdWorkspaceGuiTests.test_settings_invalid_value_keeps_input_and_locates_field) ... ok
+test_settings_saves_current_group_only_and_keeps_other_groups (__main__.RdWorkspaceGuiTests.test_settings_saves_current_group_only_and_keeps_other_groups) ... ok
+test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends (__main__.RdWorkspaceGuiTests.test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends) ... ok
+
+----------------------------------------------------------------------
+Ran 35 tests in 35.893s
+
+OK
+</system-out></testcase><testcase name="test_rd_workspace_entry.py" classname="scripts.tests" time="11.828"><system-out>test_menu_action_exists_and_opens_workspace_for_current_project (__main__.RdMainWindowEntryTests.test_menu_action_exists_and_opens_workspace_for_current_project) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_rd_apply_item_edit_is_single_undo_transaction (__main__.RdMainWindowEntryTests.test_rd_apply_item_edit_is_single_undo_transaction) ... ok
+test_rd_member_delivery_reuses_existing_batch_entry (__main__.RdMainWindowEntryTests.test_rd_member_delivery_reuses_existing_batch_entry) ... ok
+test_rd_open_project_activates_existing_window (__main__.RdMainWindowEntryTests.test_rd_open_project_activates_existing_window) ... ok
+test_rd_open_project_falls_back_to_new_window (__main__.RdMainWindowEntryTests.test_rd_open_project_falls_back_to_new_window) ... ok
+test_rd_open_source_uses_real_chapter_entry (__main__.RdMainWindowEntryTests.test_rd_open_source_uses_real_chapter_entry) ... ok
+test_rd_project_identity_and_empty_buffer_state (__main__.RdMainWindowEntryTests.test_rd_project_identity_and_empty_buffer_state) ... ok
+test_rd_save_chapters_saves_only_requested_chapters (__main__.RdMainWindowEntryTests.test_rd_save_chapters_saves_only_requested_chapters) ... ok
+test_rd_workspace_root_changed_is_remembered (__main__.RdMainWindowEntryTests.test_rd_workspace_root_changed_is_remembered) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 8.267s
+
+OK
+</system-out></testcase><testcase name="test_workspace_v29.py" classname="scripts.tests" time="3.000"><system-out>..................
+----------------------------------------------------------------------
+Ran 18 tests in 1.331s
+
+OK
+</system-out></testcase><testcase name="test_relations_v29.py" classname="scripts.tests" time="1.672"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.019s
+
+OK
+</system-out></testcase><testcase name="test_trace_matrix_v29.py" classname="scripts.tests" time="1.328"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 0.001s
+
+OK
+</system-out></testcase><testcase name="test_impact_v29.py" classname="scripts.tests" time="1.454"><system-out>...................
+----------------------------------------------------------------------
+Ran 19 tests in 0.028s
+
+OK
+</system-out></testcase><testcase name="test_collection_v29.py" classname="scripts.tests" time="2.281"><system-out>................
+----------------------------------------------------------------------
+Ran 16 tests in 0.834s
+
+OK
+</system-out></testcase><testcase name="test_collection_ops_v29.py" classname="scripts.tests" time="1.969"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.603s
+
+OK
+</system-out></testcase><testcase name="test_item_actions_v29.py" classname="scripts.tests" time="1.843"><system-out>...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.001s
+
+OK
+</system-out></testcase><testcase name="test_matrix_page_v29.py" classname="scripts.tests" time="1.047"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 0.002s
+
+OK
+</system-out></testcase><testcase name="test_traceable_items_v29.py" classname="scripts.tests" time="1.110"><system-out>.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.072s
+
+OK
+</system-out></testcase><testcase name="test_settings_v28.py" classname="scripts.tests" time="1.875"><system-out>..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.385s
+
+OK
+</system-out></testcase><testcase name="test_overview_v28.py" classname="scripts.tests" time="2.078"><system-out>.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.570s
+
+OK
+</system-out></testcase><testcase name="test_diagram_viewer_interaction.py" classname="scripts.tests" time="2.609"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.........ss
+----------------------------------------------------------------------
+Ran 11 tests in 0.375s
+
+OK (skipped=2)
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="17.578"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 16.315s
+
+OK
+</system-out></testcase></testsuite></testsuites>

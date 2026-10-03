@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 import sys
 import unittest
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,11 +30,17 @@ class FinalHandoverReportTests(unittest.TestCase):
         self.assertTrue(REPORT.is_file(), "缺少最终交接报告")
         self.text = REPORT.read_text(encoding="utf-8")
 
+    @staticmethod
+    def _without_timestamp(text: str) -> str:
+        """生成时间每次运行都不同：比较时归一化该行，其余内容必须逐字一致。"""
+        return re.sub(r"^生成时间：.*$", "生成时间：<归一化>", text, flags=re.MULTILINE)
+
     def test_report_matches_current_state(self):
         from scripts.release.report_final_handover import build_report, latest_junit
 
         self.assertEqual(
-            self.text, build_report(latest_junit()),
+            self._without_timestamp(self.text),
+            self._without_timestamp(build_report(latest_junit())),
             "报告与仓库当前状态不一致：请重新生成（python scripts\\release\\report_final_handover.py）",
         )
 
@@ -71,6 +79,26 @@ class FinalHandoverReportTests(unittest.TestCase):
     def test_report_states_uncommitted_status(self):
         self.assertIn("未提交", self.text)
         self.assertIn("未归档", self.text)
+
+    def test_saved_report_count_does_not_grow_with_default_test_list(self):
+        from scripts.release import report_final_handover as reporter
+
+        summary = {"file": "old-run.xml", "files": 3, "tests": 3, "failures": 0, "errors": 0, "failed": []}
+        with patch.object(reporter, "junit_summary", return_value=summary), patch.object(reporter, "registered_test_files", return_value=999):
+            report = reporter.build_report()
+        self.assertIn("**3 个测试文件 / 0 项失败 / 0 项错误**", report)
+        self.assertIn("测试文件数 3／JUnit 用例数 3", report)
+        self.assertIn("当前默认测试清单：999 文件", report)
+
+    def test_junit_counts_runner_files_in_one_shared_suite(self):
+        from scripts.release.report_final_handover import junit_summary
+
+        scratch = REPO_ROOT / "tmp"
+        scratch.mkdir(exist_ok=True)
+        with TemporaryDirectory(prefix="handover-count-", dir=scratch) as temp:
+            report = Path(temp) / "run.xml"
+            report.write_text('<testsuites><testsuite tests="3" failures="0"><testcase name="test_a.py" classname="scripts.tests"/><testcase name="test_b.py" classname="scripts.tests"/><testcase name="test_c.py" classname="scripts.tests"/></testsuite></testsuites>', encoding="utf-8")
+            self.assertEqual(junit_summary(report)["files"], 3)
 
 
 if __name__ == "__main__":

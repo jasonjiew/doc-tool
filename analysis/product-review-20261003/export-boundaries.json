@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "word_invoked": false,
+  "business_code_modified": false,
+  "probes": [
+    {
+      "id": "EX-1",
+      "scenario": "retry_missing_original_capture",
+      "expected_current_recapture": false,
+      "actual_current_recapture": true,
+      "confirmed_gap": true
+    },
+    {
+      "id": "EX-2",
+      "scenario": "known_capture_missing_from_report",
+      "expected_identity_match": false,
+      "actual_identity_match": true,
+      "confirmed_gap": true
+    },
+    {
+      "id": "EX-3",
+      "scenario": "regenerate_selected_chapter_round",
+      "expected_scope": {
+        "kind": "chapters",
+        "chapters": [
+          "general/_revision_record.md"
+        ],
+        "current": ""
+      },
+      "actual_scope": {
+        "kind": "project",
+        "chapters": [],
+        "current": ""
+      },
+      "original_source": "saved",
+      "new_source": "current-buffer",
+      "confirmed_gap": true
+    }
+  ],
+  "confirmed_gaps": 3
+}

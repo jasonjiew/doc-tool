@@ -362,6 +362,9 @@ class EditorPanel(QWidget):
         self._draft_loaded = False
         self._last_synced_heading = None  # 内容来自草稿（尚未落盘到正式文件）
         self._draft_failed = False  # 最近一次草稿写入是否失败（用于去重提示）
+        #: V3.4：网格/粘贴未应用时保留的待应用文本（不写盘、不丢内容）。
+        self._pending_table_text = ""
+        self._pending_table_context = None
 
         # 创作服务：拼写检查、用户词典、代码片段（测试可注入）。
         self._user_dict = user_dict if user_dict is not None else UserDictionary()
@@ -414,12 +417,17 @@ class EditorPanel(QWidget):
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(4, 3, 4, 3)
         layout.setSpacing(6)
+        from PySide6.QtWidgets import QLayout
+        bar.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
 
         # Markdown 常用格式快捷操作组（单行工具栏左侧）
         self._md_toolbar = QWidget(bar)
         md_layout = QHBoxLayout(self._md_toolbar)
         md_layout.setContentsMargins(0, 0, 0, 0)
         md_layout.setSpacing(2)
+        md_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self._md_toolbar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         self._md_actions: List[tuple] = []
         self._md_buttons: List[QPushButton] = []
@@ -443,7 +451,7 @@ class EditorPanel(QWidget):
             btn = QPushButton(text, self._md_toolbar)
             btn.setProperty("btnRole", "compact")
             btn.setToolTip(tip)
-            btn.clicked.connect(slot)
+            btn.clicked.connect(lambda _checked=False: slot())
             md_layout.addWidget(btn)
             self._md_actions.append((text, btn))
             self._md_buttons.append(btn)
@@ -457,6 +465,9 @@ class EditorPanel(QWidget):
         md_btn("引用", lambda: self._prefix_lines("> "), "引用 (> )")
         md_btn("表格", self._insert_table, "插入表格骨架")
         md_btn("美化表", self.format_table_at_cursor, "美化对齐当前表格 (Ctrl+Alt+T)")
+        # V3.4：普通表格网格与显式表格粘贴（普通 Ctrl+V 行为不变）
+        md_btn("表格网格", self.open_table_grid, "网格编辑光标所在的普通表格 (Ctrl+Alt+G)，一次撤销可还原")
+        md_btn("粘贴为表格", self.paste_as_table, "把剪贴板 TSV/管道表格预览后插入为表格 (Ctrl+Alt+V)")
         md_btn("链接", self._insert_link, "插入链接")
         md_btn("图片", self._on_insert_image, "插入图片（粘贴/选择文件）")
         md_btn("Mermaid", self.open_mermaid_workbench, "Mermaid 图形工作台")
@@ -470,6 +481,7 @@ class EditorPanel(QWidget):
         self._overflow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._overflow_menu = QMenu(self._overflow_btn)
         self._overflow_btn.setMenu(self._overflow_menu)
+        self._overflow_menu.aboutToShow.connect(self._reflow_format_toolbar)
         self._overflow_btn.hide()
         md_layout.addWidget(self._overflow_btn)
 
@@ -498,6 +510,8 @@ class EditorPanel(QWidget):
         layout.addWidget(self._dirty_label)
 
         self._status_label = QLabel("", bar)
+        self._status_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._status_label.setMaximumWidth(100)
         self._status_label.setObjectName("statusMuted")
         layout.addWidget(self._status_label)
 
@@ -637,6 +651,14 @@ class EditorPanel(QWidget):
         self._format_table_shortcut = QShortcut(
             QKeySequence("Ctrl+Alt+T"), self, self.format_table_at_cursor
         )
+        self._table_grid_shortcut = QShortcut(
+            QKeySequence("Ctrl+Alt+G"), self, self.open_table_grid
+        )
+        self._table_grid_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self._table_paste_shortcut = QShortcut(
+            QKeySequence("Ctrl+Alt+V"), self, self.paste_as_table
+        )
+        self._table_paste_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         # UI 包 2.3：Ctrl+F/Ctrl+B/Ctrl+I 只在编辑器焦点内生效——作用域挂在编辑器
         # 控件上（Qt.WidgetShortcut），其它输入框（查找/搜索面板）保持原编辑行为；
         # 项目全文查找由主窗口的 Ctrl+Shift+F 承担。
@@ -1380,39 +1402,46 @@ class EditorPanel(QWidget):
         self._reflow_format_toolbar()
 
     def _reflow_format_toolbar(self) -> None:
-        """窄窗口把放不下的格式动作移入「更多 ▾」菜单（动作本身不丢失）。
-
-        用真实控件宽度判定：可用宽度扣除右侧固定动作与标题选择器后从左到右
-        摆放，溢出的按钮隐藏并同步为菜单项；宽度恢复时按钮回到同排。
-        """
+        """以真实宽度分配动作；主动作保留，次要动作进入可达的更多菜单。"""
         if not hasattr(self, "_overflow_menu") or not self._md_buttons:
             return
-        # 溢出判定用本面板真实宽度：工具栏子部件的 sizeHint 在离屏布局下会返回
-        # 未受约束的理想宽度，不能代表屏幕上真正可用的宽度。
-        panel_width = self.width()
-        heading_width = self._heading_btn.sizeHint().width()
-        fixed = 0
-        for widget in (
-            getattr(self, "_file_label", None),
-            getattr(self, "_dirty_label", None),
-            getattr(self, "_status_label", None),
-            getattr(self, "_outline_btn", None),
-            getattr(self, "_rollback_btn", None),
-            getattr(self, "_history_btn", None),
-            getattr(self, "_ext_btn", None),
-            getattr(self, "_preview_btn", None),
-            getattr(self, "_save_btn", None),
-        ):
-            if widget is not None:
-                fixed += widget.sizeHint().width() + 8
-        available = max(0, panel_width - fixed - heading_width - 30)
-
+        width = max(0, self.width() - 12)
+        self._overflow_btn.setText("更多")
+        self._overflow_btn.setMinimumWidth(self._overflow_btn.sizeHint().width())
+        self._heading_btn.setMinimumWidth(self._heading_btn.sizeHint().width())
+        self._status_label.setVisible(width >= 900)
+        utilities = [
+            ("回滚", self._rollback_btn),
+            ("本地历史", self._history_btn),
+            ("外部打开", self._ext_btn),
+        ]
+        fixed_widgets = [self._heading_btn, self._outline_btn, self._preview_btn, self._save_btn]
+        fixed = sum(widget.sizeHint().width() + 6 for widget in fixed_widgets)
+        fixed += self._file_label.minimumWidth() + 38
+        if self._dirty_label.text():
+            fixed += self._dirty_label.sizeHint().width() + 6
+        if width >= 900:
+            fixed += 100
+        reserve_more = self._overflow_btn.sizeHint().width() + 6
+        utility_overflow = []
+        for name, button in utilities:
+            need = button.sizeHint().width() + 6
+            if width - fixed - need - reserve_more >= 220:
+                button.show()
+                button.setMinimumWidth(button.sizeHint().width())
+                fixed += need
+            else:
+                button.hide()
+                utility_overflow.append((name, button))
+        total = sum(button.sizeHint().width() + 2 for _name, button in self._md_actions[1:])
+        available = max(0, width - fixed - (reserve_more if total > width - fixed or utility_overflow else 0))
         used = 0
         overflow = []
         for name, button in self._md_actions[1:]:
             need = button.sizeHint().width() + 2
             if used + need <= available:
                 used += need
+                button.setMinimumWidth(button.sizeHint().width())
                 button.show()
             else:
                 button.hide()
@@ -1422,12 +1451,24 @@ class EditorPanel(QWidget):
         for name, button in overflow:
             action = self._overflow_menu.addAction(name)
             action.setToolTip(button.toolTip())
-            action.triggered.connect(button.click)
+            action.setEnabled(button.isEnabled())
+            action.triggered.connect(lambda _checked=False, target=button: target.click())
             self._overflow_items.append((name, action, button))
-        self._overflow_btn.setVisible(bool(overflow))
-        self._overflow_btn.setText(
-            "更多 ▾（{0}）".format(len(overflow)) if overflow else "更多 ▾"
-        )
+        if utility_overflow and overflow:
+            self._overflow_menu.addSeparator()
+        for name, button in utility_overflow:
+            action = self._overflow_menu.addAction(name)
+            action.setToolTip(button.toolTip())
+            action.setEnabled(button.isEnabled())
+            action.triggered.connect(lambda _checked=False, target=button: target.click())
+        self._utility_overflow = utility_overflow
+        md_width = self._heading_btn.sizeHint().width()
+        md_width += sum(button.sizeHint().width() + 2 for _name, button in self._md_actions[1:] if not button.isHidden())
+        if overflow or utility_overflow:
+            md_width += self._overflow_btn.sizeHint().width() + 2
+        self._md_toolbar.setFixedWidth(md_width + 4)
+        self._overflow_btn.setVisible(bool(overflow or utility_overflow))
+        self._overflow_btn.setToolTip("更多操作：{0} 项，包含收起的格式和文件操作".format(len(overflow) + len(utility_overflow)))
 
     def _set_file_label(self, rel_path: str) -> None:
         """文件标识：显示用文件名（长路径由 QLabel 省略号截断），完整值可复制。
@@ -1484,6 +1525,192 @@ class EditorPanel(QWidget):
             "| 列1 | 列2 |\n| --- | --- |\n|  |  |",
             cursor_offset=2,
         )
+
+
+    # --- V3.4 普通表格网格与显式表格粘贴 ---
+
+    def _table_source_text(self) -> str:
+        return self._editor.toPlainText()
+
+    def _table_cursor_line(self) -> int:
+        return self._editor.textCursor().blockNumber() + 1
+
+    def open_table_grid(self, model=None):
+        """网格编辑普通表格，打开时锚定源片段，单次应用并可恢复未应用草稿。"""
+        from PySide6.QtWidgets import QDialog
+        from doc_tool.application.content import table_grid
+        from doc_tool.ui.content.table_grid_dialog import TableGridDialog
+
+        if not self._writable:
+            self._status_label.setText("只读项目不可编辑表格")
+            return False
+        if model is None or isinstance(model, bool):
+            parsed = table_grid.table_at_line(
+                self._table_source_text(), self._table_cursor_line(), rel_path=self._rel_path or "",
+            )
+            if not parsed.ok or parsed.model is None:
+                self._status_label.setText(
+                    (parsed.error or "未检测到普通表格") + "；复杂原生 Word 表格继续使用原有保留方式"
+                )
+                return False
+            model = parsed.model
+        if not model.supported:
+            self._status_label.setText("该表格含有不支持无损表达的内容：原内容已保留，可继续用文本编辑")
+            return False
+        source_identity = self._rel_path
+        source_cursor = self._capture_table_fragment(model.raw_input, model.start_line)
+        pending = self._pending_table_context or {}
+        if (pending.get("rel_path") == source_identity
+                and pending.get("fragment") == model.raw_input and self._pending_table_text):
+            restored = table_grid.parse_table(self._pending_table_text)
+            if restored.ok:
+                restored.model.raw_input = model.raw_input
+                restored.model.rel_path = model.rel_path
+                restored.model.start_line = model.start_line
+                model = restored.model
+        dialog = TableGridDialog(model, parent=self)
+        while True:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                if dialog.is_dirty():
+                    self._pending_table_text = dialog.markdown_text()
+                    self._pending_table_context = {"rel_path": source_identity, "fragment": model.raw_input}
+                    self._status_label.setText("表格改动未应用：再次打开同一表格可继续，也可复制 Markdown")
+                return False
+            replacement = dialog.markdown_text()
+            if dialog.relocate_requested:
+                dialog.relocate_requested = False
+                if self._rel_path != source_identity:
+                    dialog.set_source_changed("编辑器已切换文件，请复制结果后在目标文件应用")
+                    continue
+                selected = self._choose_table_relocation()
+                if selected is None:
+                    continue
+                model.raw_input, model.start_line = selected
+                source_cursor = self._capture_table_fragment(model.raw_input, model.start_line)
+            if replacement.strip() == model.raw_input.strip():
+                self._pending_table_text = ""
+                self._pending_table_context = None
+                self._status_label.setText("表格没有变化，未修改缓冲")
+                return True
+            ok, reason = self._replace_table_fragment(
+                model.raw_input, replacement, near_line=model.start_line,
+                source_cursor=source_cursor, source_identity=source_identity,
+            )
+            if ok:
+                self._pending_table_text = ""
+                self._pending_table_context = None
+                self._status_label.setText("表格已应用到当前缓冲（一次撤销可还原）")
+                return True
+            dialog.set_source_changed(reason)
+            dialog.setResult(QDialog.DialogCode.Rejected)
+
+    def _capture_table_fragment(self, fragment: str, near_line: int):
+        """打开时锚定原表格，QTextCursor 会随片段外的编辑移动。"""
+        from doc_tool.application.content import table_grid
+
+        lines = self._table_source_text().splitlines()
+        count = len(fragment.strip("\n").splitlines())
+        start = int(near_line or 0)
+        if (start < 1 or table_grid.fragment_digest("\n".join(lines[start - 1:start - 1 + count]))
+                != table_grid.fragment_digest(fragment)):
+            located = table_grid.locate_fragment(self._table_source_text(), fragment)
+            if not located.ok:
+                return None
+            start = located.start
+        doc = self._editor.document()
+        first = doc.findBlockByNumber(start - 1)
+        last = doc.findBlockByNumber(start + count - 2)
+        if not first.isValid() or not last.isValid():
+            return None
+        cursor = QTextCursor(doc)
+        cursor.setPosition(first.position())
+        cursor.setPosition(last.position() + last.length() - 1, QTextCursor.MoveMode.KeepAnchor)
+        return cursor
+
+    def _choose_table_relocation(self):
+        from PySide6.QtWidgets import QInputDialog
+        from doc_tool.application.content import table_grid
+
+        source = self._table_source_text()
+        lines = source.splitlines()
+        choices = {}
+        index = 0
+        while index < len(lines):
+            parsed = table_grid.table_at_line(source, index + 1)
+            if parsed.ok and parsed.model is not None:
+                model = parsed.model
+                label = "第 {0} 行：{1}".format(model.start_line, " / ".join(model.header)[:80])
+                choices[label] = (model.raw_input, model.start_line)
+                index = model.end_line
+            else:
+                index += 1
+        if not choices:
+            self._status_label.setText("没有可替换的普通表格，可复制网格 Markdown 后粘贴")
+            return None
+        label, accepted = QInputDialog.getItem(
+            self, "重新定位表格", "选择要替换的当前表格：", list(choices), 0, False,
+        )
+        return choices.get(label) if accepted else None
+
+    def _replace_table_fragment(self, fragment: str, replacement: str, *, near_line: int = 0,
+                                source_cursor=None, source_identity=None):
+        """只应用到原文件的原表格；有冲突时保留草稿供显式选择或复制。"""
+        from doc_tool.application.content import table_grid
+
+        doc = self._editor.document()
+        if source_identity is not None and self._rel_path != source_identity:
+            return False, "编辑器已切换文件，请重新定位"
+        if source_cursor is not None:
+            if (source_cursor.document() != doc or table_grid.fragment_digest(
+                    source_cursor.selectedText().replace("\u2029", "\n")) != table_grid.fragment_digest(fragment)):
+                return False, "原表格片段已被其他编辑修改，请重新定位"
+            cursor = QTextCursor(source_cursor)
+        else:
+            located = table_grid.locate_fragment(self._table_source_text(), fragment, near_line=near_line)
+            if not located.ok:
+                return False, located.reason
+            cursor = self._capture_table_fragment(fragment, located.start)
+            if cursor is None:
+                return False, "原片段的行号已超出当前文档范围，请重新定位"
+        cursor.beginEditBlock()
+        cursor.insertText(str(replacement))
+        cursor.endEditBlock()
+        self._editor.setTextCursor(cursor)
+        return True, ""
+
+    def paste_as_table(self, text=None):
+        """显式“粘贴为表格”：读剪贴板 TSV/管道表格，预览后插入；普通 Ctrl+V 不变。"""
+        from PySide6.QtWidgets import QApplication, QDialog
+
+        from doc_tool.application.content import table_grid
+        from doc_tool.ui.content.table_grid_dialog import TablePasteDialog
+
+        if not self._writable:
+            self._status_label.setText("只读项目不可插入表格")
+            return False
+        if text is None or isinstance(text, bool):
+            clipboard = QApplication.clipboard()
+            text = clipboard.text() if clipboard is not None else ""
+        result = table_grid.parse_clipboard_text(text or "")
+        dialog = TablePasteDialog(result, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        if dialog.mode == TablePasteDialog.MODE_RAW:
+            self.insert_template(dialog.raw_text())
+            self._status_label.setText("已按原文插入（未做表格转换）")
+            return True
+        markdown = dialog.markdown_text()
+        cursor = self._editor.textCursor()
+        cursor.beginEditBlock()
+        cursor.insertText(markdown)
+        cursor.endEditBlock()
+        self._editor.setTextCursor(cursor)
+        self._status_label.setText(
+            "已插入表格 {0} 行 × {1} 列（数值/日期/公式按文本保留）".format(
+                result.row_count, result.column_count,
+            )
+        )
+        return True
 
     def format_table_at_cursor(self) -> bool:
         """格式化光标所在的连续表格并接入撤销栈（Ctrl+Alt+T）。"""

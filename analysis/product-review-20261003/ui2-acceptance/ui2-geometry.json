@@ -1,0 +1,361 @@
+{
+  "platform": "Qt offscreen",
+  "limitations": [
+    "structural evidence only",
+    "no real Windows DPI/IME/Word"
+  ],
+  "records": [
+    {
+      "kind": "results-panel",
+      "requested": [
+        340,
+        640
+      ],
+      "actual": [
+        368,
+        640
+      ],
+      "minimumWidthHint": 368,
+      "stacked": true,
+      "buttons": [
+        {
+          "text": "补这次成果（原轮）",
+          "width": 360,
+          "hint": 128
+        },
+        {
+          "text": "按当前修改重新生成",
+          "width": 360,
+          "hint": 128
+        },
+        {
+          "text": "更改设置…",
+          "width": 360,
+          "hint": 80
+        },
+        {
+          "text": "换目录并重新导出…",
+          "width": 360,
+          "hint": 128
+        }
+      ],
+      "compressedButtons": []
+    },
+    {
+      "kind": "results-panel",
+      "requested": [
+        420,
+        640
+      ],
+      "actual": [
+        420,
+        640
+      ],
+      "minimumWidthHint": 368,
+      "stacked": false,
+      "buttons": [
+        {
+          "text": "补这次成果（原轮）",
+          "width": 107,
+          "hint": 128
+        },
+        {
+          "text": "按当前修改重新生成",
+          "width": 107,
+          "hint": 128
+        },
+        {
+          "text": "更改设置…",
+          "width": 80,
+          "hint": 80
+        },
+        {
+          "text": "换目录并重新导出…",
+          "width": 107,
+          "hint": 128
+        }
+      ],
+      "compressedButtons": [
+        "补这次成果（原轮）",
+        "按当前修改重新生成",
+        "换目录并重新导出…"
+      ]
+    },
+    {
+      "kind": "results-panel",
+      "requested": [
+        700,
+        640
+      ],
+      "actual": [
+        700,
+        640
+      ],
+      "minimumWidthHint": 368,
+      "stacked": false,
+      "buttons": [
+        {
+          "text": "补这次成果（原轮）",
+          "width": 170,
+          "hint": 128
+        },
+        {
+          "text": "按当前修改重新生成",
+          "width": 170,
+          "hint": 128
+        },
+        {
+          "text": "更改设置…",
+          "width": 170,
+          "hint": 80
+        },
+        {
+          "text": "换目录并重新导出…",
+          "width": 170,
+          "hint": 128
+        }
+      ],
+      "compressedButtons": []
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1024,
+        640
+      ],
+      "actual": [
+        1024,
+        640
+      ],
+      "theme": "light",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        460,
+        371
+      ],
+      "navBarRect": [
+        238,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": true,
+      "overflowKeys": [
+        "diag_build",
+        "merge",
+        "toggle_summary",
+        "close"
+      ],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1024x640-light.png"
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1024,
+        640
+      ],
+      "actual": [
+        1024,
+        640
+      ],
+      "theme": "dark",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        460,
+        371
+      ],
+      "navBarRect": [
+        238,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": true,
+      "overflowKeys": [
+        "diag_build",
+        "merge",
+        "toggle_summary",
+        "close"
+      ],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1024x640-dark.png"
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1280,
+        720
+      ],
+      "actual": [
+        1280,
+        720
+      ],
+      "theme": "light",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        925,
+        451
+      ],
+      "navBarRect": [
+        393,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": true,
+      "overflowKeys": [
+        "branch",
+        "toggle_summary",
+        "close"
+      ],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1280x720-light.png"
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1280,
+        720
+      ],
+      "actual": [
+        1280,
+        720
+      ],
+      "theme": "dark",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        925,
+        451
+      ],
+      "navBarRect": [
+        393,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": true,
+      "overflowKeys": [
+        "branch",
+        "toggle_summary",
+        "close"
+      ],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1280x720-dark.png"
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1920,
+        1080
+      ],
+      "actual": [
+        1920,
+        1080
+      ],
+      "theme": "light",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        1565,
+        811
+      ],
+      "navBarRect": [
+        1033,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": false,
+      "overflowKeys": [],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1920x1080-light.png"
+    },
+    {
+      "kind": "window",
+      "requested": [
+        1920,
+        1080
+      ],
+      "actual": [
+        1920,
+        1080
+      ],
+      "theme": "dark",
+      "devicePixelRatio": 1.0,
+      "logicalDpi": 96.0,
+      "fontFamily": "Microsoft YaHei UI",
+      "editorRect": [
+        1565,
+        811
+      ],
+      "navBarRect": [
+        1033,
+        24
+      ],
+      "quickExport": [
+        125,
+        27
+      ],
+      "quickExportSizeHint": 125,
+      "results": [
+        52,
+        27
+      ],
+      "moreVisible": false,
+      "overflowKeys": [],
+      "viewMode": "write",
+      "fontStep": 1.0,
+      "screenshot": "window-1920x1080-dark.png"
+    }
+  ]
+}

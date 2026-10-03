@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="0" time="1.547"><testsuite name="doc-tool" tests="1" failures="0" time="1.547"><testcase name="test_final_handover_report.py" classname="scripts.tests" time="1.547"><system-out>test_artifact_paths_listed_actually_exist (__main__.FinalHandoverReportTests.test_artifact_paths_listed_actually_exist) ... ok
+test_junit_counts_runner_files_in_one_shared_suite (__main__.FinalHandoverReportTests.test_junit_counts_runner_files_in_one_shared_suite) ... ok
+test_report_covers_all_changes_and_counts (__main__.FinalHandoverReportTests.test_report_covers_all_changes_and_counts) ... ok
+test_report_is_linked_from_handoff_and_readiness (__main__.FinalHandoverReportTests.test_report_is_linked_from_handoff_and_readiness) ... ok
+test_report_matches_current_state (__main__.FinalHandoverReportTests.test_report_matches_current_state) ... ok
+test_report_states_uncommitted_status (__main__.FinalHandoverReportTests.test_report_states_uncommitted_status) ... ok
+test_saved_report_count_does_not_grow_with_default_test_list (__main__.FinalHandoverReportTests.test_saved_report_count_does_not_grow_with_default_test_list) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.210s
+
+OK
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,302 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="2" time="50.000"><testsuite name="doc-tool" tests="3" failures="2" time="50.000"><testcase name="test_product_post_implementation_review.py" classname="scripts.tests" time="5.937"><system-out>test_column_move_is_one_undo_transaction (__main__.GuiReviewTests.test_column_move_is_one_undo_transaction) ... ok
+test_export_uses_current_form_after_previous_freeze (__main__.GuiReviewTests.test_export_uses_current_form_after_previous_freeze) ... ok
+test_insert_delete_column_preserves_alignment_identity (__main__.GuiReviewTests.test_insert_delete_column_preserves_alignment_identity) ... ok
+test_invalid_input_is_restored_after_save_and_reopen (__main__.GuiReviewTests.test_invalid_input_is_restored_after_save_and_reopen) ... ok
+test_normal_close_button_saves_edits (__main__.GuiReviewTests.test_normal_close_button_saves_edits) ... ok
+test_real_table_grid_and_paste_buttons_pass_no_click_boolean (__main__.GuiReviewTests.test_real_table_grid_and_paste_buttons_pass_no_click_boolean) ... ok
+test_row_move_is_one_undo_transaction (__main__.GuiReviewTests.test_row_move_is_one_undo_transaction) ... ok
+test_sample_work_does_not_block_gui_and_busy_form_is_stable (__main__.GuiReviewTests.test_sample_work_does_not_block_gui_and_busy_form_is_stable) ... ok
+test_selected_rows_move_together_without_reversing_order (__main__.GuiReviewTests.test_selected_rows_move_together_without_reversing_order) ... ok
+test_clear_resource_does_not_leave_old_terms_in_pack (__main__.PackFilesReviewTests.test_clear_resource_does_not_leave_old_terms_in_pack) ... ok
+test_latest_sample_preserves_previous_project_and_artifacts (__main__.PackFilesReviewTests.test_latest_sample_preserves_previous_project_and_artifacts) ... ok
+test_metadata_changes_are_not_reused_as_old_pack (__main__.PackFilesReviewTests.test_metadata_changes_are_not_reused_as_old_pack) ... ok
+test_same_second_freezes_keep_each_previous_artifact (__main__.PackFilesReviewTests.test_same_second_freezes_keep_each_previous_artifact) ... ok
+test_ambiguous_fragment_does_not_pick_by_distance (__main__.TableDataReviewTests.test_ambiguous_fragment_does_not_pick_by_distance) ... ok
+test_grid_multiline_serializes_as_supported_break (__main__.TableDataReviewTests.test_grid_multiline_serializes_as_supported_break) ... ok
+test_tsv_entire_empty_selection_keeps_dimensions (__main__.TableDataReviewTests.test_tsv_entire_empty_selection_keeps_dimensions) ... ok
+test_tsv_keeps_trailing_empty_and_whitespace_rows (__main__.TableDataReviewTests.test_tsv_keeps_trailing_empty_and_whitespace_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 3.239s
+
+OK
+</system-out></testcase><testcase name="test_v34_table_authoring.py" classname="scripts.tests" time="10.188"><failure message="exit code 1" type="TestFailure">test_markdown_input_and_unsupported_input (__main__.DelimitedIntakeTests.test_markdown_input_and_unsupported_input) ... ok
+test_preview_pages_large_input_without_truncating_insert (__main__.DelimitedIntakeTests.test_preview_pages_large_input_without_truncating_insert) ... ok
+test_tsv_quoted_newline_uses_supported_marker (__main__.DelimitedIntakeTests.test_tsv_quoted_newline_uses_supported_marker) ... ok
+test_tsv_quotes_leading_zeros_dates_and_formulas (__main__.DelimitedIntakeTests.test_tsv_quotes_leading_zeros_dates_and_formulas) ... ok
+test_tsv_ragged_rows_are_padded_and_reported (__main__.DelimitedIntakeTests.test_tsv_ragged_rows_are_padded_and_reported) ... ok
+test_complex_preserved_table_is_not_rewritten (__main__.TableExportTests.test_complex_preserved_table_is_not_rewritten) ... ok
+test_grid_dialog_handles_large_table_without_losing_rows (__main__.TableExportTests.test_grid_dialog_handles_large_table_without_losing_rows) ... ok
+test_large_input_measurement_records_no_truncation (__main__.TableExportTests.test_large_input_measurement_records_no_truncation) ... ok
+test_unsaved_table_reaches_docx_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_docx_without_writing_disk) ... ok
+test_unsaved_table_reaches_export_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_export_without_writing_disk) ... ok
+test_apply_grid_is_single_undo_and_keeps_other_text (__main__.TableGridGuiTests.test_apply_grid_is_single_undo_and_keeps_other_text) ... ok
+test_grid_edits_rows_columns_and_alignment (__main__.TableGridGuiTests.test_grid_edits_rows_columns_and_alignment) ... ok
+test_grid_local_undo_redo_for_rows_columns_and_cells (__main__.TableGridGuiTests.test_grid_local_undo_redo_for_rows_columns_and_cells) ... ok
+test_grid_tab_navigation_and_chinese_cell (__main__.TableGridGuiTests.test_grid_tab_navigation_and_chinese_cell) ... ok
+test_non_table_line_reports_reason_without_dialog (__main__.TableGridGuiTests.test_non_table_line_reports_reason_without_dialog) ... ok
+test_paste_as_table_inserts_full_table_and_keeps_plain_paste (__main__.TableGridGuiTests.test_paste_as_table_inserts_full_table_and_keeps_plain_paste) ... ok
+test_paste_cancel_and_raw_fallback_keep_content (__main__.TableGridGuiTests.test_paste_cancel_and_raw_fallback_keep_content) ... ok
+test_preview_dialog_pages_large_input_and_reports_support (__main__.TableGridGuiTests.test_preview_dialog_pages_large_input_and_reports_support) ... ok
+test_source_changed_keeps_pending_text_without_overwriting (__main__.TableGridGuiTests.test_source_changed_keeps_pending_text_without_overwriting) ... ok
+test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity) ... FAIL
+test_multiline_cells_use_supported_marker_in_preview_and_word (__main__.TableModelTests.test_multiline_cells_use_supported_marker_in_preview_and_word) ... ok
+test_non_table_and_broken_separator_are_rejected_with_reason (__main__.TableModelTests.test_non_table_and_broken_separator_are_rejected_with_reason) ... ok
+test_ragged_input_is_padded_with_warning_and_raw_preserved (__main__.TableModelTests.test_ragged_input_is_padded_with_warning_and_raw_preserved) ... ok
+test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment (__main__.TableModelTests.test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment) ... ok
+test_trailing_empty_columns_are_not_dropped (__main__.TableModelTests.test_trailing_empty_columns_are_not_dropped) ... ok
+
+======================================================================
+FAIL: test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_v34_table_authoring.py", line 170, in test_fragment_identity_unique_change_and_ambiguity
+    self.assertIsNotNone(resolved, "光标附近应能重新定位")
+AssertionError: unexpectedly None : 光标附近应能重新定位
+
+----------------------------------------------------------------------
+Ran 25 tests in 6.972s
+
+FAILED (failures=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\.表格工程.import-staging-64064-n8vyzy_d\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\表格工程\.state\snapshots\20261003T012843-e0e8422d\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\表格工程\.state\snapshots\20261003T012843-e0e8422d\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\.表格工程.import-staging-64064-sjpx7n4h\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\表格工程\.state\snapshots\20261003T012846-0cec268a\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\表格工程\.state\snapshots\20261003T012846-0cec268a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</failure><system-out>test_markdown_input_and_unsupported_input (__main__.DelimitedIntakeTests.test_markdown_input_and_unsupported_input) ... ok
+test_preview_pages_large_input_without_truncating_insert (__main__.DelimitedIntakeTests.test_preview_pages_large_input_without_truncating_insert) ... ok
+test_tsv_quoted_newline_uses_supported_marker (__main__.DelimitedIntakeTests.test_tsv_quoted_newline_uses_supported_marker) ... ok
+test_tsv_quotes_leading_zeros_dates_and_formulas (__main__.DelimitedIntakeTests.test_tsv_quotes_leading_zeros_dates_and_formulas) ... ok
+test_tsv_ragged_rows_are_padded_and_reported (__main__.DelimitedIntakeTests.test_tsv_ragged_rows_are_padded_and_reported) ... ok
+test_complex_preserved_table_is_not_rewritten (__main__.TableExportTests.test_complex_preserved_table_is_not_rewritten) ... ok
+test_grid_dialog_handles_large_table_without_losing_rows (__main__.TableExportTests.test_grid_dialog_handles_large_table_without_losing_rows) ... ok
+test_large_input_measurement_records_no_truncation (__main__.TableExportTests.test_large_input_measurement_records_no_truncation) ... ok
+test_unsaved_table_reaches_docx_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_docx_without_writing_disk) ... ok
+test_unsaved_table_reaches_export_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_export_without_writing_disk) ... ok
+test_apply_grid_is_single_undo_and_keeps_other_text (__main__.TableGridGuiTests.test_apply_grid_is_single_undo_and_keeps_other_text) ... ok
+test_grid_edits_rows_columns_and_alignment (__main__.TableGridGuiTests.test_grid_edits_rows_columns_and_alignment) ... ok
+test_grid_local_undo_redo_for_rows_columns_and_cells (__main__.TableGridGuiTests.test_grid_local_undo_redo_for_rows_columns_and_cells) ... ok
+test_grid_tab_navigation_and_chinese_cell (__main__.TableGridGuiTests.test_grid_tab_navigation_and_chinese_cell) ... ok
+test_non_table_line_reports_reason_without_dialog (__main__.TableGridGuiTests.test_non_table_line_reports_reason_without_dialog) ... ok
+test_paste_as_table_inserts_full_table_and_keeps_plain_paste (__main__.TableGridGuiTests.test_paste_as_table_inserts_full_table_and_keeps_plain_paste) ... ok
+test_paste_cancel_and_raw_fallback_keep_content (__main__.TableGridGuiTests.test_paste_cancel_and_raw_fallback_keep_content) ... ok
+test_preview_dialog_pages_large_input_and_reports_support (__main__.TableGridGuiTests.test_preview_dialog_pages_large_input_and_reports_support) ... ok
+test_source_changed_keeps_pending_text_without_overwriting (__main__.TableGridGuiTests.test_source_changed_keeps_pending_text_without_overwriting) ... ok
+test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity) ... FAIL
+test_multiline_cells_use_supported_marker_in_preview_and_word (__main__.TableModelTests.test_multiline_cells_use_supported_marker_in_preview_and_word) ... ok
+test_non_table_and_broken_separator_are_rejected_with_reason (__main__.TableModelTests.test_non_table_and_broken_separator_are_rejected_with_reason) ... ok
+test_ragged_input_is_padded_with_warning_and_raw_preserved (__main__.TableModelTests.test_ragged_input_is_padded_with_warning_and_raw_preserved) ... ok
+test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment (__main__.TableModelTests.test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment) ... ok
+test_trailing_empty_columns_are_not_dropped (__main__.TableModelTests.test_trailing_empty_columns_are_not_dropped) ... ok
+
+======================================================================
+FAIL: test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_v34_table_authoring.py", line 170, in test_fragment_identity_unique_change_and_ambiguity
+    self.assertIsNotNone(resolved, "光标附近应能重新定位")
+AssertionError: unexpectedly None : 光标附近应能重新定位
+
+----------------------------------------------------------------------
+Ran 25 tests in 6.972s
+
+FAILED (failures=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\.表格工程.import-staging-64064-n8vyzy_d\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\表格工程\.state\snapshots\20261003T012843-e0e8422d\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-64064-1\表格工程\.state\snapshots\20261003T012843-e0e8422d\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\.表格工程.import-staging-64064-sjpx7n4h\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\表格工程\.state\snapshots\20261003T012846-0cec268a\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-64064-1\表格工程\.state\snapshots\20261003T012846-0cec268a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v35_standard_pack.py" classname="scripts.tests" time="33.875"><failure message="exit code 1" type="TestFailure">test_make_freeze_export_and_colleague_consumption (__main__.PackClosedLoopTests.test_make_freeze_export_and_colleague_consumption) ... ok
+test_source_with_sensitive_config_is_excluded_from_share (__main__.PackClosedLoopTests.test_source_with_sensitive_config_is_excluded_from_share) ... ok
+test_dialog_creates_draft_from_project_and_locates_missing_identity (__main__.PackDialogTests.test_dialog_creates_draft_from_project_and_locates_missing_identity) ... ok
+test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow) ... FAIL
+test_incomplete_draft_saves_and_reports_export_block (__main__.PackDialogTests.test_incomplete_draft_saves_and_reports_export_block) ... ok
+test_invalid_json_keeps_input_and_blocks_freeze (__main__.PackDialogTests.test_invalid_json_keeps_input_and_blocks_freeze) ... ok
+test_narrow_window_keyboard_and_no_project_dependency (__main__.PackDialogTests.test_narrow_window_keyboard_and_no_project_dependency) ... ok
+test_bad_optional_resource_falls_back_without_blocking (__main__.PackDraftTests.test_bad_optional_resource_falls_back_without_blocking) ... ok
+test_draft_from_project_copies_resources_without_touching_source (__main__.PackDraftTests.test_draft_from_project_copies_resources_without_touching_source) ... ok
+test_freeze_reuses_same_digest_and_never_overwrites_changed_version (__main__.PackDraftTests.test_freeze_reuses_same_digest_and_never_overwrites_changed_version) ... ok
+test_frozen_pack_is_consumable_and_resources_read_back (__main__.PackDraftTests.test_frozen_pack_is_consumable_and_resources_read_back) ... ok
+test_incomplete_draft_can_be_saved_and_reopened (__main__.PackDraftTests.test_incomplete_draft_can_be_saved_and_reopened) ... ok
+test_project_resources_map_to_pack_resources (__main__.PackDraftTests.test_project_resources_map_to_pack_resources) ... ok
+test_unknown_declarative_content_is_preserved (__main__.PackDraftTests.test_unknown_declarative_content_is_preserved) ... ok
+test_export_zip_contains_only_declared_resources (__main__.PackZipAndSampleTests.test_export_zip_contains_only_declared_resources) ... ok
+test_exported_zip_roundtrips_through_existing_loader (__main__.PackZipAndSampleTests.test_exported_zip_roundtrips_through_existing_loader) ... ok
+test_invalid_structure_keeps_draft_without_fake_installable (__main__.PackZipAndSampleTests.test_invalid_structure_keeps_draft_without_fake_installable) ... ok
+test_missing_optional_asset_is_listed_not_fatal (__main__.PackZipAndSampleTests.test_missing_optional_asset_is_listed_not_fatal) ... ok
+test_sample_evidence_becomes_stale_after_draft_change (__main__.PackZipAndSampleTests.test_sample_evidence_becomes_stale_after_draft_change) ... ok
+test_sample_runs_isolated_and_records_identity (__main__.PackZipAndSampleTests.test_sample_runs_isolated_and_records_identity) ... ok
+
+======================================================================
+FAIL: test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_v35_standard_pack.py", line 403, in test_freeze_export_listing_and_sample_flow
+    self.assertGreater(self.dialog.sample_table.rowCount(), 0)
+AssertionError: 0 not greater than 0
+
+----------------------------------------------------------------------
+Ran 20 tests in 30.924s
+
+FAILED (failures=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\.来源项目.import-staging-44108-krs3gkrb\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\制作目录\sample\round-bef4bdf56548475fafeb7f27bedf1454\sample-project\.state\snapshots\20261003T012852-601e0100\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\制作目录\sample\round-bef4bdf56548475fafeb7f27bedf1454\sample-project\.state\snapshots\20261003T012852-601e0100\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\.来源项目.import-staging-44108-ogvldd06\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-1\.来源项目.import-staging-44108-b2wa2glz\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-1\.来源项目.import-staging-44108-cukiegds\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-78qea581\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-zp37wmye\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-bidgo3mm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-day_1d8b\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-cz6r0hux\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-h_ov7sk1\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-trhkxo4q\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-8s8nepmm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-90sdi8i_\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-pjhnwho2\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-8uj1il_d\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-w0ey_73a\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-p2gzmsas\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-mogp2npf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-vslyh05h\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-788db81b843443388df72121854d72cd\sample-project\.state\snapshots\20261003T012916-810e6b46\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-788db81b843443388df72121854d72cd\sample-project\.state\snapshots\20261003T012916-810e6b46\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-be758744cb9141e2ad8b90c31cc553a9\sample-project\.state\snapshots\20261003T012918-07373216\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-be758744cb9141e2ad8b90c31cc553a9\sample-project\.state\snapshots\20261003T012918-07373216\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-ek9ub1oh\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-a41c5195f05741c98a7590afcaaf61b4\sample-project\.state\snapshots\20261003T012920-6d976bb9\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-a41c5195f05741c98a7590afcaaf61b4\sample-project\.state\snapshots\20261003T012920-6d976bb9\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</failure><system-out>test_make_freeze_export_and_colleague_consumption (__main__.PackClosedLoopTests.test_make_freeze_export_and_colleague_consumption) ... ok
+test_source_with_sensitive_config_is_excluded_from_share (__main__.PackClosedLoopTests.test_source_with_sensitive_config_is_excluded_from_share) ... ok
+test_dialog_creates_draft_from_project_and_locates_missing_identity (__main__.PackDialogTests.test_dialog_creates_draft_from_project_and_locates_missing_identity) ... ok
+test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow) ... FAIL
+test_incomplete_draft_saves_and_reports_export_block (__main__.PackDialogTests.test_incomplete_draft_saves_and_reports_export_block) ... ok
+test_invalid_json_keeps_input_and_blocks_freeze (__main__.PackDialogTests.test_invalid_json_keeps_input_and_blocks_freeze) ... ok
+test_narrow_window_keyboard_and_no_project_dependency (__main__.PackDialogTests.test_narrow_window_keyboard_and_no_project_dependency) ... ok
+test_bad_optional_resource_falls_back_without_blocking (__main__.PackDraftTests.test_bad_optional_resource_falls_back_without_blocking) ... ok
+test_draft_from_project_copies_resources_without_touching_source (__main__.PackDraftTests.test_draft_from_project_copies_resources_without_touching_source) ... ok
+test_freeze_reuses_same_digest_and_never_overwrites_changed_version (__main__.PackDraftTests.test_freeze_reuses_same_digest_and_never_overwrites_changed_version) ... ok
+test_frozen_pack_is_consumable_and_resources_read_back (__main__.PackDraftTests.test_frozen_pack_is_consumable_and_resources_read_back) ... ok
+test_incomplete_draft_can_be_saved_and_reopened (__main__.PackDraftTests.test_incomplete_draft_can_be_saved_and_reopened) ... ok
+test_project_resources_map_to_pack_resources (__main__.PackDraftTests.test_project_resources_map_to_pack_resources) ... ok
+test_unknown_declarative_content_is_preserved (__main__.PackDraftTests.test_unknown_declarative_content_is_preserved) ... ok
+test_export_zip_contains_only_declared_resources (__main__.PackZipAndSampleTests.test_export_zip_contains_only_declared_resources) ... ok
+test_exported_zip_roundtrips_through_existing_loader (__main__.PackZipAndSampleTests.test_exported_zip_roundtrips_through_existing_loader) ... ok
+test_invalid_structure_keeps_draft_without_fake_installable (__main__.PackZipAndSampleTests.test_invalid_structure_keeps_draft_without_fake_installable) ... ok
+test_missing_optional_asset_is_listed_not_fatal (__main__.PackZipAndSampleTests.test_missing_optional_asset_is_listed_not_fatal) ... ok
+test_sample_evidence_becomes_stale_after_draft_change (__main__.PackZipAndSampleTests.test_sample_evidence_becomes_stale_after_draft_change) ... ok
+test_sample_runs_isolated_and_records_identity (__main__.PackZipAndSampleTests.test_sample_runs_isolated_and_records_identity) ... ok
+
+======================================================================
+FAIL: test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_v35_standard_pack.py", line 403, in test_freeze_export_listing_and_sample_flow
+    self.assertGreater(self.dialog.sample_table.rowCount(), 0)
+AssertionError: 0 not greater than 0
+
+----------------------------------------------------------------------
+Ran 20 tests in 30.924s
+
+FAILED (failures=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\.来源项目.import-staging-44108-krs3gkrb\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\制作目录\sample\round-bef4bdf56548475fafeb7f27bedf1454\sample-project\.state\snapshots\20261003T012852-601e0100\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\制作目录\sample\round-bef4bdf56548475fafeb7f27bedf1454\sample-project\.state\snapshots\20261003T012852-601e0100\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-44108-1\.来源项目.import-staging-44108-ogvldd06\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-1\.来源项目.import-staging-44108-b2wa2glz\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-1\.来源项目.import-staging-44108-cukiegds\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-78qea581\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-zp37wmye\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-44108-2\.来源项目.import-staging-44108-bidgo3mm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-day_1d8b\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-cz6r0hux\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-h_ov7sk1\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-trhkxo4q\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-8s8nepmm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-90sdi8i_\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-44108-1\.来源项目.import-staging-44108-pjhnwho2\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-8uj1il_d\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-w0ey_73a\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-p2gzmsas\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-mogp2npf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-vslyh05h\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-788db81b843443388df72121854d72cd\sample-project\.state\snapshots\20261003T012916-810e6b46\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-788db81b843443388df72121854d72cd\sample-project\.state\snapshots\20261003T012916-810e6b46\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-be758744cb9141e2ad8b90c31cc553a9\sample-project\.state\snapshots\20261003T012918-07373216\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-be758744cb9141e2ad8b90c31cc553a9\sample-project\.state\snapshots\20261003T012918-07373216\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\.来源项目.import-staging-44108-ek9ub1oh\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-a41c5195f05741c98a7590afcaaf61b4\sample-project\.state\snapshots\20261003T012920-6d976bb9\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-44108-1\制作目录\sample\round-a41c5195f05741c98a7590afcaaf61b4\sample-project\.state\snapshots\20261003T012920-6d976bb9\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,45 @@
+{
+  "markdownFiles": 27,
+  "localLinks": 179,
+  "plannedChanges": [
+    {
+      "change": "product-v37-daily-workflow-ux",
+      "done": 0,
+      "tasks": 20
+    },
+    {
+      "change": "product-v38-authoring-and-exchange-ux",
+      "done": 0,
+      "tasks": 20
+    },
+    {
+      "change": "product-v39-rd-workspace-productivity",
+      "done": 0,
+      "tasks": 20
+    }
+  ],
+  "compiledSources": 14,
+  "reports": [
+    {
+      "file": "related-final.xml",
+      "files": 27,
+      "internalCases": 552,
+      "failuresAndErrors": 0
+    },
+    {
+      "file": "pack-export-final.xml",
+      "files": 4,
+      "internalCases": 75,
+      "failuresAndErrors": 0
+    },
+    {
+      "file": "handover-final.xml",
+      "files": 1,
+      "internalCases": 7,
+      "failuresAndErrors": 0
+    }
+  ],
+  "screenshots": 44,
+  "defaultTestFiles": 172,
+  "editorRestoredBlob": "c65c4a36ea76f9dd6b598197d781f4eaf522d232"
+}

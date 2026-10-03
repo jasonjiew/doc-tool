@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="0" time="21.657"><testsuite name="doc-tool" tests="3" failures="0" time="21.657"><testcase name="test_content_operations.py" classname="scripts.tests" time="9.219"><system-out>...................QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 8.307s
+
+OK
+</system-out></testcase><testcase name="test_format_check_search.py" classname="scripts.tests" time="2.719"><system-out>...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.355s
+
+OK
+</system-out></testcase><testcase name="test_v33_background_index.py" classname="scripts.tests" time="9.719"><system-out>test_background_index_task_supports_cancel (__main__.BackgroundIndexTests.test_background_index_task_supports_cancel) ... ok
+test_build_index_task_reports_batches_and_writes_cache (__main__.BackgroundIndexTests.test_build_index_task_reports_batches_and_writes_cache) ... ok
+test_panel_searches_immediately_then_indexes_in_background (__main__.BackgroundIndexTests.test_panel_searches_immediately_then_indexes_in_background) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_duplicate_sources_are_deduped (__main__.SourceDedupTests.test_duplicate_sources_are_deduped) ... ok
+test_large_scope_search_stays_bounded_without_index (__main__.SourceDedupTests.test_large_scope_search_stays_bounded_without_index) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 7.783s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-bg-index-51764-1\.proj.import-staging-51764-7y9xv08g\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-bg-index-51764-1\.proj.import-staging-51764-7xga4wme\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-bg-index-51764-1\.proj.import-staging-51764-196zqa9u\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-dedup-51764-1\.proj.import-staging-51764-8nb7bjcc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-dedup-51764-1\.proj.import-staging-51764-b2nm9dvy\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v33-dedup-51764-1\large\.proj.import-staging-51764-lqu_eqyu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+LARGE_SEARCH_JSON:{"chapters": 120, "seconds": 0.275, "hits": 120}
+</system-out></testcase></testsuite></testsuites>

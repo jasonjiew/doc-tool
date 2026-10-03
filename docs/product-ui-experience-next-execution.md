@@ -1,6 +1,6 @@
 # UI2 执行台账与持续指令
 
-日期：2026-10-02。本包 `product-ui-experience-next`，6 批 / 26 项；当前 0/26 实施项完成。计划基于当时 `2e5be72` 工作树，不要求清空、提交或回滚其他任务的改动。
+更新：2026-10-03。本包 `product-ui-experience-next`，6 批 / 26 项；当前 tasks 已勾选25/26，6.3实机待验收，实现已提交到 `d68b514`。规划时基于 `2e5be72` 工作树；下方保留各批当时记录。当前工作树已完成 [EX-1～EX-3 导出修正](product-execution-review-20261003.md)：原捕获/身份、部分范围再生成与换目录；新会话从 RD 接续。
 
 ## 1. 输入与状态
 
@@ -9,16 +9,16 @@
 - [4份能力规范](../openspec/changes/product-ui-experience-next/specs)、[26项任务](../openspec/changes/product-ui-experience-next/tasks.md)
 - [总路线图](product-master-roadmap.md)、[普通流程与兜底](product-flow-fallback-policy.md)
 
-上一轮 `product-ui-interaction-polish` 读取为 19/20，未完成项是实机验证 5.3；该实现与任务记录保留。本包没有启动业务实施，没有向其他会话发送消息。
+上一轮 `product-ui-interaction-polish` 为19/20，未完成项是实机验证5.3；本包25项已实施。三个导出差额和工具按钮主题修正已在独立复核台账记录，原任务编号与勾选保留，实机缺项单列；跨包后续使用 [确认版持续提示词](product-execution-confirmed-prompt.md)。
 
 | 批次 | 编号 | 当前 | 完成后记录 |
 |---|---|---|---|
 | UI2-A | 1.1～1.4 | 完成 4/4 | before/after 审计、主条零裁切、共享动作/焦点（见下方 UI2-A 记录） |
-| UI2-B | 2.1～2.4 | 待执行 | 首页继续/固定/过滤、兼容会话 |
-| UI2-C | 3.1～3.5 | 待执行 | 真实路径、位置历史、阅读与脏缓冲 |
-| UI2-D | 4.1～4.5 | 待执行 | 表单请求、导出范围/来源、实际文件 |
-| UI2-E | 5.1～5.4 | 待执行 | 窄面板、历史身份、局部成功与取消 |
-| UI2-F | 6.1～6.4 | 待执行 | 场景/回归/实机边界/交接 |
+| UI2-B | 2.1～2.4 | 完成 4/4 | 首页继续/固定/过滤、兼容会话 |
+| UI2-C | 3.1～3.5 | 完成 5/5 | 真实路径、位置历史、阅读与脏缓冲 |
+| UI2-D | 4.1～4.5 | 已勾选 5/5 | 表单已实现；EX-3 已修复并验证部分范围新轮 |
+| UI2-E | 5.1～5.4 | 已勾选 4/4 | 窄面板已实现；EX-1/EX-2 已修复并补回归 |
+| UI2-F | 6.1～6.4 | 完成 3/4 | 6.3实机待验收；新增反例回归已登记默认清单 |
 
 ## 2. 本次规划证据
 
@@ -192,14 +192,20 @@ after（analysis/ui-experience-next-after-20261002/widget-audit.json）：
 命令：python scripts/tests/run_tests.py --junit analysis/ui2-final.xml
 结果：163 个测试文件 / 0 失败 / 1757s（analysis/ui2-final.xml，日志 analysis/ui2-final.log）。
 该次运行在注册 test_ui2_acceptance.py 之前启动；该文件单独运行通过（见上方 6.1）并已补登记进 runner，
-所以 runner 清单现为 164 个文件（= 163 + test_ui2_acceptance.py）。
+该次补登记后 runner 为 164 个文件（= 163 + test_ui2_acceptance.py）；10-03新增修正回归后为165。
 命令：openspec validate product-ui-experience-next --strict
 结果：Change 'product-ui-experience-next' is valid（仅证明结构，不是业务验收）
 
-注册新增用例（均已进入 runner 默认清单，文件数 149（上一轮基线）→ 163）：
+UI2新增七个文件（现均已进入默认清单；UI/UI2合计默认文件数149→164，历史全量运行包含163）：
   test_ui2_visual_hierarchy.py、test_ui2_home_continue.py、test_ui2_navigation.py、test_ui2_reading_view.py、
   test_ui2_export_settings.py、test_ui2_panel_productivity.py、test_ui2_acceptance.py。
-共新增 71 项用例（项级），全部在最终回归中通过。
+2026-10-03独立专项执行上述七文件共66个内部用例，全部通过，acceptance输出到独立目录。
+证据：analysis/product-review-20261003/direct-checks.xml。
+另一个观察脚本确认EX-1～EX-3三个未覆盖差额；它退出0代表诊断成功，不代表需求通过。
+复核阶段未重跑164文件全量；修正后默认清单为165，本次只运行相关专项，不能冒充全量。
+原acceptance截图缺中文字形，仅能说明当时环境中的几何；2026-10-03注册现有Microsoft YaHei后重复3个闭环/窗口/面板用例通过。
+可读中文字形证据：analysis/product-review-20261003/ui2-acceptance-with-fonts/，复验报告font-checks.xml。
+该截图中的深色更多/标题工具按钮文字偏淡，记为UI-V1；10-03已补原主题令牌映射，修正后的字体截图及相关回归见独立修正台账。不将几何通过等同于对比度通过。
 
 本轮修复的真实回归（修复后才勾任务）：
 1. 恢复滚动位置必须在恢复光标之后（否则被自动滚动顶掉）；
@@ -219,7 +225,7 @@ after（analysis/ui-experience-next-after-20261002/widget-audit.json）：
 
 核对实际 HEAD、工作树、已有实现和任务勾选。上一轮 product-ui-interaction-polish 的实现保留，不重做旧20项，不回滚其他任务改动，不把旧实机5.3或归档作为全局前置条件。新任务已被最新代码满足则补真实证据，不重写。
 
-默认按 UI2-A→B→C→D→E→F，逐项持续实现26项中的可执行工作。每批跑通真实GUI入口和直接场景，保存证据后勾任务、更新独立台账，然后继续下一批。不要因每批结束反复停下请求确认，普通实现选择自行判断。上下文压缩后从tasks和台账继续。
+读取时已25/26，EX-1～EX-3也已完成并关联原4.4/5.2证据；不重新执行已实现的A～E或重复修正。6.3缺实机时单列待验收。跨包连续执行以docs/product-execution-confirmed-prompt.md为准，直接接RD→V3.4→V3.5→V3.6。普通选择自行判断，按真实入口验证和独立台账续接，上下文压缩后从tasks/台账恢复。
 
 核心目标：中文长名/窄窗口主按钮可读；首页继续/固定；章节路径、后退前进和阅读字号；真实多格式/范围/来源/有限版式导出设置；340px成果/辅助面板；可信历史引用与旧轮报告身份；批次局部恢复。复用原Qt主题、QAction、会话、ExportRequest/ExportScope/LayoutProfile、TaskRunner、报告/OutputState、模块/建议/队列，避免新增第二套业务状态机。
 
@@ -241,4 +247,4 @@ after（analysis/ui-experience-next-after-20261002/widget-audit.json）：
 | `check_plan.py` | 退出码0；6批26项，4能力、18要求、30场景，54个本地链接有效，无错误 |
 | `git diff --check -- docs/product-master-roadmap.md` | 退出码0 |
 
-结构证据见 [plan-check.json](../analysis/ui-experience-next-audit-20261002/plan-check.json)。业务实施状态仍为 0/26；不把文档完整计为功能完成。
+结构证据见 [plan-check.json](../analysis/ui-experience-next-audit-20261002/plan-check.json)，它是规划时记录。当前实施勾选25/26；新复核差额见独立修正台账，6.3保持实机待验收。文档完整、历史测试通过和任务勾选均不能替代新反例的真实修正。

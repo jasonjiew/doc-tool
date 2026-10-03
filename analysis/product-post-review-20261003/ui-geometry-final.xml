@@ -1,0 +1,88 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="2" failures="1" time="12.078"><testsuite name="doc-tool" tests="2" failures="1" time="12.078"><testcase name="test_ui_polish_toolbar.py" classname="scripts.tests" time="4.250"><failure message="exit code 1" type="TestFailure">test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 114, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.142s
+
+FAILED (failures=1)
+</failure><system-out>test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 114, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.142s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_product_post_implementation_review.py" classname="scripts.tests" time="7.828"><system-out>test_anchored_grid_does_not_modify_another_identical_table (__main__.GuiReviewTests.test_anchored_grid_does_not_modify_another_identical_table) ... ok
+test_anchored_grid_tracks_external_edit_and_undo_restores_table_only (__main__.GuiReviewTests.test_anchored_grid_tracks_external_edit_and_undo_restores_table_only) ... ok
+test_cancelled_grid_draft_reopens_and_applies (__main__.GuiReviewTests.test_cancelled_grid_draft_reopens_and_applies) ... ok
+test_column_move_is_one_undo_transaction (__main__.GuiReviewTests.test_column_move_is_one_undo_transaction) ... ok
+test_export_uses_current_form_after_previous_freeze (__main__.GuiReviewTests.test_export_uses_current_form_after_previous_freeze) ... ok
+test_grid_rejects_file_switch (__main__.GuiReviewTests.test_grid_rejects_file_switch) ... ok
+test_insert_delete_column_preserves_alignment_identity (__main__.GuiReviewTests.test_insert_delete_column_preserves_alignment_identity) ... ok
+test_invalid_input_is_restored_after_save_and_reopen (__main__.GuiReviewTests.test_invalid_input_is_restored_after_save_and_reopen) ... ok
+test_normal_close_button_saves_edits (__main__.GuiReviewTests.test_normal_close_button_saves_edits) ... ok
+test_pack_small_window_keeps_readable_editors_and_dark_scroll_background (__main__.GuiReviewTests.test_pack_small_window_keeps_readable_editors_and_dark_scroll_background) ... ok
+test_real_table_grid_and_paste_buttons_pass_no_click_boolean (__main__.GuiReviewTests.test_real_table_grid_and_paste_buttons_pass_no_click_boolean) ... ok
+test_replacing_emoji_table_keeps_no_partial_source (__main__.GuiReviewTests.test_replacing_emoji_table_keeps_no_partial_source) ... ok
+test_row_move_is_one_undo_transaction (__main__.GuiReviewTests.test_row_move_is_one_undo_transaction) ... ok
+test_sample_work_does_not_block_gui_and_busy_form_is_stable (__main__.GuiReviewTests.test_sample_work_does_not_block_gui_and_busy_form_is_stable) ... ok
+test_selected_rows_move_together_without_reversing_order (__main__.GuiReviewTests.test_selected_rows_move_together_without_reversing_order) ... ok
+test_toolbar_really_fits_and_labels_do_not_overlap_after_resize (__main__.GuiReviewTests.test_toolbar_really_fits_and_labels_do_not_overlap_after_resize) ... ok
+test_clear_resource_does_not_leave_old_terms_in_pack (__main__.PackFilesReviewTests.test_clear_resource_does_not_leave_old_terms_in_pack) ... ok
+test_latest_sample_preserves_previous_project_and_artifacts (__main__.PackFilesReviewTests.test_latest_sample_preserves_previous_project_and_artifacts) ... ok
+test_metadata_changes_are_not_reused_as_old_pack (__main__.PackFilesReviewTests.test_metadata_changes_are_not_reused_as_old_pack) ... ok
+test_missing_sample_record_does_not_capture_latest_source (__main__.PackFilesReviewTests.test_missing_sample_record_does_not_capture_latest_source) ... ok
+test_retry_sample_uses_original_capture_after_draft_changes (__main__.PackFilesReviewTests.test_retry_sample_uses_original_capture_after_draft_changes) ... ok
+test_same_freeze_identity_cannot_reuse_corrupted_artifact (__main__.PackFilesReviewTests.test_same_freeze_identity_cannot_reuse_corrupted_artifact) ... ok
+test_same_second_freezes_keep_each_previous_artifact (__main__.PackFilesReviewTests.test_same_second_freezes_keep_each_previous_artifact) ... ok
+test_ambiguous_fragment_does_not_pick_by_distance (__main__.TableDataReviewTests.test_ambiguous_fragment_does_not_pick_by_distance) ... ok
+test_grid_multiline_serializes_as_supported_break (__main__.TableDataReviewTests.test_grid_multiline_serializes_as_supported_break) ... ok
+test_tsv_entire_empty_selection_keeps_dimensions (__main__.TableDataReviewTests.test_tsv_entire_empty_selection_keeps_dimensions) ... ok
+test_tsv_keeps_trailing_empty_and_whitespace_rows (__main__.TableDataReviewTests.test_tsv_keeps_trailing_empty_and_whitespace_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 4.923s
+
+OK
+</system-out></testcase></testsuite></testsuites>

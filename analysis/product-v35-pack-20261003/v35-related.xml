@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="5" failures="0" time="48.859"><testsuite name="doc-tool" tests="5" failures="0" time="48.859"><testcase name="test_v35_standard_pack.py" classname="scripts.tests" time="37.766"><system-out>test_make_freeze_export_and_colleague_consumption (__main__.PackClosedLoopTests.test_make_freeze_export_and_colleague_consumption) ... ok
+test_source_with_sensitive_config_is_excluded_from_share (__main__.PackClosedLoopTests.test_source_with_sensitive_config_is_excluded_from_share) ... ok
+test_dialog_creates_draft_from_project_and_locates_missing_identity (__main__.PackDialogTests.test_dialog_creates_draft_from_project_and_locates_missing_identity) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow) ... ok
+test_incomplete_draft_saves_and_reports_export_block (__main__.PackDialogTests.test_incomplete_draft_saves_and_reports_export_block) ... ok
+test_invalid_json_keeps_input_and_blocks_freeze (__main__.PackDialogTests.test_invalid_json_keeps_input_and_blocks_freeze) ... ok
+test_narrow_window_keyboard_and_no_project_dependency (__main__.PackDialogTests.test_narrow_window_keyboard_and_no_project_dependency) ... ok
+test_bad_optional_resource_falls_back_without_blocking (__main__.PackDraftTests.test_bad_optional_resource_falls_back_without_blocking) ... ok
+test_draft_from_project_copies_resources_without_touching_source (__main__.PackDraftTests.test_draft_from_project_copies_resources_without_touching_source) ... ok
+test_freeze_reuses_same_digest_and_never_overwrites_changed_version (__main__.PackDraftTests.test_freeze_reuses_same_digest_and_never_overwrites_changed_version) ... ok
+test_frozen_pack_is_consumable_and_resources_read_back (__main__.PackDraftTests.test_frozen_pack_is_consumable_and_resources_read_back) ... ok
+test_incomplete_draft_can_be_saved_and_reopened (__main__.PackDraftTests.test_incomplete_draft_can_be_saved_and_reopened) ... ok
+test_project_resources_map_to_pack_resources (__main__.PackDraftTests.test_project_resources_map_to_pack_resources) ... ok
+test_unknown_declarative_content_is_preserved (__main__.PackDraftTests.test_unknown_declarative_content_is_preserved) ... ok
+test_export_zip_contains_only_declared_resources (__main__.PackZipAndSampleTests.test_export_zip_contains_only_declared_resources) ... ok
+test_exported_zip_roundtrips_through_existing_loader (__main__.PackZipAndSampleTests.test_exported_zip_roundtrips_through_existing_loader) ... ok
+test_invalid_structure_keeps_draft_without_fake_installable (__main__.PackZipAndSampleTests.test_invalid_structure_keeps_draft_without_fake_installable) ... ok
+test_missing_optional_asset_is_listed_not_fatal (__main__.PackZipAndSampleTests.test_missing_optional_asset_is_listed_not_fatal) ... ok
+test_sample_evidence_becomes_stale_after_draft_change (__main__.PackZipAndSampleTests.test_sample_evidence_becomes_stale_after_draft_change) ... ok
+test_sample_runs_isolated_and_records_identity (__main__.PackZipAndSampleTests.test_sample_runs_isolated_and_records_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 34.558s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-16040-1\.来源项目.import-staging-16040-m48cg2_8\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181640-8d1188c9\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181640-8d1188c9\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-16040-1\.来源项目.import-staging-16040-s2zwivgw\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\.来源项目.import-staging-16040-4f_fl3rs\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\.来源项目.import-staging-16040-xsdylnbc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181646-8055018f\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181646-8055018f\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\.来源项目.import-staging-16040-pxq8k2co\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\.来源项目.import-staging-16040-zgbg4l6e\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-16040-1\.来源项目.import-staging-16040-f85ww7z_\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-y1984f6z\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-z8vr5545\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-3giwxal7\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-7cujjf5n\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-gsk6rp4x\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-zyqsw2qj\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-16040-1\.来源项目.import-staging-16040-z3k04dce\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-hu5ggv57\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-fz_ed7xr\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-y3w1sdf7\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-es0k_54u\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-xi7t7gkm\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181707-205931a1\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181707-205931a1\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181709-a38c9cfa\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181709-a38c9cfa\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\.来源项目.import-staging-16040-x4p6bypv\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181711-ed81fce4\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-16040-1\制作目录\sample\sample-project\.state\snapshots\20261002T181711-ed81fce4\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_standard_pack_v28.py" classname="scripts.tests" time="1.843"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.489s
+
+OK
+</system-out></testcase><testcase name="test_project_from_pack_v28.py" classname="scripts.tests" time="3.016"><system-out>........
+----------------------------------------------------------------------
+Ran 8 tests in 1.274s
+
+OK
+</system-out></testcase><testcase name="test_bundled_standards_v28.py" classname="scripts.tests" time="3.875"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.830s
+
+OK
+</system-out></testcase><testcase name="test_settings_v28.py" classname="scripts.tests" time="2.359"><system-out>..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.560s
+
+OK
+</system-out></testcase></testsuite></testsuites>

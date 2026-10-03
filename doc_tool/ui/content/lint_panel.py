@@ -46,6 +46,9 @@ from doc_tool.application.content.lint import (
 _RULE_LABELS = RULE_LABELS
 _SEVERITY_LABELS = SEVERITY_LABELS
 
+#: V3.6 36-D：问题列表单页渲染条数（“显示更多”逐页增加，内容不截断）。
+ISSUE_PAGE_SIZE = 200
+
 
 class LintTreeItem(QTreeWidgetItem):
     """支持按自然路径与数值行号排序的树条目。"""
@@ -302,8 +305,13 @@ class LintPanel(QWidget):
         return [idx for idx, issue in enumerate(self._issues) if id(issue) in filtered_ids]
 
     def _render_results(self) -> None:
+        """渲染筛选后的结果；V3.6 36-D：大列表分页，避免一次插入上万行卡住界面。"""
         self._tree.clear()
         indices = self._filtered_issue_indices()
+        total_filtered = len(indices)
+        page_size = max(1, int(getattr(self, "_page_size", ISSUE_PAGE_SIZE)))
+        indices = indices[:page_size]
+        self._paged_total = total_filtered
         for idx in indices:
             issue = self._issues[idx]
             rule_label = RULE_LABELS.get(issue.rule_id, issue.rule_id)
@@ -330,9 +338,21 @@ class LintPanel(QWidget):
         total_cnt = len(self._issues)
         shown_cnt = len(indices)
         fixable_cnt = sum(1 for idx in indices if can_quick_fix(self._issues[idx]))
+        paged = total_filtered > shown_cnt
+        if hasattr(self, "_more_btn"):
+            self._more_btn.setVisible(paged)
+            self._more_btn.setText(
+                "显示更多…（已显示 {0}/{1}）".format(shown_cnt, total_filtered)
+            )
 
         if total_cnt == 0:
             self._status_label.setText("✓ 检查通过，未发现问题")
+        elif paged:
+            self._status_label.setText(
+                "已显示前 {0} / 共 {1} 项（其中 {2} 项支持 ⚡ 一键修复）——可继续显示更多".format(
+                    shown_cnt, total_filtered, fixable_cnt,
+                )
+            )
         elif shown_cnt == 0:
             self._status_label.setText(
                 "无匹配结果（共 {0} 项已按分类/关键词筛选排除）".format(total_cnt)
@@ -371,6 +391,13 @@ class LintPanel(QWidget):
         self._render_results()
 
     def _on_filter_changed(self) -> None:
+        # 筛选条件变化回到第一页，避免“筛选后只剩下一页尾部”的错觉。
+        self._page_size = ISSUE_PAGE_SIZE
+        self._render_results()
+
+    def _show_more_issues(self) -> None:
+        """每点一次多显示一页；实际内容不截断。"""
+        self._page_size = max(1, int(getattr(self, "_page_size", ISSUE_PAGE_SIZE))) + ISSUE_PAGE_SIZE
         self._render_results()
 
     def _build_results(self) -> None:
@@ -396,6 +423,13 @@ class LintPanel(QWidget):
         self._status_label = QLabel("", self)
         self._status_label.setObjectName("statusMuted")
         bottom_bar.addWidget(self._status_label, 1)
+
+        self._more_btn = QPushButton("显示更多…", self)
+        self._more_btn.setProperty("btnRole", "compact")
+        self._more_btn.setToolTip("分页显示更多问题（大项目一次渲染过多会卡住界面）")
+        self._more_btn.clicked.connect(self._show_more_issues)
+        self._more_btn.hide()
+        bottom_bar.addWidget(self._more_btn)
 
         self._quick_fix_btn = QPushButton("⚡ 一键修复", self)
         self._quick_fix_btn.setProperty("btnRole", "compact")
@@ -439,6 +473,7 @@ class LintPanel(QWidget):
         persist_error = self._terms.save(terms)
         issues = self._linter.check_all(terms)
         self._issues = list(issues)
+        self._page_size = ISSUE_PAGE_SIZE
         if self._on_issues is not None:
             self._on_issues(issues)
         self._refresh_category_combo()

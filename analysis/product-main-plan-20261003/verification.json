@@ -1,0 +1,46 @@
+{
+  "status": "complete",
+  "planningOnly": true,
+  "businessTestsRun": false,
+  "changes": [
+    {
+      "change": "product-main-workflow-optimization",
+      "done": 0,
+      "tasks": 24,
+      "batches": 6,
+      "specs": 3,
+      "strict": "passed"
+    },
+    {
+      "change": "product-v37-daily-workflow-ux",
+      "done": 0,
+      "tasks": 20,
+      "batches": 5,
+      "specs": 2,
+      "strict": "passed"
+    },
+    {
+      "change": "product-v38-authoring-and-exchange-ux",
+      "done": 0,
+      "tasks": 20,
+      "batches": 5,
+      "specs": 2,
+      "strict": "passed"
+    },
+    {
+      "change": "product-v39-rd-workspace-productivity",
+      "done": 0,
+      "tasks": 20,
+      "batches": 5,
+      "specs": 2,
+      "strict": "passed"
+    }
+  ],
+  "batches": 21,
+  "tasks": 84,
+  "done": 0,
+  "markdownFilesChecked": 33,
+  "localLinksChecked": 177,
+  "nextTask": "MAIN-A 1.1",
+  "runningBatchPolicy": "先完成当前批次，再插入MAIN并接续实际未完成队列"
+}

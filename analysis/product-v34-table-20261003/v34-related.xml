@@ -1,0 +1,218 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="6" failures="0" time="73.328"><testsuite name="doc-tool" tests="6" failures="0" time="73.328"><testcase name="test_v34_table_authoring.py" classname="scripts.tests" time="13.687"><system-out>test_markdown_input_and_unsupported_input (__main__.DelimitedIntakeTests.test_markdown_input_and_unsupported_input) ... ok
+test_preview_pages_large_input_without_truncating_insert (__main__.DelimitedIntakeTests.test_preview_pages_large_input_without_truncating_insert) ... ok
+test_tsv_quoted_newline_uses_supported_marker (__main__.DelimitedIntakeTests.test_tsv_quoted_newline_uses_supported_marker) ... ok
+test_tsv_quotes_leading_zeros_dates_and_formulas (__main__.DelimitedIntakeTests.test_tsv_quotes_leading_zeros_dates_and_formulas) ... ok
+test_tsv_ragged_rows_are_padded_and_reported (__main__.DelimitedIntakeTests.test_tsv_ragged_rows_are_padded_and_reported) ... ok
+test_complex_preserved_table_is_not_rewritten (__main__.TableExportTests.test_complex_preserved_table_is_not_rewritten) ... ok
+test_grid_dialog_handles_large_table_without_losing_rows (__main__.TableExportTests.test_grid_dialog_handles_large_table_without_losing_rows) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_large_input_measurement_records_no_truncation (__main__.TableExportTests.test_large_input_measurement_records_no_truncation) ... ok
+test_unsaved_table_reaches_docx_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_docx_without_writing_disk) ... ok
+test_unsaved_table_reaches_export_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_export_without_writing_disk) ... ok
+test_apply_grid_is_single_undo_and_keeps_other_text (__main__.TableGridGuiTests.test_apply_grid_is_single_undo_and_keeps_other_text) ... ok
+test_grid_edits_rows_columns_and_alignment (__main__.TableGridGuiTests.test_grid_edits_rows_columns_and_alignment) ... ok
+test_grid_local_undo_redo_for_rows_columns_and_cells (__main__.TableGridGuiTests.test_grid_local_undo_redo_for_rows_columns_and_cells) ... ok
+test_grid_tab_navigation_and_chinese_cell (__main__.TableGridGuiTests.test_grid_tab_navigation_and_chinese_cell) ... ok
+test_non_table_line_reports_reason_without_dialog (__main__.TableGridGuiTests.test_non_table_line_reports_reason_without_dialog) ... ok
+test_paste_as_table_inserts_full_table_and_keeps_plain_paste (__main__.TableGridGuiTests.test_paste_as_table_inserts_full_table_and_keeps_plain_paste) ... ok
+test_paste_cancel_and_raw_fallback_keep_content (__main__.TableGridGuiTests.test_paste_cancel_and_raw_fallback_keep_content) ... ok
+test_preview_dialog_pages_large_input_and_reports_support (__main__.TableGridGuiTests.test_preview_dialog_pages_large_input_and_reports_support) ... ok
+test_source_changed_keeps_pending_text_without_overwriting (__main__.TableGridGuiTests.test_source_changed_keeps_pending_text_without_overwriting) ... ok
+test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity) ... ok
+test_multiline_cells_use_supported_marker_in_preview_and_word (__main__.TableModelTests.test_multiline_cells_use_supported_marker_in_preview_and_word) ... ok
+test_non_table_and_broken_separator_are_rejected_with_reason (__main__.TableModelTests.test_non_table_and_broken_separator_are_rejected_with_reason) ... ok
+test_ragged_input_is_padded_with_warning_and_raw_preserved (__main__.TableModelTests.test_ragged_input_is_padded_with_warning_and_raw_preserved) ... ok
+test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment (__main__.TableModelTests.test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment) ... ok
+test_trailing_empty_columns_are_not_dropped (__main__.TableModelTests.test_trailing_empty_columns_are_not_dropped) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 9.692s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-36040-1\.表格工程.import-staging-36040-ub__hg8q\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-36040-1\表格工程\.state\snapshots\20261002T181000-a3257452\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-36040-1\表格工程\.state\snapshots\20261002T181000-a3257452\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-36040-1\.表格工程.import-staging-36040-s1fysbqd\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-36040-1\表格工程\.state\snapshots\20261002T181005-564dcc3f\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-36040-1\表格工程\.state\snapshots\20261002T181005-564dcc3f\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_table_format.py" classname="scripts.tests" time="3.922"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 1.587s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="14.547"><system-out>...................QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 12.572s
+
+OK
+</system-out></testcase><testcase name="test_markdown_structure.py" classname="scripts.tests" time="2.438"><system-out>test_error_presentation_prefers_concrete_detail (__main__.FailurePresentationTests.test_error_presentation_prefers_concrete_detail) ... ok
+test_exception_locations_are_relative_to_content_root (__main__.FailurePresentationTests.test_exception_locations_are_relative_to_content_root) ... ok
+test_exception_locations_fall_back_to_file_name_outside_root (__main__.FailurePresentationTests.test_exception_locations_fall_back_to_file_name_outside_root) ... ok
+test_format_stage_locations_renders_lines_for_result_card (__main__.FailurePresentationTests.test_format_stage_locations_renders_lines_for_result_card) ... ok
+test_pipeline_failure_expands_into_one_issue_per_location (__main__.FailurePresentationTests.test_pipeline_failure_expands_into_one_issue_per_location) ... ok
+test_pipeline_failure_without_locations_keeps_single_record (__main__.FailurePresentationTests.test_pipeline_failure_without_locations_keeps_single_record) ... ok
+test_plain_exception_yields_no_locations (__main__.FailurePresentationTests.test_plain_exception_yields_no_locations) ... ok
+test_single_location_summary_has_no_count_prefix (__main__.FailurePresentationTests.test_single_location_summary_has_no_count_prefix) ... ok
+test_summary_leads_with_first_location_and_total_count (__main__.FailurePresentationTests.test_summary_leads_with_first_location_and_total_count) ... ok
+test_check_bare_mermaid_structure_with_preceding_comment (__main__.MarkdownStructureLintRuleTests.test_check_bare_mermaid_structure_with_preceding_comment)
+裸 Mermaid 块前带注释时，行号精确指向错误代码行且 blocking=True。 ... ok
+test_check_mermaid_structure_blocking_on_syntax_error (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_blocking_on_syntax_error)
+Mermaid 语法错误在构建前契约中被标记为 blocking=True。 ... ok
+test_check_mermaid_structure_detects_broken_fence (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_broken_fence)
+Mermaid 围栏反引号少于 3 个（如 ``mermaid）时应报告语法错误。 ... ok
+test_check_mermaid_structure_detects_mismatched_inline_backticks (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_mismatched_inline_backticks)
+双反引号开头但单反引号闭合的残缺标记应被正确判定为未闭合。 ... ok
+test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_detects_shorter_open_longer_close_mismatch)
+单反引号开头但双反引号/三反引号结尾，或波浪线不匹配时均应报告语法错误。 ... ok
+test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_broken_mermaid_inside_fenced_code_block)
+代码块内部引用残缺 mermaid 示例（如 ```markdown 块内）不应误报阻断错误。 ... ok
+test_check_mermaid_structure_ignores_inline_code_span (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_ignores_inline_code_span)
+行首包含行内代码如 `mermaid` 语法时，不应被误报为残缺围栏。 ... ok
+test_check_mermaid_structure_supports_case_insensitive_sequence_notes (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_case_insensitive_sequence_notes)
+Mermaid sequenceDiagram 支持小写 note over 语句 ... ok
+test_check_mermaid_structure_supports_chained_edges_with_labels (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_chained_edges_with_labels)
+Mermaid flowchart 支持带标签的链式连线 A --&gt;|label| B --&gt; C ... ok
+test_check_mermaid_structure_supports_dotted_text_edge (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_supports_dotted_text_edge)
+Mermaid flowchart 支持虚线文字连线 A -. text .-&gt; B ... ok
+test_check_mermaid_structure_tolerates_bold_delimiters (__main__.MarkdownStructureLintRuleTests.test_check_mermaid_structure_tolerates_bold_delimiters)
+Mermaid 节点若括号被 Markdown 加粗符号包裹时容错支持 ... ok
+test_non_blocking_findings_stay_warning_even_when_rule_is_error (__main__.MarkdownStructureLintRuleTests.test_non_blocking_findings_stay_warning_even_when_rule_is_error) ... ok
+test_orphan_meta_is_reported_before_merging (__main__.MarkdownStructureLintRuleTests.test_orphan_meta_is_reported_before_merging) ... ok
+test_rule_is_enabled_by_default_for_every_document_type (__main__.MarkdownStructureLintRuleTests.test_rule_is_enabled_by_default_for_every_document_type) ... ok
+test_wellformed_document_is_clean (__main__.MarkdownStructureLintRuleTests.test_wellformed_document_is_clean) ... ok
+test_format_location_renders_path_line_message_hint (__main__.StructuredLocationTests.test_format_location_renders_path_line_message_hint) ... ok
+test_non_blocking_findings_do_not_fail_the_build (__main__.StructuredLocationTests.test_non_blocking_findings_do_not_fail_the_build) ... ok
+test_orphan_meta_fails_prebuild_with_path_line_and_hint (__main__.StructuredLocationTests.test_orphan_meta_fails_prebuild_with_path_line_and_hint) ... ok
+test_prebuild_reports_every_problem_in_one_pass (__main__.StructuredLocationTests.test_prebuild_reports_every_problem_in_one_pass) ... ok
+test_declared_column_count_mismatch_is_warning_with_actual_numbers (__main__.TableStructureContractTests.test_declared_column_count_mismatch_is_warning_with_actual_numbers) ... ok
+test_escaped_pipe_is_not_a_column_separator (__main__.TableStructureContractTests.test_escaped_pipe_is_not_a_column_separator) ... ok
+test_fewer_declared_widths_explains_widths_fall_back (__main__.TableStructureContractTests.test_fewer_declared_widths_explains_widths_fall_back) ... ok
+test_invalid_meta_syntax_is_blocking_and_carries_example (__main__.TableStructureContractTests.test_invalid_meta_syntax_is_blocking_and_carries_example) ... ok
+test_meta_followed_by_blank_line_is_blocking_with_gap_hint (__main__.TableStructureContractTests.test_meta_followed_by_blank_line_is_blocking_with_gap_hint) ... ok
+test_meta_parsing_is_shared_with_kernel (__main__.TableStructureContractTests.test_meta_parsing_is_shared_with_kernel) ... ok
+test_meta_with_no_table_at_all_hints_removing_meta (__main__.TableStructureContractTests.test_meta_with_no_table_at_all_hints_removing_meta) ... ok
+test_missing_separator_and_ragged_rows_are_warnings (__main__.TableStructureContractTests.test_missing_separator_and_ragged_rows_are_warnings) ... ok
+test_split_row_still_raises_automation_error_for_kernel (__main__.TableStructureContractTests.test_split_row_still_raises_automation_error_for_kernel) ... ok
+test_wellformed_table_reports_nothing (__main__.TableStructureContractTests.test_wellformed_table_reports_nothing) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.150s
+
+OK
+</system-out></testcase><testcase name="test_core_export_snapshot.py" classname="scripts.tests" time="21.234"><system-out>test_cancel_keeps_completed_formats (__main__.ExportTests.test_cancel_keeps_completed_formats) ... ok
+test_invalid_destination_falls_back_and_keeps_settings (__main__.ExportTests.test_invalid_destination_falls_back_and_keeps_settings) ... ok
+test_multi_format_partial_success_keeps_usable_results (__main__.ExportTests.test_multi_format_partial_success_keeps_usable_results) ... ok
+test_retry_only_failed_format_reuses_original_round (__main__.ExportTests.test_retry_only_failed_format_reuses_original_round) ... ok
+test_same_name_uses_new_safe_name_instead_of_overwriting (__main__.ExportTests.test_same_name_uses_new_safe_name_instead_of_overwriting) ... ok
+test_scope_and_summary_report_actual_range (__main__.ExportTests.test_scope_and_summary_report_actual_range) ... ok
+test_source_package_is_portable_and_excludes_user_data (__main__.ExportTests.test_source_package_is_portable_and_excludes_user_data) ... ok
+test_source_package_keeps_assets_and_parent_body_when_moved (__main__.ExportTests.test_source_package_keeps_assets_and_parent_body_when_moved) ... ok
+test_source_package_reports_missing_resource (__main__.ExportTests.test_source_package_reports_missing_resource) ... ok
+test_action_items_are_direct_and_limited (__main__.ReadonlyAndActionTests.test_action_items_are_direct_and_limited) ... ok
+test_readonly_project_exports_to_external_dir_without_writing_inside (__main__.ReadonlyAndActionTests.test_readonly_project_exports_to_external_dir_without_writing_inside) ... ok
+test_buffer_edit_is_captured_without_touching_disk (__main__.SnapshotTests.test_buffer_edit_is_captured_without_touching_disk) ... ok
+test_cache_key_tracks_content_and_scope (__main__.SnapshotTests.test_cache_key_tracks_content_and_scope) ... ok
+test_saved_mode_ignores_buffer_edits (__main__.SnapshotTests.test_saved_mode_ignores_buffer_edits) ... ok
+test_scope_selects_chapters_in_project_order (__main__.SnapshotTests.test_scope_selects_chapters_in_project_order) ... ok
+test_snapshot_assets_use_manifest_resource_root (__main__.SnapshotTests.test_snapshot_assets_use_manifest_resource_root) ... ok
+test_snapshot_rejects_work_directory_over_source_project (__main__.SnapshotTests.test_snapshot_rejects_work_directory_over_source_project) ... ok
+test_source_updated_detection (__main__.SnapshotTests.test_source_updated_detection) ... ok
+test_preview_uses_same_snapshot_content_as_export (__main__.SnapshotViewTests.test_preview_uses_same_snapshot_content_as_export) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 18.939s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-50884-1\.proj.import-staging-50884-me606ovk\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181031-5dad1f27\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181031-5dad1f27\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181033-75ff6aab\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181033-75ff6aab\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181034-1d997dcb\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181034-1d997dcb\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181035-525de97b\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181035-525de97b\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181037-b946a137\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181037-b946a137\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181038-1f7cb564\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-50884-1\proj\.state\snapshots\20261002T181038-1f7cb564\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-50884-2\.proj.import-staging-50884-7hx4huj6\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: C:\Users\18098\.doctool\snapshots\20261002T181042-864919bf\output\.tmp-proj(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: C:\Users\18098\.doctool\snapshots\20261002T181042-864919bf\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-50884-3\.proj.import-staging-50884-pcr7jul7\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\shared-50884-4\.proj.import-staging-50884-ftjuem8d\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_ui2_visual_hierarchy.py" classname="scripts.tests" time="17.500"><system-out>test_name_is_elided_but_full_value_is_reachable (__main__.LongNameInformationTests.test_name_is_elided_but_full_value_is_reachable) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_more_menu_trigger_uses_the_same_handler (__main__.ProjectBarOverflowTests.test_more_menu_trigger_uses_the_same_handler) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_primary_actions_keep_full_width_and_never_clip (__main__.ProjectBarOverflowTests.test_primary_actions_keep_full_width_and_never_clip) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_secondary_actions_move_into_more_menu (__main__.ProjectBarOverflowTests.test_secondary_actions_move_into_more_menu) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_wide_bar_has_no_overflow (__main__.ProjectBarOverflowTests.test_wide_bar_has_no_overflow) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_dialog_close_returns_focus_to_editor (__main__.SharedActionAndFocusTests.test_dialog_close_returns_focus_to_editor) ... This plugin does not support propagateSizeHints()
+ok
+test_normal_completion_does_not_steal_editor_focus (__main__.SharedActionAndFocusTests.test_normal_completion_does_not_steal_editor_focus) ... ok
+test_quick_export_shortcut_binding_is_declared_once (__main__.SharedActionAndFocusTests.test_quick_export_shortcut_binding_is_declared_once)
+Ctrl+E 只在菜单 QAction 声明一次；项目条按钮不再另设快捷键。 ... ok
+test_quick_export_submits_exactly_once_per_user_action (__main__.SharedActionAndFocusTests.test_quick_export_submits_exactly_once_per_user_action) ... ok
+test_status_tone_labels_have_text_not_only_colour (__main__.SharedActionAndFocusTests.test_status_tone_labels_have_text_not_only_colour) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 11.750s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-46208-1\.proj.import-staging-46208-n9bgwp78\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-46208-1\proj\.state\snapshots\20261002T181101-cd1e7bed\output\.tmp-企业研发系统软件需求说明书（超长中文名称用于窄窗口验收）(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-46208-1\proj\.state\snapshots\20261002T181101-cd1e7bed\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase></testsuite></testsuites>

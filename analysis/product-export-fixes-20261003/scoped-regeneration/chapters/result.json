@@ -1,0 +1,22 @@
+{
+  "platform": "Qt offscreen",
+  "entry": "成果页按当前修改重新生成按钮",
+  "originalRoundId": "r-9611dec49e",
+  "newRoundId": "r-80cc47610a",
+  "originalCaptureId": "20261002T172825-f9524efb",
+  "newCaptureId": "20261002T172826-ebb89177",
+  "scope": {
+    "kind": "chapters",
+    "chapters": [
+      "第1章 引言/1.1 目的.md"
+    ],
+    "current": ""
+  },
+  "sourceMode": "current-buffer",
+  "html": "regenerated/index.html",
+  "includesUnsavedMarker": true,
+  "excludesUnselectedMarker": true,
+  "diskHashBefore": "6b0a8daeb719c141a92e0424822ed862bab5847d0ec578b5b77c14c5d50f6fce",
+  "diskHashAfter": "6b0a8daeb719c141a92e0424822ed862bab5847d0ec578b5b77c14c5d50f6fce",
+  "realWordTrial": false
+}

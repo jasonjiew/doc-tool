@@ -1,0 +1,331 @@
+{
+  "kind": "v36-benchmark",
+  "generatedAt": "2026-10-03T05:17:37",
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.14",
+    "cpuCount": 12,
+    "machine": "AMD64"
+  },
+  "samplesPerPhase": 1,
+  "projects": [
+    {
+      "input": {
+        "chapters": 50,
+        "items": 600,
+        "contentBytes": 102834,
+        "projectRoot": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\v36-bench-25192-1\\sample-50",
+        "largestChapterBytes": 2020,
+        "contentSha256": "816cccce6e5df723"
+      },
+      "counts": {
+        "files": 101,
+        "projects": 1,
+        "searchHits": 600,
+        "checkIssues": 2
+      },
+      "operations": {
+        "incremental": {
+          "parseCount": 101,
+          "reuseCount": 101,
+          "files": 101,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "fullRefresh": {
+          "parseCount": 202,
+          "reuseCount": 101,
+          "files": 101,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "coldWithCache": {}
+      },
+      "phases": {
+        "manifest_open": {
+          "min": 0.013,
+          "median": 0.013,
+          "p95": 0.013,
+          "max": 0.013,
+          "samples": 1
+        },
+        "index_cold": {
+          "min": 0.1232,
+          "median": 0.1232,
+          "p95": 0.1232,
+          "max": 0.1232,
+          "samples": 1
+        },
+        "index_warm_repeat": {
+          "min": 0.1115,
+          "median": 0.1115,
+          "p95": 0.1115,
+          "max": 0.1115,
+          "samples": 1
+        },
+        "index_full_refresh": {
+          "min": 0.1583,
+          "median": 0.1583,
+          "p95": 0.1583,
+          "max": 0.1583,
+          "samples": 1
+        },
+        "search_first_page": {
+          "min": 0.0014,
+          "median": 0.0014,
+          "p95": 0.0014,
+          "max": 0.0014,
+          "samples": 1
+        },
+        "search_total": {
+          "min": 0.0012,
+          "median": 0.0012,
+          "p95": 0.0012,
+          "max": 0.0012,
+          "samples": 1
+        },
+        "preview_one_chapter": {
+          "min": 0.0004,
+          "median": 0.0004,
+          "p95": 0.0004,
+          "max": 0.0004,
+          "samples": 1
+        },
+        "check": {
+          "min": 0.227,
+          "median": 0.227,
+          "p95": 0.227,
+          "max": 0.227,
+          "samples": 1
+        },
+        "export_html_source": {
+          "min": 0.9801,
+          "median": 0.9801,
+          "p95": 0.9801,
+          "max": 0.9801,
+          "samples": 1
+        }
+      },
+      "memory": {
+        "baselineMB": 0.0,
+        "indexPeakMB": 1.0,
+        "previewPeakMB": 0.029,
+        "retainedAfterReleaseMB": 0.001,
+        "releasedRatio": 0.9988
+      },
+      "peakTracedMemoryMB": 1.0
+    },
+    {
+      "input": {
+        "chapters": 300,
+        "items": 3600,
+        "contentBytes": 617034,
+        "projectRoot": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\v36-bench-25192-1\\sample-300",
+        "largestChapterBytes": 2020,
+        "contentSha256": "5cab002129de8d0d"
+      },
+      "counts": {
+        "files": 601,
+        "projects": 1,
+        "searchHits": 3600,
+        "checkIssues": 2
+      },
+      "operations": {
+        "incremental": {
+          "parseCount": 601,
+          "reuseCount": 601,
+          "files": 601,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "fullRefresh": {
+          "parseCount": 1202,
+          "reuseCount": 601,
+          "files": 601,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "coldWithCache": {}
+      },
+      "phases": {
+        "manifest_open": {
+          "min": 0.0113,
+          "median": 0.0113,
+          "p95": 0.0113,
+          "max": 0.0113,
+          "samples": 1
+        },
+        "index_cold": {
+          "min": 0.8042,
+          "median": 0.8042,
+          "p95": 0.8042,
+          "max": 0.8042,
+          "samples": 1
+        },
+        "index_warm_repeat": {
+          "min": 0.9808,
+          "median": 0.9808,
+          "p95": 0.9808,
+          "max": 0.9808,
+          "samples": 1
+        },
+        "index_full_refresh": {
+          "min": 1.3746,
+          "median": 1.3746,
+          "p95": 1.3746,
+          "max": 1.3746,
+          "samples": 1
+        },
+        "search_first_page": {
+          "min": 0.0059,
+          "median": 0.0059,
+          "p95": 0.0059,
+          "max": 0.0059,
+          "samples": 1
+        },
+        "search_total": {
+          "min": 0.0063,
+          "median": 0.0063,
+          "p95": 0.0063,
+          "max": 0.0063,
+          "samples": 1
+        },
+        "preview_one_chapter": {
+          "min": 0.0002,
+          "median": 0.0002,
+          "p95": 0.0002,
+          "max": 0.0002,
+          "samples": 1
+        },
+        "check": {
+          "min": 0.9061,
+          "median": 0.9061,
+          "p95": 0.9061,
+          "max": 0.9061,
+          "samples": 1
+        },
+        "export_html_source": {
+          "min": 4.4924,
+          "median": 4.4924,
+          "p95": 4.4924,
+          "max": 4.4924,
+          "samples": 1
+        }
+      },
+      "memory": {
+        "baselineMB": 0.0,
+        "indexPeakMB": 2.489,
+        "previewPeakMB": 0.028,
+        "retainedAfterReleaseMB": 0.0,
+        "releasedRatio": 1.0
+      },
+      "peakTracedMemoryMB": 2.489
+    },
+    {
+      "input": {
+        "chapters": 1000,
+        "items": 12000,
+        "contentBytes": 2056934,
+        "projectRoot": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\v36-bench-25192-1\\sample-1000",
+        "largestChapterBytes": 2020,
+        "contentSha256": "350d5935484b9444"
+      },
+      "counts": {
+        "files": 2001,
+        "projects": 1,
+        "searchHits": 12000,
+        "checkIssues": 2
+      },
+      "operations": {
+        "incremental": {
+          "parseCount": 2001,
+          "reuseCount": 2001,
+          "files": 2001,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "fullRefresh": {
+          "parseCount": 4002,
+          "reuseCount": 2001,
+          "files": 2001,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "coldWithCache": {}
+      },
+      "phases": {
+        "manifest_open": {
+          "min": 0.0375,
+          "median": 0.0375,
+          "p95": 0.0375,
+          "max": 0.0375,
+          "samples": 1
+        },
+        "index_cold": {
+          "min": 3.2861,
+          "median": 3.2861,
+          "p95": 3.2861,
+          "max": 3.2861,
+          "samples": 1
+        },
+        "index_warm_repeat": {
+          "min": 2.0237,
+          "median": 2.0237,
+          "p95": 2.0237,
+          "max": 2.0237,
+          "samples": 1
+        },
+        "index_full_refresh": {
+          "min": 2.9974,
+          "median": 2.9974,
+          "p95": 2.9974,
+          "max": 2.9974,
+          "samples": 1
+        },
+        "search_first_page": {
+          "min": 0.0168,
+          "median": 0.0168,
+          "p95": 0.0168,
+          "max": 0.0168,
+          "samples": 1
+        },
+        "search_total": {
+          "min": 0.0153,
+          "median": 0.0153,
+          "p95": 0.0153,
+          "max": 0.0153,
+          "samples": 1
+        },
+        "preview_one_chapter": {
+          "min": 0.0002,
+          "median": 0.0002,
+          "p95": 0.0002,
+          "max": 0.0002,
+          "samples": 1
+        },
+        "check": {
+          "min": 2.9141,
+          "median": 2.9141,
+          "p95": 2.9141,
+          "max": 2.9141,
+          "samples": 1
+        },
+        "export_html_source": {
+          "min": 14.1349,
+          "median": 14.1349,
+          "p95": 14.1349,
+          "max": 14.1349,
+          "samples": 1
+        }
+      },
+      "memory": {
+        "baselineMB": 0.0,
+        "indexPeakMB": 9.075,
+        "previewPeakMB": 0.029,
+        "retainedAfterReleaseMB": 0.917,
+        "releasedRatio": 0.899
+      },
+      "peakTracedMemoryMB": 9.075
+    }
+  ]
+}

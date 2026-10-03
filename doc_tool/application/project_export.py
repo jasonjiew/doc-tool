@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -34,6 +34,7 @@ from doc_tool.application.intake_contract import (
     FORMATS,
     SOURCE_MODE_CURRENT_BUFFER,
     SOURCE_MODE_SAVED,
+    SCOPE_KINDS,
     STATUS_CANCELLED,
     STATUS_FAILED,
     STATUS_PENDING_CONVERT,
@@ -66,6 +67,7 @@ class ExportReport:
     captureId: str = ""
     createdAt: str = field(default_factory=utc_now_iso)
     scope: ExportScope = field(default_factory=ExportScope)
+    scopeKnown: bool = True
     sourceMode: str = SOURCE_MODE_SAVED
     destination: str = ""
     outputName: str = ""
@@ -117,7 +119,7 @@ class ExportReport:
 
     def summary_lines(self, limit: int = 3) -> List[str]:
         lines: List[str] = ["本轮范围：{0}（{1}）".format(
-            self.scope.describe(len(self.scope.chapters) or 0),
+            self.scope.describe(len(self.scope.chapters) or 0) if self.scopeKnown else "范围记录缺失",
             "当前编辑内容" if self.sourceMode == SOURCE_MODE_CURRENT_BUFFER else "已保存版本",
         )]
         for item in self.results:
@@ -149,6 +151,7 @@ class ExportReport:
             "captureId": self.captureId,
             "createdAt": self.createdAt,
             "scope": self.scope.to_dict(),
+            "scopeKnown": self.scopeKnown,
             "sourceMode": self.sourceMode,
             "destination": self.destination,
             "outputName": self.outputName,
@@ -211,10 +214,14 @@ def read_export_index(path) -> Optional[ExportReport]:
     report = ExportReport(
         variantId=str(data.get("variantId") or ""),
         variantApplied=bool(data.get("variantApplied", False)),
-        roundId=str(data.get("roundId") or new_round_id()),
+        roundId=str(data.get("roundId") or ""),
         captureId=str(data.get("captureId") or ""),
         createdAt=str(data.get("createdAt") or utc_now_iso()),
         scope=ExportScope.from_dict(data.get("scope")),
+        scopeKnown=bool(
+            data.get("scopeKnown", True) and isinstance(data.get("scope"), dict)
+            and data["scope"].get("kind") in SCOPE_KINDS
+        ),
         sourceMode=str(data.get("sourceMode") or SOURCE_MODE_SAVED),
         destination=str(data.get("destination") or ""),
         outputName=str(data.get("outputName") or ""),
@@ -537,21 +544,45 @@ def run_project_export(
     ``skip_word_refresh=True`` 时即使本机有 Word 也只做诊断构建（CLI/测试用）。
     ``prior`` 提供上一轮报告时复用其快照工作目录与 DOCX 做“只补失败格式”。
     """
-    project_root = Path(request.project_root)
+    project_root = Path(prior.projectRoot or request.project_root) if prior is not None else Path(request.project_root)
     from doc_tool.domain.manifest import ProjectManifest
     from doc_tool.domain.paths import ProjectPaths
 
-    manifest = ProjectManifest.load(project_root)
     paths = ProjectPaths(project_root)
-
-    preferred = Path(request.destination) if request.destination else paths.output_dir
+    preferred = Path(request.destination or (prior.destination if prior else "")) if (
+        request.destination or (prior and prior.destination)
+    ) else paths.output_dir
     destination, fallback_note = resolve_export_directory(
         preferred, [paths.output_dir, _default_user_export_dir()],
     )
     snapshot: Optional[EffectiveSnapshot] = None
-    if prior is not None and prior.snapshotWorkDir and Path(prior.snapshotWorkDir).is_dir():
-        snapshot = _snapshot_from_prior(prior, request)
-    if snapshot is None:
+    origin_known = prior is None or bool(
+        prior.roundId and prior.captureId
+        and (not request.capture_id or request.capture_id == prior.captureId)
+    )
+    if prior is not None:
+        # 补原轮只恢复原输入；缺快照不能通过采集当前正文“修好”旧轮。
+        request = replace(
+            request, project_root=str(project_root), scope=prior.scope,
+            source_mode=prior.sourceMode, output_name=prior.outputName or request.output_name,
+        )
+        if origin_known:
+            snapshot = _snapshot_from_prior(prior, request)
+        if snapshot is not None:
+            mark_source_updated(snapshot)
+        report = replace(
+            prior, destination=str(destination), results=list(prior.results),
+            warnings=list(prior.warnings),
+            sourceUpdated=prior.sourceUpdated or bool(snapshot and snapshot.sourceUpdated),
+        )
+        if snapshot is None:
+            note = "原轮捕获不可用：保留已有成果，需要原正文的格式可按当前内容生成新轮。"
+            if not origin_known:
+                note = "原轮来源身份缺失或不匹配：保留已有成果，请按当前内容生成新轮。"
+            if note not in report.warnings:
+                report.warnings.append(note)
+    else:
+        manifest = ProjectManifest.load(project_root)
         snapshot = capture_snapshot(
             project_root,
             scope=request.scope,
@@ -561,74 +592,82 @@ def run_project_export(
             cancel_token=cancel_token,
             variant_id=str(getattr(request, "variant_id", "") or ""),
         )
-    else:
-        mark_source_updated(snapshot)
-
-    report = ExportReport(
-        captureId=snapshot.captureId,
-        variantId=str(getattr(snapshot, "variantId", "") or ""),
-        variantApplied=bool(getattr(snapshot, "variantApplied", False)),
-        scope=snapshot.scope,
-        sourceMode=snapshot.sourceMode,
-        destination=str(destination),
-        projectRoot=str(project_root),
-        strict=bool(request.strict),
-        documentType=manifest.documentType,
-        documentVersion=manifest.documentVersion,
-        snapshotWorkDir=snapshot.workDir,
-        unsavedChapters=list(snapshot.unsavedChapters),
-        omittedChapters=list(snapshot.omittedChapters),
-        sourceUpdated=snapshot.sourceUpdated,
-        readonlyProject=snapshot.readonlyProject,
-        warnings=list(snapshot.warnings) + list(getattr(snapshot, "variantWarnings", []) or []),
-    )
+        report = ExportReport(
+            captureId=snapshot.captureId,
+            variantId=str(getattr(snapshot, "variantId", "") or ""),
+            variantApplied=bool(getattr(snapshot, "variantApplied", False)),
+            scope=snapshot.scope,
+            sourceMode=snapshot.sourceMode,
+            destination=str(destination),
+            projectRoot=str(project_root),
+            strict=bool(request.strict),
+            documentType=manifest.documentType,
+            documentVersion=manifest.documentVersion,
+            snapshotWorkDir=snapshot.workDir,
+            unsavedChapters=list(snapshot.unsavedChapters),
+            omittedChapters=list(snapshot.omittedChapters),
+            sourceUpdated=snapshot.sourceUpdated,
+            readonlyProject=snapshot.readonlyProject,
+            warnings=list(snapshot.warnings) + list(getattr(snapshot, "variantWarnings", []) or []),
+        )
+        report.outputName = _output_stem(manifest, request, snapshot)
     if fallback_note:
         report.warnings.append(fallback_note)
-    report.outputName = _output_stem(manifest, request, snapshot)
 
     formats = normalize_formats(only_formats if only_formats is not None else request.formats)
-    if prior is not None and only_formats is not None:
-        # 只补失败格式：保留上一轮其它可用结果，不重生成
-        for item in prior.results:
-            if item.format not in formats:
-                report.results.append(item)
-    docx_path = report_docx_path(prior) if prior is not None else ""
+    # 旧 DOCX 必须与该轮登记的 hash 相符；文件存在不等于仍是原轮输入。
+    docx_path = _verified_docx_path(prior) if prior is not None and origin_known else ""
 
     for fmt in formats:
+        previous = report.result_for(fmt)
         if cancel_token is not None:
             try:
                 cancel_token.check_cancel()
             except Exception:  # noqa: BLE001 - 取消保留已完成格式
-                report.results.append(FormatResult(
-                    format=fmt, status=STATUS_CANCELLED, message="已取消，其它已完成格式保留",
-                ))
+                if previous is None or not previous.usable:
+                    report.results = [item for item in report.results if item.format != fmt]
+                    report.results.append(FormatResult(
+                        format=fmt, status=STATUS_CANCELLED, message="已取消，其它已完成格式保留",
+                    ))
                 continue
-        if fmt == FORMAT_DOCX:
-            result, docx_path = _run_docx(
+        if snapshot is None and (fmt != FORMAT_PDF or not docx_path):
+            result = _unavailable_original_result(fmt, previous)
+        elif fmt == FORMAT_DOCX:
+            result, new_docx_path = _run_docx(
                 snapshot, request, destination, report.outputName,
                 refresh=bool(request.refresh) and not skip_word_refresh,
                 cancel_token=cancel_token, progress=progress,
                 word_available=word_available,
             )
+            docx_path = new_docx_path or docx_path
         elif fmt == FORMAT_HTML:
             result = _run_html(snapshot, destination, cancel_token=cancel_token, progress=progress)
         elif fmt == FORMAT_PDF:
-            result = _run_pdf(
-                docx_path, destination, report.outputName,
-                cancel_token=cancel_token, progress=progress,
-            )
+            if prior is not None and not docx_path:
+                result = _unavailable_original_result(fmt, previous)
+            else:
+                result = _run_pdf(
+                    docx_path, destination, report.outputName,
+                    cancel_token=cancel_token, progress=progress,
+                )
         elif fmt == FORMAT_SOURCE_ZIP:
             result = _run_source_zip(snapshot, request, destination, report.outputName)
         else:
             result = FormatResult(
                 format=fmt, status=STATUS_SKIPPED, message="未知格式：{0}".format(fmt),
             )
-        existing = report.result_for(fmt)
-        if existing is not None:
-            report.results = [item for item in report.results if item.format != fmt]
+        if prior is not None and previous is not None and previous.usable and not result.usable and Path(previous.path).is_file():
+            message = "本次补格式未完成：{0}；已有文件保留。".format(result.message or result.label())
+            result = replace(
+                previous, message=message, error_code=result.error_code,
+                warnings=list(previous.warnings) + [message],
+            )
+        if previous is not None:
+            result.attempts = previous.attempts + 1
+        report.results = [item for item in report.results if item.format != fmt]
         report.results.append(result)
 
-    report.docxPath = docx_path
+    report.docxPath = docx_path or (prior.docxPath if prior else "")
     if report.strict and report.strict_violations():
         report.warnings.append("严格模式：{0} 未达到正式要求".format(
             "、".join(format_label(item) for item in report.strict_violations())
@@ -648,10 +687,36 @@ def report_docx_path(report: Optional[ExportReport]) -> str:
     return ""
 
 
+def _verified_docx_path(report: ExportReport) -> str:
+    result = report.result_for(FORMAT_DOCX)
+    if result is None or not result.path or not result.sha256:
+        return ""
+    return result.path if sha256_file(Path(result.path)) == result.sha256 else ""
+
+
+def _unavailable_original_result(fmt: str, previous: Optional[FormatResult]) -> FormatResult:
+    message = "无法恢复该格式的原轮输入；旧成果保留，可按当前内容生成新轮。"
+    if previous is not None and previous.usable and Path(previous.path).is_file():
+        # 可读 Word 的待刷新状态仍保留，不因本次补缺失败隐藏已生成文件。
+        return replace(previous, message=message, warnings=list(previous.warnings) + [message])
+    return FormatResult(
+        format=fmt, status=STATUS_PENDING_CONVERT if fmt == FORMAT_PDF else STATUS_FAILED,
+        message=message, error_code="export-origin-unavailable",
+    )
+
+
 def _snapshot_from_prior(prior: ExportReport, request: ExportRequest) -> Optional[EffectiveSnapshot]:
     """复用上一轮快照工作目录（补格式时保证仍用原轮内容）。"""
+    if not prior.snapshotWorkDir or not prior.roundId or not prior.captureId:
+        return None
     work = Path(prior.snapshotWorkDir)
-    if not work.is_dir():
+    if not (work / "project.yml").is_file() or not (work / "content").is_dir():
+        return None
+    from doc_tool.domain.manifest import ProjectManifest
+
+    try:
+        ProjectManifest.load(work)
+    except Exception:  # noqa: BLE001 - 旧快照不可读时保留已有成果及独立可补格式
         return None
     snapshot = EffectiveSnapshot(
         captureId=prior.captureId,
@@ -663,14 +728,16 @@ def _snapshot_from_prior(prior: ExportReport, request: ExportRequest) -> Optiona
         omittedChapters=list(prior.omittedChapters),
         unsavedChapters=list(prior.unsavedChapters),
         readonlyProject=prior.readonlyProject,
-        warnings=[],
+        warnings=list(prior.warnings),
+        variantId=prior.variantId,
+        variantApplied=prior.variantApplied,
     )
     from doc_tool.application.effective_snapshot import discover_chapters
 
     content_root = work / "content"
     for rel_path, path in discover_chapters(content_root):
         snapshot.chapters.append(_chapter_stub(rel_path, path))
-    return snapshot
+    return snapshot if snapshot.chapters else None
 
 
 def _chapter_stub(rel_path: str, path: Path):

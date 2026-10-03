@@ -1,0 +1,35 @@
+{
+  "loaded": [
+    {
+      "path": "C:\\Windows\\Fonts\\msyh.ttc",
+      "families": [
+        "Microsoft YaHei",
+        "Microsoft YaHei UI"
+      ]
+    },
+    {
+      "path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+      "families": [
+        "Microsoft YaHei",
+        "Microsoft YaHei UI"
+      ]
+    },
+    {
+      "path": "C:\\Windows\\Fonts\\consola.ttf",
+      "families": [
+        "Consolas"
+      ]
+    },
+    {
+      "path": "C:\\Windows\\Fonts\\seguiemj.ttf",
+      "families": [
+        "Segoe UI Emoji"
+      ]
+    }
+  ],
+  "requested": "Microsoft YaHei",
+  "resolved": "Microsoft YaHei",
+  "supportsChineseGlyph": true,
+  "platform": "Qt offscreen",
+  "realDpiImeWordTrial": false
+}

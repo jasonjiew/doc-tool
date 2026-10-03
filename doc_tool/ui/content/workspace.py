@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import QTimer
@@ -79,16 +80,50 @@ from doc_tool.ui.operation_loading_overlay import run_async_operation
 from doc_tool.ui.content.unsaved_prompt import confirm_unsaved_dialog
 
 
+def _index_service_for(content_root, *, state_dir: Optional[Path] = None) -> ContentIndexService:
+    """构造内容索引服务（V3.6 36-B）：默认启用项目级派生缓存。
+
+    缓存只加速“读盘后解析”，任何失败（不可写、损坏、关闭）都会回退到直接读取
+    源码；调用方无需处理异常，因此这里吞掉构造期异常并返回无缓存服务。
+    """
+    try:
+        from doc_tool.application.content import incremental_index as _incremental
+
+        project_root = Path(state_dir).parent if state_dir is not None else None
+        cache_path = None
+        if project_root is not None:
+            cache_path = Path(project_root) / ".state" / "cache" / _incremental.CACHE_NAME
+        cache = _incremental.ChapterCache(cache_path, enabled=cache_path is not None)
+        fingerprint = _incremental.config_fingerprint(project_root) if project_root is not None else ""
+        return ContentIndexService(content_root, cache=cache, config_fingerprint=fingerprint)
+    except Exception:  # noqa: BLE001 - 缓存不可用时退回无缓存索引，功能不受影响
+        return ContentIndexService(content_root)
+
+
 def build_content_context(
     content_root: Path,
     assets_root: Optional[Path] = None,
     cancel_token=None,
     state_dir: Optional[Path] = None,
     vcs_service: Optional[Any] = None,
+    on_event=None,
 ) -> ContentIndex:
-    """后台任务：构建索引 + 引用扫描 + 快照基线维护（供 TaskRunner 执行）。"""
-    service = ContentIndexService(content_root)
-    index = service.build(cancel_token=cancel_token)
+    """后台任务：构建索引 + 引用扫描 + 快照基线维护（供 TaskRunner 执行）。
+
+    V3.6 36-D：``on_event`` 上报解析进度（只含计数），界面据此显示“已解析 N/M 章节”。
+    """
+    service = _index_service_for(content_root, state_dir=state_dir)
+
+    def _report(scanned: int, total: int) -> None:
+        if on_event is None:
+            return
+        on_event(SimpleNamespace(
+            stage="content-index", status="running",
+            detail="已解析 {0}/{1} 个章节".format(scanned, total),
+            metrics={"scanned": scanned, "totalFiles": total},
+        ))
+
+    index = service.build(cancel_token=cancel_token, on_progress=_report)
     ReferenceScanner(index, assets_root=assets_root).scan_all()
     if state_dir is not None:
         try:
@@ -194,7 +229,10 @@ class ContentWorkspace(QWidget):
         self._lint_issues: List[IssueRecord] = []
 
         self._index: Optional[ContentIndex] = None
-        self._index_service = ContentIndexService(self._content_root)
+        #: 本轮索引捕获标识（V3.6 36-D）：搜索结果带上它，旧轮结果可被识别。
+        self._index_capture_id = ""
+        self._index_capture_seq = 0
+        self._index_service = _index_service_for(self._content_root, state_dir=self._state_dir)
         self._writer = ContentWriter(
             self._content_root, self._state_dir, assets_root=self._assets_root, writable=self._writable
         )
@@ -296,6 +334,7 @@ class ContentWorkspace(QWidget):
             self._on_status("正在构建内容索引…")
         if getattr(self, "_on_stage", None) is not None:
             self._on_stage("正在构建内容全文索引…")
+        self._render_first_screen()
         self._runner.start(
             TaskSpec(
                 name="content-index",
@@ -308,9 +347,43 @@ class ContentWorkspace(QWidget):
                 },
                 timeout_seconds=120.0,
             ),
+            on_event=self._on_index_event,
             on_done=self._on_index_done,
         )
         self._poll_timer.start()
+
+    #: 首屏章节数：目录扫描阶段先渲染这么多，解析完成后替换为完整树。
+    FIRST_SCREEN_CHAPTERS = 200
+
+    def _render_first_screen(self) -> None:
+        """章节首屏：目录扫描即可展示，用户不必等全文解析完成。"""
+        try:
+            files = self._index_service.discover_files()
+        except Exception:  # noqa: BLE001 - 首屏失败不影响后台索引
+            return
+        if not files:
+            return
+        first = [rel for rel, _path in files[: self.FIRST_SCREEN_CHAPTERS]]
+        try:
+            items = build_tree(first)
+            self._tree.set_items(items)
+        except Exception:  # noqa: BLE001 - 树模型异常不影响后台索引
+            return
+        self._first_screen_count = len(first)
+        total = len(files)
+        if self._on_status is not None:
+            self._on_status(
+                "已显示前 {0} 个章节（共 {1} 个），正在解析全文索引…".format(len(first), total)
+            )
+
+    def _on_index_event(self, event) -> None:
+        """扫描中只显示已解析数量，解析完成后由索引结果给出完整统计。"""
+        metrics = getattr(event, "metrics", None) or {}
+        scanned = metrics.get("scanned")
+        total = metrics.get("totalFiles")
+        if scanned is None or total is None or self._on_status is None:
+            return
+        self._on_status("正在解析章节：{0}/{1}…".format(scanned, total))
 
     def shutdown(self) -> None:
         """项目切换/关闭时停止后台索引任务与轮询。
@@ -343,6 +416,8 @@ class ContentWorkspace(QWidget):
                 self._on_index_ready()
             return
         self._index = result
+        self._index_capture_seq += 1
+        self._index_capture_id = "index-{0}".format(self._index_capture_seq)
         try:
             self._snapshot.load()
         except Exception:
@@ -394,6 +469,8 @@ class ContentWorkspace(QWidget):
             on_open=self._open_and_locate,
             # 通用单项目不展示类型筛选；仅旧版多类型布局保留兼容过滤（任务 6.2）。
             show_type_filter=len(self._index.document_types) > 1,
+            # V3.6 36-D：后台搜索结果标注当前项目与本轮索引捕获身份。
+            context_provider=self._search_context,
         )
         self._panels.addTab(search, "搜索")
         self._remove_placeholder("搜索")
@@ -1758,6 +1835,17 @@ class ContentWorkspace(QWidget):
             os.startfile(str(target))  # type: ignore[attr-defined]  # noqa: S606
         except OSError as exc:
             QMessageBox.warning(self, "无法打开", "打开失败：{0}".format(exc))
+
+    def _search_context(self) -> dict:
+        """当前搜索请求身份：projectId + 本轮索引 captureId（只读，不写盘）。"""
+        project_id = ""
+        try:
+            from doc_tool.domain.manifest import ProjectManifest
+
+            project_id = str(ProjectManifest.load(self._project_root).projectId or "")
+        except Exception:  # noqa: BLE001 - 清单不可读时只保留捕获标识
+            project_id = ""
+        return {"projectId": project_id, "captureId": self._index_capture_id}
 
     def _after_write(self) -> None:
         """替换/重命名写回后：刷新索引并请求校验管线。"""

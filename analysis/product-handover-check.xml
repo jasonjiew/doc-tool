@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="2" failures="0" time="8.078"><testsuite name="doc-tool" tests="2" failures="0" time="8.078"><testcase name="test_final_handover_report.py" classname="scripts.tests" time="1.125"><system-out>test_artifact_paths_listed_actually_exist (__main__.FinalHandoverReportTests.test_artifact_paths_listed_actually_exist) ... ok
+test_report_covers_all_changes_and_counts (__main__.FinalHandoverReportTests.test_report_covers_all_changes_and_counts) ... ok
+test_report_is_linked_from_handoff_and_readiness (__main__.FinalHandoverReportTests.test_report_is_linked_from_handoff_and_readiness) ... ok
+test_report_matches_current_state (__main__.FinalHandoverReportTests.test_report_matches_current_state) ... ok
+test_report_states_uncommitted_status (__main__.FinalHandoverReportTests.test_report_states_uncommitted_status) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.244s
+
+OK
+</system-out></testcase><testcase name="test_release_review_bundle.py" classname="scripts.tests" time="6.953"><system-out>test_bundle_contains_all_deliverables_with_verifiable_hashes (__main__.ReviewBundleTests.test_bundle_contains_all_deliverables_with_verifiable_hashes) ... ok
+test_bundle_does_not_modify_repository_sources (__main__.ReviewBundleTests.test_bundle_does_not_modify_repository_sources) ... ok
+test_cli_default_output_is_deliverables (__main__.ReviewBundleTests.test_cli_default_output_is_deliverables) ... ok
+test_frozen_hashes_recorded_when_artifacts_exist (__main__.ReviewBundleTests.test_frozen_hashes_recorded_when_artifacts_exist) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 5.957s
+
+OK
+</system-out></testcase></testsuite></testsuites>

@@ -1,0 +1,788 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="16" failures="2" time="255.875"><testsuite name="doc-tool" tests="16" failures="2" time="255.875"><testcase name="test_ui_polish_toolbar.py" classname="scripts.tests" time="5.828"><failure message="exit code 1" type="TestFailure">test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 132, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertEqual(
+AssertionError: Lists differ: ['1.列[50 chars]'批量转图', '标题级别 H1-H6', '片段', '粘贴为表格', '美化表', '表格', '表格网格', '链接'] != ['1.列[50 chars]'批量转图', '标题级别 H1-H6', '片段', '美化表', '表格', '链接']
+
+First differing element 11:
+'粘贴为表格'
+'美化表'
+
+First list contains 2 additional elements.
+First extra element 14:
+'表格网格'
+
+  ['1.列表',
+   'B',
+   'I',
+   'Mermaid',
+   '•列表',
+   '代码',
+   '图片',
+   '引用',
+   '批量转图',
+   '标题级别 H1-H6',
+   '片段',
+-  '粘贴为表格',
+   '美化表',
+   '表格',
+-  '表格网格',
+   '链接'] : 溢出后每个格式动作仍必须有找回路径：['1.列表', 'B', 'I', 'Mermaid', '•列表', '代码', '图片', '引用', '批量转图', '标题级别 H1-H6', '片段', '粘贴为表格', '美化表', '表格', '表格网格', '链接']
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.818s
+
+FAILED (failures=1)
+</failure><system-out>test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 132, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertEqual(
+AssertionError: Lists differ: ['1.列[50 chars]'批量转图', '标题级别 H1-H6', '片段', '粘贴为表格', '美化表', '表格', '表格网格', '链接'] != ['1.列[50 chars]'批量转图', '标题级别 H1-H6', '片段', '美化表', '表格', '链接']
+
+First differing element 11:
+'粘贴为表格'
+'美化表'
+
+First list contains 2 additional elements.
+First extra element 14:
+'表格网格'
+
+  ['1.列表',
+   'B',
+   'I',
+   'Mermaid',
+   '•列表',
+   '代码',
+   '图片',
+   '引用',
+   '批量转图',
+   '标题级别 H1-H6',
+   '片段',
+-  '粘贴为表格',
+   '美化表',
+   '表格',
+-  '表格网格',
+   '链接'] : 溢出后每个格式动作仍必须有找回路径：['1.列表', 'B', 'I', 'Mermaid', '•列表', '代码', '图片', '引用', '批量转图', '标题级别 H1-H6', '片段', '粘贴为表格', '美化表', '表格', '表格网格', '链接']
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.818s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_word_release.py" classname="scripts.tests" time="7.922"><system-out>test_corrupt_state_returns_none (__main__.OutputStateTests.test_corrupt_state_returns_none)
+损坏的状态文件返回 None。 ... ok
+test_failure_state_records_error_code (__main__.OutputStateTests.test_failure_state_records_error_code)
+失败状态记录错误码。 ... ok
+test_formal_state_rejected_after_output_is_modified (__main__.OutputStateTests.test_formal_state_rejected_after_output_is_modified) ... ok
+test_missing_state_not_formal (__main__.OutputStateTests.test_missing_state_not_formal)
+状态文件不存在时 is_formal_success 返回 False。 ... ok
+test_state_file_naming (__main__.OutputStateTests.test_state_file_naming)
+状态文件名 = 输出文件名 + .state.json。 ... ok
+test_string_false_is_not_accepted_as_boolean (__main__.OutputStateTests.test_string_false_is_not_accepted_as_boolean) ... ok
+test_write_and_read_formal_state (__main__.OutputStateTests.test_write_and_read_formal_state)
+写入正式成功状态后可读回。 ... ok
+test_write_diagnostic_state (__main__.OutputStateTests.test_write_diagnostic_state)
+诊断构建状态 formal=False, diagnostic=True。 ... ok
+test_output_path_returns_formal_not_temp (__main__.PipelineAtomicPublishTests.test_output_path_returns_formal_not_temp)
+返回的 output_path 是正式路径，不是临时文件。 ... ok
+test_publish_stage_emitted_on_success (__main__.PipelineAtomicPublishTests.test_publish_stage_emitted_on_success)
+成功时事件流包含 publish 阶段。 ... ok
+test_repeated_pipeline_overwrites_formal_atomically (__main__.PipelineAtomicPublishTests.test_repeated_pipeline_overwrites_formal_atomically)
+重复执行管线时正式输出被原子覆盖，无残留临时文件。 ... ok
+test_state_restore_failure_keeps_previous_backups (__main__.PipelineAtomicPublishTests.test_state_restore_failure_keeps_previous_backups)
+发布回滚时状态文件恢复失败：上一版快照必须保留（不得被 finally 清理）， ... ok
+test_state_write_failure_rolls_back_docx_and_state (__main__.PipelineAtomicPublishTests.test_state_write_failure_rolls_back_docx_and_state)
+DOCX 替换后状态写入失败时恢复上一版完整发布。 ... ok
+test_successful_pipeline_persists_last_build_version (__main__.PipelineAtomicPublishTests.test_successful_pipeline_persists_last_build_version) ... ok
+test_atomic_publish_no_partial_output_on_failure (__main__.PipelineWordReleaseTests.test_atomic_publish_no_partial_output_on_failure)
+失败时正式输出目录中不残留临时文件。 ... ok
+test_build_failure_writes_failure_state (__main__.PipelineWordReleaseTests.test_build_failure_writes_failure_state)
+构建失败时写入失败状态文件。 ... ok
+test_diagnostic_build_publishes_but_marked_non_formal (__main__.PipelineWordReleaseTests.test_diagnostic_build_publishes_but_marked_non_formal)
+诊断构建（skip_word_refresh=True）发布成功但标记为非正式。 ... ok
+test_formal_pipeline_blocked_when_word_unavailable (__main__.PipelineWordReleaseTests.test_formal_pipeline_blocked_when_word_unavailable)
+正式模式在 Word 不可用时返回 E3001，不获取锁，不修改正式输出。 ... ok
+test_formal_success_writes_formal_state (__main__.PipelineWordReleaseTests.test_formal_success_writes_formal_state)
+正式成功（mock Word 可用 + 刷新成功 + 后校验通过）写入 formal=True。 ... ok
+test_post_validate_failure_preserves_previous_output (__main__.PipelineWordReleaseTests.test_post_validate_failure_preserves_previous_output)
+后校验失败时返回 E2002，保留旧正式输出。 ... ok
+test_word_refresh_failure_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_refresh_failure_preserves_previous_output)
+Word 刷新失败（refresh 返回 False）时保留旧正式输出。 ... ok
+test_word_refresh_generic_reason_maps_to_E3001 (__main__.PipelineWordReleaseTests.test_word_refresh_generic_reason_maps_to_E3001)
+refresh 返回 (False, "refresh_failed") 时仍映射 E3001（一般刷新失败）。 ... ok
+test_word_refresh_save_failed_reason_maps_to_E3003 (__main__.PipelineWordReleaseTests.test_word_refresh_save_failed_reason_maps_to_E3003)
+refresh 返回 (False, "save_failed") 时必须映射 E3003（保存失败）。 ... ok
+test_word_refresh_timeout_reason_maps_to_E3002 (__main__.PipelineWordReleaseTests.test_word_refresh_timeout_reason_maps_to_E3002)
+refresh 返回 (False, "timeout") 时必须映射 E3002（刷新超时）， ... ok
+test_word_save_exception_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_save_exception_preserves_previous_output)
+Word 保存异常时映射到错误码，保留旧正式输出。 ... ok
+test_word_timeout_preserves_previous_output (__main__.PipelineWordReleaseTests.test_word_timeout_preserves_previous_output)
+Word 超时（异常消息含超时）映射到 E3002，保留旧正式输出。 ... ok
+test_classify_failure_keys (__main__.RefreshReasonTests.test_classify_failure_keys) ... ok
+test_scan_reason_marker_and_default (__main__.RefreshReasonTests.test_scan_reason_marker_and_default) ... ok
+test_empty_user_profile_detected_as_non_interactive (__main__.WordCheckTests.test_empty_user_profile_detected_as_non_interactive)
+空 USERPROFILE 被识别为非交互式。 ... ok
+test_interactive_session_check_returns_bool (__main__.WordCheckTests.test_interactive_session_check_returns_bool)
+check_interactive_session 返回布尔值，不抛异常。 ... ok
+test_non_windows_interactive_session_false (__main__.WordCheckTests.test_non_windows_interactive_session_false)
+非 Windows 平台交互式会话检查返回 False。 ... ok
+test_pywin32_check_returns_bool (__main__.WordCheckTests.test_pywin32_check_returns_bool)
+check_pywin32 返回布尔值，不抛异常。 ... ok
+test_service_profile_detected_as_non_interactive (__main__.WordCheckTests.test_service_profile_detected_as_non_interactive)
+服务账号 profile 被识别为非交互式。 ... ok
+test_session_name_services_detected (__main__.WordCheckTests.test_session_name_services_detected)
+SESSIONNAME=Services 被识别为非交互式。 ... ok
+test_word_availability_report_structure (__main__.WordCheckTests.test_word_availability_report_structure)
+check_word_available 返回完整报告。 ... ok
+test_word_availability_to_dict_has_required_fields (__main__.WordCheckTests.test_word_availability_to_dict_has_required_fields)
+报告字典包含所有必需字段。 ... ok
+test_check_word_dispatchable_fallback_when_multiprocessing_fails (__main__.WordDispatchFallbackAndFrozenTests.test_check_word_dispatchable_fallback_when_multiprocessing_fails)
+multiprocessing 不可用时自动降级到 _dispatch_check_threaded。 ... ok
+test_extract_word_pid_handles_hwnd_attribute_error (__main__.WordDispatchFallbackAndFrozenTests.test_extract_word_pid_handles_hwnd_attribute_error)
+Word.Application 无 .Hwnd 属性时通过差集或 ActiveWindow 提取 PID。 ... skipped '需要 pywin32（win32process）才能验证 PID 提取'
+test_supervise_uses_thread_when_frozen (__main__.WordDispatchFallbackAndFrozenTests.test_supervise_uses_thread_when_frozen)
+冻结环境下 supervise 自动路由到 _supervise_in_thread。 ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 6.060s
+
+OK (skipped=1)
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-dd9710bw\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-gvse96ll\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-pjm87v23\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-pjm87v23\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-cy3psefw\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-cy3psefw\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-9qe_4d2y\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-9qe_4d2y\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-atomic-nvqr_bgy\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-cyr3vafb\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\doc-word-rel-cyr3vafb\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-6lgym98o\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-fhp53fgu\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-co72quyz\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-9jfjjerp\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-c4a9jgvb\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-g_8wjw7s\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-q8e4ah7a\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-3aa_6n90\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 修订记录: 写入 1 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\doc-word-rel-yu18eo8o\output\.tmp-GX-TEST-001 项目化构建测试(1.0).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_frozen_smoke.py" classname="scripts.tests" time="5.000"><failure message="exit code 1" type="TestFailure">test_frozen_cli_info_and_help (__main__.FrozenAppRuntimeTests.test_frozen_cli_info_and_help)
+冻结 CLI 可运行既有 info 与新增机器可读命令帮助。 ... ok
+test_frozen_kernel_importable (__main__.FrozenAppRuntimeTests.test_frozen_kernel_importable)
+冻结态 kernel.ensure_kernel_importable() 能定位 scripts/ 目录。 ... ok
+test_frozen_resource_root (__main__.FrozenAppRuntimeTests.test_frozen_resource_root)
+冻结态 resource_root() 指向 _internal/doc_tool/resources。 ... ok
+test_frozen_third_party_importable (__main__.FrozenAppRuntimeTests.test_frozen_third_party_importable)
+冻结态第三方库可导入。 ... FAIL
+test_exe_exists (__main__.FrozenAppStructureTests.test_exe_exists)
+DocTool.exe 存在。 ... ok
+test_internal_dir_exists (__main__.FrozenAppStructureTests.test_internal_dir_exists)
+_internal 目录存在。 ... ok
+test_license_packed (__main__.FrozenAppStructureTests.test_license_packed)
+第三方许可文件已打包。 ... ok
+test_resources_packed (__main__.FrozenAppStructureTests.test_resources_packed)
+默认项目清单已打包到 _internal/doc_tool/resources/。 ... ok
+test_scripts_packed (__main__.FrozenAppStructureTests.test_scripts_packed)
+内核脚本已打包到 _internal/scripts/。 ... ok
+test_templates_and_config_not_packed (__main__.FrozenAppStructureTests.test_templates_and_config_not_packed)
+公司模板与文档配置不被隐式打包（任务 8.2：绝不隐式打包）。 ... ok
+test_third_party_libs_packed (__main__.FrozenAppStructureTests.test_third_party_libs_packed)
+第三方库目录已打包。 ... ok
+
+======================================================================
+FAIL: test_frozen_third_party_importable (__main__.FrozenAppRuntimeTests.test_frozen_third_party_importable)
+冻结态第三方库可导入。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_frozen_smoke.py", line 184, in test_frozen_third_party_importable
+    self.assertEqual(result.returncode, 0,
+AssertionError: 1 != 0 : 第三方库导入失败: Traceback (most recent call last):
+  File "&lt;string&gt;", line 1, in &lt;module&gt;
+ModuleNotFoundError: No module named 'win32com.client'
+
+
+----------------------------------------------------------------------
+Ran 11 tests in 4.059s
+
+FAILED (failures=1)
+</failure><system-out>test_frozen_cli_info_and_help (__main__.FrozenAppRuntimeTests.test_frozen_cli_info_and_help)
+冻结 CLI 可运行既有 info 与新增机器可读命令帮助。 ... ok
+test_frozen_kernel_importable (__main__.FrozenAppRuntimeTests.test_frozen_kernel_importable)
+冻结态 kernel.ensure_kernel_importable() 能定位 scripts/ 目录。 ... ok
+test_frozen_resource_root (__main__.FrozenAppRuntimeTests.test_frozen_resource_root)
+冻结态 resource_root() 指向 _internal/doc_tool/resources。 ... ok
+test_frozen_third_party_importable (__main__.FrozenAppRuntimeTests.test_frozen_third_party_importable)
+冻结态第三方库可导入。 ... FAIL
+test_exe_exists (__main__.FrozenAppStructureTests.test_exe_exists)
+DocTool.exe 存在。 ... ok
+test_internal_dir_exists (__main__.FrozenAppStructureTests.test_internal_dir_exists)
+_internal 目录存在。 ... ok
+test_license_packed (__main__.FrozenAppStructureTests.test_license_packed)
+第三方许可文件已打包。 ... ok
+test_resources_packed (__main__.FrozenAppStructureTests.test_resources_packed)
+默认项目清单已打包到 _internal/doc_tool/resources/。 ... ok
+test_scripts_packed (__main__.FrozenAppStructureTests.test_scripts_packed)
+内核脚本已打包到 _internal/scripts/。 ... ok
+test_templates_and_config_not_packed (__main__.FrozenAppStructureTests.test_templates_and_config_not_packed)
+公司模板与文档配置不被隐式打包（任务 8.2：绝不隐式打包）。 ... ok
+test_third_party_libs_packed (__main__.FrozenAppStructureTests.test_third_party_libs_packed)
+第三方库目录已打包。 ... ok
+
+======================================================================
+FAIL: test_frozen_third_party_importable (__main__.FrozenAppRuntimeTests.test_frozen_third_party_importable)
+冻结态第三方库可导入。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_frozen_smoke.py", line 184, in test_frozen_third_party_importable
+    self.assertEqual(result.returncode, 0,
+AssertionError: 1 != 0 : 第三方库导入失败: Traceback (most recent call last):
+  File "&lt;string&gt;", line 1, in &lt;module&gt;
+ModuleNotFoundError: No module named 'win32com.client'
+
+
+----------------------------------------------------------------------
+Ran 11 tests in 4.059s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_rd_workspace_surface.py" classname="scripts.tests" time="38.266"><system-out>test_missing_template_and_word_still_allows_workspace_views (__main__.RdClosedLoopTests.test_missing_template_and_word_still_allows_workspace_views) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_open_artifact_uses_real_path (__main__.RdClosedLoopTests.test_open_artifact_uses_real_path) ... ok
+test_review_confirm_uses_saved_hashes_and_detects_later_change (__main__.RdClosedLoopTests.test_review_confirm_uses_saved_hashes_and_detects_later_change) ... ok
+test_three_member_closed_loop_relation_matrix_impact_collection (__main__.RdClosedLoopTests.test_three_member_closed_loop_relation_matrix_impact_collection) ... ok
+test_single_project_reports_no_workspace_but_keeps_views_usable (__main__.RdSingleDocumentTests.test_single_project_reports_no_workspace_but_keeps_views_usable) ... ok
+test_collection_rows_and_recover_copy_keep_source_intact (__main__.RdSurfaceTests.test_collection_rows_and_recover_copy_keep_source_intact) ... ok
+test_documents_with_buffers_marks_actual_source (__main__.RdSurfaceTests.test_documents_with_buffers_marks_actual_source) ... ok
+test_endpoint_options_show_member_chapter_and_source (__main__.RdSurfaceTests.test_endpoint_options_show_member_chapter_and_source) ... ok
+test_high_schema_member_is_readonly_but_other_members_work (__main__.RdSurfaceTests.test_high_schema_member_is_readonly_but_other_members_work)
+真实更高模式版本：只读可读，其他成员不受影响（不通过 save 伪造）。 ... ok
+test_item_action_helpers_run_on_buffer_text (__main__.RdSurfaceTests.test_item_action_helpers_run_on_buffer_text) ... ok
+test_locate_sources_uses_real_identity_and_reports_unknown_items (__main__.RdSurfaceTests.test_locate_sources_uses_real_identity_and_reports_unknown_items) ... ok
+test_matrix_view_matches_service_report_rows (__main__.RdSurfaceTests.test_matrix_view_matches_service_report_rows) ... ok
+test_matrix_view_reports_na_instead_of_fake_coverage (__main__.RdSurfaceTests.test_matrix_view_reports_na_instead_of_fake_coverage) ... ok
+test_member_rows_expose_identity_role_and_availability (__main__.RdSurfaceTests.test_member_rows_expose_identity_role_and_availability) ... ok
+test_missing_member_keeps_others_available (__main__.RdSurfaceTests.test_missing_member_keeps_others_available) ... ok
+test_overview_view_uses_service_truth (__main__.RdSurfaceTests.test_overview_view_uses_service_truth) ... ok
+test_review_rows_without_store_is_explicit (__main__.RdSurfaceTests.test_review_rows_without_store_is_explicit) ... ok
+test_collection_compare_and_export_package (__main__.RdWorkspaceGuiTests.test_collection_compare_and_export_package) ... ok
+test_collection_detail_lists_real_files_and_recover_copy (__main__.RdWorkspaceGuiTests.test_collection_detail_lists_real_files_and_recover_copy) ... ok
+test_collection_recover_reports_partial_when_a_file_is_missing (__main__.RdWorkspaceGuiTests.test_collection_recover_reports_partial_when_a_file_is_missing) ... ok
+test_copy_item_generates_new_id_in_buffer (__main__.RdWorkspaceGuiTests.test_copy_item_generates_new_id_in_buffer) ... ok
+test_declare_item_writes_single_editor_transaction (__main__.RdWorkspaceGuiTests.test_declare_item_writes_single_editor_transaction) ... ok
+test_dialog_lists_members_overview_and_settings_groups (__main__.RdWorkspaceGuiTests.test_dialog_lists_members_overview_and_settings_groups) ... ok
+test_impact_view_reports_buffer_source_and_review_state (__main__.RdWorkspaceGuiTests.test_impact_view_reports_buffer_source_and_review_state) ... ok
+test_locate_item_opens_real_source (__main__.RdWorkspaceGuiTests.test_locate_item_opens_real_source) ... ok
+test_matrix_covers_explicit_requirement_and_locates_source (__main__.RdWorkspaceGuiTests.test_matrix_covers_explicit_requirement_and_locates_source) ... ok
+test_matrix_reports_orphans_and_dangling_relations (__main__.RdWorkspaceGuiTests.test_matrix_reports_orphans_and_dangling_relations)
+孤立条目与悬空关系必须显式列出，而不是静默忽略。 ... ok
+test_matrix_without_requirements_shows_na (__main__.RdWorkspaceGuiTests.test_matrix_without_requirements_shows_na) ... ok
+test_member_delivery_reuses_existing_batch_entry (__main__.RdWorkspaceGuiTests.test_member_delivery_reuses_existing_batch_entry) ... ok
+test_narrow_window_keeps_controls_readable_and_keyboard_reachable (__main__.RdWorkspaceGuiTests.test_narrow_window_keeps_controls_readable_and_keyboard_reachable) ... ok
+test_open_member_delegates_to_project_window (__main__.RdWorkspaceGuiTests.test_open_member_delegates_to_project_window) ... ok
+test_relation_add_is_idempotent_and_uses_real_endpoints (__main__.RdWorkspaceGuiTests.test_relation_add_is_idempotent_and_uses_real_endpoints) ... ok
+test_settings_invalid_value_keeps_input_and_locates_field (__main__.RdWorkspaceGuiTests.test_settings_invalid_value_keeps_input_and_locates_field) ... ok
+test_settings_saves_current_group_only_and_keeps_other_groups (__main__.RdWorkspaceGuiTests.test_settings_saves_current_group_only_and_keeps_other_groups) ... ok
+test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends (__main__.RdWorkspaceGuiTests.test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends) ... ok
+
+----------------------------------------------------------------------
+Ran 35 tests in 34.861s
+
+OK
+</system-out></testcase><testcase name="test_rd_workspace_entry.py" classname="scripts.tests" time="12.796"><system-out>test_menu_action_exists_and_opens_workspace_for_current_project (__main__.RdMainWindowEntryTests.test_menu_action_exists_and_opens_workspace_for_current_project) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_rd_apply_item_edit_is_single_undo_transaction (__main__.RdMainWindowEntryTests.test_rd_apply_item_edit_is_single_undo_transaction) ... ok
+test_rd_member_delivery_reuses_existing_batch_entry (__main__.RdMainWindowEntryTests.test_rd_member_delivery_reuses_existing_batch_entry) ... ok
+test_rd_open_project_activates_existing_window (__main__.RdMainWindowEntryTests.test_rd_open_project_activates_existing_window) ... ok
+test_rd_open_project_falls_back_to_new_window (__main__.RdMainWindowEntryTests.test_rd_open_project_falls_back_to_new_window) ... ok
+test_rd_open_source_uses_real_chapter_entry (__main__.RdMainWindowEntryTests.test_rd_open_source_uses_real_chapter_entry) ... ok
+test_rd_project_identity_and_empty_buffer_state (__main__.RdMainWindowEntryTests.test_rd_project_identity_and_empty_buffer_state) ... ok
+test_rd_save_chapters_saves_only_requested_chapters (__main__.RdMainWindowEntryTests.test_rd_save_chapters_saves_only_requested_chapters) ... ok
+test_rd_workspace_root_changed_is_remembered (__main__.RdMainWindowEntryTests.test_rd_workspace_root_changed_is_remembered) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 8.388s
+
+OK
+</system-out></testcase><testcase name="test_v34_table_authoring.py" classname="scripts.tests" time="11.579"><system-out>test_markdown_input_and_unsupported_input (__main__.DelimitedIntakeTests.test_markdown_input_and_unsupported_input) ... ok
+test_preview_pages_large_input_without_truncating_insert (__main__.DelimitedIntakeTests.test_preview_pages_large_input_without_truncating_insert) ... ok
+test_tsv_quoted_newline_uses_supported_marker (__main__.DelimitedIntakeTests.test_tsv_quoted_newline_uses_supported_marker) ... ok
+test_tsv_quotes_leading_zeros_dates_and_formulas (__main__.DelimitedIntakeTests.test_tsv_quotes_leading_zeros_dates_and_formulas) ... ok
+test_tsv_ragged_rows_are_padded_and_reported (__main__.DelimitedIntakeTests.test_tsv_ragged_rows_are_padded_and_reported) ... ok
+test_complex_preserved_table_is_not_rewritten (__main__.TableExportTests.test_complex_preserved_table_is_not_rewritten) ... ok
+test_grid_dialog_handles_large_table_without_losing_rows (__main__.TableExportTests.test_grid_dialog_handles_large_table_without_losing_rows) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_large_input_measurement_records_no_truncation (__main__.TableExportTests.test_large_input_measurement_records_no_truncation) ... ok
+test_unsaved_table_reaches_docx_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_docx_without_writing_disk) ... ok
+test_unsaved_table_reaches_export_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_export_without_writing_disk) ... ok
+test_apply_grid_is_single_undo_and_keeps_other_text (__main__.TableGridGuiTests.test_apply_grid_is_single_undo_and_keeps_other_text) ... ok
+test_grid_edits_rows_columns_and_alignment (__main__.TableGridGuiTests.test_grid_edits_rows_columns_and_alignment) ... ok
+test_grid_local_undo_redo_for_rows_columns_and_cells (__main__.TableGridGuiTests.test_grid_local_undo_redo_for_rows_columns_and_cells) ... ok
+test_grid_tab_navigation_and_chinese_cell (__main__.TableGridGuiTests.test_grid_tab_navigation_and_chinese_cell) ... ok
+test_non_table_line_reports_reason_without_dialog (__main__.TableGridGuiTests.test_non_table_line_reports_reason_without_dialog) ... ok
+test_paste_as_table_inserts_full_table_and_keeps_plain_paste (__main__.TableGridGuiTests.test_paste_as_table_inserts_full_table_and_keeps_plain_paste) ... ok
+test_paste_cancel_and_raw_fallback_keep_content (__main__.TableGridGuiTests.test_paste_cancel_and_raw_fallback_keep_content) ... ok
+test_preview_dialog_pages_large_input_and_reports_support (__main__.TableGridGuiTests.test_preview_dialog_pages_large_input_and_reports_support) ... ok
+test_source_changed_keeps_pending_text_without_overwriting (__main__.TableGridGuiTests.test_source_changed_keeps_pending_text_without_overwriting) ... ok
+test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity) ... ok
+test_multiline_cells_use_supported_marker_in_preview_and_word (__main__.TableModelTests.test_multiline_cells_use_supported_marker_in_preview_and_word) ... ok
+test_non_table_and_broken_separator_are_rejected_with_reason (__main__.TableModelTests.test_non_table_and_broken_separator_are_rejected_with_reason) ... ok
+test_ragged_input_is_padded_with_warning_and_raw_preserved (__main__.TableModelTests.test_ragged_input_is_padded_with_warning_and_raw_preserved) ... ok
+test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment (__main__.TableModelTests.test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment) ... ok
+test_trailing_empty_columns_are_not_dropped (__main__.TableModelTests.test_trailing_empty_columns_are_not_dropped) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 7.651s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-30524-1\.表格工程.import-staging-30524-v4rth4bg\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-30524-1\表格工程\.state\snapshots\20261002T185802-38b1d828\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-30524-1\表格工程\.state\snapshots\20261002T185802-38b1d828\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-30524-1\.表格工程.import-staging-30524-z1buex_t\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-30524-1\表格工程\.state\snapshots\20261002T185806-e35f1b4a\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-30524-1\表格工程\.state\snapshots\20261002T185806-e35f1b4a\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v35_standard_pack.py" classname="scripts.tests" time="43.468"><system-out>test_make_freeze_export_and_colleague_consumption (__main__.PackClosedLoopTests.test_make_freeze_export_and_colleague_consumption) ... ok
+test_source_with_sensitive_config_is_excluded_from_share (__main__.PackClosedLoopTests.test_source_with_sensitive_config_is_excluded_from_share) ... ok
+test_dialog_creates_draft_from_project_and_locates_missing_identity (__main__.PackDialogTests.test_dialog_creates_draft_from_project_and_locates_missing_identity) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow) ... ok
+test_incomplete_draft_saves_and_reports_export_block (__main__.PackDialogTests.test_incomplete_draft_saves_and_reports_export_block) ... ok
+test_invalid_json_keeps_input_and_blocks_freeze (__main__.PackDialogTests.test_invalid_json_keeps_input_and_blocks_freeze) ... ok
+test_narrow_window_keyboard_and_no_project_dependency (__main__.PackDialogTests.test_narrow_window_keyboard_and_no_project_dependency) ... ok
+test_bad_optional_resource_falls_back_without_blocking (__main__.PackDraftTests.test_bad_optional_resource_falls_back_without_blocking) ... ok
+test_draft_from_project_copies_resources_without_touching_source (__main__.PackDraftTests.test_draft_from_project_copies_resources_without_touching_source) ... ok
+test_freeze_reuses_same_digest_and_never_overwrites_changed_version (__main__.PackDraftTests.test_freeze_reuses_same_digest_and_never_overwrites_changed_version) ... ok
+test_frozen_pack_is_consumable_and_resources_read_back (__main__.PackDraftTests.test_frozen_pack_is_consumable_and_resources_read_back) ... ok
+test_incomplete_draft_can_be_saved_and_reopened (__main__.PackDraftTests.test_incomplete_draft_can_be_saved_and_reopened) ... ok
+test_project_resources_map_to_pack_resources (__main__.PackDraftTests.test_project_resources_map_to_pack_resources) ... ok
+test_unknown_declarative_content_is_preserved (__main__.PackDraftTests.test_unknown_declarative_content_is_preserved) ... ok
+test_export_zip_contains_only_declared_resources (__main__.PackZipAndSampleTests.test_export_zip_contains_only_declared_resources) ... ok
+test_exported_zip_roundtrips_through_existing_loader (__main__.PackZipAndSampleTests.test_exported_zip_roundtrips_through_existing_loader) ... ok
+test_invalid_structure_keeps_draft_without_fake_installable (__main__.PackZipAndSampleTests.test_invalid_structure_keeps_draft_without_fake_installable) ... ok
+test_missing_optional_asset_is_listed_not_fatal (__main__.PackZipAndSampleTests.test_missing_optional_asset_is_listed_not_fatal) ... ok
+test_sample_evidence_becomes_stale_after_draft_change (__main__.PackZipAndSampleTests.test_sample_evidence_becomes_stale_after_draft_change) ... ok
+test_sample_runs_isolated_and_records_identity (__main__.PackZipAndSampleTests.test_sample_runs_isolated_and_records_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 39.755s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-5320-1\.来源项目.import-staging-5320-uk8temtw\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185813-7c9ab1af\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185813-7c9ab1af\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-5320-1\.来源项目.import-staging-5320-rbm4v_k8\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\.来源项目.import-staging-5320-kpdb8urd\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\.来源项目.import-staging-5320-dd7ob9k5\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185821-578af659\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185821-578af659\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\.来源项目.import-staging-5320-jmnk2mib\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\.来源项目.import-staging-5320-0r8vsv37\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-5320-1\.来源项目.import-staging-5320-jwqr14le\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-glv0d6j0\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-320v7z9u\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-887habw4\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-witbwmbx\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-xysbo6iy\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-kuizwnxc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-5320-1\.来源项目.import-staging-5320-c92k7xg3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-7tgk2oht\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-qk6ph3bb\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-36d83d0y\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-ziow408v\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-vxgvy7kp\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185841-8930ef88\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185841-8930ef88\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185844-372a7719\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185844-372a7719\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\.来源项目.import-staging-5320-1ukt4yv4\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185848-366033ab\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-5320-1\制作目录\sample\sample-project\.state\snapshots\20261002T185848-366033ab\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v36_large_document.py" classname="scripts.tests" time="14.032"><system-out>test_benchmark_script_produces_report_with_counts (__main__.BenchmarkHarnessTests.test_benchmark_script_produces_report_with_counts) ... ok
+test_add_delete_and_move_are_handled (__main__.CacheBehaviourTests.test_add_delete_and_move_are_handled) ... ok
+test_cache_disabled_matches_direct_scan_and_writes_nothing (__main__.CacheBehaviourTests.test_cache_disabled_matches_direct_scan_and_writes_nothing) ... ok
+test_cache_write_failure_keeps_results (__main__.CacheBehaviourTests.test_cache_write_failure_keeps_results) ... ok
+test_capacity_prune_keeps_recent_entries (__main__.CacheBehaviourTests.test_capacity_prune_keeps_recent_entries) ... ok
+test_capture_index_isolates_unsaved_buffer_from_disk_cache (__main__.CacheBehaviourTests.test_capture_index_isolates_unsaved_buffer_from_disk_cache) ... ok
+test_config_change_invalidates_cache (__main__.CacheBehaviourTests.test_config_change_invalidates_cache) ... ok
+test_corrupted_cache_falls_back_to_source (__main__.CacheBehaviourTests.test_corrupted_cache_falls_back_to_source) ... ok
+test_first_build_parses_and_second_build_reuses_cache (__main__.CacheBehaviourTests.test_first_build_parses_and_second_build_reuses_cache) ... ok
+test_parser_version_change_invalidates_cache (__main__.CacheBehaviourTests.test_parser_version_change_invalidates_cache) ... ok
+test_same_size_content_change_invalidates_by_digest (__main__.CacheBehaviourTests.test_same_size_content_change_invalidates_by_digest) ... ok
+test_repeat_refresh_parses_nothing_and_matches_direct_scan (__main__.IndexConsistencyTests.test_repeat_refresh_parses_nothing_and_matches_direct_scan) ... ok
+test_search_results_match_between_cache_and_direct (__main__.IndexConsistencyTests.test_search_results_match_between_cache_and_direct) ... ok
+test_stats_expose_counts_without_content (__main__.IndexConsistencyTests.test_stats_expose_counts_without_content) ... ok
+test_workspace_index_service_uses_project_cache (__main__.IndexConsistencyTests.test_workspace_index_service_uses_project_cache) ... ok
+test_cached_index_does_not_change_preview_check_or_export_content (__main__.SameRoundConsistencyTests.test_cached_index_does_not_change_preview_check_or_export_content) ... ok
+test_cancelled_build_keeps_partial_and_can_retry (__main__.SameRoundConsistencyTests.test_cancelled_build_keeps_partial_and_can_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 11.046s
+
+OK
+</system-out></testcase><testcase name="test_v34_v35_entries.py" classname="scripts.tests" time="9.906"><system-out>test_standard_pack_action_opens_dialog_for_current_project (__main__.EntryPointTests.test_standard_pack_action_opens_dialog_for_current_project) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_table_actions_exist_and_delegate_to_active_editor (__main__.EntryPointTests.test_table_actions_exist_and_delegate_to_active_editor) ... ok
+test_table_actions_without_open_chapter_report_reason (__main__.EntryPointTests.test_table_actions_without_open_chapter_report_reason) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 5.010s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34v35-entry-51128-1\.项目.import-staging-51128-bvirbcwk\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34v35-entry-51128-1\.项目.import-staging-51128-2pvdkz0f\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34v35-entry-51128-1\.项目.import-staging-51128-flmkekm9\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_export_round_recovery.py" classname="scripts.tests" time="20.937"><system-out>test_available_snapshot_retries_old_text_and_keeps_round_identity (__main__.OriginalRoundRecoveryTests.test_available_snapshot_retries_old_text_and_keeps_round_identity) ... ok
+test_current_project_unavailable_still_allows_snapshot_retry (__main__.OriginalRoundRecoveryTests.test_current_project_unavailable_still_allows_snapshot_retry) ... ok
+test_explicit_capture_mismatch_cannot_use_original_snapshot (__main__.OriginalRoundRecoveryTests.test_explicit_capture_mismatch_cannot_use_original_snapshot) ... ok
+test_missing_capture_can_convert_verified_original_word (__main__.OriginalRoundRecoveryTests.test_missing_capture_can_convert_verified_original_word) ... ok
+test_missing_capture_keeps_old_results_without_reading_current_content (__main__.OriginalRoundRecoveryTests.test_missing_capture_keeps_old_results_without_reading_current_content) ... ok
+test_missing_capture_keeps_readable_word_when_refresh_cannot_run (__main__.OriginalRoundRecoveryTests.test_missing_capture_keeps_readable_word_when_refresh_cannot_run) ... ok
+test_missing_identity_is_not_replaced_by_fresh_capture (__main__.OriginalRoundRecoveryTests.test_missing_identity_is_not_replaced_by_fresh_capture) ... ok
+test_rebuild_failure_keeps_word_and_allows_its_pdf_conversion (__main__.OriginalRoundRecoveryTests.test_rebuild_failure_keeps_word_and_allows_its_pdf_conversion) ... ok
+test_tampered_word_does_not_enter_original_round_conversion (__main__.OriginalRoundRecoveryTests.test_tampered_word_does_not_enter_original_round_conversion) ... ok
+test_known_capture_requires_matching_nonempty_report_identity (__main__.RoundIdentityTests.test_known_capture_requires_matching_nonempty_report_identity) ... ok
+test_reading_legacy_index_does_not_fabricate_missing_round_id (__main__.RoundIdentityTests.test_reading_legacy_index_does_not_fabricate_missing_round_id) ... ok
+test_change_directory_preserves_selected_range (__main__.RoundRegenerationTests.test_change_directory_preserves_selected_range) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_current_chapter_regeneration_keeps_original_chapter_after_navigation (__main__.RoundRegenerationTests.test_current_chapter_regeneration_keeps_original_chapter_after_navigation) ... ok
+test_current_scope_prefill_uses_original_chapter (__main__.RoundRegenerationTests.test_current_scope_prefill_uses_original_chapter) ... ok
+test_index_missing_scope_opens_settings_instead_of_assuming_full (__main__.RoundRegenerationTests.test_index_missing_scope_opens_settings_instead_of_assuming_full) ... ok
+test_legacy_unknown_scope_opens_visible_settings (__main__.RoundRegenerationTests.test_legacy_unknown_scope_opens_visible_settings) ... ok
+test_missing_current_chapter_notice_and_cancel_keep_source_and_artifact (__main__.RoundRegenerationTests.test_missing_current_chapter_notice_and_cancel_keep_source_and_artifact) ... ok
+test_removed_chapter_opens_settings_without_starting_full_export (__main__.RoundRegenerationTests.test_removed_chapter_opens_settings_without_starting_full_export) ... ok
+test_retry_missing_capture_id_does_not_submit_backend_task (__main__.RoundRegenerationTests.test_retry_missing_capture_id_does_not_submit_backend_task) ... ok
+test_selected_chapter_regeneration_creates_actual_scoped_html (__main__.RoundRegenerationTests.test_selected_chapter_regeneration_creates_actual_scoped_html) ... ok
+test_view_retains_scope_for_new_round_when_latest_index_is_overwritten (__main__.RoundRegenerationTests.test_view_retains_scope_for_new_round_when_latest_index_is_overwritten) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 16.404s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-recovery-shared-45664-1\.proj.import-staging-45664-j4ah2ag2\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\export-recovery-shared-45664-1\.proj.import-staging-45664-iwvsuetz\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase><testcase name="test_settings_v28.py" classname="scripts.tests" time="2.282"><system-out>..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.452s
+
+OK
+</system-out></testcase><testcase name="test_standard_pack_v28.py" classname="scripts.tests" time="2.375"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.638s
+
+OK
+</system-out></testcase><testcase name="test_content_operations.py" classname="scripts.tests" time="10.281"><system-out>...................QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................................................................................................................................................
+----------------------------------------------------------------------
+Ran 163 tests in 9.172s
+
+OK
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="19.937"><system-out>QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.......This plugin does not support propagateSizeHints()
+..This plugin does not support propagateSizeHints()
+.This plugin does not support propagateSizeHints()
+....This plugin does not support propagateSizeHints()
+.....................This plugin does not support propagateSizeHints()
+...........This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+............................This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+................This plugin does not support propagateSizeHints()
+This plugin does not support raise()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+.............QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 18.324s
+
+OK
+</system-out></testcase><testcase name="test_multi_window.py" classname="scripts.tests" time="38.188"><system-out>test_asset_change_marks_only_referencing_window (__main__.MultiWindowIsolationTests.test_asset_change_marks_only_referencing_window) ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_close_window_a_keeps_window_b_alive (__main__.MultiWindowIsolationTests.test_close_window_a_keeps_window_b_alive) ... ok
+test_dirty_editor_state_does_not_cross_windows (__main__.MultiWindowIsolationTests.test_dirty_editor_state_does_not_cross_windows)
+A 的编辑器脏状态不影响 B：B 没有 A 的文件标签，保存操作各写各的。 ... ok
+test_duplicate_project_open_activates_existing_window (__main__.MultiWindowIsolationTests.test_duplicate_project_open_activates_existing_window)
+同一项目重复打开：复用已有窗口，不产生第二个可写窗口。 ... This plugin does not support raise()
+This plugin does not support raise()
+ok
+test_git_project_and_no_vcs_project (__main__.MultiWindowIsolationTests.test_git_project_and_no_vcs_project) ... ok
+test_on_open_recent_opens_in_new_window (__main__.MultiWindowIsolationTests.test_on_open_recent_opens_in_new_window)
+最近项目点击：在新窗口打开，不在当前窗口切换项目。 ... This plugin does not support raise()
+This plugin does not support raise()
+ok
+test_open_project_in_new_window_creates_window (__main__.MultiWindowIsolationTests.test_open_project_in_new_window_creates_window)
+新项目在新窗口打开：注册表新增窗口并加载项目。 ... This plugin does not support raise()
+ok
+test_session_drafts_autosave_stores_are_per_project (__main__.MultiWindowIsolationTests.test_session_drafts_autosave_stores_are_per_project)
+draft/session/autosave 的 state_dir 按项目隔离。 ... ok
+test_two_projects_in_different_repos (__main__.MultiWindowIsolationTests.test_two_projects_in_different_repos) ... ok
+test_two_windows_two_projects_same_repo_fully_isolated (__main__.MultiWindowIsolationTests.test_two_windows_two_projects_same_repo_fully_isolated)
+同一 Git 仓库下两个项目：A 的改动不出现在 B（status/source/chapters）。 ... ok
+test_commit_all_changes_commits_project (__main__.VcsBackupPolicyTests.test_commit_all_changes_commits_project)
+改动面板「提交改动」在 git 项目：写入改动后提交，仓库干净。 ... ok
+test_commit_all_changes_local_project_rejected (__main__.VcsBackupPolicyTests.test_commit_all_changes_local_project_rejected)
+本地（无 VCS）项目「提交改动」返回说明，不产生提交。 ... ok
+test_commit_all_changes_scoped_to_project (__main__.VcsBackupPolicyTests.test_commit_all_changes_scoped_to_project)
+同一 git 仓库两个项目：提交 A 不影响 B 的改动。 ... ok
+test_git_project_write_creates_no_bak (__main__.VcsBackupPolicyTests.test_git_project_write_creates_no_bak) ... ok
+test_local_project_write_still_creates_bak (__main__.VcsBackupPolicyTests.test_local_project_write_still_creates_bak) ... ok
+test_local_rollback_all_uses_manifest (__main__.VcsBackupPolicyTests.test_local_rollback_all_uses_manifest)
+本地（无 VCS）项目「回滚全部」仍走 .bak 清单恢复。 ... ok
+test_rollback_all_restores_via_git_and_preserves_user_files (__main__.VcsBackupPolicyTests.test_rollback_all_restores_via_git_and_preserves_user_files)
+改动面板「回滚全部」在 git 项目：恢复被跟踪文件，删除本会话 ... ok
+test_closed_window_removed_from_registry (__main__.WindowRegistryTests.test_closed_window_removed_from_registry) ... ok
+test_register_unregister_and_count (__main__.WindowRegistryTests.test_register_unregister_and_count) ... ok
+test_strong_references_prevent_gc (__main__.WindowRegistryTests.test_strong_references_prevent_gc) ... ok
+test_window_for_project_resolve_normalization (__main__.WindowRegistryTests.test_window_for_project_resolve_normalization) ... ok
+test_shutdown_of_one_workspace_does_not_affect_other (__main__.WorkspaceStateIsolationTests.test_shutdown_of_one_workspace_does_not_affect_other) ... ok
+test_workspaces_do_not_share_index_or_status (__main__.WorkspaceStateIsolationTests.test_workspaces_do_not_share_index_or_status) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 34.758s
+
+OK
+</system-out></testcase><testcase name="test_core_gui_loop.py" classname="scripts.tests" time="13.078"><system-out>test_loop_import_edit_export_open_without_word (__main__.GuiLoopTests.test_loop_import_edit_export_open_without_word)
+源已选 → 进入编辑 → 改一章 → 快速导出 → 打开结果：全程真实服务。 ... QFontDatabase: Cannot find font directory D:/ai_develop_project_space/doc-tool/.vendor/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_loop_with_real_word_refresh_when_available (__main__.GuiLoopTests.test_loop_with_real_word_refresh_when_available)
+实机项：真实 Word 刷新闭环默认跳过，需显式开启 CORE_REAL_WORD=1。 ... skipped '真实 Word 刷新闭环为实机项：设置 CORE_REAL_WORD=1 后执行'
+test_u3_editor_reachable_and_preview_shared (__main__.GuiLoopTests.test_u3_editor_reachable_and_preview_shared)
+U-3：常用动作与章节编辑可达；预览基于同一份内容。 ... ok
+test_u8_cancel_without_running_task_is_safe (__main__.GuiLoopTests.test_u8_cancel_without_running_task_is_safe)
+U-8：没有运行中的任务时取消不报错、不弹阻断框。 ... ok
+test_u9_window_and_shortcuts (__main__.GuiLoopTests.test_u9_window_and_shortcuts)
+U-9：1280×720 逻辑窗口下主操作可达，快捷键不冲突。 ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 10.063s
+
+OK (skipped=1)
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\.闭环.import-staging-62384-y_ar6tux\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\闭环\.state\snapshots\20261002T190055-86a1ecaf\output\.tmp-闭环(1.0).docx
+[general] 插入元素=7, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\闭环\.state\snapshots\20261002T190055-86a1ecaf\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\.闭环.import-staging-62384-by89szpu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\.闭环.import-staging-62384-_8nyqyc3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\.闭环.import-staging-62384-atkuufb_\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\gui-loop-62384-1\out\.闭环.import-staging-62384-snu20_j0\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

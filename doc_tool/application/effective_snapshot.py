@@ -91,6 +91,9 @@ class EffectiveSnapshot:
     missingResources: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     unsavedChapters: List[str] = field(default_factory=list)
+    #: V3.6 36-C 3.1：本轮捕获各章真实内容摘要（relPath → sha256）。
+    #: 派生索引按它判定复用，缓冲章节不会读到磁盘旧内容。
+    captureIndex: Dict[str, str] = field(default_factory=dict)
     readonlyProject: bool = False
     externalDestination: str = ""
     sourceUpdated: bool = False
@@ -141,6 +144,7 @@ class EffectiveSnapshot:
         data["scope"] = self.scope.to_dict()
         data["chapters"] = [item.to_dict() for item in self.chapters]
         data["unsavedChapters"] = list(self.unsavedChapters)
+        data["captureIndex"] = dict(self.captureIndex)
         return data
 
     @classmethod
@@ -373,10 +377,12 @@ def capture_snapshot(
             snapshot.unsavedChapters.append(rel_path)
         text = _expand_modules(snapshot, rel_path, text)
         captured_texts[rel_path] = text
+        content_hash = sha256_text(text)
+        snapshot.captureIndex[rel_path] = content_hash
         snapshot.chapters.append(SnapshotChapter(
             rel_path=rel_path,
             title=_chapter_title(text) or Path(rel_path).stem,
-            contentHash=sha256_text(text),
+            contentHash=content_hash,
             diskHash=disk_hash,
             source=SOURCE_MODE_CURRENT_BUFFER if from_buffer else SOURCE_MODE_SAVED,
             location={"relPath": rel_path},

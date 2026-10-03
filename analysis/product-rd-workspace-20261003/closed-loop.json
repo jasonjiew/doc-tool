@@ -1,0 +1,15 @@
+{
+  "members": 3,
+  "items": 3,
+  "relations": 2,
+  "matrixRows": 1,
+  "requirements": "1",
+  "designCoverage": "100.0%",
+  "testCoverage": "100.0%",
+  "collections": 1,
+  "platform": "Qt offscreen",
+  "realDesktopTrial": false,
+  "realWordTrial": false,
+  "impactRows": 2,
+  "recovered": true
+}

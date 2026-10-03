@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -83,11 +83,14 @@ class SearchPanel(QWidget):
         *,
         on_open: Optional[Callable[[str, int], None]] = None,
         show_type_filter: bool = True,
+        context_provider: Optional[Callable[[], Dict[str, str]]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self._service = service
         self._on_open = on_open
+        #: V3.6 36-D：提供当前 projectId/captureId，使后台结果带请求身份。
+        self._context_provider = context_provider
         # 通用单项目不展示需求/设计类型筛选；仅旧版多类型布局保留兼容过滤。
         self._show_type_filter = show_type_filter
         self._debounce_timer = QTimer(self)
@@ -100,6 +103,8 @@ class SearchPanel(QWidget):
         # 在途搜索结果已被更新的查询（或清空查询）取代：终态回调丢弃旧结果，
         # 避免「清空输入框后旧搜索完成又把过期命中渲染回来」。
         self._invalidate_inflight = False
+        #: 请求代次：只有当前代次的后台结果允许更新界面。
+        self._generation = 0
 
         from doc_tool.ui.task_bridge import TaskRunner
 
@@ -133,6 +138,14 @@ class SearchPanel(QWidget):
         self._search_btn.setProperty("btnRole", "secondary")
         self._search_btn.clicked.connect(self.search_now)
         layout.addWidget(self._search_btn)
+
+        # V3.6 36-D：运行中可取消；已找到的结果保留并标为部分结果。
+        self._cancel_btn = QPushButton("取消", controls)
+        self._cancel_btn.setProperty("btnRole", "secondary")
+        self._cancel_btn.setToolTip("取消当前搜索：已找到的结果保留并标为部分结果")
+        self._cancel_btn.clicked.connect(self.cancel_search)
+        self._cancel_btn.hide()
+        layout.addWidget(self._cancel_btn)
 
         self._type_box = QComboBox(controls)
         self._type_box.addItems([label for label, _ in _TYPE_FILTERS])
@@ -216,27 +229,71 @@ class SearchPanel(QWidget):
         self._start_search(options)
 
     def _start_search(self, options: SearchOptions) -> None:
-        from doc_tool.application.content.search import run_search
+        from doc_tool.application.content.search import (
+            run_progressive_search, run_search,
+        )
         from doc_tool.ui.task_bridge import TaskSpec
 
-        # 新搜索启动即取代此前在途结果。
+        # 新搜索启动即取代此前在途结果，并递增请求代次。
         self._invalidate_inflight = False
-        self._runner.start(
-            TaskSpec(
-                name="search",
-                target=run_search,
-                kwargs={"service": self._service, "options": options},
-            ),
+        self._generation += 1
+        context: Dict[str, str] = {}
+        if callable(self._context_provider):
+            try:
+                context = dict(self._context_provider() or {})
+            except Exception:  # noqa: BLE001 - 上下文不可用不影响搜索本身
+                context = {}
+        if hasattr(self._service, "search_progressive"):
+            target = run_progressive_search
+            kwargs = {
+                "service": self._service, "options": options,
+                "generation": self._generation,
+                "project_id": str(context.get("projectId", "") or ""),
+                "capture_id": str(context.get("captureId", "") or ""),
+            }
+        else:
+            # 兼容只实现 search() 的服务（旧调用方与测试替身）。
+            target = run_search
+            kwargs = {"service": self._service, "options": options}
+        started = self._runner.start(
+            TaskSpec(name="search", target=target, kwargs=kwargs),
+            on_event=self._on_search_event,
             on_done=self._on_search_done,
         )
+        self._cancel_btn.setVisible(bool(started))
         self._poll_timer.start()
+
+    def _on_search_event(self, event) -> None:
+        """扫描中只报“已找到”数量，不谎报完整总数。"""
+        metrics = getattr(event, "metrics", None) or {}
+        if getattr(event, "kind", "") != "stage" or not metrics:
+            return
+        if metrics.get("complete"):
+            return
+        scanned = metrics.get("scanned")
+        total = metrics.get("totalFiles")
+        found = metrics.get("found")
+        if scanned is None or total is None:
+            return
+        self._summary_label.setText(
+            "扫描中：已找到 {0} 处（已扫描 {1}/{2} 文件）".format(found, scanned, total)
+        )
+
+    def cancel_search(self) -> None:
+        """请求取消：后台在文件边界停止，已找到的结果保留并标为部分结果。"""
+        if self._runner.is_running:
+            self._runner.cancel()
+            self._summary_label.setText("已请求取消，保留已找到的结果…")
 
     def _poll(self) -> None:
         self._runner.poll()
         if not self._runner.is_running:
             self._poll_timer.stop()
+            self._cancel_btn.setVisible(False)
 
     def _on_search_done(self, result) -> None:
+        # 终态即收起取消入口：不依赖轮询定时器（测试与快速完成场景同样正确）。
+        self._cancel_btn.setVisible(False)
         pending = self._pending_options
         self._pending_options = None
         if pending is not None:
@@ -249,9 +306,13 @@ class SearchPanel(QWidget):
             return
         if result is None:
             if self._runner.is_cancelled:
-                self._summary_label.setText("搜索被取消")
+                self._summary_label.setText("搜索已取消（未获得结果）")
             else:
                 self._summary_label.setText("搜索失败，请检查查询条件")
+            return
+        # 代次校验：旧请求的迟到结果不得更新当前界面。
+        generation = int(getattr(result, "generation", 0) or 0)
+        if generation and generation != self._generation:
             return
         self._last_result = result
         self._render(result)
@@ -292,7 +353,13 @@ class SearchPanel(QWidget):
             )
             self._tree.addTopLevelItem(item)
         self._tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        if result.total == 0:
+        partial = bool(getattr(result, "partial", False))
+        if partial:
+            summary = "部分结果：已找到 {0} 处（已扫描 {1}/{2} 文件）——已保留，可重试".format(
+                result.total, getattr(result, "scanned_files", 0),
+                getattr(result, "total_files", 0),
+            )
+        elif result.total == 0:
             summary = "无匹配内容" if result.query else "请输入关键字"
         elif result.truncated:
             summary = "共 {0} 处（{1} 个文件），显示前 {2} 条".format(

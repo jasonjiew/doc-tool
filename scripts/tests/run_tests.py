@@ -53,7 +53,11 @@ DEFAULT_TESTS = [
     "test_env_probe.py",
     "test_core_unsupported_objects.py",
     "test_core_unsupported_classification.py",
-    "test_core_entries_ui.py", "test_core_export_snapshot.py",
+    "test_core_entries_ui.py", "test_core_export_snapshot.py", "test_export_round_recovery.py",
+    "test_rd_workspace_surface.py", "test_rd_workspace_entry.py",
+    "test_v34_table_authoring.py", "test_v35_standard_pack.py", "test_v36_large_document.py",
+    "test_v34_v35_entries.py",
+    "test_product_post_implementation_review.py",
     "test_core_scope_presets_batch.py", "test_core_layout_package.py",
     "test_core_cli_export.py", "test_core_result_page.py", "test_core_gui_loop.py",
     "test_core_hidpi_layout.py",
@@ -148,9 +152,12 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
         paths.insert(0, str(vendor))
     if existing_pythonpath:
         paths.append(existing_pythonpath)
+    # 只补充与当前解释器同版本的第三方目录；混入其它版本的 site-packages
+    # 会让纯 Python 包走对、二进制扩展（lxml/PySide6）因 ABI 不符导入失败。
+    tag = "Python{0}{1}".format(*sys.version_info[:2])
     for candidate in [
-        Path.home() / "AppData" / "Roaming" / "Python" / "Python313" / "site-packages",
-        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python313" / "Lib" / "site-packages",
+        Path.home() / "AppData" / "Roaming" / "Python" / tag / "site-packages",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / tag / "Lib" / "site-packages",
     ]:
         if candidate.is_dir() and str(candidate) not in paths:
             paths.append(str(candidate))

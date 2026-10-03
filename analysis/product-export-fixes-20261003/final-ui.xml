@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="3" failures="0" time="111.016"><testsuite name="doc-tool" tests="3" failures="0" time="111.016"><testcase name="test_ui_polish_toolbar.py" classname="scripts.tests" time="4.641"><system-out>test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... ok
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.151s
+
+OK
+</system-out></testcase><testcase name="test_ui2_visual_hierarchy.py" classname="scripts.tests" time="44.688"><system-out>test_name_is_elided_but_full_value_is_reachable (__main__.LongNameInformationTests.test_name_is_elided_but_full_value_is_reachable) ... ok
+test_more_menu_trigger_uses_the_same_handler (__main__.ProjectBarOverflowTests.test_more_menu_trigger_uses_the_same_handler) ... ok
+test_primary_actions_keep_full_width_and_never_clip (__main__.ProjectBarOverflowTests.test_primary_actions_keep_full_width_and_never_clip) ... ok
+test_secondary_actions_move_into_more_menu (__main__.ProjectBarOverflowTests.test_secondary_actions_move_into_more_menu) ... ok
+test_wide_bar_has_no_overflow (__main__.ProjectBarOverflowTests.test_wide_bar_has_no_overflow) ... ok
+test_dialog_close_returns_focus_to_editor (__main__.SharedActionAndFocusTests.test_dialog_close_returns_focus_to_editor) ... ok
+test_normal_completion_does_not_steal_editor_focus (__main__.SharedActionAndFocusTests.test_normal_completion_does_not_steal_editor_focus) ... ok
+test_quick_export_shortcut_binding_is_declared_once (__main__.SharedActionAndFocusTests.test_quick_export_shortcut_binding_is_declared_once)
+Ctrl+E 只在菜单 QAction 声明一次；项目条按钮不再另设快捷键。 ... ok
+test_quick_export_submits_exactly_once_per_user_action (__main__.SharedActionAndFocusTests.test_quick_export_submits_exactly_once_per_user_action) ... ok
+test_status_tone_labels_have_text_not_only_colour (__main__.SharedActionAndFocusTests.test_status_tone_labels_have_text_not_only_colour) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 41.036s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-58552-1\.proj.import-staging-58552-1o8pyf85\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-58552-1\proj\.state\snapshots\20261002T172406-9fdb7181\output\.tmp-企业研发系统软件需求说明书（超长中文名称用于窄窗口验收）(1.0).docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-visual-case-58552-1\proj\.state\snapshots\20261002T172406-9fdb7181\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="D:/ai_develop_project_space/doc-tool/analysis/product-export-fixes-20261003/run_ui2_acceptance.py" classname="scripts.tests" time="61.687"><system-out>test_daily_loop_records_steps_and_real_artifacts (scripts.tests.test_ui2_acceptance.ClosedLoopEvidenceTests.test_daily_loop_records_steps_and_real_artifacts) ... ok
+test_panel_widths_geometry (scripts.tests.test_ui2_acceptance.GeometryEvidenceTests.test_panel_widths_geometry) ... ok
+test_window_sizes_and_themes_geometry (scripts.tests.test_ui2_acceptance.GeometryEvidenceTests.test_window_sizes_and_themes_geometry) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 57.219s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-52308-1\.proj.import-staging-52308-4_3_maav\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-case-52308-1\proj\.state\snapshots\20261002T172450-1d50fa6b\output\.tmp-proj(1.0).docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-case-52308-1\proj\.state\snapshots\20261002T172450-1d50fa6b\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-geometry-52308-1\.proj.import-staging-52308-fjnhghnp\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

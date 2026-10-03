@@ -1,0 +1,119 @@
+{
+  "kind": "v36-benchmark",
+  "generatedAt": "2026-10-03T05:08:52",
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.14",
+    "cpuCount": 12,
+    "machine": "AMD64"
+  },
+  "samplesPerPhase": 1,
+  "projects": [
+    {
+      "input": {
+        "chapters": 50,
+        "items": 600,
+        "contentBytes": 102834,
+        "projectRoot": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\v36-bench-68368-1\\sample-50",
+        "largestChapterBytes": 2020,
+        "contentSha256": "816cccce6e5df723"
+      },
+      "counts": {
+        "files": 101,
+        "projects": 1,
+        "searchHits": 600,
+        "checkIssues": 2
+      },
+      "operations": {
+        "incremental": {
+          "parseCount": 101,
+          "reuseCount": 101,
+          "files": 101,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "fullRefresh": {
+          "parseCount": 202,
+          "reuseCount": 101,
+          "files": 101,
+          "captureId": "",
+          "captureFiles": 0
+        },
+        "coldWithCache": {}
+      },
+      "phases": {
+        "manifest_open": {
+          "min": 0.0119,
+          "median": 0.0119,
+          "p95": 0.0119,
+          "max": 0.0119,
+          "samples": 1
+        },
+        "index_cold": {
+          "min": 0.1161,
+          "median": 0.1161,
+          "p95": 0.1161,
+          "max": 0.1161,
+          "samples": 1
+        },
+        "index_warm_repeat": {
+          "min": 0.093,
+          "median": 0.093,
+          "p95": 0.093,
+          "max": 0.093,
+          "samples": 1
+        },
+        "index_full_refresh": {
+          "min": 0.1608,
+          "median": 0.1608,
+          "p95": 0.1608,
+          "max": 0.1608,
+          "samples": 1
+        },
+        "search_first_page": {
+          "min": 0.0008,
+          "median": 0.0008,
+          "p95": 0.0008,
+          "max": 0.0008,
+          "samples": 1
+        },
+        "search_total": {
+          "min": 0.0007,
+          "median": 0.0007,
+          "p95": 0.0007,
+          "max": 0.0007,
+          "samples": 1
+        },
+        "preview_one_chapter": {
+          "min": 0.0002,
+          "median": 0.0002,
+          "p95": 0.0002,
+          "max": 0.0002,
+          "samples": 1
+        },
+        "check": {
+          "min": 0.2205,
+          "median": 0.2205,
+          "p95": 0.2205,
+          "max": 0.2205,
+          "samples": 1
+        },
+        "export_html_source": {
+          "min": 0.9287,
+          "median": 0.9287,
+          "p95": 0.9287,
+          "max": 0.9287,
+          "samples": 1
+        }
+      },
+      "memory": {
+        "baselineMB": 0.0,
+        "indexPeakMB": 1.0,
+        "previewPeakMB": 0.487,
+        "retainedAfterReleaseMB": 0.005,
+        "releasedRatio": 0.9948
+      },
+      "peakTracedMemoryMB": 1.0
+    }
+  ]
+}

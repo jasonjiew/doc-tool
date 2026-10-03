@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "readonly-html",
+  "appVersion": "2.9.0",
+  "documentVersion": "",
+  "time": "2026-10-02T17:28:26.188025+00:00",
+  "sources": [
+    {
+      "path": "第1章 引言/1.1 目的.md",
+      "sha256": "324fee409ccecd2163848cd9fa6bdf8b536db752ac18c593964db5e03b4cbeb3"
+    },
+    {
+      "path": "第1章 引言/_index.md",
+      "sha256": "0126043cbeaa901943e488f752a785038fb5b8ef5ef41096c18d371e08ac00f2"
+    }
+  ],
+  "warnings": [
+    {
+      "path": "第1章 引言/1.1 目的.md",
+      "line": 0,
+      "message": "导出使用已保存版本，未包含未保存编辑"
+    }
+  ],
+  "status": "带提醒完成",
+  "savedContent": true
+}

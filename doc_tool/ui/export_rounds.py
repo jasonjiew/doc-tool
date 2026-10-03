@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from doc_tool.application.intake_contract import (
+    ExportScope,
     FORMAT_LABELS,
     FORMAT_STATUS_LABELS,
     STATUS_READY,
@@ -91,6 +92,8 @@ class ExportRoundView:
     unsaved_chapters: List[str] = field(default_factory=list)
     index_path: str = ""
     docx_path: str = ""
+    # 仅供新轮设置预填；补原轮仍读取真实报告并核对身份。
+    scope: Optional[ExportScope] = None
 
     @property
     def usable_formats(self) -> List[RoundFormatView]:
@@ -139,12 +142,16 @@ def round_view_from_report(report) -> ExportRoundView:
             )
         )
     scope = getattr(report, "scope", None)
+    if not getattr(report, "scopeKnown", True):
+        scope = None
     scope_text = ""
     if scope is not None and hasattr(scope, "describe"):
         try:
             scope_text = scope.describe(len(getattr(scope, "chapters", None) or 0))
         except Exception:  # noqa: BLE001 - 范围描述失败不影响结果展示
             scope_text = ""
+    elif not getattr(report, "scopeKnown", True):
+        scope_text = "范围记录缺失"
     return ExportRoundView(
         round_id=str(getattr(report, "roundId", "") or ""),
         capture_id=str(getattr(report, "captureId", "") or ""),
@@ -160,6 +167,7 @@ def round_view_from_report(report) -> ExportRoundView:
         ],
         index_path=str(getattr(report, "indexPath", "") or ""),
         docx_path=str(getattr(report, "docxPath", "") or ""),
+        scope=ExportScope.from_dict(scope.to_dict()) if scope is not None and hasattr(scope, "to_dict") else None,
     )
 
 

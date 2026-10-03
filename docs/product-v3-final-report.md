@@ -1,12 +1,13 @@
 # V3 / CORE 最终交接报告
 
-生成时间：2026-10-02T15:08:37Z（UTC）
+生成时间：2026-10-03T02:58:08Z（UTC）
 生成方式：`python scripts\release\report_final_handover.py`（数字取自 tasks.md 与最新 JUnit，不手写）
 
 ## 1. 结论摘要
 
 - 五个 change 的**本地实现、测试、修复与交接物**已完成：进度 **151/157**
-- 全量回归（test-results-full-v3-r40.xml）：**163 个测试文件 / 0 项失败 / 0 项错误**
+- 已保存的回归证据（test-results-full-v3-r40.xml）：**149 个测试文件 / 0 项失败 / 0 项错误**
+- 当前默认测试清单：172 文件；清单增长不代表历史报告已覆盖新增测试。
 - 剩余 6 项任务全部为**授权/人工/实机**门：执行步骤见 `docs/product-v3-acceptance-runbook.md`
 - **未提交、未归档、未发布**；归档需显式授权。
 
@@ -22,8 +23,8 @@
 
 ## 3. 验证证据
 
-- 全量回归：`test-results-full-v3-r40.xml`
-  - 测试文件数 163／JUnit 用例数 149／失败 0／错误 0
+- 已保存的回归证据：`test-results-full-v3-r40.xml`
+  - 测试文件数 149／JUnit 用例数 149／失败 0／错误 0
 - 实机 Word（第三十二/三十八轮复跑）：`V32_REAL_WORD=1` 正式化 3 项 OK、跨进程换机 2 项 OK
 - Mermaid：项目本地 `mermaid-cli` + `chrome-headless-shell` 已装，工作台渲染成功（第三十八轮起全量 0 失败）
 - 冻结包：`build_exe.ps1` 重建 + 产物校验 + 签名 46 文件 + `test_frozen_smoke.py` 11 项 OK

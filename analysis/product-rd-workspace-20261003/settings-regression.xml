@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="1" failures="0" time="1.937"><testsuite name="doc-tool" tests="1" failures="0" time="1.937"><testcase name="test_settings_v28.py" classname="scripts.tests" time="1.937"><system-out>..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.383s
+
+OK
+</system-out></testcase></testsuite></testsuites>

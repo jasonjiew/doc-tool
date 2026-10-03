@@ -175,6 +175,12 @@ QPushButton[btnRole="primary"]:disabled {{ background: {disabled_text}; color: {
 QPushButton[btnRole="secondary"] {{ padding: 4px 12px; }}
 QPushButton[btnRole="compact"] {{ padding: 3px 9px; {font_small} }}
 
+/* 菜单工具按钮使用同一主题底色，避免深色主题继承浅色原生背景。 */
+QToolButton {{ {font_body} color: {text}; background: {panel_alt}; border: 1px solid {border}; border-radius: 4px; padding: 2px 4px; }}
+QToolButton:hover, QToolButton:focus {{ background: {panel}; border-color: {accent}; }}
+QToolButton:pressed, QToolButton:checked {{ background: {accent_press}; color: {text_on_accent}; }}
+QToolButton:disabled {{ color: {disabled_text}; background: {panel_alt}; border-color: {border}; }}
+
 /* --- 输入控件 --- */
 QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox {{ {font_body} background: {input_bg}; border: 1px solid {border}; border-radius: 4px; padding: 3px 6px; selection-background-color: {accent}; selection-color: {text_on_accent}; }}
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus {{ border-color: {accent}; }}
@@ -191,6 +197,8 @@ QTreeView::item, QListView::item, QTreeWidget::item {{ padding: 2px 4px; }}
 QTreeView::item:hover, QListView::item:hover, QTreeWidget::item:hover {{ background: {selection_bg}; }}
 QTreeView::item:selected, QListView::item:selected, QTreeWidget::item:selected, QTableView::item:selected {{ background: {selection_bg}; color: {selection_fg}; }}
 QHeaderView::section {{ {font_small} background: {panel_alt}; color: {text_muted}; border: none; border-right: 1px solid {border}; border-bottom: 1px solid {border}; padding: 3px 6px; }}
+QHeaderView, QTableCornerButton::section {{ background: {panel_alt}; border: none; }}
+QScrollArea#authoringScroll, QWidget#authoringScrollViewport, QWidget#authoringScrollContent {{ background: {panel}; border: none; }}
 
 /* --- 步骤清单（右侧 Dock） --- */
 QListWidget#stepList {{ background: {panel}; border: 1px solid {border}; }}

@@ -1,0 +1,13 @@
+{
+  "packId": "loop-pack",
+  "version": "1.0.0",
+  "schemaVersion": 1,
+  "zipFiles": 7,
+  "colleagueManifest": "D:\\ai_develop_project_space\\doc-tool\\tmp\\core-scratch\\v35-loop-16040-1\\同事项目\\project.yml",
+  "chapters": 2,
+  "variables": {
+    "docVersion": "1.0",
+    "productName": "待填写产品名"
+  },
+  "platform": "Qt offscreen / bundled Python"
+}

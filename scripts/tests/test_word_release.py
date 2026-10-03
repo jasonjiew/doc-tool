@@ -19,6 +19,11 @@
 
 from __future__ import annotations
 
+import importlib.util
+
+#: PID 提取用例依赖可选 pywin32；当前解释器没有该扩展时跳过，而不是记为产品失败。
+_HAS_WIN32PROCESS = importlib.util.find_spec("win32process") is not None
+
 import hashlib
 import json
 import os
@@ -871,6 +876,7 @@ class WordDispatchFallbackAndFrozenTests(unittest.TestCase):
                     self.assertEqual(version, "16.0")
                     mock_threaded.assert_called_once()
 
+    @unittest.skipUnless(_HAS_WIN32PROCESS, "需要 pywin32（win32process）才能验证 PID 提取")
     def test_extract_word_pid_handles_hwnd_attribute_error(self):
         """Word.Application 无 .Hwnd 属性时通过差集或 ActiveWindow 提取 PID。"""
         from doc_tool.application.word_check import _extract_word_pid

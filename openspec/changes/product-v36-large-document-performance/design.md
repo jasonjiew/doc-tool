@@ -1,6 +1,6 @@
 ## Context
 
-参见 [proposal](proposal.md)。当前已有 TaskRunner、章节解析、搜索、Mermaid 缓存、分页矩阵模型；CORE 正在统一有效内容捕获，V3.0 将扩展装配解析。优化必须围绕实际瓶颈，不能靠缓存改变覆盖率或出稿含义。
+参见 [proposal](proposal.md)。当前已有 TaskRunner、章节解析、搜索、Mermaid 缓存、分页矩阵模型；2026-10-03 复核时 CORE 有效内容捕获与 V3.0 装配代码已存在，实施先核对真实接口及验证再复用。优化必须围绕实际瓶颈，不能靠缓存改变覆盖率或出稿含义。
 
 ## Goals / Non-Goals
 

@@ -1,0 +1,3530 @@
+[
+  {
+    "file": "editor-0-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      148,
+      107
+    ],
+    "buttons": [
+      {
+        "text": "B",
+        "width": 24,
+        "hint": 24,
+        "minimumHint": 24
+      },
+      {
+        "text": "I",
+        "width": 20,
+        "hint": 20,
+        "minimumHint": 20
+      },
+      {
+        "text": "代码",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "•列表",
+        "width": 45,
+        "hint": 45,
+        "minimumHint": 45
+      },
+      {
+        "text": "1.列表",
+        "width": 50,
+        "hint": 50,
+        "minimumHint": 50
+      },
+      {
+        "text": "引用",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "回滚",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "本地历史",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "显示目录",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "外部打开",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "隐藏预览",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "保存 (Ctrl+S)",
+        "width": 92,
+        "hint": 92,
+        "minimumHint": 92
+      },
+      {
+        "text": "标题 ▾",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "更多",
+        "width": 47,
+        "hint": 47,
+        "minimumHint": 47
+      }
+    ]
+  },
+  {
+    "file": "grid-0-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      774,
+      244
+    ],
+    "buttons": [
+      {
+        "text": "添加行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上方插入行",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "添加列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左侧插入列",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "右移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "默认",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "左对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "居中",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "右对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "撤销网格操作",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "重做",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "支持范围…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "预览 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "重新定位并应用",
+        "width": 125,
+        "hint": 125,
+        "minimumHint": 125
+      },
+      {
+        "text": "复制 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "应用",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "paste-0-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      278,
+      270
+    ],
+    "buttons": [
+      {
+        "text": "插入原文（普通粘贴）",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "插入表格",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-0-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-1-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "选择 DOCX…",
+        "width": 113,
+        "hint": 113,
+        "minimumHint": 113
+      },
+      {
+        "text": "用系统 Word 打开",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "添加 Markdown…",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "移除选中",
+        "width": 141,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "添加变量",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "删除选中变量",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "查看保留的未知声明式内容",
+        "width": 190,
+        "hint": 190,
+        "minimumHint": 190
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-2-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "冻结规范包",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "导出 ZIP…",
+        "width": 93,
+        "hint": 93,
+        "minimumHint": 93
+      },
+      {
+        "text": "打开所在目录",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-3-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "在隔离样例中试用",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "打开样例成果",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-0-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "保存当前分组",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "打开成员",
+        "width": 120,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "引用加入…",
+        "width": 121,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "复制加入…",
+        "width": 120,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "重新定位…",
+        "width": 121,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "移除成员",
+        "width": 120,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-1-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "声明条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "复制条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "改编号…",
+        "width": 84,
+        "hint": 84,
+        "minimumHint": 84
+      },
+      {
+        "text": "定位来源",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "建立关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "仅保存相关两端并建立",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "删除关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-2-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "上一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "定位需求来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "计算影响",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "定位影响来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "确认当前摘要复核",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "重检选中关系",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-3-1024x640-light.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "查看详情",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "比较两份集合…",
+        "width": 123,
+        "hint": 123,
+        "minimumHint": 123
+      },
+      {
+        "text": "导出集合包…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "恢复为副本…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "成员交付（复用批量队列）…",
+        "width": 201,
+        "hint": 201,
+        "minimumHint": 201
+      },
+      {
+        "text": "打开成果",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "editor-0-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      148,
+      107
+    ],
+    "buttons": [
+      {
+        "text": "B",
+        "width": 24,
+        "hint": 24,
+        "minimumHint": 24
+      },
+      {
+        "text": "I",
+        "width": 20,
+        "hint": 20,
+        "minimumHint": 20
+      },
+      {
+        "text": "代码",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "•列表",
+        "width": 45,
+        "hint": 45,
+        "minimumHint": 45
+      },
+      {
+        "text": "1.列表",
+        "width": 50,
+        "hint": 50,
+        "minimumHint": 50
+      },
+      {
+        "text": "引用",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "表格",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "美化表",
+        "width": 52,
+        "hint": 52,
+        "minimumHint": 52
+      },
+      {
+        "text": "表格网格",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "粘贴为表格",
+        "width": 76,
+        "hint": 76,
+        "minimumHint": 76
+      },
+      {
+        "text": "链接",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "回滚",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "本地历史",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "显示目录",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "外部打开",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "隐藏预览",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "保存 (Ctrl+S)",
+        "width": 92,
+        "hint": 92,
+        "minimumHint": 92
+      },
+      {
+        "text": "标题 ▾",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "更多",
+        "width": 47,
+        "hint": 47,
+        "minimumHint": 47
+      }
+    ]
+  },
+  {
+    "file": "grid-0-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      774,
+      244
+    ],
+    "buttons": [
+      {
+        "text": "添加行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上方插入行",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "添加列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左侧插入列",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "右移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "默认",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "左对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "居中",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "右对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "撤销网格操作",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "重做",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "支持范围…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "预览 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "重新定位并应用",
+        "width": 125,
+        "hint": 125,
+        "minimumHint": 125
+      },
+      {
+        "text": "复制 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "应用",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "paste-0-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      278,
+      270
+    ],
+    "buttons": [
+      {
+        "text": "插入原文（普通粘贴）",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "插入表格",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-0-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-1-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "选择 DOCX…",
+        "width": 113,
+        "hint": 113,
+        "minimumHint": 113
+      },
+      {
+        "text": "用系统 Word 打开",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "添加 Markdown…",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "移除选中",
+        "width": 141,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "添加变量",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "删除选中变量",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "查看保留的未知声明式内容",
+        "width": 190,
+        "hint": 190,
+        "minimumHint": 190
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-2-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "冻结规范包",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "导出 ZIP…",
+        "width": 93,
+        "hint": 93,
+        "minimumHint": 93
+      },
+      {
+        "text": "打开所在目录",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-3-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "在隔离样例中试用",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "打开样例成果",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-0-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "保存当前分组",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "打开成员",
+        "width": 156,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "引用加入…",
+        "width": 156,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "复制加入…",
+        "width": 155,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "重新定位…",
+        "width": 156,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "移除成员",
+        "width": 156,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-1-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "声明条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "复制条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "改编号…",
+        "width": 84,
+        "hint": 84,
+        "minimumHint": 84
+      },
+      {
+        "text": "定位来源",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "建立关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "仅保存相关两端并建立",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "删除关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-2-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "上一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "定位需求来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "计算影响",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "定位影响来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "确认当前摘要复核",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "重检选中关系",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-3-1280x720-light.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "查看详情",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "比较两份集合…",
+        "width": 123,
+        "hint": 123,
+        "minimumHint": 123
+      },
+      {
+        "text": "导出集合包…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "恢复为副本…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "成员交付（复用批量队列）…",
+        "width": 201,
+        "hint": 201,
+        "minimumHint": 201
+      },
+      {
+        "text": "打开成果",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "editor-0-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      148,
+      107
+    ],
+    "buttons": [
+      {
+        "text": "B",
+        "width": 24,
+        "hint": 24,
+        "minimumHint": 24
+      },
+      {
+        "text": "I",
+        "width": 20,
+        "hint": 20,
+        "minimumHint": 20
+      },
+      {
+        "text": "代码",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "•列表",
+        "width": 45,
+        "hint": 45,
+        "minimumHint": 45
+      },
+      {
+        "text": "1.列表",
+        "width": 50,
+        "hint": 50,
+        "minimumHint": 50
+      },
+      {
+        "text": "引用",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "回滚",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "本地历史",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "显示目录",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "外部打开",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "隐藏预览",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "保存 (Ctrl+S)",
+        "width": 92,
+        "hint": 92,
+        "minimumHint": 92
+      },
+      {
+        "text": "标题 ▾",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "更多",
+        "width": 47,
+        "hint": 47,
+        "minimumHint": 47
+      }
+    ]
+  },
+  {
+    "file": "grid-0-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      774,
+      244
+    ],
+    "buttons": [
+      {
+        "text": "添加行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上方插入行",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "添加列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左侧插入列",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "右移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "默认",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "左对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "居中",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "右对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "撤销网格操作",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "重做",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "支持范围…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "预览 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "重新定位并应用",
+        "width": 125,
+        "hint": 125,
+        "minimumHint": 125
+      },
+      {
+        "text": "复制 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "应用",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "paste-0-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      278,
+      270
+    ],
+    "buttons": [
+      {
+        "text": "插入原文（普通粘贴）",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "插入表格",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-0-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-1-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "选择 DOCX…",
+        "width": 113,
+        "hint": 113,
+        "minimumHint": 113
+      },
+      {
+        "text": "用系统 Word 打开",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "添加 Markdown…",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "移除选中",
+        "width": 141,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "添加变量",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "删除选中变量",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "查看保留的未知声明式内容",
+        "width": 190,
+        "hint": 190,
+        "minimumHint": 190
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-2-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "冻结规范包",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "导出 ZIP…",
+        "width": 93,
+        "hint": 93,
+        "minimumHint": 93
+      },
+      {
+        "text": "打开所在目录",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-3-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "在隔离样例中试用",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "打开样例成果",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-0-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "保存当前分组",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "打开成员",
+        "width": 120,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "引用加入…",
+        "width": 121,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "复制加入…",
+        "width": 120,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "重新定位…",
+        "width": 121,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "移除成员",
+        "width": 120,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-1-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "声明条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "复制条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "改编号…",
+        "width": 84,
+        "hint": 84,
+        "minimumHint": 84
+      },
+      {
+        "text": "定位来源",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "建立关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "仅保存相关两端并建立",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "删除关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-2-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "上一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "定位需求来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "计算影响",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "定位影响来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "确认当前摘要复核",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "重检选中关系",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-3-1024x640-dark.png",
+    "width": 1024,
+    "height": 640,
+    "requested": [
+      1024,
+      640
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "查看详情",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "比较两份集合…",
+        "width": 123,
+        "hint": 123,
+        "minimumHint": 123
+      },
+      {
+        "text": "导出集合包…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "恢复为副本…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "成员交付（复用批量队列）…",
+        "width": 201,
+        "hint": 201,
+        "minimumHint": 201
+      },
+      {
+        "text": "打开成果",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "editor-0-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      148,
+      107
+    ],
+    "buttons": [
+      {
+        "text": "B",
+        "width": 24,
+        "hint": 24,
+        "minimumHint": 24
+      },
+      {
+        "text": "I",
+        "width": 20,
+        "hint": 20,
+        "minimumHint": 20
+      },
+      {
+        "text": "代码",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "•列表",
+        "width": 45,
+        "hint": 45,
+        "minimumHint": 45
+      },
+      {
+        "text": "1.列表",
+        "width": 50,
+        "hint": 50,
+        "minimumHint": 50
+      },
+      {
+        "text": "引用",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "表格",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "美化表",
+        "width": 52,
+        "hint": 52,
+        "minimumHint": 52
+      },
+      {
+        "text": "表格网格",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "粘贴为表格",
+        "width": 76,
+        "hint": 76,
+        "minimumHint": 76
+      },
+      {
+        "text": "链接",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "回滚",
+        "width": 40,
+        "hint": 40,
+        "minimumHint": 40
+      },
+      {
+        "text": "本地历史",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "显示目录",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "外部打开",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "隐藏预览",
+        "width": 64,
+        "hint": 64,
+        "minimumHint": 64
+      },
+      {
+        "text": "保存 (Ctrl+S)",
+        "width": 92,
+        "hint": 92,
+        "minimumHint": 92
+      },
+      {
+        "text": "标题 ▾",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "更多",
+        "width": 47,
+        "hint": 47,
+        "minimumHint": 47
+      }
+    ]
+  },
+  {
+    "file": "grid-0-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      774,
+      244
+    ],
+    "buttons": [
+      {
+        "text": "添加行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上方插入行",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "上移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下移行",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "添加列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左侧插入列",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "删除列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "左移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "右移列",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "默认",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "左对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "居中",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "右对齐",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "撤销网格操作",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "重做",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "支持范围…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "预览 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "重新定位并应用",
+        "width": 125,
+        "hint": 125,
+        "minimumHint": 125
+      },
+      {
+        "text": "复制 Markdown",
+        "width": 130,
+        "hint": 130,
+        "minimumHint": 130
+      },
+      {
+        "text": "应用",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "paste-0-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      278,
+      270
+    ],
+    "buttons": [
+      {
+        "text": "插入原文（普通粘贴）",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "插入表格",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "取消",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-0-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-1-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "选择 DOCX…",
+        "width": 113,
+        "hint": 113,
+        "minimumHint": 113
+      },
+      {
+        "text": "用系统 Word 打开",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "添加 Markdown…",
+        "width": 141,
+        "hint": 141,
+        "minimumHint": 141
+      },
+      {
+        "text": "移除选中",
+        "width": 141,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "添加变量",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "删除选中变量",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "查看保留的未知声明式内容",
+        "width": 190,
+        "hint": 190,
+        "minimumHint": 190
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-2-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "冻结规范包",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "导出 ZIP…",
+        "width": 93,
+        "hint": 93,
+        "minimumHint": 93
+      },
+      {
+        "text": "打开所在目录",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "pack-3-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      622,
+      461
+    ],
+    "buttons": [
+      {
+        "text": "选择目录…",
+        "width": 97,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "从当前项目创建草稿",
+        "width": 151,
+        "hint": 151,
+        "minimumHint": 151
+      },
+      {
+        "text": "从已有规范包复制…",
+        "width": 149,
+        "hint": 149,
+        "minimumHint": 149
+      },
+      {
+        "text": "保存草稿",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "在隔离样例中试用",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "打开样例成果",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-0-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "保存当前分组",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "打开成员",
+        "width": 156,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "引用加入…",
+        "width": 156,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "复制加入…",
+        "width": 155,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "重新定位…",
+        "width": 156,
+        "hint": 97,
+        "minimumHint": 97
+      },
+      {
+        "text": "移除成员",
+        "width": 156,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-1-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "声明条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "复制条目",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "改编号…",
+        "width": 84,
+        "hint": 84,
+        "minimumHint": 84
+      },
+      {
+        "text": "定位来源",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "建立关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "仅保存相关两端并建立",
+        "width": 164,
+        "hint": 164,
+        "minimumHint": 164
+      },
+      {
+        "text": "删除关系",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-2-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "上一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "下一页",
+        "width": 73,
+        "hint": 73,
+        "minimumHint": 73
+      },
+      {
+        "text": "定位需求来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "计算影响",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "定位影响来源",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "确认当前摘要复核",
+        "width": 138,
+        "hint": 138,
+        "minimumHint": 138
+      },
+      {
+        "text": "重检选中关系",
+        "width": 112,
+        "hint": 112,
+        "minimumHint": 112
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  },
+  {
+    "file": "rd-3-1280x720-dark.png",
+    "width": 1280,
+    "height": 720,
+    "requested": [
+      1280,
+      720
+    ],
+    "minimumHint": [
+      887,
+      548
+    ],
+    "buttons": [
+      {
+        "text": "新建工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "打开工作区…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "保存工作区",
+        "width": 99,
+        "hint": 99,
+        "minimumHint": 99
+      },
+      {
+        "text": "刷新",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      },
+      {
+        "text": "查看详情",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "比较两份集合…",
+        "width": 123,
+        "hint": 123,
+        "minimumHint": 123
+      },
+      {
+        "text": "导出集合包…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "恢复为副本…",
+        "width": 110,
+        "hint": 110,
+        "minimumHint": 110
+      },
+      {
+        "text": "成员交付（复用批量队列）…",
+        "width": 201,
+        "hint": 201,
+        "minimumHint": 201
+      },
+      {
+        "text": "打开成果",
+        "width": 86,
+        "hint": 86,
+        "minimumHint": 86
+      },
+      {
+        "text": "关闭",
+        "width": 60,
+        "hint": 60,
+        "minimumHint": 60
+      }
+    ]
+  }
+]

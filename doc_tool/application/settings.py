@@ -159,6 +159,10 @@ def save_settings(
     version = payload.get("documentVersion")
     if version is not None and not str(version).strip():
         errors["documentVersion"] = "版本号不能为空"
+    # RD-B 2.3：基本信息分组也要真正写入清单名称/编号，否则保存分组等于静默丢弃输入。
+    name = payload.get("documentName")
+    if name is not None and not str(name).strip():
+        errors["documentName"] = "文档名称不能为空"
     source = payload.get("qualitySource")
     if source is not None and str(source) not in ("", "pack", "project", "builtin"):
         errors["qualitySource"] = "检查策略来源只能是 pack/project/builtin 或留空"
@@ -187,6 +191,10 @@ def save_settings(
         manifest.documentVersion = str(version)
     if source is not None:
         manifest.qualitySource = str(source) or ""
+    if "documentName" in payload:
+        manifest.documentName = str(payload.get("documentName") or "")
+    if "documentNo" in payload:
+        manifest.documentNo = str(payload.get("documentNo") or "")
     if "documentKind" in payload:
         manifest.documentKind = str(payload.get("documentKind") or "")
     if "bodyStyle" in payload:

@@ -53,6 +53,9 @@ class ToolbarOverflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._app = QApplication.instance() or QApplication([])
+        # 按实际应用的 QSS 测量；原生未主题化按钮默认最小宽度不能代表产品工具栏。
+        from doc_tool.ui.styles import apply_theme
+        apply_theme(cls._app, dark=False)
 
     def setUp(self):
         self.work = fixtures.scratch_dir("ui-polish-toolbar")
@@ -97,11 +100,18 @@ class ToolbarOverflowTests(unittest.TestCase):
         self._app.processEvents()
 
     def test_all_format_actions_reachable_wide_and_narrow(self):
-        self._show(1600)
+        # 16 个动作按真实字体完整展开，1920 宽应同排；1024 宽验证溢出。
+        self._show(1920)
         self.panel.load("general/01 概述.md", "# 概述\n\n正文。\n")
         self._app.processEvents()
         names = [name for name, _t in self.panel.format_actions()]
-        self.assertEqual(names, EXPECTED_FORMAT_ACTIONS, "14 个原格式动作必须都在")
+        # V3.4 新增“表格网格/粘贴为表格”后，原 14 个动作必须仍在且相对顺序不变。
+        missing = [name for name in EXPECTED_FORMAT_ACTIONS if name not in names]
+        self.assertEqual(missing, [], "原格式动作不得丢失")
+        self.assertEqual(
+            [name for name in names if name in EXPECTED_FORMAT_ACTIONS],
+            list(EXPECTED_FORMAT_ACTIONS), "原格式动作相对顺序必须保持",
+        )
         self.assertFalse(
             self.panel._overflow_btn.isVisible(), "宽窗口下 14 个动作应同排可见"
         )
@@ -123,9 +133,15 @@ class ToolbarOverflowTests(unittest.TestCase):
         } | {
             name for name, action, button in self.panel.overflow_items() if button.isHidden()
         }
+        # 原格式动作一个都不能丢；同时新增动作也必须有找回路径。
+        self.assertTrue(
+            set(EXPECTED_FORMAT_ACTIONS) <= reachable,
+            "溢出后每个原格式动作仍必须有找回路径：{0}".format(sorted(reachable)),
+        )
         self.assertEqual(
-            sorted(reachable), sorted(EXPECTED_FORMAT_ACTIONS),
-            "溢出后每个格式动作仍必须有找回路径：{0}".format(sorted(reachable)),
+            sorted(reachable),
+            sorted(name for name, _widget in self.panel._md_actions),
+            "所有当前格式动作都必须有找回路径",
         )
         # 通过溢出菜单真实执行一个被收起的动作：「引用」是前缀类动作，
         # 只要它被收起就验证真实生效；未被收起则改测「片段」菜单项可达。

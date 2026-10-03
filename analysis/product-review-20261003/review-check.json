@@ -1,0 +1,253 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "head": "d68b514",
+  "taskSnapshot": {
+    "product-core-import-export": {
+      "checked": 39,
+      "total": 40,
+      "unchecked": [
+        "8.5"
+      ]
+    },
+    "product-v30-content-reuse": {
+      "checked": 31,
+      "total": 32,
+      "unchecked": [
+        "7.4"
+      ]
+    },
+    "product-v31-team-workflow": {
+      "checked": 25,
+      "total": 27,
+      "unchecked": [
+        "6.3",
+        "6.5"
+      ]
+    },
+    "product-v32-batch-delivery": {
+      "checked": 31,
+      "total": 32,
+      "unchecked": [
+        "7.5"
+      ]
+    },
+    "product-v33-authoring-assistance": {
+      "checked": 25,
+      "total": 26,
+      "unchecked": [
+        "6.2"
+      ]
+    },
+    "product-ui-interaction-polish": {
+      "checked": 19,
+      "total": 20,
+      "unchecked": [
+        "5.3"
+      ]
+    },
+    "product-ui-experience-next": {
+      "checked": 25,
+      "total": 26,
+      "unchecked": [
+        "6.3"
+      ]
+    },
+    "product-rd-workspace-experience": {
+      "checked": 0,
+      "total": 24,
+      "unchecked": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4"
+      ]
+    },
+    "product-v34-table-authoring": {
+      "checked": 0,
+      "total": 20,
+      "unchecked": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ]
+    },
+    "product-v35-standard-pack-authoring": {
+      "checked": 0,
+      "total": 20,
+      "unchecked": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ]
+    },
+    "product-v36-large-document-performance": {
+      "checked": 0,
+      "total": 20,
+      "unchecked": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4"
+      ]
+    }
+  },
+  "nextPackageTasks": 84,
+  "nextPackageUncheckedTasks": 84,
+  "checkedMarkdownFiles": 9,
+  "checkedLocalLinks": 80,
+  "initialDirectChecks": {
+    "executionItems": 8,
+    "failedExecutionItems": 0
+  },
+  "unitTestFiles": 7,
+  "unitTestCases": 66,
+  "unitTestRuns": [
+    {
+      "file": "test_ui2_visual_hierarchy.py",
+      "cases": 10
+    },
+    {
+      "file": "test_ui2_home_continue.py",
+      "cases": 9
+    },
+    {
+      "file": "test_ui2_navigation.py",
+      "cases": 13
+    },
+    {
+      "file": "test_ui2_reading_view.py",
+      "cases": 7
+    },
+    {
+      "file": "test_ui2_export_settings.py",
+      "cases": 15
+    },
+    {
+      "file": "test_ui2_panel_productivity.py",
+      "cases": 9
+    },
+    {
+      "file": "D:/ai_develop_project_space/doc-tool/analysis/product-review-20261003/run_ui2_acceptance.py",
+      "cases": 3
+    }
+  ],
+  "confirmedExportGaps": 3,
+  "historicalFullRun": {
+    "executionItems": 163,
+    "failedExecutionItems": 0
+  },
+  "currentDefaultTestFiles": 164,
+  "allDefaultFilesRerunThisTurn": false,
+  "chineseFontAcceptance": {
+    "executionItems": 1,
+    "failedExecutionItems": 0
+  },
+  "font": {
+    "loaded": [
+      {
+        "path": "C:\\Windows\\Fonts\\msyh.ttc",
+        "families": [
+          "Microsoft YaHei",
+          "Microsoft YaHei UI"
+        ]
+      },
+      {
+        "path": "C:\\Windows\\Fonts\\msyhbd.ttc",
+        "families": [
+          "Microsoft YaHei",
+          "Microsoft YaHei UI"
+        ]
+      },
+      {
+        "path": "C:\\Windows\\Fonts\\consola.ttf",
+        "families": [
+          "Consolas"
+        ]
+      },
+      {
+        "path": "C:\\Windows\\Fonts\\seguiemj.ttf",
+        "families": [
+          "Segoe UI Emoji"
+        ]
+      }
+    ],
+    "requested": "Microsoft YaHei",
+    "resolved": "Microsoft YaHei",
+    "supportsChineseGlyph": true,
+    "platform": "Qt offscreen",
+    "realDpiImeWordTrial": false
+  },
+  "realDpiImeWordTrial": false,
+  "errors": []
+}

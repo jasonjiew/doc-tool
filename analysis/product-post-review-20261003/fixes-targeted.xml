@@ -1,0 +1,302 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="7" failures="1" time="122.718"><testsuite name="doc-tool" tests="7" failures="1" time="122.718"><testcase name="test_product_post_implementation_review.py" classname="scripts.tests" time="7.765"><system-out>test_anchored_grid_does_not_modify_another_identical_table (__main__.GuiReviewTests.test_anchored_grid_does_not_modify_another_identical_table) ... ok
+test_anchored_grid_tracks_external_edit_and_undo_restores_table_only (__main__.GuiReviewTests.test_anchored_grid_tracks_external_edit_and_undo_restores_table_only) ... ok
+test_cancelled_grid_draft_reopens_and_applies (__main__.GuiReviewTests.test_cancelled_grid_draft_reopens_and_applies) ... ok
+test_column_move_is_one_undo_transaction (__main__.GuiReviewTests.test_column_move_is_one_undo_transaction) ... ok
+test_export_uses_current_form_after_previous_freeze (__main__.GuiReviewTests.test_export_uses_current_form_after_previous_freeze) ... ok
+test_grid_rejects_file_switch (__main__.GuiReviewTests.test_grid_rejects_file_switch) ... ok
+test_insert_delete_column_preserves_alignment_identity (__main__.GuiReviewTests.test_insert_delete_column_preserves_alignment_identity) ... ok
+test_invalid_input_is_restored_after_save_and_reopen (__main__.GuiReviewTests.test_invalid_input_is_restored_after_save_and_reopen) ... ok
+test_normal_close_button_saves_edits (__main__.GuiReviewTests.test_normal_close_button_saves_edits) ... ok
+test_real_table_grid_and_paste_buttons_pass_no_click_boolean (__main__.GuiReviewTests.test_real_table_grid_and_paste_buttons_pass_no_click_boolean) ... ok
+test_replacing_emoji_table_keeps_no_partial_source (__main__.GuiReviewTests.test_replacing_emoji_table_keeps_no_partial_source) ... ok
+test_row_move_is_one_undo_transaction (__main__.GuiReviewTests.test_row_move_is_one_undo_transaction) ... ok
+test_sample_work_does_not_block_gui_and_busy_form_is_stable (__main__.GuiReviewTests.test_sample_work_does_not_block_gui_and_busy_form_is_stable) ... ok
+test_selected_rows_move_together_without_reversing_order (__main__.GuiReviewTests.test_selected_rows_move_together_without_reversing_order) ... ok
+test_clear_resource_does_not_leave_old_terms_in_pack (__main__.PackFilesReviewTests.test_clear_resource_does_not_leave_old_terms_in_pack) ... ok
+test_latest_sample_preserves_previous_project_and_artifacts (__main__.PackFilesReviewTests.test_latest_sample_preserves_previous_project_and_artifacts) ... ok
+test_metadata_changes_are_not_reused_as_old_pack (__main__.PackFilesReviewTests.test_metadata_changes_are_not_reused_as_old_pack) ... ok
+test_same_second_freezes_keep_each_previous_artifact (__main__.PackFilesReviewTests.test_same_second_freezes_keep_each_previous_artifact) ... ok
+test_ambiguous_fragment_does_not_pick_by_distance (__main__.TableDataReviewTests.test_ambiguous_fragment_does_not_pick_by_distance) ... ok
+test_grid_multiline_serializes_as_supported_break (__main__.TableDataReviewTests.test_grid_multiline_serializes_as_supported_break) ... ok
+test_tsv_entire_empty_selection_keeps_dimensions (__main__.TableDataReviewTests.test_tsv_entire_empty_selection_keeps_dimensions) ... ok
+test_tsv_keeps_trailing_empty_and_whitespace_rows (__main__.TableDataReviewTests.test_tsv_keeps_trailing_empty_and_whitespace_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 4.370s
+
+OK
+</system-out></testcase><testcase name="test_v34_table_authoring.py" classname="scripts.tests" time="10.266"><system-out>test_markdown_input_and_unsupported_input (__main__.DelimitedIntakeTests.test_markdown_input_and_unsupported_input) ... ok
+test_preview_pages_large_input_without_truncating_insert (__main__.DelimitedIntakeTests.test_preview_pages_large_input_without_truncating_insert) ... ok
+test_tsv_quoted_newline_uses_supported_marker (__main__.DelimitedIntakeTests.test_tsv_quoted_newline_uses_supported_marker) ... ok
+test_tsv_quotes_leading_zeros_dates_and_formulas (__main__.DelimitedIntakeTests.test_tsv_quotes_leading_zeros_dates_and_formulas) ... ok
+test_tsv_ragged_rows_are_padded_and_reported (__main__.DelimitedIntakeTests.test_tsv_ragged_rows_are_padded_and_reported) ... ok
+test_complex_preserved_table_is_not_rewritten (__main__.TableExportTests.test_complex_preserved_table_is_not_rewritten) ... ok
+test_grid_dialog_handles_large_table_without_losing_rows (__main__.TableExportTests.test_grid_dialog_handles_large_table_without_losing_rows) ... ok
+test_large_input_measurement_records_no_truncation (__main__.TableExportTests.test_large_input_measurement_records_no_truncation) ... ok
+test_unsaved_table_reaches_docx_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_docx_without_writing_disk) ... ok
+test_unsaved_table_reaches_export_without_writing_disk (__main__.TableExportTests.test_unsaved_table_reaches_export_without_writing_disk) ... ok
+test_apply_grid_is_single_undo_and_keeps_other_text (__main__.TableGridGuiTests.test_apply_grid_is_single_undo_and_keeps_other_text) ... ok
+test_grid_edits_rows_columns_and_alignment (__main__.TableGridGuiTests.test_grid_edits_rows_columns_and_alignment) ... ok
+test_grid_local_undo_redo_for_rows_columns_and_cells (__main__.TableGridGuiTests.test_grid_local_undo_redo_for_rows_columns_and_cells) ... ok
+test_grid_tab_navigation_and_chinese_cell (__main__.TableGridGuiTests.test_grid_tab_navigation_and_chinese_cell) ... ok
+test_non_table_line_reports_reason_without_dialog (__main__.TableGridGuiTests.test_non_table_line_reports_reason_without_dialog) ... ok
+test_paste_as_table_inserts_full_table_and_keeps_plain_paste (__main__.TableGridGuiTests.test_paste_as_table_inserts_full_table_and_keeps_plain_paste) ... ok
+test_paste_cancel_and_raw_fallback_keep_content (__main__.TableGridGuiTests.test_paste_cancel_and_raw_fallback_keep_content) ... ok
+test_preview_dialog_pages_large_input_and_reports_support (__main__.TableGridGuiTests.test_preview_dialog_pages_large_input_and_reports_support) ... ok
+test_source_changed_keeps_pending_text_without_overwriting (__main__.TableGridGuiTests.test_source_changed_keeps_pending_text_without_overwriting) ... ok
+test_fragment_identity_unique_change_and_ambiguity (__main__.TableModelTests.test_fragment_identity_unique_change_and_ambiguity) ... ok
+test_multiline_cells_use_supported_marker_in_preview_and_word (__main__.TableModelTests.test_multiline_cells_use_supported_marker_in_preview_and_word) ... ok
+test_non_table_and_broken_separator_are_rejected_with_reason (__main__.TableModelTests.test_non_table_and_broken_separator_are_rejected_with_reason) ... ok
+test_ragged_input_is_padded_with_warning_and_raw_preserved (__main__.TableModelTests.test_ragged_input_is_padded_with_warning_and_raw_preserved) ... ok
+test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment (__main__.TableModelTests.test_roundtrip_keeps_pipes_backslash_empty_cells_and_alignment) ... ok
+test_trailing_empty_columns_are_not_dropped (__main__.TableModelTests.test_trailing_empty_columns_are_not_dropped) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 6.871s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-46740-1\.表格工程.import-staging-46740-du7tfyms\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-46740-1\表格工程\.state\snapshots\20261003T013925-b4ef9295\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-export-shared-46740-1\表格工程\.state\snapshots\20261003T013925-b4ef9295\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-46740-1\.表格工程.import-staging-46740-e89mq_vj\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-46740-1\表格工程\.state\snapshots\20261003T013928-467506e5\output\.tmp-表格工程(1.0).docx
+[general] 插入元素=9, 表格=1, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v34-multiline-46740-1\表格工程\.state\snapshots\20261003T013928-467506e5\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_v35_standard_pack.py" classname="scripts.tests" time="34.562"><system-out>test_make_freeze_export_and_colleague_consumption (__main__.PackClosedLoopTests.test_make_freeze_export_and_colleague_consumption) ... ok
+test_source_with_sensitive_config_is_excluded_from_share (__main__.PackClosedLoopTests.test_source_with_sensitive_config_is_excluded_from_share) ... ok
+test_dialog_creates_draft_from_project_and_locates_missing_identity (__main__.PackDialogTests.test_dialog_creates_draft_from_project_and_locates_missing_identity) ... ok
+test_freeze_export_listing_and_sample_flow (__main__.PackDialogTests.test_freeze_export_listing_and_sample_flow) ... ok
+test_incomplete_draft_saves_and_reports_export_block (__main__.PackDialogTests.test_incomplete_draft_saves_and_reports_export_block) ... ok
+test_invalid_json_keeps_input_and_blocks_freeze (__main__.PackDialogTests.test_invalid_json_keeps_input_and_blocks_freeze) ... ok
+test_narrow_window_keyboard_and_no_project_dependency (__main__.PackDialogTests.test_narrow_window_keyboard_and_no_project_dependency) ... ok
+test_bad_optional_resource_falls_back_without_blocking (__main__.PackDraftTests.test_bad_optional_resource_falls_back_without_blocking) ... ok
+test_draft_from_project_copies_resources_without_touching_source (__main__.PackDraftTests.test_draft_from_project_copies_resources_without_touching_source) ... ok
+test_freeze_reuses_same_digest_and_never_overwrites_changed_version (__main__.PackDraftTests.test_freeze_reuses_same_digest_and_never_overwrites_changed_version) ... ok
+test_frozen_pack_is_consumable_and_resources_read_back (__main__.PackDraftTests.test_frozen_pack_is_consumable_and_resources_read_back) ... ok
+test_incomplete_draft_can_be_saved_and_reopened (__main__.PackDraftTests.test_incomplete_draft_can_be_saved_and_reopened) ... ok
+test_project_resources_map_to_pack_resources (__main__.PackDraftTests.test_project_resources_map_to_pack_resources) ... ok
+test_unknown_declarative_content_is_preserved (__main__.PackDraftTests.test_unknown_declarative_content_is_preserved) ... ok
+test_export_zip_contains_only_declared_resources (__main__.PackZipAndSampleTests.test_export_zip_contains_only_declared_resources) ... ok
+test_exported_zip_roundtrips_through_existing_loader (__main__.PackZipAndSampleTests.test_exported_zip_roundtrips_through_existing_loader) ... ok
+test_invalid_structure_keeps_draft_without_fake_installable (__main__.PackZipAndSampleTests.test_invalid_structure_keeps_draft_without_fake_installable) ... ok
+test_missing_optional_asset_is_listed_not_fatal (__main__.PackZipAndSampleTests.test_missing_optional_asset_is_listed_not_fatal) ... ok
+test_sample_evidence_becomes_stale_after_draft_change (__main__.PackZipAndSampleTests.test_sample_evidence_becomes_stale_after_draft_change) ... ok
+test_sample_runs_isolated_and_records_identity (__main__.PackZipAndSampleTests.test_sample_runs_isolated_and_records_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 31.440s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-45892-1\.来源项目.import-staging-45892-74tjfr1n\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-45892-1\制作目录\sample\round-030e45686d3e467badeb6b6087d7c470\sample-project\.state\snapshots\20261003T013934-a7361d21\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-45892-1\制作目录\sample\round-030e45686d3e467badeb6b6087d7c470\sample-project\.state\snapshots\20261003T013934-a7361d21\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-loop-45892-1\.来源项目.import-staging-45892-0s9avda5\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\.来源项目.import-staging-45892-zhbkoq3e\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\.来源项目.import-staging-45892-1t7i2d5p\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\制作目录\sample\round-ea5cad4513f64893bbcd8e0601744aaa\sample-project\.state\snapshots\20261003T013940-4ab54fd4\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\制作目录\sample\round-ea5cad4513f64893bbcd8e0601744aaa\sample-project\.state\snapshots\20261003T013940-4ab54fd4\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\.来源项目.import-staging-45892-f4xxzh_y\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\.来源项目.import-staging-45892-58rwc6iu\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-ui-45892-1\.来源项目.import-staging-45892-eo97dyzf\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-zrgxax_s\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-2yyelwbe\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-nsnuvwec\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-jf268a_3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-mug4q0lc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-qzc3ts50\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-draft-45892-1\.来源项目.import-staging-45892-snzdby0t\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-45cf95s6\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-2h0f_8_r\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-oq_ykzmc\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-3ceif2xh\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-ygb4ikn_\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-14150c5e8bb747918492742d70e1794a\sample-project\.state\snapshots\20261003T013958-1454ff46\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-14150c5e8bb747918492742d70e1794a\sample-project\.state\snapshots\20261003T013958-1454ff46\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-1659e0bc125441a5b56a345fa8f9d3e9\sample-project\.state\snapshots\20261003T014000-f7056e8c\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-1659e0bc125441a5b56a345fa8f9d3e9\sample-project\.state\snapshots\20261003T014000-f7056e8c\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\.来源项目.import-staging-45892-81qtigle\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-cd045a57df4f4ec3925ecc93d0ac734b\sample-project\.state\snapshots\20261003T014003-3060b0f7\output\.tmp-GX-NEW 规范包样例(1.0).docx
+[general] 插入元素=4, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\v35-zip-45892-1\制作目录\sample\round-cd045a57df4f4ec3925ecc93d0ac734b\sample-project\.state\snapshots\20261003T014003-3060b0f7\logs\general-validation.md
+[general] PASS=18 FAIL=0
+</system-out></testcase><testcase name="test_ui_polish_toolbar.py" classname="scripts.tests" time="5.750"><failure message="exit code 1" type="TestFailure">test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 111, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.930s
+
+FAILED (failures=1)
+</failure><system-out>test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 111, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.930s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_rd_workspace_entry.py" classname="scripts.tests" time="11.875"><system-out>test_menu_action_exists_and_opens_workspace_for_current_project (__main__.RdMainWindowEntryTests.test_menu_action_exists_and_opens_workspace_for_current_project) ... ok
+test_rd_apply_item_edit_is_single_undo_transaction (__main__.RdMainWindowEntryTests.test_rd_apply_item_edit_is_single_undo_transaction) ... ok
+test_rd_member_delivery_reuses_existing_batch_entry (__main__.RdMainWindowEntryTests.test_rd_member_delivery_reuses_existing_batch_entry) ... ok
+test_rd_open_project_activates_existing_window (__main__.RdMainWindowEntryTests.test_rd_open_project_activates_existing_window) ... ok
+test_rd_open_project_falls_back_to_new_window (__main__.RdMainWindowEntryTests.test_rd_open_project_falls_back_to_new_window) ... ok
+test_rd_open_source_uses_real_chapter_entry (__main__.RdMainWindowEntryTests.test_rd_open_source_uses_real_chapter_entry) ... ok
+test_rd_project_identity_and_empty_buffer_state (__main__.RdMainWindowEntryTests.test_rd_project_identity_and_empty_buffer_state) ... ok
+test_rd_save_chapters_saves_only_requested_chapters (__main__.RdMainWindowEntryTests.test_rd_save_chapters_saves_only_requested_chapters) ... ok
+test_rd_workspace_root_changed_is_remembered (__main__.RdMainWindowEntryTests.test_rd_workspace_root_changed_is_remembered) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 7.942s
+
+OK
+</system-out></testcase><testcase name="test_rd_workspace_surface.py" classname="scripts.tests" time="36.391"><system-out>test_missing_template_and_word_still_allows_workspace_views (__main__.RdClosedLoopTests.test_missing_template_and_word_still_allows_workspace_views) ... ok
+test_open_artifact_uses_real_path (__main__.RdClosedLoopTests.test_open_artifact_uses_real_path) ... ok
+test_review_confirm_uses_saved_hashes_and_detects_later_change (__main__.RdClosedLoopTests.test_review_confirm_uses_saved_hashes_and_detects_later_change) ... ok
+test_three_member_closed_loop_relation_matrix_impact_collection (__main__.RdClosedLoopTests.test_three_member_closed_loop_relation_matrix_impact_collection) ... ok
+test_single_project_reports_no_workspace_but_keeps_views_usable (__main__.RdSingleDocumentTests.test_single_project_reports_no_workspace_but_keeps_views_usable) ... ok
+test_collection_rows_and_recover_copy_keep_source_intact (__main__.RdSurfaceTests.test_collection_rows_and_recover_copy_keep_source_intact) ... ok
+test_documents_with_buffers_marks_actual_source (__main__.RdSurfaceTests.test_documents_with_buffers_marks_actual_source) ... ok
+test_endpoint_options_show_member_chapter_and_source (__main__.RdSurfaceTests.test_endpoint_options_show_member_chapter_and_source) ... ok
+test_high_schema_member_is_readonly_but_other_members_work (__main__.RdSurfaceTests.test_high_schema_member_is_readonly_but_other_members_work)
+真实更高模式版本：只读可读，其他成员不受影响（不通过 save 伪造）。 ... ok
+test_item_action_helpers_run_on_buffer_text (__main__.RdSurfaceTests.test_item_action_helpers_run_on_buffer_text) ... ok
+test_locate_sources_uses_real_identity_and_reports_unknown_items (__main__.RdSurfaceTests.test_locate_sources_uses_real_identity_and_reports_unknown_items) ... ok
+test_matrix_view_matches_service_report_rows (__main__.RdSurfaceTests.test_matrix_view_matches_service_report_rows) ... ok
+test_matrix_view_reports_na_instead_of_fake_coverage (__main__.RdSurfaceTests.test_matrix_view_reports_na_instead_of_fake_coverage) ... ok
+test_member_rows_expose_identity_role_and_availability (__main__.RdSurfaceTests.test_member_rows_expose_identity_role_and_availability) ... ok
+test_missing_member_keeps_others_available (__main__.RdSurfaceTests.test_missing_member_keeps_others_available) ... ok
+test_overview_view_uses_service_truth (__main__.RdSurfaceTests.test_overview_view_uses_service_truth) ... ok
+test_review_rows_without_store_is_explicit (__main__.RdSurfaceTests.test_review_rows_without_store_is_explicit) ... ok
+test_collection_compare_and_export_package (__main__.RdWorkspaceGuiTests.test_collection_compare_and_export_package) ... ok
+test_collection_detail_lists_real_files_and_recover_copy (__main__.RdWorkspaceGuiTests.test_collection_detail_lists_real_files_and_recover_copy) ... ok
+test_collection_recover_reports_partial_when_a_file_is_missing (__main__.RdWorkspaceGuiTests.test_collection_recover_reports_partial_when_a_file_is_missing) ... ok
+test_copy_item_generates_new_id_in_buffer (__main__.RdWorkspaceGuiTests.test_copy_item_generates_new_id_in_buffer) ... ok
+test_declare_item_writes_single_editor_transaction (__main__.RdWorkspaceGuiTests.test_declare_item_writes_single_editor_transaction) ... ok
+test_dialog_lists_members_overview_and_settings_groups (__main__.RdWorkspaceGuiTests.test_dialog_lists_members_overview_and_settings_groups) ... ok
+test_impact_view_reports_buffer_source_and_review_state (__main__.RdWorkspaceGuiTests.test_impact_view_reports_buffer_source_and_review_state) ... ok
+test_locate_item_opens_real_source (__main__.RdWorkspaceGuiTests.test_locate_item_opens_real_source) ... ok
+test_matrix_covers_explicit_requirement_and_locates_source (__main__.RdWorkspaceGuiTests.test_matrix_covers_explicit_requirement_and_locates_source) ... ok
+test_matrix_reports_orphans_and_dangling_relations (__main__.RdWorkspaceGuiTests.test_matrix_reports_orphans_and_dangling_relations)
+孤立条目与悬空关系必须显式列出，而不是静默忽略。 ... ok
+test_matrix_without_requirements_shows_na (__main__.RdWorkspaceGuiTests.test_matrix_without_requirements_shows_na) ... ok
+test_member_delivery_reuses_existing_batch_entry (__main__.RdWorkspaceGuiTests.test_member_delivery_reuses_existing_batch_entry) ... ok
+test_narrow_window_keeps_controls_readable_and_keyboard_reachable (__main__.RdWorkspaceGuiTests.test_narrow_window_keeps_controls_readable_and_keyboard_reachable) ... ok
+test_open_member_delegates_to_project_window (__main__.RdWorkspaceGuiTests.test_open_member_delegates_to_project_window) ... ok
+test_relation_add_is_idempotent_and_uses_real_endpoints (__main__.RdWorkspaceGuiTests.test_relation_add_is_idempotent_and_uses_real_endpoints) ... ok
+test_settings_invalid_value_keeps_input_and_locates_field (__main__.RdWorkspaceGuiTests.test_settings_invalid_value_keeps_input_and_locates_field) ... ok
+test_settings_saves_current_group_only_and_keeps_other_groups (__main__.RdWorkspaceGuiTests.test_settings_saves_current_group_only_and_keeps_other_groups) ... ok
+test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends (__main__.RdWorkspaceGuiTests.test_unsaved_endpoint_keeps_relation_draft_then_saves_both_ends) ... ok
+
+----------------------------------------------------------------------
+Ran 35 tests in 32.775s
+
+OK
+</system-out></testcase><testcase name="test_v36_large_document.py" classname="scripts.tests" time="16.109"><system-out>test_benchmark_script_produces_report_with_counts (__main__.BenchmarkHarnessTests.test_benchmark_script_produces_report_with_counts) ... ok
+test_add_delete_and_move_are_handled (__main__.CacheBehaviourTests.test_add_delete_and_move_are_handled) ... ok
+test_cache_disabled_matches_direct_scan_and_writes_nothing (__main__.CacheBehaviourTests.test_cache_disabled_matches_direct_scan_and_writes_nothing) ... ok
+test_cache_write_failure_keeps_results (__main__.CacheBehaviourTests.test_cache_write_failure_keeps_results) ... ok
+test_capacity_prune_keeps_recent_entries (__main__.CacheBehaviourTests.test_capacity_prune_keeps_recent_entries) ... ok
+test_capture_index_isolates_unsaved_buffer_from_disk_cache (__main__.CacheBehaviourTests.test_capture_index_isolates_unsaved_buffer_from_disk_cache) ... ok
+test_config_change_invalidates_cache (__main__.CacheBehaviourTests.test_config_change_invalidates_cache) ... ok
+test_corrupted_cache_falls_back_to_source (__main__.CacheBehaviourTests.test_corrupted_cache_falls_back_to_source) ... ok
+test_first_build_parses_and_second_build_reuses_cache (__main__.CacheBehaviourTests.test_first_build_parses_and_second_build_reuses_cache) ... ok
+test_parser_version_change_invalidates_cache (__main__.CacheBehaviourTests.test_parser_version_change_invalidates_cache) ... ok
+test_same_size_content_change_invalidates_by_digest (__main__.CacheBehaviourTests.test_same_size_content_change_invalidates_by_digest) ... ok
+test_buffered_chapter_uses_memory_text_not_disk_or_cache (__main__.CaptureScopeTests.test_buffered_chapter_uses_memory_text_not_disk_or_cache) ... ok
+test_cache_entries_do_not_cross_captures (__main__.CaptureScopeTests.test_cache_entries_do_not_cross_captures) ... ok
+test_core_snapshot_records_capture_digests (__main__.CaptureScopeTests.test_core_snapshot_records_capture_digests) ... ok
+test_repeat_refresh_parses_nothing_and_matches_direct_scan (__main__.IndexConsistencyTests.test_repeat_refresh_parses_nothing_and_matches_direct_scan) ... ok
+test_search_results_match_between_cache_and_direct (__main__.IndexConsistencyTests.test_search_results_match_between_cache_and_direct) ... ok
+test_stats_expose_counts_without_content (__main__.IndexConsistencyTests.test_stats_expose_counts_without_content) ... ok
+test_workspace_index_service_uses_project_cache (__main__.IndexConsistencyTests.test_workspace_index_service_uses_project_cache) ... ok
+test_capture_index_helper_carries_capture_identity (__main__.ModuleFingerprintTests.test_capture_index_helper_carries_capture_identity) ... ok
+test_only_referencing_chapter_is_invalidated_by_module_change (__main__.ModuleFingerprintTests.test_only_referencing_chapter_is_invalidated_by_module_change) ... ok
+test_build_content_context_forwards_progress_events (__main__.ProgressiveChapterTests.test_build_content_context_forwards_progress_events) ... ok
+test_index_build_reports_progress_counts (__main__.ProgressiveChapterTests.test_index_build_reports_progress_counts) ... ok
+test_issue_list_is_paged_and_not_truncated (__main__.ProgressiveChapterTests.test_issue_list_is_paged_and_not_truncated) ... ok
+test_releasing_index_frees_traced_memory (__main__.ProgressiveChapterTests.test_releasing_index_frees_traced_memory) ... ok
+test_workspace_renders_first_screen_before_index_finishes (__main__.ProgressiveChapterTests.test_workspace_renders_first_screen_before_index_finishes) ... ok
+test_cancelled_search_is_partial_and_keeps_found_hits (__main__.ProgressiveViewTests.test_cancelled_search_is_partial_and_keeps_found_hits) ... ok
+test_progressive_search_reports_progress_and_matches_plain_search (__main__.ProgressiveViewTests.test_progressive_search_reports_progress_and_matches_plain_search) ... ok
+test_search_panel_shows_progress_and_preserves_partial_results (__main__.ProgressiveViewTests.test_search_panel_shows_progress_and_preserves_partial_results) ... ok
+test_stale_generation_result_is_ignored_by_panel (__main__.ProgressiveViewTests.test_stale_generation_result_is_ignored_by_panel) ... ok
+test_cached_index_does_not_change_preview_check_or_export_content (__main__.SameRoundConsistencyTests.test_cached_index_does_not_change_preview_check_or_export_content) ... ok
+test_cancelled_build_keeps_partial_and_can_retry (__main__.SameRoundConsistencyTests.test_cancelled_build_keeps_partial_and_can_retry) ... ok
+
+----------------------------------------------------------------------
+Ran 31 tests in 12.838s
+
+OK
+</system-out></testcase></testsuite></testsuites>

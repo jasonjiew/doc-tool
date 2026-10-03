@@ -1,0 +1,113 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="4" failures="1" time="45.062"><testsuite name="doc-tool" tests="4" failures="1" time="45.062"><testcase name="test_ui_polish_toolbar.py" classname="scripts.tests" time="4.282"><failure message="exit code 1" type="TestFailure">test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 111, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.108s
+
+FAILED (failures=1)
+</failure><system-out>test_escape_closes_find_and_returns_focus_to_editor (__main__.KeyboardContextTests.test_escape_closes_find_and_returns_focus_to_editor) ... ok
+test_find_shortcut_is_scoped_to_the_editor_widget (__main__.KeyboardContextTests.test_find_shortcut_is_scoped_to_the_editor_widget) ... ok
+test_format_shortcuts_only_apply_with_editor_focus (__main__.KeyboardContextTests.test_format_shortcuts_only_apply_with_editor_focus) ... ok
+test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain (__main__.KeyboardContextTests.test_help_entry_is_keyboard_reachable_and_editor_in_tab_chain)
+帮助等入口可键盘到达；编辑器在焦点链里（Tab/Esc 行为有落点）。 ... ok
+test_plain_typing_is_not_intercepted_as_formatting (__main__.KeyboardContextTests.test_plain_typing_is_not_intercepted_as_formatting) ... ok
+test_ctrl_f_uses_chapter_search_when_editor_focused (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_chapter_search_when_editor_focused) ... ok
+test_ctrl_f_uses_project_search_when_focus_elsewhere (__main__.ProjectSearchScopeTests.test_ctrl_f_uses_project_search_when_focus_elsewhere) ... ok
+test_project_search_action_uses_full_text_search (__main__.ProjectSearchScopeTests.test_project_search_action_uses_full_text_search) ... ok
+test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow) ... FAIL
+test_heading_level_selector_applies_h1_to_h6 (__main__.ToolbarOverflowTests.test_heading_level_selector_applies_h1_to_h6) ... ok
+test_key_actions_have_clickable_geometry_at_1024 (__main__.ToolbarOverflowTests.test_key_actions_have_clickable_geometry_at_1024) ... ok
+test_long_path_is_elided_but_copyable (__main__.ToolbarOverflowTests.test_long_path_is_elided_but_copyable) ... ok
+test_outline_is_on_demand_and_toggle_keeps_text (__main__.ToolbarOverflowTests.test_outline_is_on_demand_and_toggle_keeps_text) ... ok
+
+======================================================================
+FAIL: test_all_format_actions_reachable_wide_and_narrow (__main__.ToolbarOverflowTests.test_all_format_actions_reachable_wide_and_narrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_ui_polish_toolbar.py", line 111, in test_all_format_actions_reachable_wide_and_narrow
+    self.assertFalse(
+AssertionError: True is not false : 宽窗口下 14 个动作应同排可见
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.108s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_product_post_implementation_review.py" classname="scripts.tests" time="5.796"><system-out>test_anchored_grid_does_not_modify_another_identical_table (__main__.GuiReviewTests.test_anchored_grid_does_not_modify_another_identical_table) ... ok
+test_anchored_grid_tracks_external_edit_and_undo_restores_table_only (__main__.GuiReviewTests.test_anchored_grid_tracks_external_edit_and_undo_restores_table_only) ... ok
+test_cancelled_grid_draft_reopens_and_applies (__main__.GuiReviewTests.test_cancelled_grid_draft_reopens_and_applies) ... ok
+test_column_move_is_one_undo_transaction (__main__.GuiReviewTests.test_column_move_is_one_undo_transaction) ... ok
+test_export_uses_current_form_after_previous_freeze (__main__.GuiReviewTests.test_export_uses_current_form_after_previous_freeze) ... ok
+test_grid_rejects_file_switch (__main__.GuiReviewTests.test_grid_rejects_file_switch) ... ok
+test_insert_delete_column_preserves_alignment_identity (__main__.GuiReviewTests.test_insert_delete_column_preserves_alignment_identity) ... ok
+test_invalid_input_is_restored_after_save_and_reopen (__main__.GuiReviewTests.test_invalid_input_is_restored_after_save_and_reopen) ... ok
+test_normal_close_button_saves_edits (__main__.GuiReviewTests.test_normal_close_button_saves_edits) ... ok
+test_real_table_grid_and_paste_buttons_pass_no_click_boolean (__main__.GuiReviewTests.test_real_table_grid_and_paste_buttons_pass_no_click_boolean) ... ok
+test_replacing_emoji_table_keeps_no_partial_source (__main__.GuiReviewTests.test_replacing_emoji_table_keeps_no_partial_source) ... ok
+test_row_move_is_one_undo_transaction (__main__.GuiReviewTests.test_row_move_is_one_undo_transaction) ... ok
+test_sample_work_does_not_block_gui_and_busy_form_is_stable (__main__.GuiReviewTests.test_sample_work_does_not_block_gui_and_busy_form_is_stable) ... ok
+test_selected_rows_move_together_without_reversing_order (__main__.GuiReviewTests.test_selected_rows_move_together_without_reversing_order) ... ok
+test_clear_resource_does_not_leave_old_terms_in_pack (__main__.PackFilesReviewTests.test_clear_resource_does_not_leave_old_terms_in_pack) ... ok
+test_latest_sample_preserves_previous_project_and_artifacts (__main__.PackFilesReviewTests.test_latest_sample_preserves_previous_project_and_artifacts) ... ok
+test_metadata_changes_are_not_reused_as_old_pack (__main__.PackFilesReviewTests.test_metadata_changes_are_not_reused_as_old_pack) ... ok
+test_same_second_freezes_keep_each_previous_artifact (__main__.PackFilesReviewTests.test_same_second_freezes_keep_each_previous_artifact) ... ok
+test_ambiguous_fragment_does_not_pick_by_distance (__main__.TableDataReviewTests.test_ambiguous_fragment_does_not_pick_by_distance) ... ok
+test_grid_multiline_serializes_as_supported_break (__main__.TableDataReviewTests.test_grid_multiline_serializes_as_supported_break) ... ok
+test_tsv_entire_empty_selection_keeps_dimensions (__main__.TableDataReviewTests.test_tsv_entire_empty_selection_keeps_dimensions) ... ok
+test_tsv_keeps_trailing_empty_and_whitespace_rows (__main__.TableDataReviewTests.test_tsv_keeps_trailing_empty_and_whitespace_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 3.075s
+
+OK
+</system-out></testcase><testcase name="test_ui_polish_geometry.py" classname="scripts.tests" time="9.219"><system-out>test_geometry_at_1024x640_keeps_key_actions_usable (__main__.GeometryEvidenceTests.test_geometry_at_1024x640_keeps_key_actions_usable) ... [general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui-polish-geometry-12532-1\.proj.import-staging-12532-jresd292\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[geometry] {"windowLogical": [1024, 640], "actualWindow": [1024, 640], "devicePixelRatio": 1.0, "logicalDpi": 96.0, "fontFamily": "Sans Serif", "fontPointSize": 9.0, "bodyRect": [461, 392], "centerHostRect": [780, 458], "treeDockWidth": 240, "panelsDockVisible": false, "taskDockVisible": false, "saveRect": [628, 3, 140, 20], "moreRect": [250, 0, 56, 19], "previewRect": [542, 3, 80, 20], "outlineRect": [456, 3, 80, 20], "overflowVisible": true, "saveText": "保存 (Ctrl+S)"}
+ok
+test_geometry_at_1280x720_meets_body_target (__main__.GeometryEvidenceTests.test_geometry_at_1280x720_meets_body_target) ... [geometry] {"windowLogical": [1280, 720], "actualWindow": [1280, 720], "devicePixelRatio": 1.0, "logicalDpi": 96.0, "fontFamily": "Sans Serif", "fontPointSize": 9.0, "bodyRect": [614, 472], "centerHostRect": [1035, 538], "treeDockWidth": 240, "panelsDockVisible": false, "taskDockVisible": false, "saveRect": [883, 3, 140, 20], "moreRect": [332, 0, 56, 19], "previewRect": [797, 3, 80, 20], "outlineRect": [711, 3, 80, 20], "overflowVisible": true, "saveText": "保存 (Ctrl+S)"}
+ok
+test_text_is_readable_after_opening_project (__main__.GeometryEvidenceTests.test_text_is_readable_after_opening_project)
+首页非零尺寸不算数：打开项目后正文与关键文字必须有真实高度。 ... [geometry] {"windowLogical": [1280, 720], "actualWindow": [1280, 720], "devicePixelRatio": 1.0, "logicalDpi": 96.0, "fontFamily": "Sans Serif", "fontPointSize": 9.0, "bodyRect": [614, 472], "centerHostRect": [1035, 538], "treeDockWidth": 240, "panelsDockVisible": false, "taskDockVisible": false, "saveRect": [883, 3, 140, 20], "moreRect": [332, 0, 56, 19], "previewRect": [797, 3, 80, 20], "outlineRect": [711, 3, 80, 20], "overflowVisible": true, "saveText": "保存 (Ctrl+S)"}
+ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 5.842s
+
+OK
+</system-out></testcase><testcase name="test_ui2_acceptance.py" classname="scripts.tests" time="25.765"><system-out>test_daily_loop_records_steps_and_real_artifacts (__main__.ClosedLoopEvidenceTests.test_daily_loop_records_steps_and_real_artifacts) ... ok
+test_panel_widths_geometry (__main__.GeometryEvidenceTests.test_panel_widths_geometry) ... ok
+test_window_sizes_and_themes_geometry (__main__.GeometryEvidenceTests.test_window_sizes_and_themes_geometry) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 21.870s
+
+OK
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-63096-1\.proj.import-staging-63096-nfy2apbb\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-case-63096-1\proj\.state\snapshots\20261003T014351-77053aea\output\.tmp-proj(1.0).docx
+[general] 插入元素=9, 表格=0, 图片=0, 去重媒体=0
+[general] 校验报告: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-acceptance-case-63096-1\proj\.state\snapshots\20261003T014351-77053aea\logs\general-validation.md
+[general] PASS=18 FAIL=0
+[general] 生成完成: D:\ai_develop_project_space\doc-tool\tmp\core-scratch\ui2-geometry-63096-1\.proj.import-staging-63096-cwrl8a78\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+</system-out></testcase></testsuite></testsuites>

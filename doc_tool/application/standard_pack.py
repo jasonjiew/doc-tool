@@ -240,7 +240,12 @@ def install_pack(
         shutil.copytree(source, staging)
         if target.exists():
             shutil.rmtree(target)
-        os.replace(str(staging), str(target))
+        try:
+            os.replace(str(staging), str(target))
+        except OSError:
+            # 部分企业 PC 的 DLP/文件过滤驱动拒绝目录级原子重命名；
+            # 回退为移动（先尝试重命名，失败则复制后删除暂存目录）。
+            shutil.move(str(staging), str(target))
     except OSError as exc:
         result.errors.append("规范包固定失败：{0}".format(exc))
         shutil.rmtree(staging, ignore_errors=True)

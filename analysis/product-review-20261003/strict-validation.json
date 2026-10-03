@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Shanghai",
+  "checks": [
+    {
+      "change": "product-ui-experience-next",
+      "exitCode": 0,
+      "output": "Change 'product-ui-experience-next' is valid",
+      "success": true
+    },
+    {
+      "change": "product-rd-workspace-experience",
+      "exitCode": 0,
+      "output": "Change 'product-rd-workspace-experience' is valid",
+      "success": true
+    },
+    {
+      "change": "product-v34-table-authoring",
+      "exitCode": 0,
+      "output": "Change 'product-v34-table-authoring' is valid",
+      "success": true
+    },
+    {
+      "change": "product-v35-standard-pack-authoring",
+      "exitCode": 0,
+      "output": "Change 'product-v35-standard-pack-authoring' is valid",
+      "success": true
+    },
+    {
+      "change": "product-v36-large-document-performance",
+      "exitCode": 0,
+      "output": "Change 'product-v36-large-document-performance' is valid",
+      "success": true
+    }
+  ],
+  "businessAcceptance": false
+}

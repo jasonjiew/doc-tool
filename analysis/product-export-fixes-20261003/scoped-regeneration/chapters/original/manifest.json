@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "kind": "readonly-html",
+  "appVersion": "2.9.0",
+  "documentVersion": "",
+  "time": "2026-10-02T17:28:25.672160+00:00",
+  "sources": [
+    {
+      "path": "第1章 引言/1.1 目的.md",
+      "sha256": "6b0a8daeb719c141a92e0424822ed862bab5847d0ec578b5b77c14c5d50f6fce"
+    },
+    {
+      "path": "第1章 引言/_index.md",
+      "sha256": "0126043cbeaa901943e488f752a785038fb5b8ef5ef41096c18d371e08ac00f2"
+    }
+  ],
+  "warnings": [],
+  "status": "完成",
+  "savedContent": true
+}

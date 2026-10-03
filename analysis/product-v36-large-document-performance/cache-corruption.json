@@ -1,0 +1,7 @@
+{
+  "rebuilt": true,
+  "warnings": [
+    "缓存不可读（Expecting value: line 1 column 43 (char 42)），已按直接读取重建。"
+  ],
+  "files": 13
+}

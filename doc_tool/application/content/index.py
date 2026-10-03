@@ -19,6 +19,7 @@ import unicodedata
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from doc_tool.application.content import incremental_index as incremental
 from doc_tool.domain.content_index import ContentIndex, FileEntry, HeadingEntry
 from doc_tool.domain.cancellation import CancellationToken
 
@@ -59,8 +60,31 @@ def infer_document_type(rel_path: str) -> str:
 class ContentIndexService:
     """内容索引服务：构建、增量重建、失效刷新。"""
 
-    def __init__(self, content_root: Path) -> None:
+    def __init__(self, content_root: Path, *, cache=None, config_fingerprint: str = "",
+                 capture_id: str = "", override_texts=None,
+                 per_file_fingerprint=None) -> None:
+        """``cache`` 为可选派生缓存（V3.6）：不传时行为与无缓存完全一致。
+
+        V3.6 36-C 3.1：``capture_id`` 让缓存条目按捕获隔离；``override_texts``
+        提供本轮捕获的内存文本（未保存缓冲/变体展开），这些章节只用内存真实摘要，
+        既不再读磁盘、也不写持久缓存。
+        """
         self._content_root: Path = Path(content_root).resolve()
+        self._cache = cache
+        self._config_fingerprint = str(config_fingerprint or "")
+        self._capture_id = str(capture_id or "")
+        self._override_texts = {str(key).replace("\\", "/"): str(value) for key, value in (override_texts or {}).items()}
+        #: V3.6 36-C 3.2：按文件装配指纹（模块/变量依赖），未给出的文件用全局配置指纹。
+        self._per_file_fingerprint = {
+            str(key).replace("\\", "/"): str(value)
+            for key, value in (per_file_fingerprint or {}).items()
+        }
+        self.capture_paths: set = set()
+        #: 本次服务实例中「真正解析」与「缓存/摘要命中」的文件次数（性能观测用）。
+        self.parse_count = 0
+        self.reuse_count = 0
+        self._digests: dict = {}
+        self._cache_loaded = False
         # 布局 B（content_root 本身就是文档类型目录，如 content/requirement）时，
         # 用目录名作为默认文档类型；布局 A（父目录含类型子目录）由首段推断。
         self._default_doc_type = (
@@ -122,17 +146,60 @@ class ContentIndexService:
 
     # --- 构建 ---
 
-    def build(self, cancel_token: Optional[CancellationToken] = None) -> ContentIndex:
-        """全量扫描 contentRoot 构建索引。可传入取消令牌在文件边界安全中断。"""
+    def build(
+        self,
+        cancel_token: Optional[CancellationToken] = None,
+        *,
+        save_cache: bool = True,
+        on_progress=None,
+        progress_every: int = 25,
+    ) -> ContentIndex:
+        """全量扫描 contentRoot 构建索引。可传入取消令牌在文件边界安全中断。
+
+        V3.6 36-B：启用派生缓存时，内容摘要 + 解析器版本 + 配置指纹一致的文件
+        直接复用之前解析出的行与标题，不再重复解析；缓存不可用时行为不变。
+
+        V3.6 36-D：``on_progress(scanned, total)`` 按 ``progress_every`` 个文件回报
+        进度（只含计数），供界面在扫描中显示“已解析 N/M 章节”而不是假总数。
+        """
         index = ContentIndex()
-        for rel_path, file_path in self.discover_files():
+        files = self.discover_files()
+        self._ensure_cache_loaded()
+        if self._cache is not None:
+            self._cache.sync_paths(rel for rel, _path in files)
+        total = len(files)
+        interval = max(1, int(progress_every))
+        for position, (rel_path, file_path) in enumerate(files, start=1):
             if cancel_token is not None:
                 cancel_token.check_cancel()
             self._index_file(index, rel_path, file_path)
+            if on_progress is not None and (position % interval == 0 or position >= total):
+                on_progress(position, total)
         index.document_types = {
             self._doc_type_of(rel) for rel in index.files.keys()
         }
+        if save_cache and self._cache is not None:
+            self._cache_result = self._cache.save()
         return index
+
+    def _ensure_cache_loaded(self) -> None:
+        if self._cache is None or self._cache_loaded:
+            return
+        self._cache.load()
+        self._cache_loaded = True
+
+    def stats(self) -> dict:
+        """性能观测：解析/复用次数与缓存统计（不含正文）。"""
+        payload = {
+            "parseCount": self.parse_count,
+            "reuseCount": self.reuse_count,
+            "files": len(self._digests),
+            "captureId": self._capture_id,
+            "captureFiles": len(self.capture_paths),
+        }
+        if self._cache is not None:
+            payload["cache"] = self._cache.stats()
+        return payload
 
     def rebuild_file(self, index: ContentIndex, rel_path: str) -> None:
         """重建单个文件索引（含删除场景：文件消失则移除条目）。"""
@@ -152,23 +219,38 @@ class ContentIndexService:
             self.rebuild_file(index, rel_path)
 
     def refresh(self, index: ContentIndex) -> int:
-        """全量重扫：新增/删除/变更文件，重建内容条目并返回文件总数。
+        """增量重扫：新增/删除/变更文件，重建内容条目并返回文件总数。
 
-        非破坏性：只更新 ContentIndex 内容，不影响引用索引（由调用方
-        重扫 ReferenceScanner）。用于"刷新索引"等手动操作。
+        V3.6 36-B：**先按内容摘要确认是否真的变化**（mtime/size 只作初筛提示，
+        正确性来自摘要），未变化的文件不再重复解析；摘要缺失时按变化处理，
+        保证正确性优先于命中率。非破坏性：不影响引用索引（由调用方重扫）。
         """
-        current = {rel for rel, _ in self.discover_files()}
-        # 标记全部现有文件失效以便重建；新增文件直接加入
-        for rel_path in index.all_files():
-            index.invalidate(rel_path)
-        for rel_path in current:
-            if rel_path not in index.files:
-                index.invalidate(rel_path)
-        self.refresh_dirty(index)
-        # refresh_dirty 已移除消失文件条目并刷新 document_types 无需额外处理
+        current = dict(self.discover_files())
+        removed = [rel for rel in list(index.files.keys()) if rel not in current]
+        for rel_path in removed:
+            index.files.pop(rel_path, None)
+            index.lines.pop(rel_path, None)
+            index.headings.pop(rel_path, None)
+            index.references.pop(rel_path, None)
+            index.refresh(rel_path)
+            self._digests.pop(rel_path, None)
+            if self._cache is not None:
+                self._cache.drop(rel_path)
+        self._ensure_cache_loaded()
+        if self._cache is not None:
+            self._cache.sync_paths(current.keys())
+        for rel_path, file_path in current.items():
+            digest = incremental.content_digest(file_path)
+            known = self._digests.get(rel_path, "")
+            if index.files.get(rel_path) is not None and digest and digest == known:
+                self.reuse_count += 1
+                continue
+            self._index_file(index, rel_path, file_path, digest=digest)
         index.document_types = {
             self._doc_type_of(rel) for rel in index.files.keys()
         }
+        if self._cache is not None:
+            self._cache.save()
         return len(index.files)
 
     def _resolve(self, rel_path: str) -> Optional[Path]:
@@ -180,8 +262,84 @@ class ContentIndexService:
             return None
         return target
 
-    def _index_file(self, index: ContentIndex, rel_path: str, file_path: Path) -> None:
-        """为单个文件构建 FileEntry + lines + headings，并入索引。"""
+    def _fingerprint_for(self, rel_path: str) -> str:
+        """该文件的失效键：有装配指纹时用它，否则用全局配置指纹。"""
+        if not self._per_file_fingerprint:
+            return self._config_fingerprint
+        specific = self._per_file_fingerprint.get(str(rel_path).replace("\\", "/"), "")
+        if specific:
+            return "{0}+{1}".format(self._config_fingerprint, specific)
+        return self._config_fingerprint
+
+    def _index_lines(self, index: ContentIndex, rel_path: str, lines) -> None:
+        """用给定行内容建立 FileEntry + lines + headings（不读盘）。"""
+        line_list = list(lines)
+        entry = FileEntry(
+            rel_path=rel_path,
+            document_type=self._doc_type_of(rel_path),
+            line_count=len(line_list),
+        )
+        headings: List[HeadingEntry] = []
+        for line_no, line in enumerate(line_list, start=1):
+            match = _HEADING_RE.match(line)
+            if match is None:
+                continue
+            text = match.group(2)
+            headings.append(HeadingEntry(
+                rel_path=rel_path, line_no=line_no, level=len(match.group(1)),
+                text=text, anchor_id=slugify_heading(text),
+            ))
+        index.files[rel_path] = entry
+        index.lines[rel_path] = line_list
+        index.headings[rel_path] = headings
+        index.refresh(rel_path)
+        index.document_types.add(entry.document_type)
+
+    def _index_file(self, index: ContentIndex, rel_path: str, file_path: Path,
+                    *, digest: str = "") -> None:
+        """为单个文件构建 FileEntry + lines + headings，并入索引。
+
+        命中派生缓存时直接复用行与标题（内容摘要一致），否则真实解析。
+        """
+        override = self._override_texts.get(str(rel_path).replace("\\", "/"))
+        if override is not None:
+            # 本轮捕获的内存文本：摘要是真实内容的摘要，不读盘、不命中/写入缓存。
+            self.capture_paths.add(str(rel_path))
+            self.parse_count += 1
+            self._index_lines(index, rel_path, override.splitlines())
+            self._digests[rel_path] = incremental.text_digest(override)
+            return
+        resolved_digest = digest or incremental.content_digest(file_path)
+        cached = None
+        if self._cache is not None:
+            self._ensure_cache_loaded()
+            cached = self._cache.get(
+                rel_path, digest=resolved_digest,
+                config_fp=self._fingerprint_for(rel_path),
+                capture_id=self._capture_id,
+            )
+        if cached is not None:
+            self.reuse_count += 1
+            entry = FileEntry(
+                rel_path=rel_path,
+                document_type=self._doc_type_of(rel_path),
+                line_count=cached.line_count,
+            )
+            headings = [
+                HeadingEntry(
+                    rel_path=rel_path, line_no=line_no, level=level,
+                    text=text, anchor_id=anchor,
+                )
+                for line_no, level, text, anchor in cached.headings
+            ]
+            index.files[rel_path] = entry
+            index.lines[rel_path] = list(cached.lines)
+            index.headings[rel_path] = headings
+            index.refresh(rel_path)
+            index.document_types.add(entry.document_type)
+            self._digests[rel_path] = resolved_digest
+            return
+        self.parse_count += 1
         lines = self.read_lines(file_path)
         entry = FileEntry(
             rel_path=rel_path,
@@ -209,3 +367,21 @@ class ContentIndexService:
         index.headings[rel_path] = headings
         index.refresh(rel_path)
         index.document_types.add(entry.document_type)
+        self._digests[rel_path] = resolved_digest
+        if self._cache is not None:
+            try:
+                stat = file_path.stat()
+            except OSError:
+                stat = None
+            self._cache.put(rel_path, incremental.CachedChapter(
+                digest=resolved_digest,
+                config_fingerprint=self._fingerprint_for(rel_path),
+                capture_id=self._capture_id,
+                line_count=len(lines),
+                lines=list(lines),
+                headings=[
+                    (item.line_no, item.level, item.text, item.anchor_id) for item in headings
+                ],
+                size=int(stat.st_size) if stat is not None else 0,
+                mtime=float(stat.st_mtime) if stat is not None else 0.0,
+            ))

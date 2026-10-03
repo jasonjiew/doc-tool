@@ -597,6 +597,25 @@ class MainWindow(QMainWindow):
         self._refactor_action = QAction("章节重命名/重编号…", self)
         self._refactor_action.triggered.connect(self._on_content_refactor)
         content_menu.addAction(self._refactor_action)
+        # V3.4 34-B/34-C：表格网格与显式表格粘贴（普通 Ctrl+V 行为不变）
+        self._table_grid_action = QAction("编辑表格网格…", self)
+        self._table_grid_action.setShortcut(QKeySequence("Ctrl+Alt+G"))
+        self._table_grid_action.setToolTip("网格编辑光标所在的普通表格；一次撤销可还原")
+        self._table_grid_action.triggered.connect(self._on_table_grid)
+        content_menu.addAction(self._table_grid_action)
+        self._table_paste_action = QAction("粘贴为表格…", self)
+        self._table_paste_action.setShortcut(QKeySequence("Ctrl+Alt+V"))
+        self._table_paste_action.setToolTip("把剪贴板 TSV/管道表格预览后插入；普通粘贴保持既有行为")
+        self._table_paste_action.triggered.connect(self._on_paste_as_table)
+        content_menu.addAction(self._table_paste_action)
+        # V3.5：规范包制作（草稿/冻结/导出/隔离样例）
+        self._standard_pack_action = QAction("规范包制作…", self)
+        self._standard_pack_action.setShortcut(QKeySequence("Ctrl+Alt+P"))
+        self._standard_pack_action.setToolTip(
+            "从项目或已有规范包创建草稿，冻结导出 ZIP，并在隔离样例中试用"
+        )
+        self._standard_pack_action.triggered.connect(self._on_standard_pack)
+        content_menu.addAction(self._standard_pack_action)
         self._lint_action = QAction("术语/一致性检查", self)
         self._lint_action.triggered.connect(self._on_content_lint)
         content_menu.addAction(self._lint_action)
@@ -615,6 +634,14 @@ class MainWindow(QMainWindow):
         self._reuse_action.setShortcut(QKeySequence("Ctrl+Alt+R"))
         self._reuse_action.triggered.connect(self._on_reuse_dialog)
         content_menu.addAction(self._reuse_action)
+        # RD-A 1.4：研发工作区一个入口集中成员/概览/设置、条目/关系、矩阵/影响、集合/成果。
+        self._rd_workspace_action = QAction("研发工作区…", self)
+        self._rd_workspace_action.setShortcut(QKeySequence("Ctrl+Alt+D"))
+        self._rd_workspace_action.setToolTip(
+            "工作区成员与概览、稳定条目与显式关系、矩阵与影响复核、版本集合与成果"
+        )
+        self._rd_workspace_action.triggered.connect(self._on_rd_workspace)
+        content_menu.addAction(self._rd_workspace_action)
         content_menu.addSeparator()
         self._open_external_action = QAction("在外部编辑器打开当前文件", self)
         self._open_external_action.triggered.connect(self._on_content_open_external)
@@ -1669,6 +1696,23 @@ class MainWindow(QMainWindow):
                             title="插入表格骨架",
                             category="编辑",
                             callback=editor._insert_table,
+                        )
+                    )
+                    # V3.4：表格网格与显式表格粘贴也从命令面板可达
+                    items.append(
+                        PaletteItem(
+                            title="编辑表格网格",
+                            category="编辑",
+                            shortcut="Ctrl+Alt+G",
+                            callback=editor.open_table_grid,
+                        )
+                    )
+                    items.append(
+                        PaletteItem(
+                            title="粘贴为表格",
+                            category="编辑",
+                            shortcut="Ctrl+Alt+V",
+                            callback=editor.paste_as_table,
                         )
                     )
                     items.append(
@@ -4146,7 +4190,7 @@ class MainWindow(QMainWindow):
             "variants": variants,
         }
 
-    def _on_export_settings(self, preset_request=None) -> None:
+    def _on_export_settings(self, preset_request=None, *, notice="") -> None:
         """打开导出设置；一次“开始导出”即提交原服务。"""
         from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
 
@@ -4161,6 +4205,7 @@ class MainWindow(QMainWindow):
             current_chapter=context["current_chapter"],
             unsaved_count=context["unsaved_count"],
             variants=context["variants"],
+            notice=notice,
             parent=self,
         )
         if preset_request is not None:
@@ -4313,15 +4358,22 @@ class MainWindow(QMainWindow):
             )
         )
 
-    def _round_request(self, view):
+    def _round_request(self, view, report=None):
         """由成果轮次重建出稿请求（原轮范围/来源/目录，不读新正文）。"""
-        from doc_tool.application.intake_contract import ExportRequest
+        from doc_tool.application.intake_contract import ExportRequest, ExportScope
+
+        if report is None:
+            report = self._report_for_round(view)
+        scope = self._scope_for_export_round(view, report)
 
         return ExportRequest(
             project_root=view.project_root or str(self._project_summary.project_root),
             formats=[item.format for item in view.formats] or ["docx"],
+            scope=ExportScope.from_dict(scope.to_dict()) if scope is not None else ExportScope(),
             source_mode=view.source_mode or "saved",
             destination=view.destination,
+            output_name=str(getattr(report, "outputName", "") or ""),
+            capture_id=str(getattr(report, "captureId", "") or ""),
         )
 
     def _run_export_task(self, *, name: str, target, args, kwargs, message: str) -> None:
@@ -4347,7 +4399,6 @@ class MainWindow(QMainWindow):
 
     def _on_retry_export_round(self, view) -> None:
         """补这次成果：用旧捕获与原范围只补缺失/失败格式，不读当前新正文。"""
-        from doc_tool.application.intake_contract import ExportRequest
         from doc_tool.application.project_export import retry_export_formats
 
         report = self._report_for_round(view)
@@ -4368,7 +4419,7 @@ class MainWindow(QMainWindow):
             name="project-export",
             target=retry_export_formats,
             args=(report, pending),
-            kwargs={"request": self._round_request(view)},
+            kwargs={"request": self._round_request(view, report)},
             message="正在补本轮缺失格式（沿用原捕获）…",
         )
 
@@ -4376,7 +4427,7 @@ class MainWindow(QMainWindow):
         """取回该轮真实报告，并校验 roundId/captureId 身份。
 
         同目录 ``export-result.json`` 会被新轮覆盖：若读到的报告不是所选轮，
-        必须返回 None（宁可不补也不能拿最新索引冒充旧轮）。
+        返回 None，并由新轮/设置入口继续，不能拿最新索引冒充旧轮。
         """
         from doc_tool.application.project_export import read_export_index
 
@@ -4399,7 +4450,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _round_identity_matches(view, report) -> bool:
-        """轮次身份校验：roundId 必须相等；两边都有 captureId 时也必须相等。
+        """轮次身份校验：roundId 必须相等；已知 captureId 必须得到匹配。
 
         历史引用只保存了 roundId 时不得因缺少 captureId 而误判失配。
         """
@@ -4409,27 +4460,46 @@ class MainWindow(QMainWindow):
             return False
         wanted_capture = str(getattr(view, "capture_id", "") or "")
         got_capture = str(getattr(report, "captureId", "") or "")
-        if wanted_capture and got_capture and wanted_capture != got_capture:
-            return False
-        return True
+        return bool(got_capture and (not wanted_capture or wanted_capture == got_capture))
+
+    @staticmethod
+    def _scope_for_export_round(view, report):
+        if report is not None and getattr(report, "scopeKnown", True):
+            return getattr(report, "scope", None)
+        return getattr(view, "scope", None)
+
+    def _new_round_request(self, view, *, destination=None):
+        """带入原范围创建新轮；失效范围回到可见设置，不静默扩大范围。"""
+        from doc_tool.application.intake_contract import SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER
+
+        report = self._report_for_round(view)
+        scope = self._scope_for_export_round(view, report)
+        request = self._round_request(view, report)
+        request.project_root = str(self._project_summary.project_root)
+        request.capture_id = ""
+        request.destination = destination or view.destination or str(self._project_summary.paths.output_dir)
+        buffers = self._collect_buffer_texts()
+        request.source_mode = "current-buffer" if buffers else "saved"
+        missing = scope is None
+        if scope is not None and scope.kind in (SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER):
+            available = set(self._export_settings_context()["chapters"])
+            wanted = scope.chapters if scope.kind == SCOPE_CHAPTERS else [scope.current]
+            missing = not wanted or any(chapter not in available for chapter in wanted)
+        if missing:
+            notice = "原范围缺失或部分章节已不可用：请查看下方实际范围，可改选章节或整份后开始导出。旧成果保留。"
+            self._on_export_settings(request, notice=notice)
+            return None, {}
+        return request, buffers
 
     def _on_regenerate_round(self, view) -> None:
         """按当前修改重新生成：UI 线程收集缓冲，后台建立新 current-buffer 轮次。"""
-        from doc_tool.application.intake_contract import (
-            FORMAT_DOCX, ExportRequest, ExportScope, SCOPE_PROJECT,
-        )
         from doc_tool.application.project_export import run_project_export
 
         if self._project_summary is None:
             return
-        buffers = self._collect_buffer_texts()
-        request = ExportRequest(
-            project_root=str(self._project_summary.project_root),
-            formats=[item.format for item in view.formats] or [FORMAT_DOCX],
-            scope=ExportScope(kind=SCOPE_PROJECT),
-            source_mode="current-buffer" if buffers else "saved",
-            destination=view.destination or str(self._project_summary.paths.output_dir),
-        )
+        request, buffers = self._new_round_request(view)
+        if request is None:
+            return
         self._run_export_task(
             name="project-export",
             target=run_project_export,
@@ -4443,31 +4513,22 @@ class MainWindow(QMainWindow):
     def _on_export_settings_for_round(self, view) -> None:
         """从旧轮打开导出设置：带入可解析的原范围/格式/目录，提交产生新轮。
 
-        原范围从真实报告读取（不从 scope_text 反解析）；读不到原报告时只带入格式/目录，
-        范围回到默认整份并在表单里可见。
+        原范围从真实报告或生成时结构化视图读取（不从 scope_text 反解析）；
+        无法恢复时在表单内显示默认范围，供用户明确提交。
         """
-        from doc_tool.application.intake_contract import ExportRequest
-
         if view is None or self._project_summary is None:
             return
+        preset = self._round_request(view)
+        preset.capture_id = ""
+        preset.destination = preset.destination or str(self._project_summary.paths.output_dir)
         report = self._report_for_round(view)
-        scope = getattr(report, "scope", None) if report is not None else None
-        preset = ExportRequest(
-            project_root=view.project_root or str(self._project_summary.project_root),
-            formats=[item.format for item in view.formats] or ["docx"],
-            scope=scope if scope is not None else ExportRequest().scope,
-            source_mode=view.source_mode or "current-buffer",
-            destination=view.destination or str(self._project_summary.paths.output_dir),
-            strict=False,
-        )
-        self._on_export_settings(preset)
+        notice = ""
+        if self._scope_for_export_round(view, report) is None:
+            notice = "原范围无法恢复，当前预填整份文档；可改选范围后生成新轮。旧成果保留。"
+        self._on_export_settings(preset, notice=notice)
 
     def _on_change_export_destination(self, view) -> None:
         """换目录并重新导出：明示来源/范围，建立新轮，旧成果保留。"""
-        from doc_tool.application.intake_contract import (
-            FORMAT_DOCX, SOURCE_MODE_CURRENT_BUFFER, ExportRequest, ExportScope,
-            SCOPE_PROJECT,
-        )
         from doc_tool.application.project_export import run_project_export
 
         if self._project_summary is None:
@@ -4478,14 +4539,9 @@ class MainWindow(QMainWindow):
         if not chosen:
             self._status_label.setText("已取消换目录：原成果保持不变")
             return
-        buffers = self._collect_buffer_texts()
-        request = ExportRequest(
-            project_root=view.project_root or str(self._project_summary.project_root),
-            formats=[item.format for item in view.formats] or [FORMAT_DOCX],
-            scope=ExportScope(kind=SCOPE_PROJECT),
-            source_mode=SOURCE_MODE_CURRENT_BUFFER if buffers else "saved",
-            destination=chosen,
-        )
+        request, buffers = self._new_round_request(view, destination=chosen)
+        if request is None:
+            return
         self._run_export_task(
             name="project-export",
             target=run_project_export,
@@ -5962,3 +6018,274 @@ class MainWindow(QMainWindow):
         self._append_log("⊘ 已请求安全取消；任务停止后应用将自动退出。")
         self.runner.cancel()
         event.ignore()
+
+    # ------------------------------------------------------------------
+    # RD 研发工作区（RD-A 1.4 / RD-B～RD-E）
+    # ------------------------------------------------------------------
+
+    def _on_standard_pack_entry(self) -> None:
+        self._on_standard_pack()
+
+    def _on_table_grid(self) -> None:
+        """菜单入口 → 当前编辑器表格网格（没有打开章节或不是普通表格时给出原因）。"""
+        editor = self._active_editor()
+        if editor is None:
+            self._show_status_message("请先打开要编辑表格的章节")
+            return
+        editor.open_table_grid()
+
+    def _on_paste_as_table(self) -> None:
+        editor = self._active_editor()
+        if editor is None:
+            self._show_status_message("请先打开要插入表格的章节")
+            return
+        editor.paste_as_table()
+
+    def _on_rd_workspace(self) -> None:
+        """打开研发工作区：成员/概览/设置、条目/关系、矩阵/影响、集合/成果。"""
+        dialog = self.rd_workspace_dialog()
+        dialog.exec()
+
+    def rd_workspace_dialog(self):
+        """构建研发工作区对话框（同一实例可被测试直接驱动）。"""
+        from doc_tool.ui.rd_workspace import RdWorkspaceDialog
+
+        dialog = RdWorkspaceDialog(self, root=self._rd_workspace_root(), parent=self)
+        self._rd_dialog = dialog
+        return dialog
+
+    def _rd_workspace_root(self) -> str:
+        """工作区根目录：已选记录 → 当前项目或其上级的 workspace.yml → 当前项目。"""
+        remembered = str(getattr(self, "_rd_workspace_path", "") or "")
+        if remembered and (Path(remembered) / "workspace.yml").is_file():
+            return remembered
+        summary = getattr(self, "_project_summary", None)
+        root = ""
+        try:
+            root = str(getattr(summary, "project_root", "") or "")
+        except Exception:  # noqa: BLE001 - 未打开项目时按空处理
+            root = ""
+        if not root:
+            return remembered
+        candidate = Path(root)
+        for base in (candidate, candidate.parent, candidate.parent.parent, candidate.parent.parent.parent):
+            try:
+                if (base / "workspace.yml").is_file():
+                    return str(base)
+            except OSError:
+                continue
+        return root
+
+    # --- 宿主接口：供 RdWorkspaceDialog 复用现有入口 ---
+
+    def rd_project_root(self) -> str:
+        try:
+            return str(self._project_summary.project_root)
+        except Exception:  # noqa: BLE001 - 未打开项目
+            return ""
+
+    def rd_project_id(self) -> str:
+        try:
+            return str(self._project_summary.manifest.projectId or "")
+        except Exception:  # noqa: BLE001 - 未打开项目
+            return ""
+
+    def rd_collect_buffers(self) -> dict:
+        return dict(self._collect_buffer_texts())
+
+    def rd_current_chapter(self) -> str:
+        workspace = getattr(self, "_content_workspace", None)
+        current = ""
+        getter = getattr(workspace, "current_file", None)
+        if callable(getter):
+            try:
+                current = str(getter() or "")
+            except Exception:  # noqa: BLE001 - 无当前章节
+                current = ""
+        return self._normalize_buffer_rel_path(current)
+
+    def rd_cursor_line(self) -> int:
+        editor = self._active_editor()
+        target = getattr(editor, "_editor", None) or editor
+        getter = getattr(target, "textCursor", None)
+        if not callable(getter):
+            return 0
+        try:
+            return int(getter().blockNumber()) + 1
+        except Exception:  # noqa: BLE001 - 光标不可用时按第 1 行
+            return 1
+
+    def rd_open_source(self, rel_path: str, line_no=None, source: str = "") -> bool:
+        """按真实来源定位：relPath + 行号，来源进入位置历史说明。"""
+        return self._open_chapter_in_workspace(
+            rel_path, int(line_no) if line_no else None,
+            source=source or "研发工作区",
+        )
+
+    def _rd_tab_key(self, rel_path: str) -> str:
+        """编辑器标签使用的键（带文档类型前缀），找不到返回空串。"""
+        value = str(rel_path or "").replace("\\", "/")
+        if not value:
+            return ""
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None)
+        if tabs is None:
+            return ""
+        candidates = [value]
+        document_type = ""
+        try:
+            document_type = str(self._project_summary.manifest.documentType or "")
+        except Exception:  # noqa: BLE001
+            document_type = ""
+        if document_type and not value.startswith(document_type + "/"):
+            candidates.insert(0, "{0}/{1}".format(document_type, value))
+        for candidate in candidates:
+            try:
+                if tabs.editor_for(candidate) is not None:
+                    return candidate
+            except Exception:  # noqa: BLE001 - 接口差异时继续尝试
+                continue
+        return ""
+
+    def rd_apply_item_edit(self, rel_path: str, text: str, message: str = ""):
+        """把条目动作结果一次写入编辑缓冲（整段替换，一次撤销可还原）。"""
+        from PySide6.QtGui import QTextCursor
+
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None)
+        if tabs is None:
+            return None
+        key = self._rd_tab_key(rel_path)
+        if not key:
+            opened = self._open_chapter_in_workspace(rel_path, None, source="研发工作区")
+            if not opened:
+                return None
+            key = self._rd_tab_key(rel_path)
+        editor = tabs.editor_for(key) if key else None
+        target = getattr(editor, "_editor", None)
+        if target is None:
+            return None
+        cursor = target.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        target.setTextCursor(cursor)
+        cursor.insertText(str(text))
+        target.setTextCursor(cursor)
+        target.setFocus()
+        if message:
+            self._show_status_message(message)
+        return True
+
+    def rd_save_chapters(self, rel_paths) -> bool:
+        """只保存指定章节（不隐式保存整个工作区）。"""
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None)
+        if tabs is None:
+            return False
+        wanted = [str(item) for item in (rel_paths or [])]
+        if not wanted:
+            return False
+        saved: list = []
+        for rel_path in wanted:
+            key = self._rd_tab_key(rel_path)
+            if not key:
+                continue
+            try:
+                if hasattr(tabs, "activate"):
+                    tabs.activate(key)
+                if tabs.save_current():
+                    saved.append(key)
+            except Exception:  # noqa: BLE001 - 单个章节保存失败不影响其他章节
+                continue
+        return len(saved) == len(wanted)
+
+    def rd_open_project(self, path: str):
+        """打开/激活成员项目窗口（保留其他窗口的未保存缓冲）。"""
+        try:
+            existing = self._find_window_for_project(str(path))
+        except Exception:  # noqa: BLE001 - 查找失败时按新窗口打开
+            existing = None
+        if existing is not None:
+            self._activate_window(existing)
+            return True
+        try:
+            self._open_project_in_new_window(str(path))
+            return True
+        except Exception:  # noqa: BLE001 - 打开失败返回 None，由界面给出可执行兜底
+            return None
+
+    def _find_window_for_project(self, path: str):
+        try:
+            from PySide6.QtWidgets import QApplication
+        except Exception:  # noqa: BLE001
+            return None
+        target = ""
+        try:
+            target = str(Path(path).resolve())
+        except OSError:
+            target = str(path)
+        for widget in QApplication.topLevelWidgets():
+            if widget is self or not isinstance(widget, MainWindow):
+                continue
+            try:
+                root = str(Path(widget.rd_project_root()).resolve())
+            except Exception:  # noqa: BLE001 - 无项目的窗口跳过
+                continue
+            if root and root == target:
+                return widget
+        return None
+
+    def rd_open_path(self, path: str):
+        return self._open_path(Path(path))
+
+    def rd_member_delivery(self, root: str) -> str:
+        """成员交付：直接复用既有批量交付入口（V3.2 持久队列，不另建协调器）。"""
+        try:
+            self._on_delivery_batch()
+        except Exception as exc:  # noqa: BLE001 - 交付入口不可用时给出可执行兜底
+            return "批量交付入口不可用：{0}；可在菜单「操作 → 批量交付」重试。".format(exc)
+        return "已打开既有批量交付入口：串行 Word、逐成员状态与未完成重试沿用持久队列。"
+
+    def rd_status(self, message: str) -> None:
+        if message:
+            self._show_status_message(message)
+
+    def rd_workspace_root_changed(self, root: str) -> None:
+        self._rd_workspace_path = str(root or "")
+
+    # ------------------------------------------------------------------
+    # V3.5 规范包制作（35-B～35-D）
+    # ------------------------------------------------------------------
+
+    def _on_standard_pack(self) -> None:
+        dialog = self.standard_pack_dialog()
+        dialog.exec()
+
+    def standard_pack_dialog(self):
+        from doc_tool.ui.standard_pack_dialog import StandardPackDialog
+
+        dialog = StandardPackDialog(
+            self, draft_dir=str(getattr(self, "_standard_pack_dir", "") or ""),
+            project_root=self.rd_project_root(), parent=self,
+        )
+        self._standard_pack_dialog = dialog
+        return dialog
+
+    def sp_project_root(self) -> str:
+        return self.rd_project_root()
+
+    def sp_default_draft_dir(self) -> str:
+        remembered = str(getattr(self, "_standard_pack_dir", "") or "")
+        if remembered:
+            return remembered
+        root = self.rd_project_root()
+        return str(Path(root) / "pack-draft") if root else str(Path.cwd() / "pack-draft")
+
+    def sp_open_path(self, path: str):
+        target = Path(path)
+        if target.is_dir():
+            return self._open_directory(target, create=False)
+        return self._open_path(target)
+
+    def sp_status(self, message: str) -> None:
+        if message:
+            self._show_status_message(message)

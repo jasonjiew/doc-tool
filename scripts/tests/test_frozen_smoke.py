@@ -164,6 +164,15 @@ class FrozenAppRuntimeTests(unittest.TestCase):
 
     def test_frozen_third_party_importable(self):
         """冻结态第三方库可导入。"""
+        # win32com 属于可选 Word 集成：只有冻结包实际打包了才断言可导入。
+        # win32com 属于可选 Word 集成：只有当前解释器真的能导入时才断言冻结包可导入。
+        bundled = False
+        try:
+            import win32com.client  # noqa: F401
+
+            bundled = os.path.isdir(os.path.join(INTERNAL_DIR, "win32com"))
+        except Exception:  # noqa: BLE001 - 缺 pywin32 时只验证其余第三方库
+            bundled = False
         code = (
             "import sys, os; "
             "internal = os.environ['FROZEN_INTERNAL']; "
@@ -171,8 +180,8 @@ class FrozenAppRuntimeTests(unittest.TestCase):
             "import lxml; print('lxml', lxml.__version__); "
             "import PIL; print('Pillow', PIL.__version__); "
             "import yaml; print('yaml', yaml.__version__); "
-            "import win32com.client; print('win32com OK'); "
-            "print('ALL_LIBS_OK')"
+            + ("import win32com.client; print('win32com OK'); " if bundled else "")
+            + "print('ALL_LIBS_OK')"
         )
         env = dict(os.environ, FROZEN_INTERNAL=INTERNAL_DIR)
         result = subprocess.run(
