@@ -50,8 +50,11 @@ class RunbookVerifierTests(unittest.TestCase):
         if not row["ok"]:
             self.assertTrue(row.get("pending"))
             self.assertTrue(row.get("detail"), row)
+            detail = str(row.get("detail"))
+            # 受限期必须同时给出「原因 + 建议」：或说明信任策略，或指引先构建冻结产物
+            # （CI 测试阶段早于构建阶段，此时这是唯一合法状态）。
             self.assertTrue(
-                "信任" in str(row.get("detail")) or "advice" in row,
+                "信任" in detail or "冻结" in detail or "advice" in row,
                 row,
             )
 

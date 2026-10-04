@@ -270,6 +270,11 @@ class ProjectBar(QWidget):
             self._version_label,
         ):
             reserved += max(0, widget.minimumSizeHint().width()) + 10
+        # 主按钮的硬下限 = 当前字体/样式下的完整尺寸：空间不足时宁可继续溢出
+        # 次级动作，也不把主按钮压到裁切文字（Qt 默认允许压到 minimumSizeHint）。
+        self._quick_export_btn.setMinimumWidth(
+            max(0, self._quick_export_btn.sizeHint().width())
+        )
         for widget in (self._quick_export_btn, self._results_btn, self._more_btn):
             reserved += max(0, widget.sizeHint().width()) + 10
         self._overflow.set_primary_width(reserved)

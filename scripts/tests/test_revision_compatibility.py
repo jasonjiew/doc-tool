@@ -223,11 +223,11 @@ class RevisionCompatibilityTests(unittest.TestCase):
             # 1. open_project
             summary = open_project(str(manifest_file))
             self.assertEqual(summary.manifest.documentName, "通用测试")
-            self.assertEqual(summary.project_root, tmp_dir)
+            self.assertEqual(summary.project_root, Path(os.path.realpath(str(tmp_dir))))
 
             # 2. ProjectPaths
             paths = ProjectPaths(manifest_file)
-            self.assertEqual(paths.root, tmp_dir)
+            self.assertEqual(paths.root, Path(os.path.realpath(str(tmp_dir))))
             self.assertEqual(paths.manifest_file, manifest_file)
 
             # 3. ProjectManifest.load
