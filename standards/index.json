@@ -10,8 +10,7 @@
       "skeleton/2 需求描述.md": "a189f657236ca027b8c22c038051df007de323fea076d00a543b079906133637",
       "variables.yml": "a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1",
       "terms.yml": "b327183ff06b820d38ba0342033ec64be5c73dc6916542c6a9e77ee3249a6bda",
-      "rules.yml": "93a83d3020353699457c28d9ec041c585b5486755975905358e36973bf2c3064",
-      "template.docx": "373aac17222693fac6fbc14428b7335426a3b6bac10a41e576e360a64dd1a9d2"
+      "rules.yml": "93a83d3020353699457c28d9ec041c585b5486755975905358e36973bf2c3064"
     }
   },
   "generic-design": {
@@ -25,8 +24,7 @@
       "skeleton/2 设计说明.md": "ef9f8a6f6776d0964bada8d2e7038745ee1a170d99214df2caf41247debc2cfc",
       "variables.yml": "a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1",
       "terms.yml": "ea09613932d3a437cf21ac2ed4e314c23bb175b1d98ea54ad12af40b1ad92526",
-      "rules.yml": "9217e98f5c102fd8396367a3e53493696bdefe53eae7fc69f6f500464ef1e385",
-      "template.docx": "5088f7daf091212240de96f87373c9f1f31c7b2b60adebfee83359b685fa8619"
+      "rules.yml": "9217e98f5c102fd8396367a3e53493696bdefe53eae7fc69f6f500464ef1e385"
     }
   },
   "generic-test": {

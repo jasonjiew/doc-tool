@@ -78,7 +78,7 @@ class TemplateChangePlanTests(unittest.TestCase):
 
     def test_retained_and_missing_parts_are_listed(self):
         plan = plan_template_change(
-            old_source=PACK, new_source=PACK / "template.docx", new_pack_root=PACK,
+            old_source=PACK, new_source=TEMPLATE_B, new_pack_root=PACK,
         )
         self.assertTrue(plan.retainedParts, "应列出保留部件")
         self.assertTrue(set(plan.retainedParts) & set(RETAINED_PART_KEYS))
@@ -117,6 +117,10 @@ class ApplyTemplateChangeTests(unittest.TestCase):
         self.assertIn("只改变模板配置", text)
         self.assertIn("新轮", text)
 
+    @unittest.skipUnless(
+        (PACK / "template.docx").is_file(),
+        "规范包品牌底模不随仓库分发，跳过依赖它的用例",
+    )
     def test_fixed_pack_creates_editable_copy_without_touching_original(self):
         original_files = sorted(
             path.relative_to(PACK).as_posix() for path in PACK.rglob("*") if path.is_file()
@@ -143,7 +147,7 @@ class ApplyTemplateChangeTests(unittest.TestCase):
 
     def test_copy_path_conflict_gets_new_name(self):
         plan = plan_template_change(
-            old_source=PACK, new_source=PACK / "template.docx", new_pack_root=PACK,
+            old_source=PACK, new_source=TEMPLATE_B, new_pack_root=PACK,
         )
         drafts = self.work / "drafts"
         first, first_path, _ = editable_copy(PACK, drafts, name="副本")
@@ -175,10 +179,10 @@ class ReopenNavigationTests(unittest.TestCase):
         # 再次规划与查看差异都不应改动草稿
         for _ in range(3):
             plan = plan_template_change(
-                old_source=PACK / "template.docx", new_source=TEMPLATE_A,
+                old_source=TEMPLATE_B, new_source=TEMPLATE_A,
                 new_pack_root=PACK,
             )
-            plan_template_change(old_source=TEMPLATE_A, new_source=PACK / "template.docx")
+            plan_template_change(old_source=TEMPLATE_A, new_source=TEMPLATE_B)
         self.assertEqual(marker.read_bytes(), before, "规划不得改动既有制作草稿")
         payload = json.loads(marker.read_text(encoding="utf-8"))
         self.assertIn("packId", payload)

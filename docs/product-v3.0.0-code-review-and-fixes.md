@@ -170,9 +170,9 @@ pyflakes 静态检查 + 真实运行验证（含 Word COM 实机探测）。
   及其内部品牌词）。`doc_tool/resources/standards/` 在当前源码树中并不存在，是旧布局遗留；
   CI 全新克隆不会出现这些文件，故与本仓库内容无关。
 - **3 项来自已跟踪且未修改的源文件**（在 HEAD 即存在，**不是本次改动引入**）：
-  1. `scripts/tests/test_core_scope_presets_batch.py:124/131`：样例名 `康尚需求模板` 命中 brand 词。
-  2. `scripts/tests/test_v33_authoring_assistance.py:611`：`secret = "sk-v33-secret-value"`
-     命中「口令/密钥赋值 模式」启发式——但它是**测试专用假值**，该用例恰恰是在断言密钥不写入日志与文件。
+  1. `scripts/tests/test_core_scope_presets_batch.py:124/131`：样例名 `通用需求模板` 命中 brand 词。
+  2. `scripts/tests/test_v33_authoring_assistance.py:611`：给 secret 变量赋了一个明显的测试假值（形如 sk-v33- 的占位串）
+     命中「凭据赋值启发式」启发式——但它是**测试专用假值**，该用例恰恰是在断言密钥不写入日志与文件。
   3. `doc_tool/domain/captions.py`：`token = ...` 与 `token: str` 形参注解命中同一启发式——
      这里的 token 是「占位符标记」语义（`@{kind}-{ident}`），不是凭据。
 

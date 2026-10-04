@@ -41,6 +41,20 @@ class PackProjectResult:
         return self.project_root is not None and not self.errors
 
 
+def _generic_template_path() -> Optional[Path]:
+    """仓库/打包内的通用底模（缺失时返回 None）。"""
+    candidate = Path(__file__).resolve().parent.parent / "resources" / "generic-template.docx"
+    if candidate.is_file():
+        return candidate
+    try:
+        from doc_tool.application.template_fill_plan import resource_root
+
+        fallback = Path(resource_root()) / "generic-template.docx"
+        return fallback if fallback.is_file() else None
+    except Exception:  # noqa: BLE001 - 打包环境缺少该模块时按无底模处理
+        return None
+
+
 def create_project_from_pack(
     pack_source: Union[str, Path],
     project_root: Union[str, Path],
@@ -85,6 +99,11 @@ def create_project_from_pack(
     installed = install.pack or pack
 
     template_source = installed.entry("template.docx")
+    if template_source is None:
+        # 规范包可以不带底模（品牌底模不随仓库分发）：按既有设计回退通用底模。
+        template_source = _generic_template_path()
+        if template_source is not None:
+            result.warnings.append("规范包未包含底模，已回退通用底模。")
     if template_source is not None:
         shutil.copy2(template_source, template_dir / "template.docx")
     else:

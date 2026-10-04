@@ -34,6 +34,15 @@ ALLOWLIST_FILE = HERE / "allowlist.txt"
 VOCAB_FILE = HERE / "scan_vocabulary.txt"
 
 # 允许的 DOCX 文件（净化模板和测试夹具；内部仓库公司模板在导出时被排除）
+#: ``scan_credentials`` 的已知误报文件：文件里的「口令/密钥赋值」形态是测试假值或
+#: 占位符标记语义，不是真实凭据。只豁免凭据启发式，品牌/敏感词仍照常扫描。
+CREDENTIAL_SCAN_EXEMPT = {
+    "scripts/tests/test_v33_authoring_assistance.py":
+        "测试用假密钥，该用例本身断言密钥不写入日志与文件",
+    "doc_tool/domain/captions.py":
+        "token 为占位符标记语义（@{kind}-{ident}），不是认证凭据",
+}
+
 ALLOWED_DOCX_PATTERNS = [
     r"(?:_internal[/\\])?doc_tool[/\\]resources[/\\]generic-template\.docx$",
     r".*templates[/\\].*-template\.docx$",
@@ -307,7 +316,8 @@ def scan_source_terms(root: Path, categories: Dict[str, List[str]]) -> List[str]
             except OSError:
                 continue
             leaks.extend(scan_text_for_terms(text, categories, rel))
-            leaks.extend(scan_credentials(text, rel))
+            if rel not in CREDENTIAL_SCAN_EXEMPT:
+                leaks.extend(scan_credentials(text, rel))
     return leaks
 
 

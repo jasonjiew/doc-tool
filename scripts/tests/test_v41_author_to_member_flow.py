@@ -18,6 +18,8 @@ for candidate in (str(REPO_ROOT), str(REPO_ROOT / "scripts")):
 from scripts.tests import core_fixtures as fixtures  # noqa: E402
 
 PACK = REPO_ROOT / "standards" / "generic-requirement"
+#: 规范包自带底模不随仓库分发（品牌底模不进公开仓库），用例统一用已净化底模。
+PACK_TEMPLATE = REPO_ROOT / "templates" / "requirement-template.docx"
 
 
 class AuthorToMemberFlowTests(unittest.TestCase):
@@ -27,6 +29,10 @@ class AuthorToMemberFlowTests(unittest.TestCase):
         self.work = Path(tempfile.mkdtemp(prefix="v41-flow-"))
         self.addCleanup(shutil.rmtree, self.work, True)
 
+    @unittest.skipUnless(
+        (PACK / "template.docx").is_file(),
+        "规范包品牌底模不随仓库分发，跳过依赖它的用例",
+    )
     def test_skeleton_project_from_pack_then_edit_then_export(self):
         # 1) 负责人侧：从既有规范包生成可编辑草稿并冻结出新包
         from doc_tool.application.pack_authoring import (
@@ -100,7 +106,7 @@ class AuthorToMemberFlowTests(unittest.TestCase):
         """小样：用规范包自带真实底模与受支持设置，隔离目录、不改项目。"""
         from doc_tool.application.template_sample import run_sample
 
-        template = PACK / "template.docx"
+        template = PACK_TEMPLATE
         self.assertTrue(template.is_file())
         outcome = run_sample(
             template, self.work / "samples",
@@ -122,7 +128,7 @@ class AuthorToMemberFlowTests(unittest.TestCase):
         """设置变化后试用：新小样用实际设置与独立轮次，旧成果仍可打开。"""
         from doc_tool.application.template_sample import run_sample
 
-        template = PACK / "template.docx"
+        template = PACK_TEMPLATE
         first = run_sample(template, self.work / "samples", layout={"table_width": "equal"})
         second = run_sample(
             template, self.work / "samples", layout={"table_width": "proportional"},
@@ -173,7 +179,7 @@ class SchemaOneAndResourceTests(unittest.TestCase):
         entry = next(item for item in library.entries if item.packRoot == str(PACK))
         self.assertIsInstance(entry.unknown, dict)
         payload = preset_payload({
-            "template": str(PACK / "template.docx"),
+            "template": str(PACK_TEMPLATE),
             "layout": {"mode": "template", "fonts": {"body": "宋体"}, "header": "页眉占位"},
         })
         self.assertEqual(payload["layout"], {"mode": "template"})

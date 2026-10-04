@@ -121,14 +121,14 @@ class PresetTests(unittest.TestCase):
     def test_save_resolve_and_partial_match(self):
         store = IntakePresets(self.work)
         preset = store.save(
-            "康尚需求模板",
+            "通用需求模板",
             {"Heading1": 1, "Custom9": 2},
             style_names={"Custom9": "自定义小节"},
         )
         self.assertEqual(preset_file(self.work).name, "intake-presets.json")
         self.assertNotEqual(preset_file(self.work).name, "template-fill-recipes.json")
         reloaded = IntakePresets(self.work)
-        resolved = reloaded.resolve(reloaded.find("康尚需求模板"), {
+        resolved = reloaded.resolve(reloaded.find("通用需求模板"), {
             "Heading1": "heading 1", "Other": "自定义小节",
         })
         self.assertEqual(resolved.mapping, {"Heading1": 1, "Other": 2})
