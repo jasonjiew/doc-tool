@@ -1,5 +1,6 @@
 """Explicit image-reference plans and rollback of only this application."""
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from doc_tool.application.content.preview import _IMAGE_RE
@@ -83,6 +84,9 @@ class AssetBatchService:
         written = []
         try:
             needed = {self.asset_path(rel, row.replacement) for rel in updated for row in groups[rel]}
+            # 成员判断按 realpath 归一化比较：CI 的临时目录同时存在 8.3 短名与长名两种形态，
+            # 直接比较 Path 会把同一文件判成不同目标而静默跳过（表现为写入没发生）。
+            needed_keys = {os.path.realpath(str(item)) for item in needed}
             for target, raw in (imported or {}).items():
                 root = self.writer.assets_root
                 target_path = Path(target)
@@ -95,7 +99,7 @@ class AssetBatchService:
                         target_path.resolve().relative_to(Path(root).resolve())
                     )
                 target = _resolve_inside(root, relative)
-                if target not in needed: continue
+                if os.path.realpath(str(target)) not in needed_keys: continue
                 if target.exists(): raise ValueError('导入目标已出现，刷新计划后重试')
                 from io import BytesIO
                 from PIL import Image

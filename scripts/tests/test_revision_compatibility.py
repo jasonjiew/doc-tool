@@ -239,7 +239,7 @@ class RevisionCompatibilityTests(unittest.TestCase):
 
             # 4. manifest.resolve_paths
             rp = m.resolve_paths(manifest_file)
-            self.assertEqual(rp.root, tmp_dir)
+            self.assertEqual(rp.root, Path(os.path.realpath(str(tmp_dir))))
 
             # 5. WindowRegistry 路径归一化匹配
             reg = WindowRegistry()
