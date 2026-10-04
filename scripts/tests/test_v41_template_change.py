@@ -27,6 +27,19 @@ TEMPLATE_B = REPO_ROOT / "templates" / "design-template.docx"
 PACK = REPO_ROOT / "standards" / "generic-requirement"
 
 
+def _pack_declares_template(pack_root) -> bool:
+    """规范包是否声明自带底模。
+
+    品牌底模不随仓库分发（见 v3.0.0 审核报告），内置规范包已不再声明
+    template.docx；因此依赖「包自带底模」的用例前提不成立，应跳过而非失败。
+    """
+    try:
+        text = (pack_root / "pack.yml").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "template.docx" in text
+
+
 class TemplateChangePlanTests(unittest.TestCase):
     """4.1：更换前展示真实身份、有效/失效映射、版式变化与保留部件边界。"""
 
@@ -118,8 +131,8 @@ class ApplyTemplateChangeTests(unittest.TestCase):
         self.assertIn("新轮", text)
 
     @unittest.skipUnless(
-        (PACK / "template.docx").is_file(),
-        "规范包品牌底模不随仓库分发，跳过依赖它的用例",
+        _pack_declares_template(PACK),
+        "规范包已不再声明自带底模，用例前提不成立",
     )
     def test_fixed_pack_creates_editable_copy_without_touching_original(self):
         original_files = sorted(

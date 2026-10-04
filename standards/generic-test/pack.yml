@@ -4,8 +4,8 @@ version: 1.0.0
 documentKind: general
 description: 通用测试说明书规范包（可公开分发）
 files:
-  skeleton/1 概述.md: ea49aae870d38800886c351999e324ad9bc09c81709775184bef785ad9be7ec2
-  skeleton/2 测试用例.md: cfa7740e8bfa24e7b390ad14af6359ea82aaf90d6336e3ed2fa1cc06d5d5b311
-  variables.yml: a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1
-  terms.yml: 5bc3d5845e547758ff1e86de09d6e646071cf64646d6cec57b3373595275e895
-  rules.yml: 776f9aae1abdc1b0e517d0c43e93da9bf9ed891bc0e3c1d4fae01e7ec52e6e38
+  skeleton/1 概述.md: 0443dbebce9d67bdb839c597bec827f84cfaab375f3493f909431e14de15e267
+  skeleton/2 测试用例.md: a7c39f3773018c82713419e28a5bed62f5f9a914c1d7f4619b2650f4c63c1dae
+  variables.yml: c2f6a8c9765a11401a87332763d880a51ad22f3cb2e9d112167f04034d147141
+  terms.yml: 454fe1c4d7170745658fbfc68885b618f6efc2c75b01f61ab8b5b25261e1c082
+  rules.yml: 92deabc277a4fddd21cb0e2d46448822bc0cd8896409b32088b42768e9e3c493

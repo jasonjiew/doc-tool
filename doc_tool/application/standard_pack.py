@@ -367,10 +367,27 @@ def backup_pack(project_root: Union[str, Path], pack_ref: Dict[str, str]) -> Opt
 
 
 def sha256_file(path: Union[str, Path]) -> str:
+    """包内文件摘要：按归一化换行（CRLF 转 LF）后的字节计算。
+
+    同一文本文件在不同检出配置下可能是 CRLF（开发机）或 LF（全新克隆）；
+    若按原始字节记摘要，两者必然不一致，校验会整体误报「包已变化」。
+    归一化后摘要与检出配置无关；逐块读取并保留跨块的尾部 CR。
+    """
     digest = hashlib.sha256()
+    carry = b""
     with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
-            digest.update(chunk)
+        while True:
+            chunk = handle.read(65536)
+            if not chunk:
+                break
+            chunk = carry + chunk
+            if chunk.endswith(b"\r"):
+                carry, chunk = chunk[-1:], chunk[:-1]
+            else:
+                carry = b""
+            digest.update(chunk.replace(b"\r\n", b"\n"))
+    if carry:
+        digest.update(carry)
     return digest.hexdigest()
 
 

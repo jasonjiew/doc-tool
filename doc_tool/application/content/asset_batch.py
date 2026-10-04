@@ -84,11 +84,17 @@ class AssetBatchService:
         try:
             needed = {self.asset_path(rel, row.replacement) for rel in updated for row in groups[rel]}
             for target, raw in (imported or {}).items():
-                root = Path(self.writer.assets_root)
-                target = _resolve_inside(
-                    root,
-                    str(Path(target).resolve().relative_to(root.resolve())),
-                )
+                root = self.writer.assets_root
+                target_path = Path(target)
+                try:
+                    relative = str(target_path.relative_to(root))
+                except ValueError:
+                    # 8.3 短名与长名可能指向同一目录：归一化后再取相对路径；
+                    # target 仍按原写法构造，以免与 asset_path() 产出的形态不一致。
+                    relative = str(
+                        target_path.resolve().relative_to(Path(root).resolve())
+                    )
+                target = _resolve_inside(root, relative)
                 if target not in needed: continue
                 if target.exists(): raise ValueError('导入目标已出现，刷新计划后重试')
                 from io import BytesIO

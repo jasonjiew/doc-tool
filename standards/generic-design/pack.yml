@@ -4,8 +4,8 @@ version: 1.0.0
 documentKind: design
 description: 通用详细设计说明书规范包（可公开分发）
 files:
-  skeleton/1 引言.md: 7f4f838903b6436ec2a3d82b2ec59255946a06f2422704990ed647df05f52d6a
-  skeleton/2 设计说明.md: ef9f8a6f6776d0964bada8d2e7038745ee1a170d99214df2caf41247debc2cfc
-  variables.yml: a837fc1638a294e6bd1bd93eb1ecc35e991f5799df2688d17574f6cdfdf623d1
-  terms.yml: ea09613932d3a437cf21ac2ed4e314c23bb175b1d98ea54ad12af40b1ad92526
-  rules.yml: 9217e98f5c102fd8396367a3e53493696bdefe53eae7fc69f6f500464ef1e385
+  skeleton/1 引言.md: 4c66fff5b90e33b242b5107da2f11721e7ef5e3b846dd4f7500d327fcc4efe6b
+  skeleton/2 设计说明.md: 27a4c4c5af022a78b9d7c902a1907ff9bbad4df3d7277268e1028765e320b96c
+  variables.yml: c2f6a8c9765a11401a87332763d880a51ad22f3cb2e9d112167f04034d147141
+  terms.yml: f796b2c9c85459417b5f2b837e07ee1d22bf3af3b7aaed4c16f309a60cb30466
+  rules.yml: 9b2bbb8ca76aca0c4b31f5f162101cbf31b89001ffff0eca79992c6983a72f39
