@@ -228,7 +228,10 @@ class RevisionCompatibilityTests(unittest.TestCase):
             # 2. ProjectPaths
             paths = ProjectPaths(manifest_file)
             self.assertEqual(paths.root, Path(os.path.realpath(str(tmp_dir))))
-            self.assertEqual(paths.manifest_file, manifest_file)
+            self.assertEqual(
+                Path(os.path.realpath(str(paths.manifest_file))),
+                Path(os.path.realpath(str(manifest_file))),
+            )
 
             # 3. ProjectManifest.load
             m = ProjectManifest.load(manifest_file)

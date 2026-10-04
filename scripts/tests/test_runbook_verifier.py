@@ -4,12 +4,18 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+#: 归档前置核对依赖 openspec CLI；CI 未安装该工具，此时无法执行该检查，
+#: 应跳过而不是判失败（与 test_frozen_smoke 对冻结产物的处理一致）。
+OPENSPEC_CLI = shutil.which("openspec") or shutil.which("openspec.cmd")
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -34,6 +40,10 @@ class RunbookVerifierTests(unittest.TestCase):
                 self.assertIn(key, row)
             self.assertIsInstance(row["ok"], bool)
 
+    @unittest.skipUnless(
+        OPENSPEC_CLI,
+        "需要 openspec CLI（CI 未安装），跳过归档前置核对",
+    )
     def test_archive_dry_run_passes_and_does_not_modify_repo(self):
         tasks = REPO_ROOT / "openspec" / "changes" / "product-core-import-export" / "tasks.md"
         before = tasks.stat().st_mtime_ns

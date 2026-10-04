@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 import unittest
@@ -17,6 +18,12 @@ CHANGES_DIR = REPO_ROOT / "openspec" / "changes"
 ARCHIVE_DIR = CHANGES_DIR / "archive"
 
 
+#: 归档前置核对依赖 openspec CLI；CI 未安装该工具，此时无法执行该检查，
+#: 应跳过而不是判失败（与 test_frozen_smoke 对冻结产物的处理一致）。
+OPENSPEC_CLI = shutil.which("openspec") or shutil.which("openspec.cmd")
+
+
+@unittest.skipUnless(OPENSPEC_CLI, "需要 openspec CLI（CI 未安装），跳过归档 dry-run 核对")
 class ArchiveRunnerDryRunTests(unittest.TestCase):
     def _snapshot(self):
         return sorted(

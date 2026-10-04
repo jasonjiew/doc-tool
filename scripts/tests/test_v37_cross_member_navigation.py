@@ -22,6 +22,15 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from scripts.tests import core_fixtures as fixtures  # noqa: E402
 
 
+def _norm_path(path) -> str:
+    """路径比较前的归一化。
+
+    CI 的临时目录是 8.3 短名（RUNNER~1），与夹具产出的长名指向同一目录，
+    两边都必须归一化后再比较，否则同一路径会被判成不同。
+    """
+    return os.path.realpath(str(path))
+
+
 class _Host:
     """最小宿主：记录真实打开的成员根路径顺序。"""
 
@@ -122,8 +131,11 @@ class CrossMemberNavigationTests(unittest.TestCase):
             QApplication.processEvents()
         self.assertEqual(len(self.host.opened), len(names), self.host.statuses)
         for name in names:
-            self.assertIn(str(self.members[name]), self.host.opened,
-                          "每个成员必须按真实路径打开")
+            self.assertIn(
+                _norm_path(self.members[name]),
+                [_norm_path(item) for item in self.host.opened],
+                "每个成员必须按真实路径打开",
+            )
 
         # 身份用真实 projectId / relPath，不用显示名代替
         for item in dialog._members:
@@ -151,8 +163,11 @@ class CrossMemberNavigationTests(unittest.TestCase):
         QApplication.processEvents()
         dialog.open_member_btn.click()
         QApplication.processEvents()
-        self.assertNotIn(str(self.workspace_root / "不存在的成员"), self.host.opened,
-                         "不可用成员不得被打开")
+        self.assertNotIn(
+            _norm_path(self.workspace_root / "不存在的成员"),
+            [_norm_path(item) for item in self.host.opened],
+            "不可用成员不得被打开",
+        )
         self.assertTrue(
             any("不可用" in item or "不存在" in item for item in
                 list(self.host.statuses) + [dialog._status_label.text()]),
@@ -165,7 +180,11 @@ class CrossMemberNavigationTests(unittest.TestCase):
         QApplication.processEvents()
         dialog.open_member_btn.click()
         QApplication.processEvents()
-        self.assertIn(str(self.members["Alpha"]), self.host.opened, "合法成员必须继续可用")
+        self.assertIn(
+            _norm_path(self.members["Alpha"]),
+            [_norm_path(item) for item in self.host.opened],
+            "合法成员必须继续可用",
+        )
 
 
 if __name__ == "__main__":
