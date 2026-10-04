@@ -54,6 +54,9 @@ class AssetBatchService:
         groups = {}
         for edit in edits:
             if edit.selected: groups.setdefault(edit.source, []).append(edit)
+        # imported 的键由调用方给出，可能是长名而 writer.assets_root 是 8.3 短名（或相反）：
+        # 统一按 realpath 比较，否则「选择的资源不存在」会误判、整批静默跳过、连写入都不发生。
+        imported_keys = {os.path.realpath(str(key)) for key in (imported or {})}
         before = {}
         updated = {}
         for rel, rows in groups.items():
@@ -68,7 +71,7 @@ class AssetBatchService:
             try:
                 for row in rows:
                     target = self.asset_path(rel, row.replacement)
-                    if not target.is_file() and (not imported or target not in imported): raise ValueError('选择的资源不存在')
+                    if not target.is_file() and os.path.realpath(str(target)) not in imported_keys: raise ValueError('选择的资源不存在')
                     if text[row.start:row.end] != row.old: raise ValueError('引用范围已变化')
             except (ValueError, OSError) as exc:
                 result['skipped'].append(rel)
