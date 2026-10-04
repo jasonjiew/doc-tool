@@ -1,0 +1,628 @@
+{
+  "generatedAt": "2026-10-03T18:47:24",
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 151 Stepping 5, GenuineIntel"
+  },
+  "tiers": [
+    {
+      "chapters": 50,
+      "samples": 5,
+      "stages": {
+        "coldDiscover": {
+          "samples": [
+            7.697,
+            7.37,
+            7.033,
+            7.48,
+            7.378
+          ],
+          "medianMs": 7.378,
+          "p95Ms": 7.653,
+          "maxMs": 7.697,
+          "minMs": 7.033
+        },
+        "coldRead": {
+          "samples": [
+            4.391,
+            5.234,
+            4.315,
+            4.496,
+            3.859
+          ],
+          "medianMs": 4.391,
+          "p95Ms": 5.086,
+          "maxMs": 5.234,
+          "minMs": 3.859
+        },
+        "coldIndex": {
+          "samples": [
+            16.765,
+            17.906,
+            15.576,
+            18.691,
+            18.102
+          ],
+          "medianMs": 17.906,
+          "p95Ms": 18.573,
+          "maxMs": 18.691,
+          "minMs": 15.576
+        },
+        "coldRules": {
+          "samples": [
+            126.554,
+            4.607,
+            2.559,
+            2.599,
+            3.285
+          ],
+          "medianMs": 3.285,
+          "p95Ms": 102.165,
+          "maxMs": 126.554,
+          "minMs": 2.559
+        },
+        "coldCollect": {
+          "samples": [
+            0.003,
+            0.003,
+            0.002,
+            0.001,
+            0.002
+          ],
+          "medianMs": 0.002,
+          "p95Ms": 0.003,
+          "maxMs": 0.003,
+          "minMs": 0.001
+        },
+        "coldTotal": {
+          "samples": [
+            155.729,
+            35.524,
+            29.828,
+            33.59,
+            32.947
+          ],
+          "medianMs": 33.59,
+          "p95Ms": 131.688,
+          "maxMs": 155.729,
+          "minMs": 29.828
+        },
+        "hotDiscover": {
+          "samples": [
+            6.914,
+            9.878,
+            7.197,
+            9.084,
+            8.959
+          ],
+          "medianMs": 8.959,
+          "p95Ms": 9.719,
+          "maxMs": 9.878,
+          "minMs": 6.914
+        },
+        "hotRead": {
+          "samples": [
+            3.589,
+            4.149,
+            4.68,
+            5.947,
+            3.944
+          ],
+          "medianMs": 4.149,
+          "p95Ms": 5.693,
+          "maxMs": 5.947,
+          "minMs": 3.589
+        },
+        "hotIndex": {
+          "samples": [
+            26.312,
+            14.578,
+            15.465,
+            14.563,
+            22.402
+          ],
+          "medianMs": 15.465,
+          "p95Ms": 25.53,
+          "maxMs": 26.312,
+          "minMs": 14.563
+        },
+        "hotRules": {
+          "samples": [
+            3.354,
+            3.203,
+            3.131,
+            2.903,
+            4.097
+          ],
+          "medianMs": 3.203,
+          "p95Ms": 3.949,
+          "maxMs": 4.097,
+          "minMs": 2.903
+        },
+        "hotCollect": {
+          "samples": [
+            0.003,
+            0.002,
+            0.003,
+            0.002,
+            0.004
+          ],
+          "medianMs": 0.003,
+          "p95Ms": 0.004,
+          "maxMs": 0.004,
+          "minMs": 0.002
+        },
+        "hotTotal": {
+          "samples": [
+            40.578,
+            32.301,
+            30.812,
+            32.844,
+            39.817
+          ],
+          "medianMs": 32.844,
+          "p95Ms": 40.426,
+          "maxMs": 40.578,
+          "minMs": 30.812
+        },
+        "chapterChangeIndex": {
+          "samples": [
+            16.579,
+            17.447,
+            16.56,
+            16.117,
+            17.205
+          ],
+          "medianMs": 16.579,
+          "p95Ms": 17.399,
+          "maxMs": 17.447,
+          "minMs": 16.117
+        },
+        "rulesChangeIndex": {
+          "samples": [
+            29.913,
+            24.138,
+            24.446,
+            25.417,
+            25.833
+          ],
+          "medianMs": 25.417,
+          "p95Ms": 29.097,
+          "maxMs": 29.913,
+          "minMs": 24.138
+        }
+      },
+      "release": {
+        "objectsBefore": 18464,
+        "objectsAfter": 18465,
+        "objectsDelta": 1,
+        "gcCollected": 0,
+        "peakBytes": 187761,
+        "currentBytes": 78638
+      },
+      "parseCounts": [],
+      "assertions": {
+        "issueCountCold": 0,
+        "issueCountHot": 0,
+        "sameIssuesColdAsHot": true
+      },
+      "p95ImprovementPercent": 69.3
+    },
+    {
+      "chapters": 300,
+      "samples": 5,
+      "stages": {
+        "coldDiscover": {
+          "samples": [
+            41.914,
+            45.585,
+            43.896,
+            41.658,
+            49.458
+          ],
+          "medianMs": 43.896,
+          "p95Ms": 48.683,
+          "maxMs": 49.458,
+          "minMs": 41.658
+        },
+        "coldRead": {
+          "samples": [
+            25.785,
+            24.551,
+            24.308,
+            25.93,
+            29.189
+          ],
+          "medianMs": 25.785,
+          "p95Ms": 28.537,
+          "maxMs": 29.189,
+          "minMs": 24.308
+        },
+        "coldIndex": {
+          "samples": [
+            104.646,
+            106.808,
+            110.196,
+            102.357,
+            121.076
+          ],
+          "medianMs": 106.808,
+          "p95Ms": 118.9,
+          "maxMs": 121.076,
+          "minMs": 102.357
+        },
+        "coldRules": {
+          "samples": [
+            18.395,
+            23.441,
+            19.637,
+            16.744,
+            19.344
+          ],
+          "medianMs": 19.344,
+          "p95Ms": 22.68,
+          "maxMs": 23.441,
+          "minMs": 16.744
+        },
+        "coldCollect": {
+          "samples": [
+            0.003,
+            0.004,
+            0.003,
+            0.003,
+            0.005
+          ],
+          "medianMs": 0.003,
+          "p95Ms": 0.004,
+          "maxMs": 0.005,
+          "minMs": 0.003
+        },
+        "coldTotal": {
+          "samples": [
+            191.001,
+            200.844,
+            198.443,
+            187.087,
+            219.523
+          ],
+          "medianMs": 198.443,
+          "p95Ms": 215.787,
+          "maxMs": 219.523,
+          "minMs": 187.087
+        },
+        "hotDiscover": {
+          "samples": [
+            45.819,
+            44.791,
+            45.586,
+            44.297,
+            40.89
+          ],
+          "medianMs": 44.791,
+          "p95Ms": 45.772,
+          "maxMs": 45.819,
+          "minMs": 40.89
+        },
+        "hotRead": {
+          "samples": [
+            24.638,
+            24.672,
+            24.134,
+            23.409,
+            23.431
+          ],
+          "medianMs": 24.134,
+          "p95Ms": 24.665,
+          "maxMs": 24.672,
+          "minMs": 23.409
+        },
+        "hotIndex": {
+          "samples": [
+            132.186,
+            81.837,
+            79.604,
+            92.141,
+            82.687
+          ],
+          "medianMs": 82.687,
+          "p95Ms": 124.177,
+          "maxMs": 132.186,
+          "minMs": 79.604
+        },
+        "hotRules": {
+          "samples": [
+            17.022,
+            16.609,
+            16.529,
+            15.981,
+            16.352
+          ],
+          "medianMs": 16.529,
+          "p95Ms": 16.94,
+          "maxMs": 17.022,
+          "minMs": 15.981
+        },
+        "hotCollect": {
+          "samples": [
+            0.003,
+            0.003,
+            0.003,
+            0.003,
+            0.002
+          ],
+          "medianMs": 0.003,
+          "p95Ms": 0.003,
+          "maxMs": 0.003,
+          "minMs": 0.002
+        },
+        "hotTotal": {
+          "samples": [
+            220.115,
+            168.567,
+            166.38,
+            176.364,
+            163.914
+          ],
+          "medianMs": 168.567,
+          "p95Ms": 211.365,
+          "maxMs": 220.115,
+          "minMs": 163.914
+        },
+        "chapterChangeIndex": {
+          "samples": [
+            83.394,
+            80.211,
+            87.174,
+            84.029,
+            85.652
+          ],
+          "medianMs": 84.029,
+          "p95Ms": 86.87,
+          "maxMs": 87.174,
+          "minMs": 80.211
+        },
+        "rulesChangeIndex": {
+          "samples": [
+            165.818,
+            151.293,
+            158.921,
+            151.745,
+            141.531
+          ],
+          "medianMs": 151.745,
+          "p95Ms": 164.439,
+          "maxMs": 165.818,
+          "minMs": 141.531
+        }
+      },
+      "release": {
+        "objectsBefore": 22995,
+        "objectsAfter": 22996,
+        "objectsDelta": 1,
+        "gcCollected": 0,
+        "peakBytes": 724186,
+        "currentBytes": 429930
+      },
+      "parseCounts": [],
+      "assertions": {
+        "issueCountCold": 0,
+        "issueCountHot": 0,
+        "sameIssuesColdAsHot": true
+      },
+      "p95ImprovementPercent": 2.05
+    },
+    {
+      "chapters": 1000,
+      "samples": 5,
+      "stages": {
+        "coldDiscover": {
+          "samples": [
+            147.361,
+            139.857,
+            142.403,
+            136.835,
+            148.032
+          ],
+          "medianMs": 142.403,
+          "p95Ms": 147.898,
+          "maxMs": 148.032,
+          "minMs": 136.835
+        },
+        "coldRead": {
+          "samples": [
+            85.7,
+            77.842,
+            81.778,
+            79.326,
+            85.729
+          ],
+          "medianMs": 81.778,
+          "p95Ms": 85.724,
+          "maxMs": 85.729,
+          "minMs": 77.842
+        },
+        "coldIndex": {
+          "samples": [
+            330.579,
+            346.519,
+            329.979,
+            324.067,
+            356.048
+          ],
+          "medianMs": 330.579,
+          "p95Ms": 354.142,
+          "maxMs": 356.048,
+          "minMs": 324.067
+        },
+        "coldRules": {
+          "samples": [
+            54.16,
+            55.696,
+            57.43,
+            57.375,
+            65.783
+          ],
+          "medianMs": 57.375,
+          "p95Ms": 64.112,
+          "maxMs": 65.783,
+          "minMs": 54.16
+        },
+        "coldCollect": {
+          "samples": [
+            0.003,
+            0.005,
+            0.004,
+            0.003,
+            0.005
+          ],
+          "medianMs": 0.004,
+          "p95Ms": 0.005,
+          "maxMs": 0.005,
+          "minMs": 0.003
+        },
+        "coldTotal": {
+          "samples": [
+            618.096,
+            620.291,
+            611.974,
+            598.007,
+            656.493
+          ],
+          "medianMs": 618.096,
+          "p95Ms": 649.253,
+          "maxMs": 656.493,
+          "minMs": 598.007
+        },
+        "hotDiscover": {
+          "samples": [
+            142.191,
+            181.554,
+            147.662,
+            144.67,
+            154.804
+          ],
+          "medianMs": 147.662,
+          "p95Ms": 176.204,
+          "maxMs": 181.554,
+          "minMs": 142.191
+        },
+        "hotRead": {
+          "samples": [
+            82.418,
+            81.558,
+            83.858,
+            87.12,
+            83.98
+          ],
+          "medianMs": 83.858,
+          "p95Ms": 86.492,
+          "maxMs": 87.12,
+          "minMs": 81.558
+        },
+        "hotIndex": {
+          "samples": [
+            455.282,
+            253.951,
+            284.45,
+            256.315,
+            275.818
+          ],
+          "medianMs": 275.818,
+          "p95Ms": 421.115,
+          "maxMs": 455.282,
+          "minMs": 253.951
+        },
+        "hotRules": {
+          "samples": [
+            54.887,
+            56.843,
+            52.499,
+            55.752,
+            72.625
+          ],
+          "medianMs": 55.752,
+          "p95Ms": 69.468,
+          "maxMs": 72.625,
+          "minMs": 52.499
+        },
+        "hotCollect": {
+          "samples": [
+            0.004,
+            0.004,
+            0.004,
+            0.007,
+            0.004
+          ],
+          "medianMs": 0.004,
+          "p95Ms": 0.006,
+          "maxMs": 0.007,
+          "minMs": 0.004
+        },
+        "hotTotal": {
+          "samples": [
+            735.195,
+            574.505,
+            569.168,
+            544.459,
+            588.042
+          ],
+          "medianMs": 574.505,
+          "p95Ms": 705.765,
+          "maxMs": 735.195,
+          "minMs": 544.459
+        },
+        "chapterChangeIndex": {
+          "samples": [
+            285.118,
+            263.008,
+            286.681,
+            286.59,
+            296.73
+          ],
+          "medianMs": 286.59,
+          "p95Ms": 294.72,
+          "maxMs": 296.73,
+          "minMs": 263.008
+        },
+        "rulesChangeIndex": {
+          "samples": [
+            491.938,
+            471.287,
+            476.496,
+            464.319,
+            507.949
+          ],
+          "medianMs": 476.496,
+          "p95Ms": 504.747,
+          "maxMs": 507.949,
+          "minMs": 464.319
+        }
+      },
+      "release": {
+        "objectsBefore": 35626,
+        "objectsAfter": 35627,
+        "objectsDelta": 1,
+        "gcCollected": 0,
+        "peakBytes": 2237993,
+        "currentBytes": 1303419
+      },
+      "parseCounts": [],
+      "assertions": {
+        "issueCountCold": 0,
+        "issueCountHot": 0,
+        "sameIssuesColdAsHot": true
+      },
+      "p95ImprovementPercent": -8.7
+    }
+  ],
+  "targets": {
+    "hotP95ImprovementPercent": [
+      69.3,
+      2.05,
+      -8.7
+    ],
+    "met30Percent": false
+  }
+}

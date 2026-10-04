@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-10-03T21:52:12",
+  "python": "3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]",
+  "command": "python -m pytest <file> -q -p no:cacheprovider",
+  "workers": 2,
+  "timeoutSeconds": 300,
+  "seconds": 27.42,
+  "requestedFiles": [
+    "test_gui_services.py",
+    "test_v37_cross_member_navigation.py",
+    "test_v39_three_member_loop.py",
+    "test_v40_entry_and_release.py"
+  ],
+  "files": [
+    {
+      "file": "test_gui_services.py",
+      "returncode": 0,
+      "seconds": 26.27,
+      "counts": {
+        "passed": 170
+      },
+      "timedOut": false,
+      "tail": "........................................................................ [ 42%]\n........................................................................ [ 84%]\n..........................                                               [100%]\n170 passed in 20.41s"
+    },
+    {
+      "file": "test_v37_cross_member_navigation.py",
+      "returncode": 0,
+      "seconds": 12.29,
+      "counts": {
+        "passed": 2
+      },
+      "timedOut": false,
+      "tail": "..                                                                       [100%]\n2 passed in 6.94s"
+    },
+    {
+      "file": "test_v39_three_member_loop.py",
+      "returncode": 0,
+      "seconds": 9.9,
+      "counts": {
+        "passed": 2
+      },
+      "timedOut": false,
+      "tail": "..                                                                       [100%]\n2 passed in 5.97s"
+    },
+    {
+      "file": "test_v40_entry_and_release.py",
+      "returncode": 0,
+      "seconds": 5.23,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 1.84s"
+    }
+  ],
+  "totals": {
+    "passed": 179,
+    "failed": 0,
+    "skipped": 0,
+    "error": 0
+  },
+  "failedFiles": [],
+  "timedOutFiles": []
+}

@@ -168,6 +168,35 @@ class TabsHost(QWidget):
             except (OSError, UnicodeDecodeError):
                 pass
 
+    def remap_path(self, old_rel_path: str, new_rel_path: str) -> bool:
+        """把已打开标签从旧路径改到新路径，**保留未保存正文**（MAIN2-C 3.2）。
+
+        章节改名/移动后必须沿用同一个编辑器实例：否则未保存内容要么被丢弃，
+        要么在旧路径保存时重建已改名的文件。缓冲键、标签标题与当前标签都随
+        新路径走，光标与撤销栈保持不变（同一 QPlainTextEdit 实例）。
+        """
+        old_rel_path = str(old_rel_path or "")
+        new_rel_path = str(new_rel_path or "")
+        if not old_rel_path or not new_rel_path or old_rel_path == new_rel_path:
+            return False
+        editor = self._editors.pop(old_rel_path, None)
+        if editor is None:
+            return False
+        self._editors[new_rel_path] = editor
+        # 编辑器内部记录的路径与 mtime 必须跟上，否则保存会写回旧路径。
+        try:
+            editor.set_rel_path(new_rel_path)
+        except Exception:  # noqa: BLE001 - 老版本编辑器没有该方法时退化为重载
+            try:
+                target = self._writer.resolve(new_rel_path)
+                editor.load(new_rel_path, target.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, AttributeError):
+                pass
+        idx = self._tabs.indexOf(editor)
+        if idx >= 0:
+            self._tabs.setTabText(idx, new_rel_path.rsplit("/", 1)[-1])
+        return True
+
     def editors(self) -> List[EditorPanel]:
         """返回全部已打开编辑器（保持打开顺序，供未保存收集）。"""
         return list(self._editors.values())

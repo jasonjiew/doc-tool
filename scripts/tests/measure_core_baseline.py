@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """CORE-H 8.3 本机基线测量：导入/出稿阶段耗时、内存峰值、取消响应与缓存无关性。
 
-用法：``$env:PYTHONUTF8='1'; $env:PYTHONPATH=(Get-Location).Path; python scripts\tests\measure_core_baseline.py``
+用法：``$env:PYTHONUTF8='1'; $env:PYTHONPATH=(Get-Location).Path; python scripts/tests/measure_core_baseline.py``
 输出一行 JSON，便于写入台账；只做测量，不做断言。
 """
 

@@ -1,0 +1,152 @@
+{
+  "generatedAt": "2026-10-03T22:30:37",
+  "python": "3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]",
+  "command": "python -m pytest <file> -q -p no:cacheprovider",
+  "workers": 4,
+  "timeoutSeconds": 300,
+  "seconds": 59.25,
+  "requestedFiles": [
+    "test_main2a_intake_result.py",
+    "test_v41_template_sample.py",
+    "test_v42_grouped_fix_panel.py",
+    "test_v42_incremental_correctness.py",
+    "test_v42_issues_grouping.py",
+    "test_v42_quality_workbench.py",
+    "test_v42_rule_dependencies.py",
+    "test_v42_rule_trial.py",
+    "test_v43_delivery_entry_flow.py",
+    "test_v43_delivery_preparation.py",
+    "test_v43_member_format_results.py",
+    "test_v43_revision_compare.py"
+  ],
+  "files": [
+    {
+      "file": "test_main2a_intake_result.py",
+      "returncode": 0,
+      "seconds": 23.59,
+      "counts": {
+        "passed": 10
+      },
+      "timedOut": false,
+      "tail": "..........                                                               [100%]\n10 passed in 14.02s"
+    },
+    {
+      "file": "test_v41_template_sample.py",
+      "returncode": 0,
+      "seconds": 14.7,
+      "counts": {
+        "passed": 11
+      },
+      "timedOut": false,
+      "tail": "...........                                                              [100%]\n11 passed in 5.25s"
+    },
+    {
+      "file": "test_v42_grouped_fix_panel.py",
+      "returncode": 0,
+      "seconds": 13.66,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 4.21s"
+    },
+    {
+      "file": "test_v42_incremental_correctness.py",
+      "returncode": 0,
+      "seconds": 11.87,
+      "counts": {
+        "passed": 9
+      },
+      "timedOut": false,
+      "tail": ".........                                                                [100%]\n9 passed in 2.44s"
+    },
+    {
+      "file": "test_v42_issues_grouping.py",
+      "returncode": 0,
+      "seconds": 12.28,
+      "counts": {
+        "passed": 11
+      },
+      "timedOut": false,
+      "tail": "...........                                                          [100%]\n11 passed, 4 subtests passed in 4.41s"
+    },
+    {
+      "file": "test_v42_quality_workbench.py",
+      "returncode": 0,
+      "seconds": 10.55,
+      "counts": {
+        "passed": 11
+      },
+      "timedOut": false,
+      "tail": "...........                                                              [100%]\n11 passed in 2.57s"
+    },
+    {
+      "file": "test_v42_rule_dependencies.py",
+      "returncode": 0,
+      "seconds": 10.31,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 2.86s"
+    },
+    {
+      "file": "test_v42_rule_trial.py",
+      "returncode": 0,
+      "seconds": 11.34,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 2.47s"
+    },
+    {
+      "file": "test_v43_delivery_entry_flow.py",
+      "returncode": 0,
+      "seconds": 20.82,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 11.70s"
+    },
+    {
+      "file": "test_v43_delivery_preparation.py",
+      "returncode": 0,
+      "seconds": 35.04,
+      "counts": {
+        "passed": 15
+      },
+      "timedOut": false,
+      "tail": "...............                                                          [100%]\n15 passed in 25.91s"
+    },
+    {
+      "file": "test_v43_member_format_results.py",
+      "returncode": 0,
+      "seconds": 24.22,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 15.57s"
+    },
+    {
+      "file": "test_v43_revision_compare.py",
+      "returncode": 0,
+      "seconds": 11.19,
+      "counts": {
+        "passed": 15
+      },
+      "timedOut": false,
+      "tail": "...............                                                          [100%]\n15 passed in 4.32s"
+    }
+  ],
+  "totals": {
+    "passed": 111,
+    "failed": 0,
+    "skipped": 0,
+    "error": 0
+  },
+  "failedFiles": [],
+  "timedOutFiles": []
+}

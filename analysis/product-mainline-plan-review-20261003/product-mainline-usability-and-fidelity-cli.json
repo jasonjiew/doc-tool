@@ -1,0 +1,288 @@
+{
+  "name": "product-mainline-usability-and-fidelity",
+  "status": {
+    "changeName": "product-mainline-usability-and-fidelity",
+    "schemaName": "spec-driven",
+    "planningHome": {
+      "kind": "repo",
+      "root": "D:\\ai_develop_project_space\\doc-tool",
+      "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+      "defaultSchema": "spec-driven"
+    },
+    "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity",
+    "artifactPaths": {
+      "proposal": {
+        "outputPath": "proposal.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\proposal.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\proposal.md"
+        ]
+      },
+      "specs": {
+        "outputPath": "specs/**/*.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\**\\*.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\actionable-import-continuation\\spec.md",
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\coherent-final-export\\spec.md",
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\desktop-source-update-workflow\\spec.md",
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\effective-authoring-and-assets\\spec.md"
+        ]
+      },
+      "design": {
+        "outputPath": "design.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\design.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\design.md"
+        ]
+      },
+      "tasks": {
+        "outputPath": "tasks.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\tasks.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\tasks.md"
+        ]
+      }
+    },
+    "isComplete": true,
+    "applyRequires": [
+      "tasks"
+    ],
+    "nextSteps": [
+      "All planning artifacts are complete; review tasks before implementation."
+    ],
+    "actionContext": {
+      "mode": "repo-local",
+      "sourceOfTruth": "repo",
+      "planningArtifacts": [
+        "proposal",
+        "design",
+        "specs",
+        "tasks"
+      ],
+      "linkedContext": [],
+      "allowedEditRoots": [
+        "D:\\ai_develop_project_space\\doc-tool"
+      ],
+      "requiresAffectedAreaSelection": false,
+      "constraints": [
+        "Repo-local change artifacts and implementation edits are scoped to this project."
+      ]
+    },
+    "artifacts": [
+      {
+        "id": "proposal",
+        "outputPath": "proposal.md",
+        "status": "done"
+      },
+      {
+        "id": "design",
+        "outputPath": "design.md",
+        "status": "done"
+      },
+      {
+        "id": "specs",
+        "outputPath": "specs/**/*.md",
+        "status": "done"
+      },
+      {
+        "id": "tasks",
+        "outputPath": "tasks.md",
+        "status": "done"
+      }
+    ],
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "strict": {
+    "items": [
+      {
+        "id": "product-mainline-usability-and-fidelity",
+        "type": "change",
+        "valid": true,
+        "issues": [],
+        "durationMs": 5
+      }
+    ],
+    "summary": {
+      "totals": {
+        "items": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "byType": {
+        "change": {
+          "items": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      }
+    },
+    "version": "1.0",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "apply": {
+    "changeName": "product-mainline-usability-and-fidelity",
+    "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity",
+    "schemaName": "spec-driven",
+    "contextFiles": {
+      "proposal": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\proposal.md"
+      ],
+      "specs": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\actionable-import-continuation\\spec.md",
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\coherent-final-export\\spec.md",
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\desktop-source-update-workflow\\spec.md",
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\specs\\effective-authoring-and-assets\\spec.md"
+      ],
+      "design": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\design.md"
+      ],
+      "tasks": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-mainline-usability-and-fidelity\\tasks.md"
+      ]
+    },
+    "progress": {
+      "total": 24,
+      "complete": 0,
+      "remaining": 24
+    },
+    "tasks": [
+      {
+        "id": "1",
+        "description": "1.1 从真实Word/Markdown/批量入口复核支持矩阵、有效默认与导入结果，记录当前服务/入口差额；保留旧MAIN证据，不以服务可用代替按钮可用。",
+        "done": false
+      },
+      {
+        "id": "2",
+        "description": "1.2 将原导入记录接到非模态可重开的完整问题列表，支持按章/类型筛选、分页/搜索和最后一项定位；超过40项不截断，动作绑定真实项目窗口。",
+        "done": false
+      },
+      {
+        "id": "3",
+        "description": "1.3 复用原批量结果支持选定失败/待转换/未开始项接续，保留输入设置、成功项目及原路径；Word一文件一项目、Markdown确认顺序合并一项目的语义保持。",
+        "done": false
+      },
+      {
+        "id": "4",
+        "description": "1.4 用有效默认导入后直接进入有效编辑位置，结果/原件可再打开；核验缺图/无标题/坏可选配置及修复后真实记录数量，不增加必答模板/编号步骤。",
+        "done": false
+      },
+      {
+        "id": "5",
+        "description": "2.1 复用原解析/compare/reimport_plan/preview生成隔离只读差异，接入活缓冲与dirty_paths，后台计算可取消，预览不写正文或源记录。",
+        "done": false
+      },
+      {
+        "id": "6",
+        "description": "2.2 将菜单/按钮/来源拖放接到实际差异选择页，展示新增/修改/删除及当前/传入内容，只选合法项；冲突/脏项默认保留，可查看、另存传入副本或仅保存相关章后刷新。",
+        "done": false
+      },
+      {
+        "id": "7",
+        "description": "2.3 应用核对源摘要、所选正文/缓冲及预览代次，变化项局部刷新/跳过，其他合法项继续；复用原事务/恢复，实际写失败恢复本次范围，取消不写。",
+        "done": false
+      },
+      {
+        "id": "8",
+        "description": "2.4 验证部分接收后源版本/基线/再次比较的事实，未选/冲突项不冒充已接收；结果可定位，返回保持无关多章草稿和原上下文。",
+        "done": false
+      },
+      {
+        "id": "9",
+        "description": "3.1 章节复制默认读当前有效正文并传入原复制服务，代码/换行/表格/资源保持，副本条目新身份；原磁盘/脏缓冲不隐式保存或覆盖。",
+        "done": false
+      },
+      {
+        "id": "10",
+        "description": "3.2 验证并补改名/移动/排序的路径映射、缓冲键/标签/返回位置与确定性引用联动，父_index.md正文保持；只处理受影响章，原身份与恢复清单保持。",
+        "done": false
+      },
+      {
+        "id": "11",
+        "description": "3.3 为支持的所选章节批量复制/移动提供实际目标摘要、冲突新名与逐项结果，取消不写；复用原服务，无效项局部跳过，含复制身份与资源读回。",
+        "done": false
+      },
+      {
+        "id": "12",
+        "description": "3.4 操作后预览/检查及出稿立即采用当前表达，旧问题标过期/重检；保留表格草稿、普通粘贴、焦点/光标，晚到请求不串章。",
+        "done": false
+      },
+      {
+        "id": "13",
+        "description": "4.1 图片清单/缺失/未用扫描叠加活缓冲的实际引用，显示当前依据和引用位置，当前未保存新增引用的资产不能误列可清理。",
+        "done": false
+      },
+      {
+        "id": "14",
+        "description": "4.2 单项缺图修复允许选择项目外图片，复用原资产入库/命名/引用服务；所选引用保留alt/尺寸，当前章写缓冲一次撤销，未打开章走原写入服务。",
+        "done": false
+      },
+      {
+        "id": "15",
+        "description": "4.3 批量修图预览当前工作集并明确所选引用，源变化只刷新/跳过该项；移除图片默认只改所选表达，不删除同一行其他正文/图片。",
+        "done": false
+      },
+      {
+        "id": "16",
+        "description": "4.4 显式资源回收核对当前引用并复用恢复路径，默认不选/不自动删除；验证修复/撤销/回收/重开后正文和资源读回，相关预览和检查更新。",
+        "done": false
+      },
+      {
+        "id": "17",
+        "description": "5.1 出稿摘要从真实请求/捕获读回来源、范围、格式、模板/版式及目录，显示已有提醒和可用下一步；快速导出不新增全保存/全检查/必答确认。",
+        "done": false
+      },
+      {
+        "id": "18",
+        "description": "5.2 修正版式/Word刷新/最终状态与摘要/PDF的阶段顺序，PDF取同轮最终DOCX；兼容后置改版式再次刷新或标待刷新，登记失败保留可读稿而不沿用旧正式状态。",
+        "done": false
+      },
+      {
+        "id": "19",
+        "description": "5.3 复验既有HTML独立轮次目录/路径和历史保持，修正项目捕获的来源提示/清单，已捕获脏章不得仍报未导出；独立已保存入口语义保持，连续两轮来源/资源分别核验。",
+        "done": false
+      },
+      {
+        "id": "20",
+        "description": "5.4 对照当前章/选章/整份及父_index.md、宽图/长表/代码/链接的最终DOCX/PDF/HTML/源码包，副本脱离源目录可用；范围外链接明确边界，不隐式扩大范围。",
+        "done": false
+      },
+      {
+        "id": "21",
+        "description": "6.1 从真实入口完成Word导入→未保存复制/修图/检查→出稿，Markdown多来源→批量章节→离线出稿，源Word修订→选择接收→再次比较→出稿三条闭环。",
+        "done": false
+      },
+      {
+        "id": "22",
+        "description": "6.2 运行本包直接相关验证，覆盖40项以上结果、跨窗口定位、脏章复制/修图/清理、预览后变化、最终顺序/hash/PDF来源及两轮HTML；保留原断言，记录真实覆盖/失败。",
+        "done": false
+      },
+      {
+        "id": "23",
+        "description": "6.3 条件可用时核验真实企业Word底模、中文IME/剪贴板、原生缩放及长表/宽图分页；不足保持未勾选并留复验步骤，独立后续任务继续。",
+        "done": false
+      },
+      {
+        "id": "24",
+        "description": "6.4 更新主线用法/支持矩阵/恢复和成品事实、联合执行台账及证据，运行本change严格校验；保留旧任务与原验证范围，接续V4.1。",
+        "done": false
+      }
+    ],
+    "state": "ready",
+    "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "commands": {
+    "status": "openspec status --change product-mainline-usability-and-fidelity --json",
+    "strict": "openspec validate product-mainline-usability-and-fidelity --strict --json",
+    "apply": "openspec instructions apply --change product-mainline-usability-and-fidelity --json"
+  }
+}

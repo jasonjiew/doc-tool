@@ -1,8 +1,10 @@
 # 主功能优化补充计划（MAIN）
 
-日期：2026-10-03。面向企业研发文档团队。补充在 [V3.7～V3.9 UI/交互计划](product-v37-v39-roadmap.md)旁，新增 `product-main-workflow-optimization`，MAIN-A～F 共 **6 批/24 项**；与原三包合计 **21 批/84 项**，目前均未实施。版本计划编号与当前应用发布版本分开维护。
+日期：2026-10-03。面向企业研发文档团队。原新增 `product-main-workflow-optimization`，MAIN-A～F共6批/24项，与V3.7～V3.9共21批/84项；本文保留当时功能设计，当前MAIN已23/24、四包75/84，详见 [实际台账](product-v37-v39-execution.md)。版本计划编号与发布版本分开维护。
 
-本次只补规划，不修改主功能业务代码。先验证现有行为，仅实现真实差额。旧 RD/V3.4～V3.6 80/84 和审查修复保持，历史实机缺口不阻断本轮独立工作。
+更新：2026-10-03。最新读取 HEAD `7ba19dd`；MAIN/V3.7～V3.9 已勾选 **75/84**，余下九项按真实依赖分别补验收。当前新增队列 **V4.0→MAIN2→V4.1→V4.2→V4.3**，26 批/104 项、实施 0/104。先完成已有执行中的批次，再从 **40-A 1.1** 接续。见 [新路线图](product-v40-v43-roadmap.md)、[新台账](product-v40-v43-execution.md)、[完整持续指令](product-v40-v43-execution-prompt.md)。
+
+本文最初用于规划，后续实施结果见实际台账；当前新V4.0～V4.3仍只完成规划。后续先验证现有行为，仅实现真实差额。旧 RD/V3.4～V3.6 80/84 和审查修复保持，历史实机缺口不阻断本轮独立工作。
 
 ## 1. 六组主功能优化
 
@@ -58,10 +60,10 @@ Word 首先优化日常表达：标题与列表关系、普通表格列宽和长
 | Markdown多来源 | 导入同名不同图→范围替换→复导入局部冲突→副本离线出稿 | 图片不串来源；活缓冲不丢；所选范围和原项目保持 |
 | 局部失败 | 坏来源/缺图/无Word/缓存坏/目标占用/取消 | 可用内容与成果保留，问题可定位，继续编辑或单项补齐 |
 
-正常次序：**MAIN-A→B→C→D→E→F → V3.7 → V3.8 → V3.9**。若已有任务正在执行，先完成当前批次，再插入 MAIN，随后接实际未完成队列。首项 **MAIN-A 1.1**。每批运行相关内容/来源回归并交接；真实 Word/企业底模/IME 缺条件保留 MAIN-F 6.3，继续其他独立任务。
+原规划次序为MAIN-A～F→V3.7→V3.8→V3.9，当前四包已75/84，不能再从MAIN-A重做。最新队列 **V4.0→MAIN2→V4.1→V4.2→V4.3**，正常首项 **40-A 1.1**；已有执行先完成当前批次。MAIN-F 6.3真实Word/企业底模/IME等缺口按实际条件补，其他独立工作继续。
 
 实施资料：[提案](../openspec/changes/product-main-workflow-optimization/proposal.md)、[设计](../openspec/changes/product-main-workflow-optimization/design.md)、[导入规范](../openspec/changes/product-main-workflow-optimization/specs/core-intake-quality/spec.md)、[编辑规范](../openspec/changes/product-main-workflow-optimization/specs/core-authoring-productivity/spec.md)、[出稿规范](../openspec/changes/product-main-workflow-optimization/specs/core-output-quality/spec.md)、[24项任务](../openspec/changes/product-main-workflow-optimization/tasks.md)、[完整持续指令](product-execution-confirmed-prompt.md)、[队列台账](product-v37-v39-execution.md)。
 
 ## 7. 当前状态
 
-MAIN 0/24，V3.7～V3.9 0/60，本次仅补规划。执行状态以各 tasks 为准，不能用规划 strict 通过代替主功能验收。OpenSpec完整性与本地链接校验在本次规划记录中留档；未运行业务测试，因为本次没有业务实现改动。
+MAIN实际23/24，V3.7～V3.9分别17/20、19/20、16/20，共75/84；本文设计表不代表剩余量。最新五包26批/104项为规划准备，新增 [MAIN2](product-mainline-optimization.md)24项具体主线优化。见 [路线图](product-v40-v43-roadmap.md)、[复核验证](../analysis/product-mainline-plan-review-20261003/verification.json)。任务按实时证据勾选，strict不替代业务/真实Word，本次未运行业务测试。

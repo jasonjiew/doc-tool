@@ -329,6 +329,9 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
         # 或 spawn 句柄受限：自动降级为线程级物理 DispatchEx 探针
         return _dispatch_check_threaded(timeout_seconds)
 
+    # 超时强杀时子进程来不及 Quit：先记录基线，事后清理**新增**的 Word 进程，
+    # 否则每次探测超时都会在系统里留下一个孤儿 WINWORD。
+    baseline_pids = _get_winword_pids()
     word_pid = None
     try:
         process.start()
@@ -350,14 +353,43 @@ def check_word_dispatchable(timeout_seconds: float = 10.0) -> tuple:
         for message in messages:
             if message and message[0] == "pid":
                 word_pid = int(message[1])
+
+        def _sweep_new_word() -> int:
+            """清理本次探测**新增**的 Word 进程（绝不动用户已打开的 Word）。
+
+            冷启动时 Word 进程的创建**可能晚于子进程被杀的时刻**（实测：杀完立刻
+            清扫仍会漏掉 3 个），因此这里等待并重复清扫若干轮，直到不再出现新增
+            进程或达到上限。返回最终清理掉的进程数。
+            """
+            killed: set = set()
+            for _round in range(5):
+                new_pids = _get_winword_pids() - baseline_pids - killed
+                if not new_pids:
+                    if _round == 0:
+                        # 首轮就没有新增，仍给一次短等待，避免创建更晚时漏掉。
+                        time.sleep(0.5)
+                        continue
+                    break
+                for _pid in sorted(new_pids):
+                    _kill_process_tree(_pid)
+                    killed.add(_pid)
+                time.sleep(0.5)
+            return len(killed)
+
         if process.is_alive():
+            # 超时：子进程来不及 Quit，按本次专用进程归属强杀（含其 Word 子进程）。
             _kill_process_tree(word_pid)
             _kill_process_tree(process.pid)
             process.join(2)
-            return False, ""
+
+        # worker 的 Quit 是异步的：成功路径同样可能短暂残留本次探测的 Word 进程，
+        # 因此无论成败都只清扫「本次探测新增」的进程（baseline 内的用户 Word 绝不动）。
         for message in reversed(messages):
             if message and message[0] == "result":
-                return bool(message[1]), str(message[2])
+                success_now = bool(message[1])
+                _sweep_new_word()
+                return success_now, str(message[2])
+        _sweep_new_word()
         return False, ""
     except (OSError, RuntimeError):
         if process.is_alive():
@@ -399,16 +431,25 @@ def check_word_available(
         deadline = time.monotonic() + dispatch_timeout_seconds
         success = False
         version = ""
+        first_attempt = True
         while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            # 冷启动时首次 Word COM Dispatch 实测可能耗时 5～50+ 秒
+            # （analysis/v40/probe_word2.py）：**首次尝试必须独占剩余预算**，
+            # 否则每次都在冷启动未完成时被杀进程重来，整条重试链必然全失败。
+            budget = remaining if first_attempt else max(1.0, remaining / 2.0)
+            first_attempt = False
             success, version = check_word_dispatchable(
-                timeout_seconds=max(1.0, deadline - time.monotonic())
+                timeout_seconds=max(1.0, budget)
             )
             if success:
                 break
             # 首次失败不立即返回，给一次重试机会（COM 启动竞争）
             time.sleep(0.2)
-        report.word_dispatchable = success
         report.version = version
+        report.word_dispatchable = bool(success)
         if not success:
             reasons.append("Word COM 启动失败，请确认 Microsoft Word 已正确安装。")
     else:

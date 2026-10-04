@@ -15,13 +15,14 @@ UI 经 QTimer 轮询事件队列。用户可安全取消正在运行的任务。
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from time import monotonic
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -88,6 +89,9 @@ from doc_tool.ui.workbench_state import (
 # 文档类型中文映射（与 project_bar 共享同一数据源）。
 from doc_tool.ui.project_bar import DOC_TYPE_LABELS
 
+#: 主窗口兜底日志（无状态栏时仍留下可诊断记录）。
+logger = logging.getLogger(__name__)
+
 # 主窗口只负责展示语义；业务结果仍使用原有 bool / PipelineResult。
 TASK_UI = {
     "validate": {
@@ -144,6 +148,27 @@ def _pipeline_stage_labels():
 
         _PIPELINE_STAGE_UI_LABELS = PIPELINE_STAGE_LABELS
     return _PIPELINE_STAGE_UI_LABELS
+
+
+def _run_reimport_preview(service, source, dirty_paths, local_contents, cancel_token=None):
+    """后台执行隔离差异预览（MAIN2-B 2.1）——纯只读，不写正文/源记录。
+
+    取消失效于阶段边界：取消令牌在抽取前后各检查一次，取消后返回 ``(None, 原因)``。
+    """
+    if cancel_token is not None:
+        try:
+            cancel_token.check_cancel()
+        except Exception:  # noqa: BLE001 - 已取消时立即返回
+            return None, "已取消，未生成差异"
+    session, error = service.preview(
+        source, dirty_paths=list(dirty_paths or ()), local_contents=dict(local_contents or {}),
+    )
+    if cancel_token is not None:
+        try:
+            cancel_token.check_cancel()
+        except Exception:  # noqa: BLE001 - 取消后不返回会话
+            return None, "已取消，未生成差异"
+    return session, error
 
 
 class MainWindow(QMainWindow):
@@ -506,6 +531,14 @@ class MainWindow(QMainWindow):
         )
         self._import_action.triggered.connect(self._on_import_document)
         file_menu.addAction(self._import_action)
+        # MAIN2-A 1.2：导入结果可重开（非模态窗口），处理完问题可随时回来继续。
+        self._intake_result_action = QAction("导入结果与待处理项…", self)
+        self._intake_result_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        self._intake_result_action.setToolTip(
+            "重新打开当前项目的导入结果：完整处理事实、按类型/章节筛选、分页与就地处理"
+        )
+        self._intake_result_action.triggered.connect(self.reopen_intake_result)
+        file_menu.addAction(self._intake_result_action)
         self._open_action = QAction("打开项目…", self)
         self._open_action.setShortcut(QKeySequence("Ctrl+O"))
         self._open_action.triggered.connect(self._on_open_project)
@@ -616,6 +649,15 @@ class MainWindow(QMainWindow):
         )
         self._standard_pack_action.triggered.connect(self._on_standard_pack)
         content_menu.addAction(self._standard_pack_action)
+        # V4.1 41-A 1.4：本地模板目录（列表/详情 + 按用途接入既有建项/填充/出稿）
+        self._template_library_action = QAction("本地模板目录…", self)
+        self._template_library_action.setShortcut(QKeySequence("Ctrl+Alt+L"))
+        self._template_library_action.setToolTip(
+            "按用途（骨架建项/模板填充/项目出稿）查看本地规范与模板，读真实来源与内容摘要，"
+            "并接入既有建项/填充/出稿入口"
+        )
+        self._template_library_action.triggered.connect(self._on_template_library)
+        content_menu.addAction(self._template_library_action)
         self._lint_action = QAction("术语/一致性检查", self)
         self._lint_action.triggered.connect(self._on_content_lint)
         content_menu.addAction(self._lint_action)
@@ -950,6 +992,18 @@ class MainWindow(QMainWindow):
         others = [item for item in selected if detect_intake_kind(item) != KIND_MARKDOWN]
         if markdown_paths:
             self._create_markdown_project(markdown_paths)
+        # 只把可导入的 Word/.doc 计入批次判定；不支持格式仍按原路由单独提示。
+        word_like = [
+            item for item in others
+            if detect_intake_kind(item) in ("docx", "doc")
+        ]
+        if not others:
+            return
+        # MAIN2-A 1.3：多份 Word 走批次（一文件一项目，失败项可接续），
+        # 单份仍走既有向导以保留模板/映射选择体验。
+        if len(word_like) > 1:
+            self._start_word_batch([Path(item) for item in word_like])
+            return
         for item in others:
             route = route_for(item, project_open=bool(self._project_summary))
             if route.action == ACTION_REIMPORT:
@@ -973,6 +1027,47 @@ class MainWindow(QMainWindow):
             result = wizard.run()
             if result is not None:
                 self._open_import_result(str(result))
+
+    def _start_word_batch(self, sources: List[Path]) -> None:
+        """多份 Word：调用既有批次服务，结果非模态展示并支持接续。"""
+        from doc_tool.application.intake_batch import run_word_batch
+        from doc_tool.application.intake_entries import default_project_parent
+
+        batch = run_word_batch(sources, parent_dir=default_project_parent())
+        self._last_batch_result = batch
+        self._show_batch_result(batch)
+        succeeded = list(getattr(batch, "succeeded", []) or [])
+        if succeeded:
+            # 成功项目立即可编辑：打开第一份并给出可重开的导入结果。
+            self._open_import_result(succeeded[0].project_root)
+
+    def _show_batch_result(self, batch) -> None:
+        from doc_tool.ui.batch_result_window import BatchResultWindow
+
+        existing = getattr(self, "_batch_result_window", None)
+        if existing is not None:
+            try:
+                existing.close()
+                # 关闭只是隐藏：必须显式销毁，否则每次重开都留下一个隐藏窗口。
+                existing.deleteLater()
+            except RuntimeError:  # noqa: BLE001 - 控件已销毁
+                pass
+        window = BatchResultWindow(batch, host=self, parent=self)
+        self._batch_result_window = window
+        window.show()
+
+    def _retry_intake_items(self, batch, sources, window=None) -> bool:
+        """接续所选失败/待转换/未开始项，保留输入设置与已成功项目。"""
+        from doc_tool.application.intake_batch import retry_selected_word_items
+
+        merged = retry_selected_word_items(batch, sources)
+        self._last_batch_result = merged
+        retried = len(sources)
+        done = len([item for item in merged.items if item.status == "ok"])
+        self._show_status_message(
+            "已接续 {0} 项；当前可打开 {1} 份（成功项目未重建）".format(retried, done)
+        )
+        return True
 
     def _intake_selection(self, paths: Optional[object]) -> List[Path]:
         """把入参（拖放列表/单个路径）归一为文件列表；为空时弹选择框。"""
@@ -1026,50 +1121,111 @@ class MainWindow(QMainWindow):
             self._open_project_path(project_root)
         else:
             self._open_project_in_new_window(project_root)
-        # CORE 3.3：结果页先给可打开项目与待完善数量，再给最多 3 个直接动作。
+        # MAIN2-A：导入后立即进入可编辑状态，结果以**非模态**窗口常驻可重开。
         self._show_intake_result_page(project_root)
 
-    def _show_intake_result_page(self, project_root: str) -> None:
-        """展示导入结果页（按类型/章节归并，默认最多 3 项可行动问题）。"""
+    def _build_intake_page(self, project_root: str):
+        """读取导入结果页模型（失败返回 None，不影响已生成项目）。"""
         from doc_tool.application.intake_result_page import build_result_page
 
         try:
-            page = build_result_page(project_root)
+            return build_result_page(project_root)
         except Exception:  # noqa: BLE001 - 结果页失败不影响已生成项目
+            return None
+
+    def _show_intake_result_page(self, project_root: str) -> None:
+        """展示导入结果窗口（非模态、可重开、完整列表可搜索分页）。"""
+        page = self._build_intake_page(project_root)
+        if page is None:
             return
-        if not page.needsAttention and not page.unavailableComparisons:
+        if not page.needsAttention and not page.unavailableComparisons and not page.details:
+            self._show_status_message("导入完成，可直接编辑")
             return
-        box = QMessageBox(self)
-        box.setWindowTitle("导入结果")
-        box.setText("\n".join(page.summary))
-        buttons = {}
-        for action in page.actions[:3]:
-            buttons[box.addButton(action.label, QMessageBox.ButtonRole.ActionRole)] = action
-        detail_button = box.addButton("查看全部问题", QMessageBox.ButtonRole.ActionRole)
-        box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is detail_button:
-            self._show_intake_details(page)
+        self._intake_page = page
+        # 同一项目只保留一个结果窗口；再次打开时复用并前置，避免窗口堆积。
+        existing = getattr(self, "_intake_result_window", None)
+        if existing is not None:
+            try:
+                existing.close()
+                # 关闭只是隐藏：必须显式销毁，否则每次重开都留下一个隐藏窗口。
+                existing.deleteLater()
+            except RuntimeError:  # noqa: BLE001 - 控件已销毁
+                pass
+        from doc_tool.ui.intake_result_window import IntakeResultWindow
+
+        window = IntakeResultWindow(page, host=self, parent=self)
+        self._intake_result_window = window
+        window.show()
+        window.raise_()
+
+    def reopen_intake_result(self) -> bool:
+        """重开导入结果窗口（菜单/快捷键入口）；没有记录时给出下一步。"""
+        project_root = ""
+        if self._project_summary is not None:
+            project_root = str(self._project_summary.project_root or "")
+        if not project_root:
+            self._show_status_message("当前没有打开的项目：导入或打开项目后可查看导入结果")
+            return False
+        from doc_tool.application.import_record import read_import_record
+
+        if read_import_record(Path(project_root)) is None:
+            self._show_status_message("该项目没有导入记录（Markdown/规范包建项属于该情况）")
+            return False
+        self._show_intake_result_page(project_root)
+        return True
+
+    def _locate_intake_finding(self, page, item, window=None) -> None:
+        """定位一条处理事实（绑定本项目窗口，不串同名相对路径）。"""
+        rel_path = str(item.get("target_path") or "")
+        if not rel_path:
+            from doc_tool.application.intake_result_page import resolve_chapter_rel_path
+
+            rel_path = resolve_chapter_rel_path(
+                getattr(page, "projectRoot", "") or "", str(item.get("target_chapter") or "")
+            )
+        line = item.get("target_line")
+        line = line if isinstance(line, int) else None
+        if rel_path and self._open_chapter_in_workspace(rel_path, line, source="导入结果定位"):
+            self._show_status_message("已定位到章节：{0}".format(rel_path))
             return
-        action = buttons.get(clicked)
-        if action is not None:
-            self._run_intake_action(project_root, action)
+        self._show_status_message("请在章节树中定位：{0}".format(
+            item.get("target_chapter") or item.get("detail") or item.get("feature") or ""
+        ))
+
+    def _open_intake_original(self, page, item) -> None:
+        """查看原件（缺文件时给出可执行的下一步，不静默失败）。"""
+        retained = str(item.get("retained_path") or page.retainedPath or "original/source.docx")
+        target = Path(str(page.projectRoot or "")) / retained
+        if target.is_file():
+            self._on_open_result_output(str(target))
+            return
+        self._show_status_message("原件不存在：{0}（可继续编辑正文，或从来源重新导入）".format(retained))
+
+    def _replace_intake_image(self, page, item, window=None) -> bool:
+        """用项目外图片替换占位（复用资产入库与写入服务），成功返回 True。"""
+        from doc_tool.application.intake_result_page import replace_placeholder_image
+
+        chosen, _selected = QFileDialog.getOpenFileName(
+            self, "选择替代图片", "",
+            "图片 (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;所有文件 (*)",
+        )
+        if not chosen:
+            return False
+        outcome = replace_placeholder_image(
+            str(page.projectRoot or ""), str(item.get("target_path") or ""), chosen,
+            line=item.get("target_line") if isinstance(item.get("target_line"), int) else None,
+        )
+        self._show_status_message(outcome.summary_line())
+        if outcome.ok and getattr(self, "_content_workspace", None) is not None:
+            try:
+                self._content_workspace._rebuild_index()
+            except Exception:  # noqa: BLE001 - 索引刷新失败不影响已替换的正文
+                pass
+        return bool(outcome.ok)
 
     def _show_intake_details(self, page) -> None:
-        """完整处理事实与自动处理项（不在默认视图中逐项打扰用户）。"""
-        lines = list(page.summary)
-        lines.append("")
-        lines.append("共 {0} 项处理事实（自动处理 {1} 项）".format(
-            len(page.details), page.autoHandled,
-        ))
-        for item in page.details[:40]:
-            lines.append("· {0} / {1} / {2}{3}".format(
-                item.get("feature", ""), item.get("handling", ""),
-                item.get("target_chapter", "") or item.get("source_part", ""),
-                ("｜" + str(item.get("detail"))) if item.get("detail") else "",
-            ))
-        QMessageBox.information(self, "全部问题与自动处理", "\n".join(lines))
+        """兼容入口：完整处理事实现在由非模态结果窗口承载（不截断）。"""
+        self._show_intake_result_page(getattr(page, "projectRoot", "") or "")
 
     def _run_intake_action(self, project_root: str, action) -> None:
         """执行结果页动作：复用既有资源修复、章节定位与原件查看服务。"""
@@ -1165,7 +1321,7 @@ class MainWindow(QMainWindow):
                 return
             except Exception:  # noqa: BLE001 - 状态栏不可用时不影响主流程
                 pass
-        logger.info("ui", "status_message", {"message": str(message)})
+        logger.info("ui/status_message: %s", message)
 
     # --- 命令注册表（V3.1 4.2 / V3.3 5.3）：菜单与命令面板同源 ---
 
@@ -1491,7 +1647,7 @@ class MainWindow(QMainWindow):
                     title="全部保存",
                     category="编辑",
                     shortcut="Ctrl+Shift+S",
-                    callback=self._on_content_save_all,
+                    callback=self._on_save_all,
                 )
             )
             items.append(
@@ -1509,14 +1665,14 @@ class MainWindow(QMainWindow):
                     title="正式合并出稿",
                     category="构建",
                     shortcut="Ctrl+Shift+B",
-                    callback=self._on_merge_task,
+                    callback=self._on_merge,
                 )
             )
             items.append(
                 PaletteItem(
                     title="快速构建（草稿）",
                     category="构建",
-                    callback=self._on_diag_task,
+                    callback=self._on_diag_build,
                 )
             )
             items.append(
@@ -1524,7 +1680,7 @@ class MainWindow(QMainWindow):
                     title="项目结构与资源校验",
                     category="校验",
                     shortcut="F5",
-                    callback=self._on_validate_task,
+                    callback=self._on_validate,
                 )
             )
 
@@ -1638,6 +1794,13 @@ class MainWindow(QMainWindow):
                 title="Markdown 模板填充（底模出稿）…",
                 category="工具",
                 callback=lambda: self._on_template_fill(),
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="本地模板目录（规范/模板/出稿）…",
+                category="工具",
+                callback=lambda: self._on_template_library(),
             )
         )
         items.append(
@@ -4468,9 +4631,19 @@ class MainWindow(QMainWindow):
             return getattr(report, "scope", None)
         return getattr(view, "scope", None)
 
-    def _new_round_request(self, view, *, destination=None):
-        """带入原范围创建新轮；失效范围回到可见设置，不静默扩大范围。"""
-        from doc_tool.application.intake_contract import SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER
+    def _new_round_request(self, view, *, destination=None, force_source=None):
+        """带入原范围创建新轮；失效范围回到可见设置，不静默扩大范围。
+
+        ``force_source`` 显式指定本轮来源（``current-buffer`` 用于“按最新内容
+        重新生成”），缺省时沿用原轮报告里的真实来源，避免把未保存缓冲悄悄
+        混进“已保存来源”的新轮。
+        """
+        from doc_tool.application.intake_contract import (
+            SCOPE_CHAPTERS,
+            SCOPE_CURRENT_CHAPTER,
+            SOURCE_MODE_CURRENT_BUFFER,
+            SOURCE_MODE_SAVED,
+        )
 
         report = self._report_for_round(view)
         scope = self._scope_for_export_round(view, report)
@@ -4479,7 +4652,19 @@ class MainWindow(QMainWindow):
         request.capture_id = ""
         request.destination = destination or view.destination or str(self._project_summary.paths.output_dir)
         buffers = self._collect_buffer_texts()
-        request.source_mode = "current-buffer" if buffers else "saved"
+        # 来源范围必须沿用原轮事实：已保存来源的旧轮换目录/重新生成时不得
+        # 静默把编辑器缓冲注入进来（否则报告写“已保存”却导出了未保存正文）。
+        previous_mode = str(getattr(report, "sourceMode", "") or "")
+        if force_source == SOURCE_MODE_SAVED:
+            request.source_mode, buffers = SOURCE_MODE_SAVED, {}
+        elif force_source == SOURCE_MODE_CURRENT_BUFFER:
+            request.source_mode = SOURCE_MODE_CURRENT_BUFFER
+        elif previous_mode == SOURCE_MODE_SAVED:
+            request.source_mode, buffers = SOURCE_MODE_SAVED, {}
+        elif previous_mode == SOURCE_MODE_CURRENT_BUFFER:
+            request.source_mode = SOURCE_MODE_CURRENT_BUFFER
+        else:
+            request.source_mode = SOURCE_MODE_CURRENT_BUFFER if buffers else SOURCE_MODE_SAVED
         missing = scope is None
         if scope is not None and scope.kind in (SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER):
             available = set(self._export_settings_context()["chapters"])
@@ -4493,11 +4678,16 @@ class MainWindow(QMainWindow):
 
     def _on_regenerate_round(self, view) -> None:
         """按当前修改重新生成：UI 线程收集缓冲，后台建立新 current-buffer 轮次。"""
+        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
         from doc_tool.application.project_export import run_project_export
 
         if self._project_summary is None:
             return
-        request, buffers = self._new_round_request(view)
+        # 该入口的语义就是“按最新内容”：原轮即使是已保存来源，这一轮也明确
+        # 建立 current-buffer 捕获（不静默沿用旧来源口径）。
+        request, buffers = self._new_round_request(
+            view, force_source=SOURCE_MODE_CURRENT_BUFFER
+        )
         if request is None:
             return
         self._run_export_task(
@@ -4581,9 +4771,12 @@ class MainWindow(QMainWindow):
             retry_button = box.addButton("补失败格式（原轮）", QMessageBox.ButtonRole.ActionRole)
         change_button = box.addButton("更换目录…", QMessageBox.ButtonRole.ActionRole)
         regenerate_button = box.addButton("按最新内容重新生成", QMessageBox.ButtonRole.ActionRole)
+        detail_button = box.addButton("复制阶段诊断", QMessageBox.ButtonRole.ActionRole)
         box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
+        clicked = self._exec_message_box(box)
+        if clicked is detail_button:
+            self._copy_export_stage_diagnostic(report)
+            return
         if clicked is open_button:
             usable = report.usable_results()
             if usable:
@@ -4608,6 +4801,70 @@ class MainWindow(QMainWindow):
                 "已生成 {0} 个可用结果；可从顶部「成果」逐文件打开或补缺".format(usable)
             )
 
+    def _copy_export_stage_diagnostic(self, report) -> str:
+        """把本轮 Word 阶段/清理/环境诊断复制到剪贴板（不含业务正文）。
+
+        事实来自 ``ExportReport.wordRefresh``（由 ``WordOperationReport.to_dict()``
+        写入），缺字段显示“未知”，不补造阶段。
+        """
+        from doc_tool.domain.word_operations import WordOperationReport, environment_facts
+
+        payload = dict(getattr(report, "wordRefresh", None) or {})
+        lines = ["{0}：{1}".format(key, value) for key, value in environment_facts().items()]
+        lines.append("")
+        lines.append("轮次：{0}".format(getattr(report, "roundId", "") or "未知"))
+        lines.append("来源：{0}".format(
+            "当前编辑内容" if getattr(report, "sourceMode", "") == "current-buffer" else "已保存版本"
+        ))
+        if payload:
+            lines.append("阶段：")
+            for item in payload.get("stages") or []:
+                if not isinstance(item, dict):
+                    continue
+                lines.append("  - {0} {1}s（{2}）{3}".format(
+                    item.get("label") or item.get("stage") or "未知",
+                    item.get("elapsedSeconds"), item.get("outcome") or "未知",
+                    ("：" + str(item.get("detail"))) if item.get("detail") else "",
+                ))
+            ownership = payload.get("ownership") or {}
+            lines.append("归属：{0}".format(
+                "已证明（{0}）".format(ownership.get("proof")) if ownership.get("provable")
+                else "无法证明，未清理任何 Word 进程"
+            ))
+            lines.append("清理：{0}".format(payload.get("cleanup") or "未执行"))
+            if payload.get("residual"):
+                lines.append("残留待处理：{0}".format(payload.get("residualDetail") or "未知"))
+        else:
+            lines.append("阶段：未知（本轮未执行 Word 刷新或缺失记录）")
+        stages = [str(item) for item in getattr(report, "wordStages", None) or []]
+        if stages:
+            lines.append("阶段原文：")
+            lines.extend("  - {0}".format(item) for item in stages)
+        elif not payload:
+            lines.append("阶段原文：未知")
+        text = "\n".join(lines)
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.clipboard().setText(text)
+        except Exception:  # noqa: BLE001 - 无剪贴板时仍给出状态说明
+            pass
+        self._status_label.setText("已复制阶段诊断（不含业务正文）")
+        return text
+
+    def _exec_message_box(self, box):
+        """显示结果框并返回被点击的按钮（非交互测试可替换此单一入口）。
+
+        保留模块级 ``QMessageBox`` 引用是为了让离屏测试整体替换掉真实弹窗；
+        这里再提供一个**动作级**的接缝，使“后台任务完成后弹结果框”的用例不必
+        逐个打桩 QMessageBox 也能避免模态等待（V4.0 40-A 1.3）。
+        """
+        box.exec()
+        try:
+            return box.clickedButton()
+        except RuntimeError:  # noqa: BLE001 - 控件已销毁时视为未选择动作
+            return None
+
     def _on_reimport_source(self) -> None:
         if not self._project_summary or not self._project_summary.is_writable:
             return
@@ -4616,8 +4873,12 @@ class MainWindow(QMainWindow):
             return
         self._reimport_into_current(Path(source))
 
-    def _reimport_into_current(self, source: Path) -> None:
-        """把外部 Word 修改接回当前项目（既有差异重导入服务，不新建项目）。"""
+    def _reimport_into_current(self, source: Path, *, auto_apply: bool = False) -> None:
+        """把外部 Word 修改接回当前项目：先生成隔离差异，再由用户选择接收。
+
+        MAIN2-B：默认走“预览 → 选择 → 应用”的真实入口（复用既有只读差异服务）。
+        ``auto_apply=True`` 保留给无界面/兼容调用：直接应用全部合法项。
+        """
         if not self._project_summary or not self._project_summary.is_writable:
             QMessageBox.information(
                 self, "当前没有可写项目",
@@ -4625,14 +4886,197 @@ class MainWindow(QMainWindow):
             )
             return
         from doc_tool.application.content.reimport import ReimportService
+
+        source = Path(source)
         service = ReimportService(self._project_summary.manifest, self._project_summary.paths)
-        result = service.reimport(Path(source))
+        if auto_apply:
+            result = service.reimport(source)
+            self._after_reimport(result)
+            return
+        buffers = self._collect_buffer_texts()
+        local_contents = dict(buffers)
+        try:
+            root = self._project_summary.paths.resolve(
+                self._project_summary.manifest.relative_content_root()
+            )
+            local_contents.update({
+                rel_path: path.read_text(encoding="utf-8")
+                for rel_path, path in (
+                    (rel, root / rel) for rel in self._chapter_rel_paths(root)
+                )
+                if path.is_file() and rel_path not in local_contents
+            })
+        except Exception:  # noqa: BLE001 - 读不到磁盘正文时只用缓冲做 diff
+            local_contents = dict(buffers)
+        # 差异计算放后台（可取消）：大文档抽取/对比不应卡住写作区。
+        self._status_label.setText("正在后台生成隔离差异（不写正式正文）…")
+        from doc_tool.ui.task_bridge import TaskSpec
+
+        self._start_task(TaskSpec(
+            name="reimport-preview", target=_run_reimport_preview,
+            args=(service, source, sorted(buffers), local_contents),
+            timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
+        ), on_done=self._on_reimport_preview_done)
+
+    def _on_reimport_preview_done(self, result) -> None:
+        """后台差异返回：打开选择窗口；失败/取消只提示，不写任何正文。
+
+        结果形态容错（非交互测试/异常返回）：不是 ``(session, error)`` 时一律按
+        “未生成差异”处理并给出可读原因，绝不静默挂起或把异常对象当成会话。
+        """
+        # 自定义 on_done 取代了标准收尾：必须在这里结束任务态，否则计时器不停、
+        # _current_task 残留，导入/打开项目/正式合并/重新导入会一直被禁用。
+        self._elapsed_timer.stop()
+        self._poll_timer.stop()
+        self._task_started_at = None
+        self._current_task = ""
+        self._refresh_interaction_state()
+        if isinstance(result, tuple) and len(result) == 2:
+            session, error = result
+        elif result is None:
+            session, error = None, "后台任务未返回结果（可能已取消）"
+        else:
+            session, error = None, "后台任务返回了非预期结果：{0}".format(type(result).__name__)
+        if session is None:
+            self._status_label.setText("差异预览未生成：{0}".format(error or "已取消或未知原因"))
+            return
+        self._reimport_session = session
+        self._reimport_source = getattr(session.plan, "source_path", "")
+        self._status_label.setText("已生成隔离差异，请在窗口中选择要接收的章节")
+        from doc_tool.ui.reimport_preview_window import ReimportPreviewWindow
+
+        existing = getattr(self, "_reimport_window", None)
+        if existing is not None:
+            try:
+                existing.close()
+                # 关闭只是隐藏：必须显式销毁，否则每次重开都留下一个隐藏窗口。
+                existing.deleteLater()
+            except RuntimeError:  # noqa: BLE001 - 控件已销毁
+                pass
+        window = ReimportPreviewWindow(
+            session, host=self, source_path=self._reimport_source, parent=self,
+        )
+        self._reimport_window = window
+        window.show()
+        window.raise_()
+
+    def _chapter_rel_paths(self, content_root) -> List[str]:
+        """当前项目的章节相对路径（用于 diff 的“当前内容”一侧）。"""
+        try:
+            from doc_tool.application.effective_snapshot import discover_chapters
+
+            return [rel for rel, _path in discover_chapters(content_root)]
+        except Exception:  # noqa: BLE001 - 发现失败时只用缓冲
+            return []
+
+    def _apply_reimport_session(self, session, source_path: str) -> bool:
+        """应用差异会话：只写“已选且未被阻止”的项，失败按原事务回滚。"""
+        from doc_tool.application.content.reimport import ReimportService
+        from doc_tool.application.content.reimport_preview import apply_session
+
+        if not self._project_summary or not self._project_summary.is_writable:
+            self._show_status_message("当前项目不可写，未写入任何内容")
+            return False
+        service = ReimportService(self._project_summary.manifest, self._project_summary.paths)
+        outcome = apply_session(session, service, source_path)
+        applied = list(outcome.get("applied") or [])
+        skipped = list(outcome.get("blocked") or []) + list(outcome.get("skipped") or [])
+        if outcome.get("rolledBack"):
+            self._show_status_message("写入失败，已恢复本次范围；未接收的差异仍保留")
+            return False
+        if applied:
+            message = "已接收 {0} 章".format(len(applied))
+            if skipped:
+                message += "；保留 {0} 章（冲突/未保存内容）".format(len(skipped))
+            self._show_status_message(message)
+        else:
+            self._show_status_message("没有接收任何章节（未选或冲突项保留本地）")
+            return False
+        if self._content_workspace is not None:
+            try:
+                self._content_workspace._rebuild_index()
+            except Exception:  # noqa: BLE001 - 索引刷新失败不影响已写入正文
+                pass
+        return True
+
+    def _save_reimport_incoming_copy(self, source_path: str) -> str:
+        """另存传入副本（不写正式正文），返回保存路径（取消返回空串）。"""
+        source = Path(str(source_path or ""))
+        if not source.is_file():
+            self._show_status_message("传入文件已不存在，无法另存副本")
+            return ""
+        suggested = source.with_name("{0}-传入副本{1}".format(source.stem, source.suffix))
+        chosen, _selected = QFileDialog.getSaveFileName(
+            self, "另存传入副本", str(suggested), "Word 文档 (*.docx);;所有文件 (*)",
+        )
+        if not chosen:
+            return ""
+        try:
+            import shutil
+
+            shutil.copy2(str(source), chosen)
+        except OSError as exc:
+            self._show_status_message("另存副本失败：{0}".format(exc))
+            return ""
+        self._show_status_message("已另存传入副本：{0}（正式正文未改动）".format(chosen))
+        return chosen
+
+    def _save_chapters_then_refresh(self, source_path: str, rel_paths, window=None) -> bool:
+        """只保存相关章后重新生成差异（其它章节的脏内容保持不动）。"""
+        saved = 0
+        for rel_path in rel_paths:
+            if self._save_chapter_buffer(str(rel_path)):
+                saved += 1
+        if not saved:
+            self._show_status_message("相关章节没有可保存的未保存内容")
+            return False
+        self._show_status_message("已保存 {0} 章未保存内容，正在刷新差异…".format(saved))
+        self._reimport_into_current(Path(source_path))
+        return True
+
+    def _save_chapter_buffer(self, rel_path: str) -> bool:
+        """保存单个章节的编辑器缓冲（只影响该章，不触发全量保存）。"""
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None) if workspace is not None else None
+        if tabs is None or not hasattr(tabs, "editor_for"):
+            return False
+        # 差异会话给的是 contentRoot 相对路径，而标签键带文档类型前缀
+        # （general/…）：两种键都要试，否则永远找不到编辑器、按钮变成空操作。
+        keys = [rel_path]
+        try:
+            document_type = str(self._project_summary.manifest.documentType or "")
+        except Exception:  # noqa: BLE001
+            document_type = ""
+        if document_type and not rel_path.startswith(document_type + "/"):
+            keys.insert(0, "{0}/{1}".format(document_type, rel_path))
+        editor = None
+        for key in keys:
+            try:
+                editor = tabs.editor_for(key)
+            except Exception:  # noqa: BLE001
+                editor = None
+            if editor is not None:
+                break
+        if editor is None:
+            return False
+        saver = getattr(editor, "save", None)
+        if not callable(saver):
+            return False
+        try:
+            return bool(saver())
+        except Exception:  # noqa: BLE001 - 单章保存失败不影响其它章节
+            return False
+
+    def _after_reimport(self, result) -> None:
+        """兼容入口：直接应用后的结果说明（不经过差异窗口）。"""
         if not result.success:
             self._show_error("重新导入失败", result.message, result.error_code)
             return
         if self._content_workspace is not None:
             self._content_workspace._rebuild_index()
-        detail = "已合入 {0} 个章节变更。".format(sum(item.status != "unchanged" for item in result.changes))
+        detail = "已合入 {0} 个章节变更。".format(
+            sum(item.status != "unchanged" for item in result.changes)
+        )
         if result.conflicts:
             detail += "\n{0} 个冲突章节默认保留本地内容。".format(len(result.conflicts))
         QMessageBox.information(self, "重新导入完成", detail)
@@ -6289,3 +6733,78 @@ class MainWindow(QMainWindow):
     def sp_status(self, message: str) -> None:
         if message:
             self._show_status_message(message)
+
+    # ------------------------------------------------------------------
+    # V4.1 41-A 1.4 本地企业模板目录（列表/详情 + 既有动作）
+    # ------------------------------------------------------------------
+
+    def _on_template_library(self) -> None:
+        dialog = self.template_library_dialog()
+        dialog.exec()
+
+    def template_library_dialog(self):
+        from doc_tool.ui.template_library_dialog import TemplateLibraryDialog
+
+        summary = self._project_summary
+        writable = bool(getattr(summary, "is_writable", False)) if summary is not None else None
+        dialog = TemplateLibraryDialog(
+            self, project_root=self.rd_project_root(), state_dir=self.tl_state_dir(),
+            project_writable=writable, parent=self,
+        )
+        self._template_library_dialog = dialog
+        return dialog
+
+    def tl_state_dir(self) -> str:
+        from doc_tool.ui.template_library_dialog import default_state_dir
+
+        return str(default_state_dir())
+
+    def tl_project_root(self) -> str:
+        return self.rd_project_root()
+
+    def tl_project_writable(self) -> bool:
+        summary = self._project_summary
+        return bool(summary is not None and getattr(summary, "is_writable", False))
+
+    def tl_project_chapters(self) -> list:
+        """当前项目的章节 Markdown 绝对路径（只读，不写盘；未打开项目返回空）。"""
+        summary = self._project_summary
+        if summary is None:
+            return []
+        try:
+            paths = getattr(summary, "paths", None)
+            manifest = getattr(summary, "manifest", None)
+            if paths is not None and manifest is not None:
+                content_root = Path(paths.resolve(manifest.relative_content_root()))
+            else:
+                content_root = Path(str(summary.project_root)) / "content"
+        except Exception:  # noqa: BLE001 - 读不出章节只返回空清单，不阻断目录界面
+            return []
+        try:
+            return [str(item) for item in sorted(content_root.rglob("*.md")) if item.is_file()]
+        except OSError:
+            return []
+
+    def tl_busy_check(self) -> bool:
+        return bool(self.runner.is_running)
+
+    def tl_open_path(self, path: str):
+        return self.sp_open_path(path)
+
+    def tl_status(self, message: str) -> None:
+        if message:
+            self._show_status_message(message)
+
+    def tl_project_created(self, project_root: str) -> None:
+        """模板目录建项：新项目在新窗口打开，当前项目与打开中的章节保持原样。"""
+        self._open_import_result(str(project_root))
+
+    def tl_open_pack_draft(self, draft_dir: str) -> None:
+        """模板目录的副本用既有「规范包制作」打开（原固定包不原地修改）。"""
+        from doc_tool.ui.standard_pack_dialog import StandardPackDialog
+
+        dialog = StandardPackDialog(
+            self, draft_dir=str(draft_dir), project_root=self.rd_project_root(), parent=self,
+        )
+        self._standard_pack_dialog = dialog
+        dialog.exec()

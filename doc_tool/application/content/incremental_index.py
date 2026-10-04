@@ -32,8 +32,50 @@ CACHE_SCHEMA_VERSION = 1
 DEFAULT_MAX_ENTRIES = 4000
 
 
-def content_digest(path) -> str:
-    """文件内容摘要（唯一正确性来源；读取失败返回空串）。"""
+#: 进程内 stat 指纹 -> 内容摘要缓存（V4.2 42-B）。
+#:
+#: stat 不能证明内容未变；缓存仅供显式选择快速探测的调用方使用。
+#: 索引与配置失效判断默认真实读取，覆盖同大小且保留 mtime 的改写。
+#: 缓存只在内存里，不落盘、不跨进程；容量超限时整体丢弃（坏缓存直接重算）。
+_DIGEST_CACHE: "Dict[Tuple[str, int, int], str]" = {}
+_DIGEST_CACHE_MAX = 20000
+
+
+def file_stat_fingerprint(path) -> Optional[Tuple[str, int, int]]:
+    """返回 ``(绝对路径, size, mtime_ns)``；取不到返回 None（调用方真实读取）。"""
+    target = Path(path)
+    try:
+        stat = target.stat()
+    except OSError:
+        return None
+    return (str(target), int(stat.st_size), int(stat.st_mtime_ns))
+
+
+def content_digest(path, *, use_stat_cache: bool = False) -> str:
+    """文件内容摘要（唯一正确性来源；读取失败返回空串）。
+
+    ``use_stat_cache=True`` 时，若 ``(路径, 大小, mtime_ns)`` 与上次一致，直接复用
+    上次的真实摘要——**没有重新读取文件**，可能漏掉保留 stat 的修改。
+    因此正确性相关调用必须保持默认 False；默认路径每次都真实读取，但同样登记到
+    进程内缓存，供后续 ``use_stat_cache=True`` 的调用复用。
+    """
+    fingerprint = file_stat_fingerprint(path)
+    if use_stat_cache and fingerprint is not None:
+        cached = _DIGEST_CACHE.get(fingerprint)
+        if cached is not None:
+            return cached
+    # 默认路径必须真实读取（同大小/同 mtime 的改写也要被发现），但结果照常入缓存：
+    # 「是否复用」由 use_stat_cache 决定，「是否记录」不影响正确性。
+    digest = _read_digest(path)
+    if fingerprint is not None:
+        if len(_DIGEST_CACHE) >= _DIGEST_CACHE_MAX:
+            # 容量不足：整体丢弃后重算，不保留可能不一致的旧条目。
+            _DIGEST_CACHE.clear()
+        _DIGEST_CACHE[fingerprint] = digest
+    return digest
+
+
+def _read_digest(path) -> str:
     target = Path(path)
     try:
         hasher = hashlib.sha256()
@@ -43,6 +85,11 @@ def content_digest(path) -> str:
         return hasher.hexdigest()
     except OSError:
         return ""
+
+
+def reset_digest_cache() -> None:
+    """清空进程内摘要缓存（测试/长驻进程释放内存用）。"""
+    _DIGEST_CACHE.clear()
 
 
 def text_digest(text: str) -> str:

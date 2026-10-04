@@ -1,0 +1,264 @@
+{
+  "name": "product-v42-incremental-quality-workbench",
+  "status": {
+    "changeName": "product-v42-incremental-quality-workbench",
+    "schemaName": "spec-driven",
+    "planningHome": {
+      "kind": "repo",
+      "root": "D:\\ai_develop_project_space\\doc-tool",
+      "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+      "defaultSchema": "spec-driven"
+    },
+    "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench",
+    "artifactPaths": {
+      "proposal": {
+        "outputPath": "proposal.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md"
+        ]
+      },
+      "specs": {
+        "outputPath": "specs/**/*.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\**\\*.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\incremental-quality-evaluation\\spec.md",
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\quality-workbench-actions\\spec.md"
+        ]
+      },
+      "design": {
+        "outputPath": "design.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md"
+        ]
+      },
+      "tasks": {
+        "outputPath": "tasks.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md"
+        ]
+      }
+    },
+    "isComplete": true,
+    "applyRequires": [
+      "tasks"
+    ],
+    "nextSteps": [
+      "All planning artifacts are complete; review tasks before implementation."
+    ],
+    "actionContext": {
+      "mode": "repo-local",
+      "sourceOfTruth": "repo",
+      "planningArtifacts": [
+        "proposal",
+        "design",
+        "specs",
+        "tasks"
+      ],
+      "linkedContext": [],
+      "allowedEditRoots": [
+        "D:\\ai_develop_project_space\\doc-tool"
+      ],
+      "requiresAffectedAreaSelection": false,
+      "constraints": [
+        "Repo-local change artifacts and implementation edits are scoped to this project."
+      ]
+    },
+    "artifacts": [
+      {
+        "id": "proposal",
+        "outputPath": "proposal.md",
+        "status": "done"
+      },
+      {
+        "id": "design",
+        "outputPath": "design.md",
+        "status": "done"
+      },
+      {
+        "id": "specs",
+        "outputPath": "specs/**/*.md",
+        "status": "done"
+      },
+      {
+        "id": "tasks",
+        "outputPath": "tasks.md",
+        "status": "done"
+      }
+    ],
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "strict": {
+    "items": [
+      {
+        "id": "product-v42-incremental-quality-workbench",
+        "type": "change",
+        "valid": true,
+        "issues": [],
+        "durationMs": 3
+      }
+    ],
+    "summary": {
+      "totals": {
+        "items": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "byType": {
+        "change": {
+          "items": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      }
+    },
+    "version": "1.0",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "apply": {
+    "changeName": "product-v42-incremental-quality-workbench",
+    "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench",
+    "schemaName": "spec-driven",
+    "contextFiles": {
+      "proposal": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md"
+      ],
+      "specs": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\incremental-quality-evaluation\\spec.md",
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\quality-workbench-actions\\spec.md"
+      ],
+      "design": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md"
+      ],
+      "tasks": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md"
+      ]
+    },
+    "progress": {
+      "total": 20,
+      "complete": 0,
+      "remaining": 20
+    },
+    "tasks": [
+      {
+        "id": "1",
+        "description": "1.1 核对旧 120 章基准及 39-D 4.4 缺项，用同一次运行拆分目录发现、读取/摘要、索引、局部/全局规则、结果整理、UI 呈现和释放。",
+        "done": false
+      },
+      {
+        "id": "2",
+        "description": "1.2 建立 50/300/1000 章代表性合成工程，每档至少五次冷/热/单章变化/规则变化采样，记录中位/p95、峰值与对象释放及解释器/依赖/硬件口径。",
+        "done": false
+      },
+      {
+        "id": "3",
+        "description": "1.3 根据实测选取复用索引、结果缓存或 UI 呈现的实际差额，列规则依赖与无缓存正确性基线；不预设规则遍历是唯一瓶颈。",
+        "done": false
+      },
+      {
+        "id": "4",
+        "description": "1.4 保存可复跑量测脚本/原始样本及比较口径，目标为主要热路径 p95 改善至少 30%、50 章不恶化超过 10%；旧可自动量测项按真实证据补验收。",
+        "done": false
+      },
+      {
+        "id": "5",
+        "description": "2.1 复用原 ContentIndexService/ChapterCache 的轻量检查会话，以可靠变化集合和文本摘要更新索引；保留同大小/同时间外部修改校验，收益由量测确认。",
+        "done": false
+      },
+      {
+        "id": "6",
+        "description": "2.2 为支持的局部规则复用结果，键包含规则/参数/解析器、正文、范围和依赖摘要；单章变化只重复必要工作，并与无缓存完整结果逐项一致。",
+        "done": false
+      },
+      {
+        "id": "7",
+        "description": "2.3 为跨章编号/术语/链接/覆盖及模块/变量明确失效策略，覆盖移动/删除/依赖变化；未知规则或不可靠变化提示退完整核对。",
+        "done": false
+      },
+      {
+        "id": "8",
+        "description": "2.4 活缓冲派生仅存内存，缓存损坏/旧版/关闭/容量不足回直接计算；任务按项目/范围/代次登记，取消或切项目后的结果不串入新工作集。",
+        "done": false
+      },
+      {
+        "id": "9",
+        "description": "3.1 在原问题列表支持按章节/规则分组及全部/本轮变化/选章/选规则过滤，统计保持实际总量与严重级别，分页不改报告事实。",
+        "done": false
+      },
+      {
+        "id": "10",
+        "description": "3.2 详情显示规则、建议、来源位置、检查范围/时点和过期状态，正文变化后相关结果标待重检；范围外明确未检查。",
+        "done": false
+      },
+      {
+        "id": "11",
+        "description": "3.3 基于真实同项目结果生成新增/消失/保留比较，缺基线显示未知；本轮过滤零条不能冒充整份工程无问题。",
+        "done": false
+      },
+      {
+        "id": "12",
+        "description": "3.4 验证问题定位与返回原筛选/页签/光标，保留多章未保存内容，覆盖加载/空/部分结果/过期及小窗口、主题、键盘状态。",
+        "done": false
+      },
+      {
+        "id": "13",
+        "description": "4.1 沿用 QualityRulesConfig 支持字段提供启用/严重级别/实际参数编辑，未知原文保留；规则试跑不隐式保存，也不将 warning 变成普通出稿门禁。",
+        "done": false
+      },
+      {
+        "id": "14",
+        "description": "4.2 对所选当前工作集试跑，比较真实问题变化并明确应用设置；未支持规则显示未执行，不能算通过。",
+        "done": false
+      },
+      {
+        "id": "15",
+        "description": "4.3 沿用 quick fix/缓冲与写入清单，按章展示确定性修正差异、选择应用及撤销/恢复；源摘要变化仅刷新/跳过冲突项，其余继续。",
+        "done": false
+      },
+      {
+        "id": "16",
+        "description": "4.4 支持当前版本个人视图的暂不处理，正式报告仍保留真实问题；验证不自动改业务身份/关系复核/正式状态且重复应用无副作用。",
+        "done": false
+      },
+      {
+        "id": "17",
+        "description": "5.1 对照冷/热/无缓存、外部同大小同时间修改、规则/模块/变量变化、缓存坏及取消重跑的逐项结果，运行相关回归，保存失败与未覆盖范围。",
+        "done": false
+      },
+      {
+        "id": "18",
+        "description": "5.2 重测 50/300/1000 章耗时、UI 取消确认和切章/关闭后内存/对象释放；目标未达如实记录及保留原始样本，不能删规则或放宽断言制造收益。",
+        "done": false
+      },
+      {
+        "id": "19",
+        "description": "5.3 在真实大工程与原生桌面完成检查/定位/修正/预览/出稿试点及资源量测；真实环境不足保持未勾选，不阻塞 V4.3。",
+        "done": false
+      },
+      {
+        "id": "20",
+        "description": "5.4 更新增量依赖、问题/规则用法、容量回退、台账与性能事实，运行本 change 的 OpenSpec strict；接续 V4.3。",
+        "done": false
+      }
+    ],
+    "state": "ready",
+    "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "commands": {
+    "status": "openspec status --change product-v42-incremental-quality-workbench --json",
+    "strict": "openspec validate product-v42-incremental-quality-workbench --strict --json",
+    "apply": "openspec instructions apply --change product-v42-incremental-quality-workbench --json"
+  }
+}

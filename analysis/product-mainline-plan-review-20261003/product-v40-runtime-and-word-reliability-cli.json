@@ -1,0 +1,264 @@
+{
+  "name": "product-v40-runtime-and-word-reliability",
+  "status": {
+    "changeName": "product-v40-runtime-and-word-reliability",
+    "schemaName": "spec-driven",
+    "planningHome": {
+      "kind": "repo",
+      "root": "D:\\ai_develop_project_space\\doc-tool",
+      "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+      "defaultSchema": "spec-driven"
+    },
+    "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability",
+    "artifactPaths": {
+      "proposal": {
+        "outputPath": "proposal.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md"
+        ]
+      },
+      "specs": {
+        "outputPath": "specs/**/*.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\**\\*.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\bounded-word-operations\\spec.md",
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\runtime-recovery-and-evidence\\spec.md"
+        ]
+      },
+      "design": {
+        "outputPath": "design.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md"
+        ]
+      },
+      "tasks": {
+        "outputPath": "tasks.md",
+        "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md",
+        "existingOutputPaths": [
+          "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md"
+        ]
+      }
+    },
+    "isComplete": true,
+    "applyRequires": [
+      "tasks"
+    ],
+    "nextSteps": [
+      "All planning artifacts are complete; review tasks before implementation."
+    ],
+    "actionContext": {
+      "mode": "repo-local",
+      "sourceOfTruth": "repo",
+      "planningArtifacts": [
+        "proposal",
+        "design",
+        "specs",
+        "tasks"
+      ],
+      "linkedContext": [],
+      "allowedEditRoots": [
+        "D:\\ai_develop_project_space\\doc-tool"
+      ],
+      "requiresAffectedAreaSelection": false,
+      "constraints": [
+        "Repo-local change artifacts and implementation edits are scoped to this project."
+      ]
+    },
+    "artifacts": [
+      {
+        "id": "proposal",
+        "outputPath": "proposal.md",
+        "status": "done"
+      },
+      {
+        "id": "design",
+        "outputPath": "design.md",
+        "status": "done"
+      },
+      {
+        "id": "specs",
+        "outputPath": "specs/**/*.md",
+        "status": "done"
+      },
+      {
+        "id": "tasks",
+        "outputPath": "tasks.md",
+        "status": "done"
+      }
+    ],
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "strict": {
+    "items": [
+      {
+        "id": "product-v40-runtime-and-word-reliability",
+        "type": "change",
+        "valid": true,
+        "issues": [],
+        "durationMs": 29
+      }
+    ],
+    "summary": {
+      "totals": {
+        "items": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "byType": {
+        "change": {
+          "items": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      }
+    },
+    "version": "1.0",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "apply": {
+    "changeName": "product-v40-runtime-and-word-reliability",
+    "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability",
+    "schemaName": "spec-driven",
+    "contextFiles": {
+      "proposal": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md"
+      ],
+      "specs": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\bounded-word-operations\\spec.md",
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\runtime-recovery-and-evidence\\spec.md"
+      ],
+      "design": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md"
+      ],
+      "tasks": [
+        "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md"
+      ]
+    },
+    "progress": {
+      "total": 20,
+      "complete": 0,
+      "remaining": 20
+    },
+    "tasks": [
+      {
+        "id": "1",
+        "description": "1.1 按实际 runner 入口复现最新 report 的非零退出、失败与超时文件；记录命令、解释器/依赖、用例数、退出码、阻塞阶段及覆盖范围，不能将文件失败数当用例失败数。",
+        "done": false
+      },
+      {
+        "id": "2",
+        "description": "1.2 修复可复现的真实断言、收集/编码和环境适配差额，包含 MAIN 同源出稿回归；保留正文、捕获身份与成果状态断言，验证收集为零或异常退出不会报绿。",
+        "done": false
+      },
+      {
+        "id": "3",
+        "description": "1.3 修正非交互 GUI 测试的模态等待、重入和退出生命周期，验证正常按钮仍触发原服务，关闭后无迟到写 UI；不能通过禁用业务行为或跳过失败造通过。",
+        "done": false
+      },
+      {
+        "id": "4",
+        "description": "1.4 逐项核对 MAIN/V3.7～V3.9 余下九项，拆出可自动执行与真实试点部分；补本批可执行基线，明确 39-D 4.4 多规模/释放量测接到 42-A/E，更新事实台账。",
+        "done": false
+      },
+      {
+        "id": "5",
+        "description": "2.1 为现有探测、转换、目录/域刷新和退出补统一阶段记录与有限预算，覆盖等待忙锁、取得 PID 前启动、打开、处理、写成果及清理；以实际测量校准默认值。",
+        "done": false
+      },
+      {
+        "id": "6",
+        "description": "2.2 复用现有工作进程/helper 执行适配，让启动和 COM 阻塞可由自有监督者有界返回；冻结/受限路径不得误启动第二个可见主窗口，未具备能力时明确回退。",
+        "done": false
+      },
+      {
+        "id": "7",
+        "description": "2.3 核实 helper/Word 归属及忙锁生命周期，仅清理已证明属于本任务的实例；未知 Word 归属保留事实、只停自有 helper，HTML/编辑可继续，下一 Word 动作按真实资源状态处理。",
+        "done": false
+      },
+      {
+        "id": "8",
+        "description": "2.4 模拟启动前、打开、刷新、保存和退出卡住及占用，验证时限、下一任务与残留记录；同时打开的用户 Word、原文件和旧成果均保持。",
+        "done": false
+      },
+      {
+        "id": "9",
+        "description": "3.1 取消请求一秒内在 UI 确认，真实停止/清理独立标示；以本轮临时成果和请求代次阻止超时、切项目及取消后的晚到结果登记或覆盖。",
+        "done": false
+      },
+      {
+        "id": "10",
+        "description": "3.2 复用原队列/结果索引，按成员与格式保留可用成果；补原轮从可信报告与捕获恢复原范围，当前正文新轮明确另建，不静默混用来源。",
+        "done": false
+      },
+      {
+        "id": "11",
+        "description": "3.3 验证重开后的原轮恢复、部分失败重试及缺失/不匹配报告；旧成果仍可打开，不能用视图中的 captureId 代替可信元数据放行重试。",
+        "done": false
+      },
+      {
+        "id": "12",
+        "description": "3.4 为关闭流程核实去抖、草稿、回调和自有工作任务的有界收尾；重复开关、切章和任务退出后可恢复到实际可用上下文。",
+        "done": false
+      },
+      {
+        "id": "13",
+        "description": "4.1 在原任务/成果页面显示当前阶段、可用格式、局部失败与清理事实，提供打开成果、补原轮、生成最新及回输入的直接动作。",
+        "done": false
+      },
+      {
+        "id": "14",
+        "description": "4.2 提供可复制的诊断摘要，含运行环境、阶段、耗时、原因及成果路径；默认不包含业务正文，缺证据字段显示未知。",
+        "done": false
+      },
+      {
+        "id": "15",
+        "description": "4.3 验证 1024/1280/1920、明暗主题、长名称、键盘和加载/取消/部分完成/失败状态，主动作可达且返回保持未保存内容。",
+        "done": false
+      },
+      {
+        "id": "16",
+        "description": "4.4 核对源码与可用冻结构建的 helper 入口、线程/UI 分工及反复打开关闭资源释放；冻结或实机部分无条件时保留对应证据缺口，其他检查完成。",
+        "done": false
+      },
+      {
+        "id": "17",
+        "description": "5.1 从真实入口验证导入→活缓冲修改/检查→多格式出稿→单格式失败→补原轮→新轮→关闭重开；无 Word/Git、坏可选配置、文件占用及局部失败保留可用成果。",
+        "done": false
+      },
+      {
+        "id": "18",
+        "description": "5.2 运行本版直接相关回归并核对当前默认清单，记录实际文件/用例/失败/超时/未覆盖范围；未修复项带复现和影响，不能宣称全绿。",
+        "done": false
+      },
+      {
+        "id": "19",
+        "description": "5.3 在具备条件时完成真实 Word/企业底模、原生桌面/IME/缩放及冻结执行试点；尚无实测保持未勾选并留复验步骤，不阻塞 V4.1 独立工作。",
+        "done": false
+      },
+      {
+        "id": "20",
+        "description": "5.4 更新用户用法、阶段/恢复契约、执行台账与验证证据，运行本 change 的 OpenSpec strict；按实际任务状态交接 V4.1，规划通过不能替代业务验收。",
+        "done": false
+      }
+    ],
+    "state": "ready",
+    "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+    "root": {
+      "path": "D:\\ai_develop_project_space\\doc-tool",
+      "source": "nearest"
+    }
+  },
+  "commands": {
+    "status": "openspec status --change product-v40-runtime-and-word-reliability --json",
+    "strict": "openspec validate product-v40-runtime-and-word-reliability --strict --json",
+    "apply": "openspec instructions apply --change product-v40-runtime-and-word-reliability --json"
+  }
+}

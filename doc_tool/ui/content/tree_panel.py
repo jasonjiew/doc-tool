@@ -272,6 +272,8 @@ class ChapterTree(QWidget):
         on_delete_file: Optional[Callable[[str], None]] = None,
         on_rename_file: Optional[Callable[[str], None]] = None,
         on_copy_file: Optional[Callable[[str], None]] = None,
+        on_batch_copy: Optional[Callable[[List[str]], None]] = None,
+        on_batch_move: Optional[Callable[[List[str]], None]] = None,
         on_renumber_dir: Optional[Callable[[str], None]] = None,
         on_move_node: Optional[Callable[[str, str, Optional[str]], bool]] = None,
         on_clear_markers: Optional[Callable[[], None]] = None,
@@ -289,6 +291,8 @@ class ChapterTree(QWidget):
         self._on_delete_file = on_delete_file
         self._on_rename_file = on_rename_file
         self._on_copy_file = on_copy_file
+        self._on_batch_copy = on_batch_copy
+        self._on_batch_move = on_batch_move
         self._on_renumber_dir = on_renumber_dir
         self._on_move_node = on_move_node
         self._on_clear_markers = on_clear_markers
@@ -349,7 +353,8 @@ class ChapterTree(QWidget):
         self._tree._on_key = self._handle_tree_key
         self._tree.setModel(self._model)
         self._tree.setHeaderHidden(True)
-        self._tree.setSelectionMode(QTreeView.SelectionMode.SingleSelection)
+        # MAIN2-C 3.3：多选章节后右键可批量复制/移动（Ctrl/Shift 选择）。
+        self._tree.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
         self._tree.setEditTriggers(QTreeView.EditTrigger.NoEditTriggers)
         self._tree.set_drag_enabled(self._writable)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -438,6 +443,30 @@ class ChapterTree(QWidget):
         self._tree.scrollTo(index)
         return True
 
+    def select_files(self, rel_paths) -> int:
+        """按路径建立一个多选集合（首个作为当前项，其余按 Ctrl 追加）。
+
+        MAIN2-C 3.3：批量复制/移动的入口是「章节树多选」，这个方法就是那条
+        真实选择路径（与用户 Ctrl 点选等价），供界面与测试共用。
+        """
+        wanted = [rel for rel in dict.fromkeys(rel_paths or []) if rel]
+        model = self._tree.selectionModel()
+        if model is None:
+            return 0
+        selected = 0
+        for order, rel in enumerate(wanted):
+            index = self._index_for(rel)
+            if not index.isValid():
+                continue
+            if order == 0:
+                self._tree.setCurrentIndex(index)
+                flag = model.SelectionFlag.ClearAndSelect
+            else:
+                flag = model.SelectionFlag.Select
+            model.select(index, flag | model.SelectionFlag.Rows)
+            selected += 1
+        return selected
+
     def set_current(self, rel_path: Optional[str]) -> None:
         """记录当前打开的文件，供选中回调去重。"""
         self._current = rel_path
@@ -490,21 +519,31 @@ class ChapterTree(QWidget):
         rel_path = self._model.data(index, Qt.ItemDataRole.UserRole)
         return rel_path if rel_path else None
 
+    def clear_selection(self) -> None:
+        """清空多选（保留当前项），避免导航后残留批量操作目标。"""
+        model = self._tree.selectionModel()
+        if model is None:
+            return
+        current = self._tree.currentIndex()
+        for index in list(model.selectedIndexes()):
+            if index != current:
+                model.select(index, model.SelectionFlag.Deselect)
+
     def selected_files(self) -> List[str]:
-        """当前多选的文件节点（MAIN-B 2.1「所选章」范围）。
+        """当前多选的文件节点（MAIN-B 2.1「所选章」、MAIN2-C 3.3 批量条目）。
 
         只返回真实文件节点，按树中顺序去重；目录节点与未选中的文件不包含。
         无多选时返回当前项的单个文件，便于范围下拉复用同一入口。
         """
         index = self._tree.currentIndex()
-        if not index.isValid():
-            return []
         try:
             indexes = list(self._tree.selectionModel().selectedIndexes())
         except Exception:  # noqa: BLE001 - 无选择模型时退回当前项
-            indexes = [index]
-        if index not in indexes:
+            indexes = [index] if index.isValid() else []
+        if index.isValid() and index not in indexes:
             indexes.append(index)
+        if not indexes:
+            return []
         files: List[str] = []
         for item in indexes:
             rel_path = self._model.data(item, Qt.ItemDataRole.UserRole)
@@ -598,6 +637,21 @@ class ChapterTree(QWidget):
                 )
             )
             menu.addAction(copy_link)
+            selected = self.selected_files()
+            if self._writable and len(selected) > 1:
+                # MAIN2-C 3.3：多选章节 → 批量复制/移动（真实目标摘要 + 逐项结果）。
+                menu.addSeparator()
+                batch_label = "（{0} 个章节）".format(len(selected))
+                batch_copy = QAction("批量复制所选章节…{0}".format(batch_label), menu)
+                batch_copy.triggered.connect(
+                    lambda: self._on_batch_copy and self._on_batch_copy(list(selected))
+                )
+                menu.addAction(batch_copy)
+                batch_move = QAction("批量移动到…{0}".format(batch_label), menu)
+                batch_move.triggered.connect(
+                    lambda: self._on_batch_move and self._on_batch_move(list(selected))
+                )
+                menu.addAction(batch_move)
             if self._writable:
                 menu.addSeparator()
                 file_status = self._status_map.get(rel_path)

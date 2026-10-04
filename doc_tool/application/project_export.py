@@ -87,6 +87,9 @@ class ExportReport:
     omittedChapters: List[str] = field(default_factory=list)
     sourceUpdated: bool = False
     readonlyProject: bool = False
+    #: V4.0 40-D：本轮 Word 刷新的真实阶段与清理事实（缺项表示未知）。
+    wordStages: List[str] = field(default_factory=list)
+    wordRefresh: Dict[str, object] = field(default_factory=dict)
 
     # --- 查询 ---
 
@@ -170,6 +173,8 @@ class ExportReport:
             "omittedChapters": list(self.omittedChapters),
             "sourceUpdated": self.sourceUpdated,
             "readonlyProject": self.readonlyProject,
+            "wordStages": list(self.wordStages),
+            "wordRefresh": dict(self.wordRefresh),
             "snapshotWorkDir": self.snapshotWorkDir,
             "docxPath": self.docxPath,
             "indexPath": self.indexPath,
@@ -238,6 +243,8 @@ def read_export_index(path) -> Optional[ExportReport]:
         omittedChapters=[str(item) for item in data.get("omittedChapters") or []],
         sourceUpdated=bool(data.get("sourceUpdated", False)),
         readonlyProject=bool(data.get("readonlyProject", False)),
+        wordStages=[str(item) for item in data.get("wordStages") or []],
+        wordRefresh=dict(data.get("wordRefresh") or {}),
     )
     return report
 
@@ -307,12 +314,13 @@ def _run_docx(
     cancel_token: Optional[CancellationToken],
     progress,
     word_available: Optional[bool] = None,
+    word_facts: Optional[Dict[str, object]] = None,
 ) -> Tuple[FormatResult, str]:
     """在快照工作目录构建 DOCX，并把稳定副本复制到导出目录。"""
     from doc_tool.application.pipeline import run_pipeline
     from doc_tool.domain.manifest import ProjectManifest
     from doc_tool.domain.paths import ProjectPaths
-    from doc_tool.domain.output_state import is_formal_success
+    from doc_tool.domain.word_operations import WordOperationReport
 
     work = Path(snapshot.workDir)
     paths = ProjectPaths(work)
@@ -322,11 +330,18 @@ def _run_docx(
     use_refresh = bool(refresh) and resolved_word
     if progress is not None:
         progress("docx", "开始生成 Word")
+    # V4.0 40-D：把这一轮 Word 刷新的真实阶段/清理事实带回去（缺项表示未知）。
+    word_report = WordOperationReport(
+        operation="word-refresh", source="", target=str(destination / stem),
+    )
+    if word_facts is not None:
+        word_facts["report"] = word_report
     result = run_pipeline(
         manifest, paths, skip_word_refresh=not use_refresh,
         word_available=resolved_word if use_refresh else None,
         cancel_token=cancel_token, progress=None,
     )
+    _collected_word_report(result, word_report)
     source_output = None
     pending = False
     if result.success and result.output_path and Path(result.output_path).is_file():
@@ -336,7 +351,7 @@ def _run_docx(
         pending = True
     elif result.output_path and Path(result.output_path).is_file():
         source_output = Path(result.output_path)
-        pending = not is_formal_success(source_output)
+        pending = not is_formal_docx(source_output)
     if source_output is None:
         detail = result.last_stage.detail if result.last_stage else "构建未产出可用文件"
         return FormatResult(
@@ -351,22 +366,7 @@ def _run_docx(
             format=FORMAT_DOCX, status=STATUS_FAILED, error_code="E8001",
             message="无法写入导出目录：{0}".format(exc), backend="kernel",
         ), ""
-    formal = bool(use_refresh and is_formal_success(source_output))
-    if formal:
-        # 正式状态记录随源文件在快照项目目录；目标目录需要自己的记录，
-        # 否则下游（按包正式化/复核）会把已刷新的正式稿误判为待刷新。
-        try:
-            from doc_tool.domain.output_state import write_state
-
-            write_state(
-                str(target), formal=True, diagnostic=False,
-                app_version=APP_VERSION,
-                commit=_export_commit_id(),
-                schema_version=int(getattr(manifest, "schemaVersion", 0) or 0),
-                stages=None, compute_hash=True,
-            )
-        except Exception:  # noqa: BLE001 - 状态写入失败不推翻已生成的正式稿
-            pass
+    formal = bool(use_refresh and is_formal_docx(source_output))
     status = STATUS_READY if formal else STATUS_PENDING_REFRESH
     warnings: List[str] = []
     if pending or not formal:
@@ -384,12 +384,109 @@ def _run_docx(
             warnings.append("超宽内容已保留并定位：{0} 处".format(len(layout_outcome.oversized)))
         if not layout_outcome.ok and layout_outcome.message:
             warnings.append(layout_outcome.message)
+    # MAIN2-E 5.2：版式在登记**之前**定稿——先写文件，再登记 hash/正式状态。
+    # 兼容入口若在刷新后才改版式（``rewritten``），再次有界刷新；无法刷新时
+    # 明确标“待刷新”，绝不沿用旧正式状态。
+    if (layout_outcome is not None and getattr(layout_outcome, "rewritten", False)
+            and formal and use_refresh):
+        refreshed = _refresh_after_layout(manifest, paths, target, word_report)
+        if refreshed:
+            warnings.append("版式在 Word 刷新后应用，已再次有界刷新目录/页码")
+        else:
+            formal = False
+            status = STATUS_PENDING_REFRESH
+            warnings.append(
+                "版式在 Word 刷新后应用，未能再次刷新：本稿标为待刷新（不沿用旧正式状态）"
+            )
+    if formal:
+        # 正式状态记录随源文件在快照项目目录；目标目录需要自己的记录，
+        # 否则下游（按包正式化/复核）会把已刷新的正式稿误判为待刷新。
+        # 顺序固定：版本/内容/刷新 → 版式定稿 → 登记最终字节。
+        try:
+            from doc_tool.domain.output_state import write_state
+
+            write_state(
+                str(target), formal=True, diagnostic=False,
+                app_version=APP_VERSION,
+                commit=_export_commit_id(),
+                schema_version=int(getattr(manifest, "schemaVersion", 0) or 0),
+                stages=None, compute_hash=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - 登记失败保留可读成果与真实待办
+            warnings.append("正式状态登记未完成（成果可打开）：{0}".format(exc))
+    # 阶段事实与清理结论进入提醒：结果页/成果页据此说明“卡在哪一步”。
+    if refresh:
+        stage_lines = word_report.stage_lines()
+        if stage_lines:
+            warnings.append("Word 阶段：" + "；".join(stage_lines[-4:]))
+        if word_report.residual:
+            warnings.append("Word 残留待处理：{0}".format(
+                word_report.residualDetail or "无法证明归属，未清理用户 Word"
+            ))
+        if word_facts is not None:
+            word_facts["stages"] = list(stage_lines)
+            word_facts["refresh"] = word_report.to_dict()
     return FormatResult(
         format=FORMAT_DOCX, status=status, path=str(target),
         sha256=sha256_file(target), backend="kernel", formal=formal,
         warnings=warnings,
         message="" if formal else "目录/页码待刷新",
     ), str(target)
+
+
+def is_formal_docx(path) -> bool:
+    """正式稿判定（单一入口：便于测试替换，不复制状态逻辑）。"""
+    from doc_tool.domain.output_state import is_formal_success
+
+    return bool(is_formal_success(path))
+
+
+def _refresh_with_word(manifest, paths, output_override=None, report=None):
+    """单一刷新入口（便于替换/测试）：复用既有 kernel 适配。"""
+    from doc_tool.adapters.kernel import refresh_with_project
+
+    return refresh_with_project(
+        manifest, paths, output_override=output_override, report=report,
+    )
+
+
+def _refresh_after_layout(manifest, paths, target: Path, word_report) -> bool:
+    """版式后置修改后再次有界刷新；返回是否刷新成功（失败标待刷新）。"""
+    try:
+        from doc_tool.domain.word_operations import WordOperationReport
+
+        follow = WordOperationReport(
+            operation="word-refresh:after-layout", source="", target=str(target),
+        )
+        ok, _reason = _refresh_with_word(
+            manifest, paths, output_override=str(target), report=follow.to_dict(),
+        )
+        return bool(ok)
+    except Exception as exc:  # noqa: BLE001 - 刷新失败不推翻已生成文件
+        if word_report is not None:
+            word_report.stage("process", "版式后再次刷新失败：{0}".format(exc), outcome="failed")
+        return False
+
+
+def _collected_word_report(result, word_report) -> None:
+    """把管线本轮 Word 事实并入出稿报告对象（缺字段保持未知）。"""
+    payload = dict(getattr(result, "wordRefresh", {}) or {})
+    if not payload:
+        return
+    word_report.operation = str(payload.get("operation") or word_report.operation)
+    word_report.timeoutStage = str(payload.get("timeoutStage") or "")
+    word_report.timeoutDetail = str(payload.get("timeoutDetail") or "")
+    word_report.cleanup = str(payload.get("cleanup") or "")
+    word_report.residual = bool(payload.get("residual"))
+    word_report.residualDetail = str(payload.get("residualDetail") or "")
+    for item in payload.get("stages") or []:
+        if not isinstance(item, dict):
+            continue
+        word_report.stage(
+            str(item.get("stage") or ""), str(item.get("detail") or ""),
+            outcome=str(item.get("outcome") or "done"),
+            elapsed=float(item.get("elapsedSeconds") or 0.0),
+        )
 
 
 def _apply_layout(target: Path, request: ExportRequest, snapshot: EffectiveSnapshot):
@@ -617,6 +714,8 @@ def run_project_export(
     formats = normalize_formats(only_formats if only_formats is not None else request.formats)
     # 旧 DOCX 必须与该轮登记的 hash 相符；文件存在不等于仍是原轮输入。
     docx_path = _verified_docx_path(prior) if prior is not None and origin_known else ""
+    # V4.0 40-D：本轮 Word 阶段事实（由 _run_docx 填充，缺项表示本轮未刷新/未知）。
+    word_facts: Dict[str, object] = {}
 
     for fmt in formats:
         previous = report.result_for(fmt)
@@ -639,6 +738,7 @@ def run_project_export(
                     refresh=bool(request.refresh) and not skip_word_refresh,
                     cancel_token=cancel_token, progress=progress,
                     word_available=word_available,
+                    word_facts=word_facts,
                 )
                 docx_path = new_docx_path or docx_path
             elif fmt == FORMAT_HTML:
@@ -680,6 +780,11 @@ def run_project_export(
         report.results.append(result)
 
     report.docxPath = docx_path or (prior.docxPath if prior else "")
+    # V4.0 40-D：阶段事实进入成果页/结果页，说明“卡在哪一步、是否已清理”。
+    report.wordStages = [str(item) for item in (word_facts.get("stages") or [])]
+    payload = word_facts.get("refresh")
+    if isinstance(payload, dict):
+        report.wordRefresh = dict(payload)
     if report.strict and report.strict_violations():
         report.warnings.append("严格模式：{0} 未达到正式要求".format(
             "、".join(format_label(item) for item in report.strict_violations())

@@ -45,6 +45,7 @@ from doc_tool.domain.manifest import ProjectManifest
 from doc_tool.domain.paths import ProjectPaths, build_output_filename
 from doc_tool.domain.project_lock import TASK_BUILD, acquire_lock, release_lock
 from doc_tool.domain.runtime_log import RuntimeLog
+from doc_tool.domain.word_operations import STAGE_LABELS
 
 
 STAGE_REVISION = "revision"
@@ -195,6 +196,8 @@ class PipelineResult:
     error_code: Optional[str] = None
     #: V2.7（6.5）：无 Word/刷新失败时保留的可打开待刷新副本路径。
     pending_output_path: Optional[str] = None
+    #: V4.0 40-B：本轮 Word 刷新的阶段/预算/归属/清理事实（缺字段表示未知）。
+    wordRefresh: Dict[str, object] = field(default_factory=dict)
 
     @property
     def last_stage(self) -> Optional[StageEvent]:
@@ -204,6 +207,44 @@ class PipelineResult:
 # 单次失败最多透出的出错位置条数：一份大文档可能一次性积累上百个问题，
 # 全量塞进事件 metrics 会让日志与界面失控；超出部分由日志中的完整消息兜底。
 _MAX_LOCATIONS = 50
+
+
+def _word_stage_metrics(report: Optional[Dict[str, object]]) -> Dict[str, object]:
+    """把 Word 有界执行事实压成事件 metrics（脱敏，不含正文）。"""
+    if not report:
+        return {}
+    return {
+        "currentStage": report.get("currentStage") or "",
+        "timeoutStage": report.get("timeoutStage") or "",
+        "stages": [
+            {
+                "stage": item.get("stage"), "elapsedSeconds": item.get("elapsedSeconds"),
+                "outcome": item.get("outcome"),
+            }
+            for item in (report.get("stages") or []) if isinstance(item, dict)
+        ],
+        "ownership": (report.get("ownership") or {}).get("proof")
+        if isinstance(report.get("ownership"), dict) else "",
+        "cleanup": report.get("cleanup") or "",
+        "residual": bool(report.get("residual")),
+    }
+
+
+def _word_failure_detail(message: str, report: Optional[Dict[str, object]]) -> str:
+    """失败说明补上“卡在哪一步 + 清理事实”，缺证据时保持原文。"""
+    if not report:
+        return message
+    lines = [message]
+    stage = str(report.get("timeoutStage") or report.get("currentStage") or "")
+    if stage:
+        label = STAGE_LABELS.get(stage, stage)
+        lines.append("阶段：{0}".format(label))
+    cleanup = str(report.get("cleanup") or "")
+    if cleanup:
+        lines.append("清理：{0}".format(cleanup))
+    if report.get("residual"):
+        lines.append("残留待处理：{0}".format(report.get("residualDetail") or "未知"))
+    return "\n".join(lines)
 
 
 def _relative_to(path_value: str, root: Optional[Path]) -> str:
@@ -1086,14 +1127,20 @@ def _run_pipeline_inner(
         log.info(STAGE_WORD_REFRESH, "started")
         try:
             # Word 保存是临界区：取消在保存完成前不中断
+            word_report: Dict[str, object] = {}
             with token.critical_section():
                 ok, refresh_reason = refresh_with_project(
                     manifest, paths, output_override=str(temp_output),
+                    report=word_report,
                 )
+            # V4.0 40-B：把本轮真实阶段/归属/清理事实附到事件上（缺字段为未知）。
+            if word_report:
+                result.wordRefresh = word_report
             if ok:
                 result.events.append(StageEvent(
                     STAGE_WORD_REFRESH, "succeeded",
                     detail="TOC、NUMPAGES 与全部 story 域刷新完成",
+                    metrics=_word_stage_metrics(word_report),
                 ))
                 log.info(STAGE_WORD_REFRESH, "succeeded")
                 _record_stage(STAGE_WORD_REFRESH, "succeeded")
@@ -1101,7 +1148,9 @@ def _run_pipeline_inner(
                 err = _refresh_error(refresh_reason, manifest.refreshTimeoutSeconds)
                 result.events.append(StageEvent(
                     STAGE_WORD_REFRESH, "failed",
-                    detail=err.user_message, error_code=err.code,
+                    detail=_word_failure_detail(err.user_message, word_report),
+                    error_code=err.code,
+                    metrics=_word_stage_metrics(word_report),
                 ))
                 log.error(STAGE_WORD_REFRESH, exception=err)
                 result.error_code = err.code

@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-10-03T21:51:37",
+  "python": "3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]",
+  "command": "python -m pytest <file> -q -p no:cacheprovider",
+  "workers": 2,
+  "timeoutSeconds": 300,
+  "seconds": 29.68,
+  "requestedFiles": [
+    "test_gui_services.py",
+    "test_v37_cross_member_navigation.py"
+  ],
+  "files": [
+    {
+      "file": "test_gui_services.py",
+      "returncode": 0,
+      "seconds": 29.67,
+      "counts": {
+        "passed": 170
+      },
+      "timedOut": false,
+      "tail": "........................................................................ [ 42%]\n........................................................................ [ 84%]\n..........................                                               [100%]\n170 passed in 22.27s"
+    },
+    {
+      "file": "test_v37_cross_member_navigation.py",
+      "returncode": 1,
+      "seconds": 22.39,
+      "counts": {
+        "failed": 2
+      },
+      "timedOut": false,
+      "tail": "[general] 生成完成: C:\\Users\\18098\\AppData\\Local\\Temp\\v37-24-598_hko6\\工作区\\.Beta.import-staging-38700-zd5uz38y\\output\\.trial-build.docx\n[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0\n[general] 生成完成: C:\\Users\\18098\\AppData\\Local\\Temp\\v37-24-598_hko6\\工作区\\.Gamma.import-staging-38700-4bpm1gh1\\output\\.trial-build.docx\n[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0\n=========================== short test summary info ===========================\nFAILED scripts/tests/test_v37_cross_member_navigation.py::CrossMemberNavigationTests::test_missing_member_reports_and_others_stay_usable\nFAILED scripts/tests/test_v37_cross_member_navigation.py::CrossMemberNavigationTests::test_open_activate_return_keeps_other_members\n2 failed in 15.50s"
+    }
+  ],
+  "totals": {
+    "passed": 170,
+    "failed": 2,
+    "skipped": 0,
+    "error": 0
+  },
+  "failedFiles": [
+    "test_v37_cross_member_navigation.py"
+  ],
+  "timedOutFiles": []
+}

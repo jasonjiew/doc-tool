@@ -1,0 +1,106 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="9" failures="1" time="258.382"><testsuite name="doc-tool" tests="9" failures="1" time="258.382"><testcase name="test_main_e_export_rounds.py" classname="scripts.tests" time="8.873"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 4.447s
+
+OK
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\main-e-export-av2mf1pj\项目\.state\snapshots\20261003T084056-685fe4ca\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\main-e-export-av2mf1pj\项目\.state\snapshots\20261003T084056-685fe4ca\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\main-e-export-a7gfpyj4\项目\.state\snapshots\20261003T084057-ace5bf6c\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\main-e-export-a7gfpyj4\项目\.state\snapshots\20261003T084057-ace5bf6c\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\main-e-export-a7gfpyj4\项目\.state\snapshots\20261003T084058-7ff0283b\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\main-e-export-a7gfpyj4\项目\.state\snapshots\20261003T084058-7ff0283b\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+[requirement] 修订记录: 写入 29 行
+[requirement] 解除 HYPERLINK 域 132 个（目标书签不存在，转为静态文本）
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\main-e-export-j0r6tj4i\项目\.state\snapshots\20261003T084100-3e7fc3cb\output\.tmp-GX-TEST-001 项目化构建测试(3.8).docx
+[requirement] 插入元素=11, 表格=1, 图片=0, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\main-e-export-j0r6tj4i\项目\.state\snapshots\20261003T084100-3e7fc3cb\logs\requirement-validation.md
+[requirement] PASS=20 FAIL=0
+</system-out></testcase><testcase name="test_gui_services.py" classname="scripts.tests" time="32.439"><system-out>.......................................................................................................QLayout: Attempting to add QLayout "" to QWidget "", which already has a layout
+...................................................................
+----------------------------------------------------------------------
+Ran 170 tests in 30.282s
+
+OK
+</system-out></testcase><testcase name="test_home_experience_iteration.py" classname="scripts.tests" time="6.569"><failure message="exit code 1" type="TestFailure">.........F.........
+======================================================================
+FAIL: test_project_bar_close_button_lifecycle (__main__.HomeExperienceIterationTests.test_project_bar_close_button_lifecycle)
+测试 ProjectBar 上的关闭项目按钮显隐与点击回调。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_home_experience_iteration.py", line 205, in test_project_bar_close_button_lifecycle
+    self.assertFalse(bar._close_btn.isHidden())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 19 tests in 3.762s
+
+FAILED (failures=1)
+</failure><system-out>.........F.........
+======================================================================
+FAIL: test_project_bar_close_button_lifecycle (__main__.HomeExperienceIterationTests.test_project_bar_close_button_lifecycle)
+测试 ProjectBar 上的关闭项目按钮显隐与点击回调。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\ai_develop_project_space\doc-tool\scripts\tests\test_home_experience_iteration.py", line 205, in test_project_bar_close_button_lifecycle
+    self.assertFalse(bar._close_btn.isHidden())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 19 tests in 3.762s
+
+FAILED (failures=1)
+</system-out></testcase><testcase name="test_iteration_scenarios.py" classname="scripts.tests" time="119.989"><system-out>[PASS] A 新增章节+H4+表格+自然尺寸图片+诊断构建
+[PASS] B 修改 Markdown 仅改变目标正文
+[PASS] C 删除章节后正文/编号/TOC 恢复
+[PASS] D 非连续编号失败并给出 3.1.14 建议
+[PASS] E 图片缺失失败且输出保持原子性
+[PASS] F _index 父正文顺序
+[PASS] G &lt;br&gt; 写为真实 w:br
+</system-out></testcase><testcase name="test_local_history.py" classname="scripts.tests" time="15.795"><system-out>....................s..
+----------------------------------------------------------------------
+Ran 23 tests in 13.444s
+
+OK (skipped=1)
+</system-out></testcase><testcase name="test_release_review_bundle.py" classname="scripts.tests" time="7.224"><system-out>test_bundle_contains_all_deliverables_with_verifiable_hashes (__main__.ReviewBundleTests.test_bundle_contains_all_deliverables_with_verifiable_hashes) ... ok
+test_bundle_does_not_modify_repository_sources (__main__.ReviewBundleTests.test_bundle_does_not_modify_repository_sources) ... ok
+test_cli_default_output_is_deliverables (__main__.ReviewBundleTests.test_cli_default_output_is_deliverables) ... ok
+test_frozen_hashes_recorded_when_artifacts_exist (__main__.ReviewBundleTests.test_frozen_hashes_recorded_when_artifacts_exist) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 6.102s
+
+OK
+</system-out></testcase><testcase name="test_review_docx.py" classname="scripts.tests" time="3.961"><system-out>.................
+----------------------------------------------------------------------
+Ran 17 tests in 1.609s
+
+OK
+</system-out></testcase><testcase name="test_validator_negative.py" classname="scripts.tests" time="58.577"><system-out>[PASS] V01 正确需求文档: validator exit=0, expected=accept
+[PASS] V02 正确详细设计文档: validator exit=0, expected=accept
+[PASS] V03 空正文: validator exit=1, expected=reject
+[PASS] V04 删除 H3: validator exit=1, expected=reject
+[PASS] V05 交换标题顺序: validator exit=1, expected=reject
+[PASS] V06 修改正文文本: validator exit=1, expected=reject
+[PASS] V07 父正文移动到子标题后: validator exit=1, expected=reject
+[PASS] V08 修改普通表格单元格: validator exit=1, expected=reject
+[PASS] V09 删除复杂表格: validator exit=1, expected=reject
+[PASS] V10 图片 relationship 目标缺失: validator exit=1, expected=reject
+[PASS] V11 document.xml 非法 updateFields: validator exit=1, expected=reject
+[PASS] V12 重复媒体文件: validator exit=1, expected=reject
+[SUCCESS] Validator 正向/负向回归全部符合预期。
+</system-out></testcase><testcase name="test_core_export_ui.py" classname="scripts.tests" time="4.956"><system-out /></testcase></testsuite></testsuites>

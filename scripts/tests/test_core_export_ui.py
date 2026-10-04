@@ -233,6 +233,11 @@ class ChangeDirectoryActionTests(unittest.TestCase):
             self.addCleanup(window.close)
             window._project_summary = _FakeSummary(self.project)
             window._collect_buffer_texts = lambda: dict(buffers)
+            # 后台任务完成后会弹「出稿结果」框；非交互用例必须显式处理模态等待，
+            # 否则 exec() 会一直阻塞（V4.0 40-A 1.3）。这里记录被调用事实，
+            # 不影响真实按钮/服务行为。
+            modal_calls: list = []
+            window._exec_message_box = lambda box, _calls=modal_calls: _calls.append(box) or None
             view = window._record_export_round(report)
             with patch(
                 "doc_tool.ui.main_window.QFileDialog.getExistingDirectory",

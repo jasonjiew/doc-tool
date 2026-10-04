@@ -1,0 +1,1076 @@
+{
+  "date": "2026-10-03",
+  "mode": "planning-only",
+  "changes": [
+    {
+      "name": "product-v40-runtime-and-word-reliability",
+      "status": {
+        "changeName": "product-v40-runtime-and-word-reliability",
+        "schemaName": "spec-driven",
+        "planningHome": {
+          "kind": "repo",
+          "root": "D:\\ai_develop_project_space\\doc-tool",
+          "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+          "defaultSchema": "spec-driven"
+        },
+        "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability",
+        "artifactPaths": {
+          "proposal": {
+            "outputPath": "proposal.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md"
+            ]
+          },
+          "specs": {
+            "outputPath": "specs/**/*.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\**\\*.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\bounded-word-operations\\spec.md",
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\runtime-recovery-and-evidence\\spec.md"
+            ]
+          },
+          "design": {
+            "outputPath": "design.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md"
+            ]
+          },
+          "tasks": {
+            "outputPath": "tasks.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md"
+            ]
+          }
+        },
+        "isComplete": true,
+        "applyRequires": [
+          "tasks"
+        ],
+        "nextSteps": [
+          "All planning artifacts are complete; review tasks before implementation."
+        ],
+        "actionContext": {
+          "mode": "repo-local",
+          "sourceOfTruth": "repo",
+          "planningArtifacts": [
+            "proposal",
+            "design",
+            "specs",
+            "tasks"
+          ],
+          "linkedContext": [],
+          "allowedEditRoots": [
+            "D:\\ai_develop_project_space\\doc-tool"
+          ],
+          "requiresAffectedAreaSelection": false,
+          "constraints": [
+            "Repo-local change artifacts and implementation edits are scoped to this project."
+          ]
+        },
+        "artifacts": [
+          {
+            "id": "proposal",
+            "outputPath": "proposal.md",
+            "status": "done"
+          },
+          {
+            "id": "design",
+            "outputPath": "design.md",
+            "status": "done"
+          },
+          {
+            "id": "specs",
+            "outputPath": "specs/**/*.md",
+            "status": "done"
+          },
+          {
+            "id": "tasks",
+            "outputPath": "tasks.md",
+            "status": "done"
+          }
+        ],
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "strict": {
+        "items": [
+          {
+            "id": "product-v40-runtime-and-word-reliability",
+            "type": "change",
+            "valid": true,
+            "issues": [],
+            "durationMs": 3
+          }
+        ],
+        "summary": {
+          "totals": {
+            "items": 1,
+            "passed": 1,
+            "failed": 0
+          },
+          "byType": {
+            "change": {
+              "items": 1,
+              "passed": 1,
+              "failed": 0
+            }
+          }
+        },
+        "version": "1.0",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "apply": {
+        "changeName": "product-v40-runtime-and-word-reliability",
+        "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability",
+        "schemaName": "spec-driven",
+        "contextFiles": {
+          "proposal": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\proposal.md"
+          ],
+          "specs": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\bounded-word-operations\\spec.md",
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\specs\\runtime-recovery-and-evidence\\spec.md"
+          ],
+          "design": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\design.md"
+          ],
+          "tasks": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v40-runtime-and-word-reliability\\tasks.md"
+          ]
+        },
+        "progress": {
+          "total": 20,
+          "complete": 0,
+          "remaining": 20
+        },
+        "tasks": [
+          {
+            "id": "1",
+            "description": "1.1 按实际 runner 入口复现最新 report 的非零退出、失败与超时文件；记录命令、解释器/依赖、用例数、退出码、阻塞阶段及覆盖范围，不能将文件失败数当用例失败数。",
+            "done": false
+          },
+          {
+            "id": "2",
+            "description": "1.2 修复可复现的真实断言、收集/编码和环境适配差额，包含 MAIN 同源出稿回归；保留正文、捕获身份与成果状态断言，验证收集为零或异常退出不会报绿。",
+            "done": false
+          },
+          {
+            "id": "3",
+            "description": "1.3 修正非交互 GUI 测试的模态等待、重入和退出生命周期，验证正常按钮仍触发原服务，关闭后无迟到写 UI；不能通过禁用业务行为或跳过失败造通过。",
+            "done": false
+          },
+          {
+            "id": "4",
+            "description": "1.4 逐项核对 MAIN/V3.7～V3.9 余下九项，拆出可自动执行与真实试点部分；补本批可执行基线，明确 39-D 4.4 多规模/释放量测接到 42-A/E，更新事实台账。",
+            "done": false
+          },
+          {
+            "id": "5",
+            "description": "2.1 为现有探测、转换、目录/域刷新和退出补统一阶段记录与有限预算，覆盖等待忙锁、取得 PID 前启动、打开、处理、写成果及清理；以实际测量校准默认值。",
+            "done": false
+          },
+          {
+            "id": "6",
+            "description": "2.2 复用现有工作进程/helper 执行适配，让启动和 COM 阻塞可由自有监督者有界返回；冻结/受限路径不得误启动第二个可见主窗口，未具备能力时明确回退。",
+            "done": false
+          },
+          {
+            "id": "7",
+            "description": "2.3 核实 helper/Word 归属及忙锁生命周期，仅清理已证明属于本任务的实例；未知 Word 归属保留事实、只停自有 helper，HTML/编辑可继续，下一 Word 动作按真实资源状态处理。",
+            "done": false
+          },
+          {
+            "id": "8",
+            "description": "2.4 模拟启动前、打开、刷新、保存和退出卡住及占用，验证时限、下一任务与残留记录；同时打开的用户 Word、原文件和旧成果均保持。",
+            "done": false
+          },
+          {
+            "id": "9",
+            "description": "3.1 取消请求一秒内在 UI 确认，真实停止/清理独立标示；以本轮临时成果和请求代次阻止超时、切项目及取消后的晚到结果登记或覆盖。",
+            "done": false
+          },
+          {
+            "id": "10",
+            "description": "3.2 复用原队列/结果索引，按成员与格式保留可用成果；补原轮从可信报告与捕获恢复原范围，当前正文新轮明确另建，不静默混用来源。",
+            "done": false
+          },
+          {
+            "id": "11",
+            "description": "3.3 验证重开后的原轮恢复、部分失败重试及缺失/不匹配报告；旧成果仍可打开，不能用视图中的 captureId 代替可信元数据放行重试。",
+            "done": false
+          },
+          {
+            "id": "12",
+            "description": "3.4 为关闭流程核实去抖、草稿、回调和自有工作任务的有界收尾；重复开关、切章和任务退出后可恢复到实际可用上下文。",
+            "done": false
+          },
+          {
+            "id": "13",
+            "description": "4.1 在原任务/成果页面显示当前阶段、可用格式、局部失败与清理事实，提供打开成果、补原轮、生成最新及回输入的直接动作。",
+            "done": false
+          },
+          {
+            "id": "14",
+            "description": "4.2 提供可复制的诊断摘要，含运行环境、阶段、耗时、原因及成果路径；默认不包含业务正文，缺证据字段显示未知。",
+            "done": false
+          },
+          {
+            "id": "15",
+            "description": "4.3 验证 1024/1280/1920、明暗主题、长名称、键盘和加载/取消/部分完成/失败状态，主动作可达且返回保持未保存内容。",
+            "done": false
+          },
+          {
+            "id": "16",
+            "description": "4.4 核对源码与可用冻结构建的 helper 入口、线程/UI 分工及反复打开关闭资源释放；冻结或实机部分无条件时保留对应证据缺口，其他检查完成。",
+            "done": false
+          },
+          {
+            "id": "17",
+            "description": "5.1 从真实入口验证导入→活缓冲修改/检查→多格式出稿→单格式失败→补原轮→新轮→关闭重开；无 Word/Git、坏可选配置、文件占用及局部失败保留可用成果。",
+            "done": false
+          },
+          {
+            "id": "18",
+            "description": "5.2 运行本版直接相关回归并核对当前默认清单，记录实际文件/用例/失败/超时/未覆盖范围；未修复项带复现和影响，不能宣称全绿。",
+            "done": false
+          },
+          {
+            "id": "19",
+            "description": "5.3 在具备条件时完成真实 Word/企业底模、原生桌面/IME/缩放及冻结执行试点；尚无实测保持未勾选并留复验步骤，不阻塞 V4.1 独立工作。",
+            "done": false
+          },
+          {
+            "id": "20",
+            "description": "5.4 更新用户用法、阶段/恢复契约、执行台账与验证证据，运行本 change 的 OpenSpec strict；按实际任务状态交接 V4.1，规划通过不能替代业务验收。",
+            "done": false
+          }
+        ],
+        "state": "ready",
+        "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "commands": {
+        "status": "openspec status --change product-v40-runtime-and-word-reliability --json",
+        "strict": "openspec validate product-v40-runtime-and-word-reliability --strict --json",
+        "apply": "openspec instructions apply --change product-v40-runtime-and-word-reliability --json"
+      }
+    },
+    {
+      "name": "product-v41-enterprise-template-workflows",
+      "status": {
+        "changeName": "product-v41-enterprise-template-workflows",
+        "schemaName": "spec-driven",
+        "planningHome": {
+          "kind": "repo",
+          "root": "D:\\ai_develop_project_space\\doc-tool",
+          "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+          "defaultSchema": "spec-driven"
+        },
+        "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows",
+        "artifactPaths": {
+          "proposal": {
+            "outputPath": "proposal.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\proposal.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\proposal.md"
+            ]
+          },
+          "specs": {
+            "outputPath": "specs/**/*.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\specs\\**\\*.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\specs\\enterprise-template-library\\spec.md",
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\specs\\template-recipe-and-trial\\spec.md"
+            ]
+          },
+          "design": {
+            "outputPath": "design.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\design.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\design.md"
+            ]
+          },
+          "tasks": {
+            "outputPath": "tasks.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\tasks.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\tasks.md"
+            ]
+          }
+        },
+        "isComplete": true,
+        "applyRequires": [
+          "tasks"
+        ],
+        "nextSteps": [
+          "All planning artifacts are complete; review tasks before implementation."
+        ],
+        "actionContext": {
+          "mode": "repo-local",
+          "sourceOfTruth": "repo",
+          "planningArtifacts": [
+            "proposal",
+            "design",
+            "specs",
+            "tasks"
+          ],
+          "linkedContext": [],
+          "allowedEditRoots": [
+            "D:\\ai_develop_project_space\\doc-tool"
+          ],
+          "requiresAffectedAreaSelection": false,
+          "constraints": [
+            "Repo-local change artifacts and implementation edits are scoped to this project."
+          ]
+        },
+        "artifacts": [
+          {
+            "id": "proposal",
+            "outputPath": "proposal.md",
+            "status": "done"
+          },
+          {
+            "id": "design",
+            "outputPath": "design.md",
+            "status": "done"
+          },
+          {
+            "id": "specs",
+            "outputPath": "specs/**/*.md",
+            "status": "done"
+          },
+          {
+            "id": "tasks",
+            "outputPath": "tasks.md",
+            "status": "done"
+          }
+        ],
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "strict": {
+        "items": [
+          {
+            "id": "product-v41-enterprise-template-workflows",
+            "type": "change",
+            "valid": true,
+            "issues": [],
+            "durationMs": 3
+          }
+        ],
+        "summary": {
+          "totals": {
+            "items": 1,
+            "passed": 1,
+            "failed": 0
+          },
+          "byType": {
+            "change": {
+              "items": 1,
+              "passed": 1,
+              "failed": 0
+            }
+          }
+        },
+        "version": "1.0",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "apply": {
+        "changeName": "product-v41-enterprise-template-workflows",
+        "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows",
+        "schemaName": "spec-driven",
+        "contextFiles": {
+          "proposal": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\proposal.md"
+          ],
+          "specs": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\specs\\enterprise-template-library\\spec.md",
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\specs\\template-recipe-and-trial\\spec.md"
+          ],
+          "design": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\design.md"
+          ],
+          "tasks": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v41-enterprise-template-workflows\\tasks.md"
+          ]
+        },
+        "progress": {
+          "total": 20,
+          "complete": 0,
+          "remaining": 20
+        },
+        "tasks": [
+          {
+            "id": "1",
+            "description": "1.1 盘点并复用现有规范包、DOCX 底模、RecipeStore 和导出预设，建立可重建本地目录引用；按骨架建项、模板填充、项目出稿区分实际用途。",
+            "done": false
+          },
+          {
+            "id": "2",
+            "description": "1.2 支持按名称/用途搜索和最近使用，详情读出真实来源、版本/内容摘要和兼容信息；同名模板不按显示名合并，固定包只生成制作副本。",
+            "done": false
+          },
+          {
+            "id": "3",
+            "description": "1.3 实现空目录有效默认、缺路径重定位及坏索引局部回退；其他条目照常使用，原模板/包/未知声明保持。",
+            "done": false
+          },
+          {
+            "id": "4",
+            "description": "1.4 从现有规范/模板入口接入列表与详情，验证加载、空、无结果、缺失、只读和回退状态及回到原上下文。",
+            "done": false
+          },
+          {
+            "id": "5",
+            "description": "2.1 沿用现有 recipe/导出设置保存模板引用、实际样式映射、已支持 LayoutProfile 字段及格式，兼容旧记录和未知元数据。",
+            "done": false
+          },
+          {
+            "id": "6",
+            "description": "2.2 对实际底模样式 ID 与消费者支持字段核验映射/设置，保留有效项并显示替代摘要；未支持声明保留详情但不声称已应用。",
+            "done": false
+          },
+          {
+            "id": "7",
+            "description": "2.3 将正文来源/结构化范围与模板预设分开，普通快速导出默认整份当前内容；template-fill 的输出仍为 DOCX 文件路径，换目录不丢所选范围。",
+            "done": false
+          },
+          {
+            "id": "8",
+            "description": "2.4 验证保存/重开/重命名/删除预设、失效样式与损坏配置回退；当前活缓冲、原 recipe 和历史捕获不被隐式改写。",
+            "done": false
+          },
+          {
+            "id": "9",
+            "description": "3.1 用所选真实模板及设置生成独立通用小样，覆盖标题列表、长表/多行、宽图、代码和已支持字段；沿用原样例服务和 V4.0 后台适配。",
+            "done": false
+          },
+          {
+            "id": "10",
+            "description": "3.2 展示实际底模、应用/替代参数与可读成果；HTML 内容预览、Word 待刷新和真实分页视觉分别标示，无 Word 仍可继续试用。",
+            "done": false
+          },
+          {
+            "id": "11",
+            "description": "3.3 小样复用按模板内容摘要、映射、版式及样例内容失效，每轮目录独立；旧样例补 Word 使用原报告/捕获，新设置明确生成新轮。",
+            "done": false
+          },
+          {
+            "id": "12",
+            "description": "3.4 默认小样不带业务正文，仅在明确选择片段时复制到隔离目录；验证取消、占用、单格式失败和重开不会覆盖当前项目与旧样例。",
+            "done": false
+          },
+          {
+            "id": "13",
+            "description": "4.1 更换前显示旧/新模板真实身份、有效/失效映射、受支持版式变化及保留部件边界；应用只改变所选配置及后续明确新轮。",
+            "done": false
+          },
+          {
+            "id": "14",
+            "description": "4.2 在列表详情提供试用小样、使用此模板和最近成果，高级映射按需展开；当前项目出稿无需进入规范制作或填写全部高级项。",
+            "done": false
+          },
+          {
+            "id": "15",
+            "description": "4.3 保持制作草稿、未知资源、未保存正文和导航返回；固定包需要编辑时自动进入可编辑副本，不原地修改历史包。",
+            "done": false
+          },
+          {
+            "id": "16",
+            "description": "4.4 验证搜索/切用途/缺失模板/试用中/部分结果及 1024/1280/1920、明暗主题、Tab/Esc/长名称，主动作可达且支持滚动/溢出。",
+            "done": false
+          },
+          {
+            "id": "17",
+            "description": "5.1 用现有通用底模走负责人制作/冻结→成员选择→骨架建项或模板填充→导入/活缓冲编辑→小样→实际出稿，逐用途核验实际文件与参数。",
+            "done": false
+          },
+          {
+            "id": "18",
+            "description": "5.2 验证旧 schema 1 规范包/recipe 消费、未知资源保留、坏可选设置回退及更换模板后补旧轮同源；运行直接相关回归并保留内容/来源断言。",
+            "done": false
+          },
+          {
+            "id": "19",
+            "description": "5.3 在真实企业底模和 Word 中核验目录、封面/保留部件、标题列表、长表/宽图/代码及成员试用；真实视觉不足保持未勾选，不能以诊断 DOCX 或 HTML 替代。",
+            "done": false
+          },
+          {
+            "id": "20",
+            "description": "5.4 更新模板用途/预设/试用用法、支持字段矩阵、执行台账与证据，运行本 change 的 OpenSpec strict；接续 V4.2 独立任务。",
+            "done": false
+          }
+        ],
+        "state": "ready",
+        "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "commands": {
+        "status": "openspec status --change product-v41-enterprise-template-workflows --json",
+        "strict": "openspec validate product-v41-enterprise-template-workflows --strict --json",
+        "apply": "openspec instructions apply --change product-v41-enterprise-template-workflows --json"
+      }
+    },
+    {
+      "name": "product-v42-incremental-quality-workbench",
+      "status": {
+        "changeName": "product-v42-incremental-quality-workbench",
+        "schemaName": "spec-driven",
+        "planningHome": {
+          "kind": "repo",
+          "root": "D:\\ai_develop_project_space\\doc-tool",
+          "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+          "defaultSchema": "spec-driven"
+        },
+        "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench",
+        "artifactPaths": {
+          "proposal": {
+            "outputPath": "proposal.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md"
+            ]
+          },
+          "specs": {
+            "outputPath": "specs/**/*.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\**\\*.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\incremental-quality-evaluation\\spec.md",
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\quality-workbench-actions\\spec.md"
+            ]
+          },
+          "design": {
+            "outputPath": "design.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md"
+            ]
+          },
+          "tasks": {
+            "outputPath": "tasks.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md"
+            ]
+          }
+        },
+        "isComplete": true,
+        "applyRequires": [
+          "tasks"
+        ],
+        "nextSteps": [
+          "All planning artifacts are complete; review tasks before implementation."
+        ],
+        "actionContext": {
+          "mode": "repo-local",
+          "sourceOfTruth": "repo",
+          "planningArtifacts": [
+            "proposal",
+            "design",
+            "specs",
+            "tasks"
+          ],
+          "linkedContext": [],
+          "allowedEditRoots": [
+            "D:\\ai_develop_project_space\\doc-tool"
+          ],
+          "requiresAffectedAreaSelection": false,
+          "constraints": [
+            "Repo-local change artifacts and implementation edits are scoped to this project."
+          ]
+        },
+        "artifacts": [
+          {
+            "id": "proposal",
+            "outputPath": "proposal.md",
+            "status": "done"
+          },
+          {
+            "id": "design",
+            "outputPath": "design.md",
+            "status": "done"
+          },
+          {
+            "id": "specs",
+            "outputPath": "specs/**/*.md",
+            "status": "done"
+          },
+          {
+            "id": "tasks",
+            "outputPath": "tasks.md",
+            "status": "done"
+          }
+        ],
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "strict": {
+        "items": [
+          {
+            "id": "product-v42-incremental-quality-workbench",
+            "type": "change",
+            "valid": true,
+            "issues": [],
+            "durationMs": 3
+          }
+        ],
+        "summary": {
+          "totals": {
+            "items": 1,
+            "passed": 1,
+            "failed": 0
+          },
+          "byType": {
+            "change": {
+              "items": 1,
+              "passed": 1,
+              "failed": 0
+            }
+          }
+        },
+        "version": "1.0",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "apply": {
+        "changeName": "product-v42-incremental-quality-workbench",
+        "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench",
+        "schemaName": "spec-driven",
+        "contextFiles": {
+          "proposal": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\proposal.md"
+          ],
+          "specs": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\incremental-quality-evaluation\\spec.md",
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\specs\\quality-workbench-actions\\spec.md"
+          ],
+          "design": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\design.md"
+          ],
+          "tasks": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v42-incremental-quality-workbench\\tasks.md"
+          ]
+        },
+        "progress": {
+          "total": 20,
+          "complete": 0,
+          "remaining": 20
+        },
+        "tasks": [
+          {
+            "id": "1",
+            "description": "1.1 核对旧 120 章基准及 39-D 4.4 缺项，用同一次运行拆分目录发现、读取/摘要、索引、局部/全局规则、结果整理、UI 呈现和释放。",
+            "done": false
+          },
+          {
+            "id": "2",
+            "description": "1.2 建立 50/300/1000 章代表性合成工程，每档至少五次冷/热/单章变化/规则变化采样，记录中位/p95、峰值与对象释放及解释器/依赖/硬件口径。",
+            "done": false
+          },
+          {
+            "id": "3",
+            "description": "1.3 根据实测选取复用索引、结果缓存或 UI 呈现的实际差额，列规则依赖与无缓存正确性基线；不预设规则遍历是唯一瓶颈。",
+            "done": false
+          },
+          {
+            "id": "4",
+            "description": "1.4 保存可复跑量测脚本/原始样本及比较口径，目标为主要热路径 p95 改善至少 30%、50 章不恶化超过 10%；旧可自动量测项按真实证据补验收。",
+            "done": false
+          },
+          {
+            "id": "5",
+            "description": "2.1 复用原 ContentIndexService/ChapterCache 的轻量检查会话，以可靠变化集合和文本摘要更新索引；保留同大小/同时间外部修改校验，收益由量测确认。",
+            "done": false
+          },
+          {
+            "id": "6",
+            "description": "2.2 为支持的局部规则复用结果，键包含规则/参数/解析器、正文、范围和依赖摘要；单章变化只重复必要工作，并与无缓存完整结果逐项一致。",
+            "done": false
+          },
+          {
+            "id": "7",
+            "description": "2.3 为跨章编号/术语/链接/覆盖及模块/变量明确失效策略，覆盖移动/删除/依赖变化；未知规则或不可靠变化提示退完整核对。",
+            "done": false
+          },
+          {
+            "id": "8",
+            "description": "2.4 活缓冲派生仅存内存，缓存损坏/旧版/关闭/容量不足回直接计算；任务按项目/范围/代次登记，取消或切项目后的结果不串入新工作集。",
+            "done": false
+          },
+          {
+            "id": "9",
+            "description": "3.1 在原问题列表支持按章节/规则分组及全部/本轮变化/选章/选规则过滤，统计保持实际总量与严重级别，分页不改报告事实。",
+            "done": false
+          },
+          {
+            "id": "10",
+            "description": "3.2 详情显示规则、建议、来源位置、检查范围/时点和过期状态，正文变化后相关结果标待重检；范围外明确未检查。",
+            "done": false
+          },
+          {
+            "id": "11",
+            "description": "3.3 基于真实同项目结果生成新增/消失/保留比较，缺基线显示未知；本轮过滤零条不能冒充整份工程无问题。",
+            "done": false
+          },
+          {
+            "id": "12",
+            "description": "3.4 验证问题定位与返回原筛选/页签/光标，保留多章未保存内容，覆盖加载/空/部分结果/过期及小窗口、主题、键盘状态。",
+            "done": false
+          },
+          {
+            "id": "13",
+            "description": "4.1 沿用 QualityRulesConfig 支持字段提供启用/严重级别/实际参数编辑，未知原文保留；规则试跑不隐式保存，也不将 warning 变成普通出稿门禁。",
+            "done": false
+          },
+          {
+            "id": "14",
+            "description": "4.2 对所选当前工作集试跑，比较真实问题变化并明确应用设置；未支持规则显示未执行，不能算通过。",
+            "done": false
+          },
+          {
+            "id": "15",
+            "description": "4.3 沿用 quick fix/缓冲与写入清单，按章展示确定性修正差异、选择应用及撤销/恢复；源摘要变化仅刷新/跳过冲突项，其余继续。",
+            "done": false
+          },
+          {
+            "id": "16",
+            "description": "4.4 支持当前版本个人视图的暂不处理，正式报告仍保留真实问题；验证不自动改业务身份/关系复核/正式状态且重复应用无副作用。",
+            "done": false
+          },
+          {
+            "id": "17",
+            "description": "5.1 对照冷/热/无缓存、外部同大小同时间修改、规则/模块/变量变化、缓存坏及取消重跑的逐项结果，运行相关回归，保存失败与未覆盖范围。",
+            "done": false
+          },
+          {
+            "id": "18",
+            "description": "5.2 重测 50/300/1000 章耗时、UI 取消确认和切章/关闭后内存/对象释放；目标未达如实记录及保留原始样本，不能删规则或放宽断言制造收益。",
+            "done": false
+          },
+          {
+            "id": "19",
+            "description": "5.3 在真实大工程与原生桌面完成检查/定位/修正/预览/出稿试点及资源量测；真实环境不足保持未勾选，不阻塞 V4.3。",
+            "done": false
+          },
+          {
+            "id": "20",
+            "description": "5.4 更新增量依赖、问题/规则用法、容量回退、台账与性能事实，运行本 change 的 OpenSpec strict；接续 V4.3。",
+            "done": false
+          }
+        ],
+        "state": "ready",
+        "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "commands": {
+        "status": "openspec status --change product-v42-incremental-quality-workbench --json",
+        "strict": "openspec validate product-v42-incremental-quality-workbench --strict --json",
+        "apply": "openspec instructions apply --change product-v42-incremental-quality-workbench --json"
+      }
+    },
+    {
+      "name": "product-v43-delivery-and-revision-workbench",
+      "status": {
+        "changeName": "product-v43-delivery-and-revision-workbench",
+        "schemaName": "spec-driven",
+        "planningHome": {
+          "kind": "repo",
+          "root": "D:\\ai_develop_project_space\\doc-tool",
+          "changesDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes",
+          "defaultSchema": "spec-driven"
+        },
+        "changeRoot": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench",
+        "artifactPaths": {
+          "proposal": {
+            "outputPath": "proposal.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\proposal.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\proposal.md"
+            ]
+          },
+          "specs": {
+            "outputPath": "specs/**/*.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\specs\\**\\*.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\specs\\delivery-preparation-and-results\\spec.md",
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\specs\\revision-comparison-and-handover\\spec.md"
+            ]
+          },
+          "design": {
+            "outputPath": "design.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\design.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\design.md"
+            ]
+          },
+          "tasks": {
+            "outputPath": "tasks.md",
+            "resolvedOutputPath": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\tasks.md",
+            "existingOutputPaths": [
+              "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\tasks.md"
+            ]
+          }
+        },
+        "isComplete": true,
+        "applyRequires": [
+          "tasks"
+        ],
+        "nextSteps": [
+          "All planning artifacts are complete; review tasks before implementation."
+        ],
+        "actionContext": {
+          "mode": "repo-local",
+          "sourceOfTruth": "repo",
+          "planningArtifacts": [
+            "proposal",
+            "design",
+            "specs",
+            "tasks"
+          ],
+          "linkedContext": [],
+          "allowedEditRoots": [
+            "D:\\ai_develop_project_space\\doc-tool"
+          ],
+          "requiresAffectedAreaSelection": false,
+          "constraints": [
+            "Repo-local change artifacts and implementation edits are scoped to this project."
+          ]
+        },
+        "artifacts": [
+          {
+            "id": "proposal",
+            "outputPath": "proposal.md",
+            "status": "done"
+          },
+          {
+            "id": "design",
+            "outputPath": "design.md",
+            "status": "done"
+          },
+          {
+            "id": "specs",
+            "outputPath": "specs/**/*.md",
+            "status": "done"
+          },
+          {
+            "id": "tasks",
+            "outputPath": "tasks.md",
+            "status": "done"
+          }
+        ],
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "strict": {
+        "items": [
+          {
+            "id": "product-v43-delivery-and-revision-workbench",
+            "type": "change",
+            "valid": true,
+            "issues": [],
+            "durationMs": 3
+          }
+        ],
+        "summary": {
+          "totals": {
+            "items": 1,
+            "passed": 1,
+            "failed": 0
+          },
+          "byType": {
+            "change": {
+              "items": 1,
+              "passed": 1,
+              "failed": 0
+            }
+          }
+        },
+        "version": "1.0",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "apply": {
+        "changeName": "product-v43-delivery-and-revision-workbench",
+        "changeDir": "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench",
+        "schemaName": "spec-driven",
+        "contextFiles": {
+          "proposal": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\proposal.md"
+          ],
+          "specs": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\specs\\delivery-preparation-and-results\\spec.md",
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\specs\\revision-comparison-and-handover\\spec.md"
+          ],
+          "design": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\design.md"
+          ],
+          "tasks": [
+            "D:\\ai_develop_project_space\\doc-tool\\openspec\\changes\\product-v43-delivery-and-revision-workbench\\tasks.md"
+          ]
+        },
+        "progress": {
+          "total": 20,
+          "complete": 0,
+          "remaining": 20
+        },
+        "tasks": [
+          {
+            "id": "1",
+            "description": "1.1 复用 RD/CORE/delivery 请求组合交付准备视图，选择实际成员/章节、格式、模板或 V4.1 预设及目录，摘要从最终请求参数读回。",
+            "done": false
+          },
+          {
+            "id": "2",
+            "description": "1.2 开始交付时沿用原服务固定逐成员真实捕获和正文来源，未保存内容按明确所选来源进入捕获；提交后编辑仅影响下一轮。",
+            "done": false
+          },
+          {
+            "id": "3",
+            "description": "1.3 缺成员/失效范围/坏可选设置仅影响对应项，合法成员可继续；复用原队列、忙锁、V4.0 时限与取消，不建第二批量执行器。",
+            "done": false
+          },
+          {
+            "id": "4",
+            "description": "1.4 从现有研发/出稿入口验证准备→提交→返回修改，普通单文档流程保持直接出稿，默认不强制进入研发工作区。",
+            "done": false
+          },
+          {
+            "id": "5",
+            "description": "2.1 主表按真实成员/版本展示可用格式、局部失败/待刷新及下一动作，详情显示原报告/捕获/范围/模板，已完成格式先可打开。",
+            "done": false
+          },
+          {
+            "id": "6",
+            "description": "2.2 支持只补失败成员/格式或原轮，来源从可信捕获恢复；生成当前最新明确新轮，后改正文不会混入补原轮。",
+            "done": false
+          },
+          {
+            "id": "7",
+            "description": "2.3 验证取消、重开、报告缺失/不匹配、输出占用及单格式失败；旧成果保持，缺原身份不可猜补，部分集合不得假报完整正式。",
+            "done": false
+          },
+          {
+            "id": "8",
+            "description": "2.4 验证成员筛选、长名称/同名、加载/部分完成/失败、详情与返回，在小窗口/明暗主题/键盘下保留当前选中与脏缓冲。",
+            "done": false
+          },
+          {
+            "id": "9",
+            "description": "3.1 版本选择器显示名称/时间/来源并使用真实路径或 ID，读取两个固定快照/捕获，区分同名集合及历史缺项。",
+            "done": false
+          },
+          {
+            "id": "10",
+            "description": "3.2 按正文/资源/稳定条目与关系/成果生成事实差异，源码配置与模块/变量解析后的装配内容分别比较；不能仅按标题/显示编号对齐。",
+            "done": false
+          },
+          {
+            "id": "11",
+            "description": "3.3 缺历史正文/依赖/成果的部分标不可比较，其他差异继续；定位来源和返回保持实际成员/版本/筛选上下文。",
+            "done": false
+          },
+          {
+            "id": "12",
+            "description": "3.4 从真实差异预填可编辑修订说明，不替用户确认评审或正式状态；验证说明内容、未比较项和来源可追溯。",
+            "done": false
+          },
+          {
+            "id": "13",
+            "description": "4.1 复用集合导出生成本地成果包，含实际所选可读文件、资源、manifest/修订说明和离线入口；源码为明确选项，链接是包内真实相对路径。",
+            "done": false
+          },
+          {
+            "id": "14",
+            "description": "4.2 跨机补 Word 继续复用 snapshot_package 的原捕获与必要资源，UI/manifest 区分成果包与补充包用途；无刷新输入的只读包不能声称可补 Word。",
+            "done": false
+          },
+          {
+            "id": "15",
+            "description": "4.3 验证重名成员/成果、缺文件、取消和排除项清单，保留已完成文件及真实缺项；不自动上传或向他人发消息。",
+            "done": false
+          },
+          {
+            "id": "16",
+            "description": "4.4 复用 collection_ops 将所选范围恢复到新副本，目标冲突默认新名，坏项跳过列明；原项目/成果/活缓冲保持，可打开副本再返回原工作台。",
+            "done": false
+          },
+          {
+            "id": "17",
+            "description": "5.1 用三个合成成员从真实入口完成准备→提交后编辑→部分失败→补原轮→新轮→两版比较→修订说明→离线包→副本恢复，核验身份、正文及成果事实。",
+            "done": false
+          },
+          {
+            "id": "18",
+            "description": "5.2 运行队列/捕获/版本/打包/恢复与导航相关回归及包末覆盖核对，确认旧数据可读、部分失败可继续与包可离线打开，保存真实证据。",
+            "done": false
+          },
+          {
+            "id": "19",
+            "description": "5.3 在真实三成员研发工程与接收人环境试点，核验模板/Word、修订说明、离线阅读及后续补充；条件不足保持未勾选并留复验步骤。",
+            "done": false
+          },
+          {
+            "id": "20",
+            "description": "5.4 更新交付/修订/包用途/副本恢复用法、执行台账及最终覆盖与风险，运行本 change 的 OpenSpec strict；仅依据实际任务和证据提出下一轮差额。",
+            "done": false
+          }
+        ],
+        "state": "ready",
+        "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification.",
+        "root": {
+          "path": "D:\\ai_develop_project_space\\doc-tool",
+          "source": "nearest"
+        }
+      },
+      "commands": {
+        "status": "openspec status --change product-v43-delivery-and-revision-workbench --json",
+        "strict": "openspec validate product-v43-delivery-and-revision-workbench --strict --json",
+        "apply": "openspec instructions apply --change product-v43-delivery-and-revision-workbench --json"
+      }
+    }
+  ],
+  "documents": [
+    "docs/product-v40-v43-roadmap.md",
+    "docs/product-v40-v43-execution.md",
+    "docs/product-v40-v43-execution-prompt.md",
+    "docs/product-master-roadmap.md",
+    "docs/product-function-catalog.md",
+    "docs/product-v37-v39-roadmap.md",
+    "docs/product-v37-v39-execution.md",
+    "docs/product-main-workflow-optimization.md",
+    "docs/product-post-implementation-review-20261003.md",
+    "docs/product-next-execution.md",
+    "docs/product-main-v37-v39-execution-prompt.md",
+    "docs/product-execution-confirmed-prompt.md"
+  ]
+}

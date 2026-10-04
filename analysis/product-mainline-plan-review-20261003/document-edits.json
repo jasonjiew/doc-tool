@@ -1,0 +1,602 @@
+[
+  {
+    "path": "docs/product-v40-v43-roadmap.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-v40-v43-execution.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-master-roadmap.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-function-catalog.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-next-execution.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-main-workflow-optimization.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-execution-confirmed-prompt.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-v37-v39-roadmap.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-v37-v39-execution.md",
+    "replacements": [
+      {
+        "old": "**V4.0→V4.1→V4.2→V4.3**",
+        "replacement": "**V4.0→MAIN2→V4.1→V4.2→V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**V4.0 → V4.1 → V4.2 → V4.3**",
+        "replacement": "**V4.0 → MAIN2 → V4.1 → V4.2 → V4.3**",
+        "optional": true
+      },
+      {
+        "old": "**20 批/80 项",
+        "replacement": "**26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "**20批/80项",
+        "replacement": "**26批/104项",
+        "optional": true
+      },
+      {
+        "old": "20 批/80 项",
+        "replacement": "26 批/104 项",
+        "optional": true
+      },
+      {
+        "old": "20批/80项",
+        "replacement": "26批/104项",
+        "optional": true
+      },
+      {
+        "old": "实施 0/80",
+        "replacement": "实施 0/104",
+        "optional": true
+      },
+      {
+        "old": "实施0/80",
+        "replacement": "实施0/104",
+        "optional": true
+      },
+      {
+        "old": "业务0/80",
+        "replacement": "业务0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划0/80",
+        "replacement": "新规划0/104",
+        "optional": true
+      },
+      {
+        "old": "业务 0/80",
+        "replacement": "业务 0/104",
+        "optional": true
+      },
+      {
+        "old": "新规划 **20",
+        "replacement": "新规划 **26",
+        "optional": true
+      }
+    ],
+    "append": ""
+  },
+  {
+    "path": "docs/product-v40-v43-execution-prompt.md",
+    "replacements": [],
+    "append": "",
+    "replaceEntire": "# V4.0 + MAIN2 + V4.1～V4.3 完整持续开发指令\n\n更新：2026-10-03。已复核真实入口并加入 [MAIN2主线优化](product-mainline-optimization.md)。联合范围 **5个change、26批/104项**；本次完成规划修正，新增队列业务0/104。见 [路线图](product-v40-v43-roadmap.md)、[联合台账](product-v40-v43-execution.md)。以下全文可直接复制：\n\n```text\n在 D:/ai_develop_project_space/doc-tool 连续完成 V4.0、MAIN2、V4.1、V4.2、V4.3 的本地功能开发和验证。不要停在分析、方案或单个批次；完成所有当前可执行任务。按需使用 openspec-apply-change，遵守适用 AGENTS.md 与项目技能，保留已有未提交改动和成果。普通可逆实现选择自主处理，不逐批询问。\n\n先读：\n- docs/product-v40-v43-roadmap.md\n- docs/product-mainline-optimization.md\n- docs/product-v40-v43-execution.md\n- docs/product-function-catalog.md\n- docs/product-flow-fallback-policy.md\n- docs/product-v37-v39-execution.md\n以及当前 change 的 proposal.md、design.md、specs/**/*.md、tasks.md。\n\n核对实时 HEAD、工作树、任务勾选和最近证据。规划基准7ba19dd、应用2.9.0；旧MAIN/V3.7/V3.8/V3.9为23/24、17/20、19/20、16/20，合计75/84，只作快照。新五包共26批/104项；版本名是计划编号，不自动修改发布版本。旧已实现服务/页面先验证，只补真实差额；服务测试通过不能代替桌面按钮闭环。已有批次正在执行时先完成本批直接验证，再接实际未完成队列，不中断或重做。\n\n依次执行：\n1. product-v40-runtime-and-word-reliability，40-A～E，20项：\n   A复现回归和旧缺项；B Word各阶段有界执行；C取消/部分成果/原轮恢复；D实际状态/诊断/桌面兼容；E主流程与试点。\n2. product-mainline-usability-and-fidelity，MAIN2-A～F，24项：\n   A导入后继续写；B外部Word修订选择接收；C当前内容章节操作；D活缓冲资源修复；E最终成品一致；F三条主线验收。\n3. product-v41-enterprise-template-workflows，41-A～E，20项：\n   A本地模板目录；B受支持预设；C真实底模隔离小样；D模板更换与常用交互；E制作到成员出稿。\n4. product-v42-incremental-quality-workbench，42-A～E，20项：\n   A同机分阶段量测；B正确增量；C问题分组/时点；D规则试跑/成组修正；E正确性/性能/释放。\n5. product-v43-delivery-and-revision-workbench，43-A～E，20项：\n   A实际交付准备；B成员/格式成果；C两版事实比较/修订；D本地包/副本恢复；E三成员闭环。\n\n各包按批次依赖接续。正常下一项40-A 1.1；任务已有进度则从实时未完成、可执行项开始。V4.0之后优先MAIN2，主线跑通再做模板与团队组合。真实试点缺条件只保留对应任务/子项，继续后续独立工作。\n\n产品原则：\n默认“导入→编辑→检查→快速导出→打开成果”。使用有效默认、高级项按需展开；尽力完成、局部失败兜底、可用成果先交付。普通warning、缺模板/Git/模型、坏可选设置、缺单个成员或单格式失败不成为全流程门禁。严格模式由用户明确选择。不要求先保存全部、完成全部检查、小样或研发工作区才能普通导入/出稿。\n\n40-A先复现真实报告：\nanalysis/regression/report.json的历史记录是180文件、2860 passed、4 failed、15 skipped、8个非零退出文件、1个超时；非零文件包括test_main_e_export_rounds.py。按实际runner入口复现并区分断言、收集、编码、模态等待、退出异常、依赖和COM阻塞，保存环境、命令、退出码与覆盖。未修改文件不能证明问题无关；收集为零、超时或退出异常不算通过。单文件限时后继续其他检查，保留内容/来源/身份有效断言。\n旧九项逐项拆自动可验与真实部分。39-D 4.4合成50/300/1000章和释放可先补，接42-A/E；三成员合成闭环接43-E；全部原验收满足才勾原任务，不能统称都只能等环境。\n\nMAIN2必须交付以下主线优化：\nA. 导入：\n- 沿用真实ImportRecord/result_page/batch和现有面板，让结果非模态、可重开、完整搜索/分页/按章定位；超过40项最后一项仍可见，默认少量主要问题不等于截断全部记录。\n- 结果动作绑定真实项目/窗口，同名相对路径不串项目；修复后读回原记录数量。\n- Word一文件一项目；多Markdown按用户确认顺序合并一项目。成功即可编辑，失败/待转换/未开始项可选定接续，保留设置和成功项目，不重复创建。\n- 正常设置直接建项，无标题可单章，缺图/复杂对象保留原件并可行动，不强迫填模板/编号。\n\nB. 接收源Word修订：\n- 将现有只读解析/compare/reimport_plan/reimport_preview接入实际菜单/按钮/来源拖放，后台生成隔离差异，预览不写正式正文。\n- 展示新增/修改/删除、当前/传入内容及所选范围；传入真实buffer和dirty_paths。默认可应用合法项，冲突/脏项保留，可查看差异/另存传入副本/仅保存相关章后再刷新。\n- 应用核对源摘要、当前正文/缓冲和请求代次，预览后变化局部刷新/跳过，其余合法已选项继续；取消不写，实际失败按原事务恢复本次范围。\n- 部分接收后再次比较仍符合实际正文/基线，跳过项不假报已接收，原件版本、无关草稿与返回位置保持。\n\nC. 章节和编辑：\n- 复制章节默认读当前有效正文，而非旧index.lines；副本条目新身份，原磁盘/脏缓冲不隐式保存，代码/换行/表格/资源保持。\n- 改名/移动/排序使用原映射，保留原身份、父_index.md正文、缓冲键/标签/返回位置与确定性引用。支持的批量复制/移动显示实际目标，冲突新名、无效项局部跳过。\n- 操作可按原撤销/恢复范围还原；保留表格草稿、普通粘贴和光标。预览/检查/出稿立即读当前表达，旧请求不串章。问题分组/性能仍由V4.2负责。\n\nD. 图片和资源：\n- 清单、缺图和未用资源判断叠加活缓冲；刚插入但未保存的引用不能误列可清理。\n- 单项/批量均能选择外部替代图，复用资产入库/命名，展示明确引用；当前章改缓冲一次撤销，未打开章走ContentWriter，保留alt/尺寸和无关内容。\n- 移除所选图片默认只改该表达，不能默认删同行其他文字/图片；源变化局部刷新/跳过，其他合法项继续。\n- 清理默认不选、不自动删除，明确回收后可按原路径恢复；修复后预览/检查/成品一致。\n\nE. 导出：\n- 从真实ExportRequest/EffectiveSnapshot读回来源、范围、格式、模板/版式、目录和已知提醒。快速导出仍默认整份当前内容，不加全保存/全检查/必答确认，不被上次单章选择缩小。\n- 修正最终顺序：固定本轮来源/范围→受支持内容和版式→可用Word刷新→保存最终DOCX→登记最终hash/状态→同轮PDF。PDF必须取最终DOCX。\n- 当前代码在刷新/状态后再_apply_layout，须从真实入口复现。版式优先前置；兼容入口必须后置修改时，再次有界刷新或标待刷新，不能沿用旧正式状态。登记失败保留可读成果与待办，不假报正式通过。\n- 新轮HTML/资源独立目录、登记真实路径，连续两轮旧成果仍可打开。活缓冲已经捕获不能再报未导出。\n- 对照当前章/选章/整份及父正文、长表/宽图/代码/链接，离线HTML/源码包脱离源目录可用。范围外链接说明边界，不悄悄扩大范围或造假本地链接。\nF. 从真实入口验收Word导入、多Markdown建项、源Word修订接收三条闭环；包含未保存复制/修图、取消/变化项、原轮补充/新轮、最终成品与离线路径。\n\nV4.0运行要求：\n沿用原Word工作进程/helper，有限预算覆盖忙锁、取得PID前启动、打开、处理/刷新、写成果、退出/清理；不可中断COM线程不能假称保证停止。源码/冻结适配按实际helper能力验证，不启动第二个可见主窗口。\n仅清理已证明属于本任务的helper/Word实例，不凭进程名或全局新增PID猜归属；未知Word只停自有helper并记残留，其他格式/编辑继续。取消请求一秒内确认，真实停止独立显示；临时成果核对项目/代次/捕获后才登记，晚到结果不覆盖。\n原轮恢复使用可信报告/captureId/roundId/结构化范围，缺失或不匹配仅限制该动作；保留旧成果，当前内容新轮明确另建。关闭有界收尾草稿/去抖/回调，诊断默认不带业务正文。\n\nV4.1模板要求：\n本地目录引用原规范/模板/recipe，区分骨架建项、模板填充、项目出稿；同名按真实来源/摘要区分，坏索引可重建，固定包编辑副本。\n预设仅用真实样式映射与已支持LayoutProfile字段mode、image_width、table_width、repeat_header、allow_row_split、landscape_chapters、page_break_before_chapter；未知声明保留，未支持字体/封面/页眉字段不假报生效。schema 1消费保持，template-fill --output仍是DOCX文件路径，预设与正文来源/范围分开。\n所选真实底模小样每轮隔离，模板摘要/映射/版式/内容变化使复用失效，默认通用内容；HTML是内容预览，真实Word分页另有实证。更换摘要实际可读，补旧样例仍取原捕获。\n\nV4.2检查要求：\n先同次运行细分发现/读取摘要/索引/规则/结果/UI/释放，不预设规则遍历唯一瓶颈。50/300/1000章每档至少五次冷/热/单章变化/规则变化，记录原始样本、中位/p95、峰值/对象释放；按实测选有效且较简单的优化。\n复用索引/结果键含正文、规则参数、解析器、范围和依赖摘要；跨章/模块/变量正确失效，未知依赖完整兜底。mtime/size不能单独证明未改，保留同大小/同时间修改断言；活缓冲派生只在内存，坏缓存直接算，结果与无缓存逐项一致。\n分组/筛选/分页不改报告事实，范围外未检查、正文变过期、缺基线未知。支持字段规则试跑不隐式保存；确定性成组修正给差异/选择/撤销，冲突局部跳过，暂不处理只改个人当前版本视图。目标主热路径p95改善至少30%、50章不恶化超过10%，未达如实记，不删规则/样本或弱化断言。\n\nV4.3交付要求：\n原请求组合准备成员/范围/模板/格式/目录，提交固定逐成员捕获，后续编辑下一轮生效；缺成员局部处理。按成员/格式先打开可用成果，仅补所需项，部分集合不假报完整正式。\n比较两个固定真实版本，路径/ID区分同名，正文/资源与稳定条目/关系有证据；源码配置与模块/变量装配变化分别比较，缺历史数据对应部分不可比较。修订说明实际差异预填且可编辑，不自动改复核/正式状态。\n本地接收人包包含实际文件/资源/清单/修订与离线入口，源码明确选择；跨机补Word继续snapshot_package原捕获/必要资源，区分用途，只读文件包不冒充可刷新包。恢复仅新副本，冲突新名、坏项跳过，原工程/缓冲保持。三成员合成闭环先自动验证，真实团队另测。\n\n全部页面复用原action registry、状态/导航、TaskRunner/TaskDock、CORE/ExportRequest/EffectiveSnapshot、原队列/结果索引/快照包、规范/RecipeStore、索引/linter/quick fix、collection_ops与评审；不建第二套schema、身份、任务或成果状态。\nUI主动作靠近内容，高级项折叠，加载/空/无筛选结果/部分/失败/只读/过期就地给下一步；返回保持页签/筛选/光标/多章正文/表格与规范草稿。QWidget留UI线程，后台数据核对代次。\n1024×640、1280×720、1920×1080，明暗主题、长名称/表头/滚动、Tab/Shift+Tab/Esc实际可用，窄时滚动或溢出；中文IME不被快捷键劫持。原生Word/缩放/剪贴板与离屏验证分开留证。\n\n每批完成后运行直接相关检查，保存真实命令、环境、退出码、内容/来源/范围/身份断言、截图或几何/性能，勾有证据的任务并更新docs/product-v40-v43-execution.md。通过后继续；新改动/失败/未决问题才扩大或重复验证。最终核对当前默认runner实际执行范围，文件与用例数分别报告，历史180文件和旧专项不冒充最新覆盖。\n真实Word/底模/IME/冻结/团队/大工程条件不足保持对应任务未勾选，写复验步骤并继续独立项；离屏、诊断DOCX、OpenSpec strict不替代真实视觉/正式成果/业务完成。只有所有当前可执行工作完成，或剩余逐项证明依赖实际外部条件时结束。\n\n保留现有工作，大文件改前保留完整差异并验证写后完整性，异常先恢复再继续；不重置/清理他人改动，不自动提交、推送、发布、归档、安装到他人环境或发送外部消息。上下文压缩后依据tasks和台账接续，不重新开始。\n最终报告五包实际状态、主功能/UI真实入口闭环、测试覆盖与失败、内容来源/范围、兜底、性能/释放、实机缺口和下一直接任务；不要用规划完成替代功能完成。\n```\n\n任务入口：[V4.0](../openspec/changes/product-v40-runtime-and-word-reliability/tasks.md)、[MAIN2](../openspec/changes/product-mainline-usability-and-fidelity/tasks.md)、[V4.1](../openspec/changes/product-v41-enterprise-template-workflows/tasks.md)、[V4.2](../openspec/changes/product-v42-incremental-quality-workbench/tasks.md)、[V4.3](../openspec/changes/product-v43-delivery-and-revision-workbench/tasks.md)。\n"
+  }
+]

@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from doc_tool.domain.errors import PathEscapeError, ProjectManifestError
 

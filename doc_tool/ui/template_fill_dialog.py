@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -55,9 +56,13 @@ class TemplateFillDialog(QDialog):
         parent: Optional[QWidget] = None,
         busy_check=None,
         paths: Optional[List[Path]] = None,
+        template: Optional[str] = None,
+        recipe: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self._busy_check = busy_check
+        #: 本地模板目录条目携带的 recipe 路径（空 = 按受支持字段默认）。
+        self._library_recipe = str(recipe or "")
         self._runner = TaskRunner()
         self._style_map: Optional[Dict[str, int]] = None
         self._parsed_styles: Optional[TemplateStyles] = None
@@ -216,10 +221,12 @@ class TemplateFillDialog(QDialog):
         self._file_list.model().rowsRemoved.connect(lambda *_: self._plan_timer.start())
         self._strict.toggled.connect(lambda *_: self._plan_timer.start())
 
-        # 记忆底模：预填上次使用的 .docx（失效时解析警告会提示）。
-        last_template = load_last_template()
+        # 记忆底模：本地模板目录传入的底模优先，其次上次使用的 .docx（失效时解析警告会提示）。
+        last_template = str(template or "") or load_last_template()
         if last_template:
             self._template_edit.setText(last_template)
+        if self._library_recipe:
+            self._apply_library_recipe(self._library_recipe)
         self._recipe_combo.currentIndexChanged.connect(self._select_recipe)
         for warning in self._presets.warnings:
             self._details.appendPlainText(warning)
@@ -238,9 +245,34 @@ class TemplateFillDialog(QDialog):
         recipe = self._recipe_combo.currentData()
         name, ok = QInputDialog.getText(self, '预设名称', '名称：', text=recipe.get('name', '') if recipe else '')
         if not ok: return
+        # V4.1 41-B：按**实际底模枚举出的样式 ID** 校验映射，并把受支持版式
+        # 字段一起保存；未知/不支持声明只保留在详情里，不声称生效。
+        known_style_ids = (
+            {style.style_id for style in self._parsed_styles.paragraph_styles}
+            if self._parsed_styles else set()
+        )
         try:
-            self._presets.save_recipe(name, self._settings(), recipe.get('recipeId') if recipe else None)
+            saved = self._presets.save_recipe(
+                name, self._settings(),
+                recipe.get('recipeId') if recipe else None,
+                known_style_ids=known_style_ids,
+            )
             self._reload_recipes()
+            detail = saved.get('mappingSummary') or ''
+            if detail:
+                self._details.appendPlainText('⚠️ ' + detail)
+            unsupported = saved.get('unsupportedLayout') or {}
+            if unsupported:
+                self._details.appendPlainText(
+                    'ℹ️ 以下声明本工具暂不支持，已保留原文但不会生效：' + '、'.join(sorted(unsupported))
+                )
+            problems = saved.get('layoutProblems') or []
+            if problems:
+                self._details.appendPlainText('⚠️ 版式字段未写入：' + '；'.join(problems))
+            if saved.get('layout'):
+                self._details.appendPlainText(
+                    '✓ 已保存受支持版式设置（{0} 项）。'.format(len(saved['layout']))
+                )
         except (OSError, ValueError) as exc:
             self._details.appendPlainText('预设保存失败：' + str(exc))
 
@@ -273,6 +305,55 @@ class TemplateFillDialog(QDialog):
         self._strict.setChecked(bool(values.get('strict')))
         self._output_edit.setText(values.get('outputDir', ''))
         self._name_edit.setText(values.get('outputName', ''))
+
+    def _apply_library_recipe(self, recipe_path: str) -> None:
+        """接入本地模板目录条目携带的 recipe：只应用底模真实存在的标题样式映射。
+
+        读不出或字段不合法只留提示，不改底模、不改其它输入；没有对应样式的声明
+        保留在提示里但不声称已生效。
+        """
+        try:
+            data = json.loads(Path(recipe_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            self._details.appendPlainText("⚠️ 目录 recipe 不可读，保持默认映射：{0}".format(exc))
+            return
+        mapping = data.get("mapping") or data.get("styleMap") or {}
+        if not isinstance(mapping, dict):
+            self._details.appendPlainText("⚠️ 目录 recipe 的映射不是映射表，保持默认映射。")
+            return
+        candidate = {
+            str(key): value
+            for key, value in mapping.items()
+            if isinstance(value, int) and 1 <= value <= 6
+        }
+        known = (
+            {style.style_id for style in self._parsed_styles.paragraph_styles}
+            if self._parsed_styles else set()
+        )
+        if not known:
+            self._details.appendPlainText(
+                "⚠️ 底模样式未能解析，目录 recipe 的 {0} 项映射未应用（保持默认自动匹配）。".format(
+                    len(candidate)
+                )
+            )
+            return
+        applied = {key: value for key, value in candidate.items() if key in known}
+        dropped = sorted(set(candidate) - set(applied))
+        if applied:
+            self._style_map = applied
+            self._details.appendPlainText(
+                "✓ 已应用目录 recipe 的标题样式映射（{0} 项）。".format(len(applied))
+            )
+        if dropped:
+            self._details.appendPlainText(
+                "⚠️ recipe 中 {0} 项在底模里没有对应样式，未应用：{1}".format(
+                    len(dropped), "、".join(dropped[:5])
+                )
+            )
+        if not applied and not dropped:
+            self._details.appendPlainText(
+                "ℹ️ 目录 recipe 未提供可应用的标题样式映射，沿用默认自动匹配。"
+            )
 
     def _select_recipe(self, index):
         recipe = self._recipe_combo.itemData(index)

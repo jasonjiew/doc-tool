@@ -118,6 +118,10 @@ class ContentIndexService:
         )
         # 布局 A 以类型子目录为根；布局 B 以 content_root 自身为根。
         roots = type_dirs if type_dirs else [self._content_root]
+        # V4.2 42-B 实测：改成 `rglob("*")` + Python 侧筛后缀反而更慢
+        # （1000 章 cold discover 149ms → 244ms，因为对每个目录项都做了一次
+        # Python 层判断），因此保留“按后缀 rglob”这一由解释器 C 层过滤的实现。
+        # 结论来自 analysis/v42/measure-staged.json，不凭直觉优化。
         for base in roots:
             for suffix in MD_SUFFIXES:
                 for file_path in base.rglob("*" + suffix):

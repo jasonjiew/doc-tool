@@ -92,6 +92,8 @@ class ExportRoundView:
     unsaved_chapters: List[str] = field(default_factory=list)
     index_path: str = ""
     docx_path: str = ""
+    #: V4.0 40-D：本轮 Word 刷新的真实阶段与清理事实（缺项表示未知）。
+    word_stages: List[str] = field(default_factory=list)
     # 仅供新轮设置预填；补原轮仍读取真实报告并核对身份。
     scope: Optional[ExportScope] = None
 
@@ -162,6 +164,7 @@ def round_view_from_report(report) -> ExportRoundView:
         destination=str(getattr(report, "destination", "") or ""),
         formats=formats,
         warnings=[str(w) for w in getattr(report, "warnings", None) or []],
+        word_stages=[str(item) for item in getattr(report, "wordStages", None) or []],
         unsaved_chapters=[
             str(item) for item in getattr(report, "unsavedChapters", None) or []
         ],

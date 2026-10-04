@@ -18,7 +18,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from doc_tool.domain.content_index import ContentIndex
 
@@ -56,12 +56,99 @@ class LintIssue:
             self.rule_id = self.rule
 
 
+#: 进程内“检查结果复用”缓存（V4.2 42-B）。
+#:
+#: 键包含正文状态（每章路径 + 行数 + 内容摘要）、规则参数、解析器版本与范围，
+#: 依赖摘要变化必然换键——因此不会拿旧结果冒充新正文。容量超限整体丢弃。
+_LINT_RESULT_CACHE: "Dict[tuple, List[LintIssue]]" = {}
+_LINT_RESULT_CACHE_MAX = 64
+#: 解析器版本参与键：解析逻辑变化必须使旧结果失效。
+LINT_PARSER_VERSION = "lint-v1"
+
+#: 规则依赖分类（V4.2 42-B 2.3）。
+#:
+#: - ``local``：只看单章正文——单章变化时其它章的结果可以复用；
+#: - ``cross-chapter``：依赖全项目正文（重复标题、术语一致性、跨章编号、链接/覆盖）。
+#:
+#: 未列出的规则按 ``unknown`` 处理：**一律退完整核对**，不做任何复用推断。
+RULE_DEPENDENCIES = {
+    "todo_residual": "local",
+    "markdown_structure": "local",
+    "mermaid_syntax": "local",
+    "heading_format": "local",
+    "field_completeness": "local",
+    "sensitive_info": "local",
+    "interface_table_structure": "local",
+    "duplicate_title": "cross-chapter",
+    "term_case": "cross-chapter",
+    "required_section": "cross-chapter",
+    "numbering_uniqueness": "cross-chapter",
+}
+
+
+def rule_dependency(rule_id: str) -> str:
+    """规则的依赖范围：``local`` / ``cross-chapter`` / ``unknown``。"""
+    return RULE_DEPENDENCIES.get(str(rule_id or ""), "unknown")
+
+
+def requires_full_recheck(rule_ids) -> bool:
+    """给定规则集合是否需要完整核对（含任何跨章或未知依赖规则时为真）。
+
+    保守口径：只要有一条跨章或未知依赖规则启用，就不能只按“本章变化”复用结果，
+    必须整份重算——避免把跨章规则（重复标题/术语/编号/链接覆盖）的结果算漏。
+    """
+    for rule_id in rule_ids or ():
+        if rule_dependency(rule_id) in ("cross-chapter", "unknown"):
+            return True
+    return False
+
+
+def reset_lint_result_cache() -> None:
+    """清空检查结果复用缓存（测试/长驻进程释放内存用）。"""
+    _LINT_RESULT_CACHE.clear()
+
+
+def index_dependency_digest(index) -> tuple:
+    """索引依赖摘要：正文（路径 + 行数 + 内容摘要）、解析器版本与文档类型集合。
+
+    内容摘要优先用索引自带的 ``contentDigests``；没有时**按真实行文本**计算
+    sha256——这正是“键必须包含正文”的落地方式：正文任何变化都会换键。
+    """
+    import hashlib
+
+    digests = getattr(index, "contentDigests", None) or {}
+    files = getattr(index, "files", {}) or {}
+    lines = getattr(index, "lines", {}) or {}
+    parts = []
+    for rel_path in sorted(files):
+        body_lines = lines.get(rel_path) or []
+        digest = str(digests.get(rel_path) or "")
+        if not digest:
+            hasher = hashlib.sha256()
+            for line in body_lines:
+                hasher.update(str(line).encode("utf-8"))
+                hasher.update(b"\n")
+            digest = hasher.hexdigest()
+        parts.append((
+            rel_path,
+            int(getattr(files[rel_path], "line_count", 0)),
+            digest,
+            len(body_lines),
+        ))
+    return (
+        LINT_PARSER_VERSION,
+        tuple(sorted(str(item) for item in (getattr(index, "document_types", None) or ()))),
+        tuple(parts),
+    )
+
+
 class ContentLinter:
     """一致性检查器（纯服务）。"""
 
-    def __init__(self, index: ContentIndex, rules_config=None) -> None:
+    def __init__(self, index: ContentIndex, rules_config=None, *, use_result_cache: bool = True) -> None:
         self._index = index
         self._rules_config = rules_config
+        self._use_result_cache = bool(use_result_cache)
 
     def _rules(self):
         if self._rules_config is not None:
@@ -70,8 +157,37 @@ class ContentLinter:
         doc_type = next(iter(self._index.document_types), "general")
         return {rule.rule_id: rule for rule in default_rules(doc_type)}
 
+    def _rules_signature(self) -> tuple:
+        """规则参数签名：启用状态与严重级别进入依赖键（规则变化必然换键）。"""
+        signature = []
+        for rule_id, rule in sorted(self._rules().items()):
+            signature.append((
+                str(rule_id), bool(getattr(rule, "enabled", True)),
+                str(getattr(rule, "severity", "")),
+                str(getattr(rule, "params", "") or ""),
+            ))
+        return tuple(signature)
+
     def check_all(self, terms: List[str]) -> List[LintIssue]:
-        """运行全部检查，返回按文件与行排序的结果。"""
+        """运行全部检查，返回按文件与行排序的结果。
+
+        V4.2 42-B：同一进程内对“同一正文状态 + 同一规则参数 + 同一范围”复用上次
+        结果——依赖摘要变化即换键，因此不会用旧结果冒充新正文；容量不足或未命中
+        时完整重算，结果与无缓存完全一致。
+        """
+        cache_key = None
+        if self._use_result_cache:
+            try:
+                cache_key = (
+                    index_dependency_digest(self._index),
+                    self._rules_signature(),
+                    tuple(sorted(str(item) for item in (terms or ()))),
+                )
+                cached = _LINT_RESULT_CACHE.get(cache_key)
+                if cached is not None:
+                    return list(cached)
+            except Exception:  # noqa: BLE001 - 键构造失败时直接完整重算
+                cache_key = None
         issues = []
         dispatch = {
             "duplicate_title": lambda rule: self.check_duplicate_titles(rule.severity),
@@ -91,6 +207,10 @@ class ContentLinter:
                 issues.extend(dispatch[rule.rule_id](rule))
         from doc_tool.domain.content_index import path_natural_sort_key
         issues.sort(key=lambda i: (path_natural_sort_key(i.rel_path), i.line_no))
+        if cache_key is not None:
+            if len(_LINT_RESULT_CACHE) >= _LINT_RESULT_CACHE_MAX:
+                _LINT_RESULT_CACHE.clear()
+            _LINT_RESULT_CACHE[cache_key] = list(issues)
         return issues
 
     def check_duplicate_titles(self, severity: str = "warning") -> List[LintIssue]:

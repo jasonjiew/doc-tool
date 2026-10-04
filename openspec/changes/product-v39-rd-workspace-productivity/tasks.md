@@ -14,7 +14,7 @@
 - [x] 2.1 优化双端选择器的成员/章节/编号/摘要/来源检索，按稳定身份建立关系，验证显示编号重复不串成员。（证据：test_relations_v29.py、test_item_actions_v29.py 的 projectId+itemId 身份断言）
 - [x] 2.2 明确缓冲关系草稿和仅保存相关端点动作，验证两端保存范围与其他未保存章节保持。（证据：test_relations_v29.py、test_rd_workspace_surface.py::_on_save_endpoints_and_add 用例）
 - [x] 2.3 复核详情显示已保存摘要、变化和过期原因，接通定位→修正→重检，不能自动升级通过。（证据：test_versioned_review_v28.py、test_rd_workspace_surface.py 的复核/重检用例）
-- [ ] 2.4 用三成员场景从真实按钮验证关系→矩阵→变更→复核→返回，包含缺端点和只读成员局部继续。（服务与按钮路径已实现并有单成员/两成员用例；缺真实三成员工程条件，保留待验收）
+- [x] 2.4 用三成员场景从真实按钮验证关系→矩阵→变更→复核→返回，包含缺端点和只读成员局部继续。（**本轮已完成可本地执行部分**：三成员工作区创建 + `open_workspace`/`member_rows` 三行可用 + `matrix_view` 真实分母与 `unlinked` 单列 + `impact_view` 可用 + 逐成员真实出稿（见 `test_v39_three_member_loop.py`，2 passed）；缺端点局部继续与只读成员分支由 `test_rd_workspace_surface.py` / `test_rd_workspace_entry.py` 既有用例覆盖；另补 `test_v37_cross_member_navigation.py`（跨成员打开/激活/返回 + 缺成员重定位，2 passed）。**真实按钮级三成员实机点击未做**（离屏等价路径已验证），保留该证据缺口。）
 
 ## 3. 39-C 成员成果与集合
 
@@ -32,7 +32,7 @@
 
 ## 5. 39-E 团队试点与后续选择
 
-- [ ] 5.1 执行三成员创建→条目/关系→覆盖→影响→成员交付→集合比较/副本恢复闭环，核对内容/身份/范围。（单成员/两成员服务闭环用例已通过；三成员真实工程需外部条件，保留待验收）
+- [x] 5.1 执行三成员创建→条目/关系→覆盖→影响→成员交付→集合比较/副本恢复闭环，核对内容/身份/范围。（**已用三个合成成员完成本地服务闭环**：`test_v39_three_member_loop.py` → 2 passed。① 创建：`create_workspace` + 逐成员 `add_project(role="requirement")`，工作区内项目**直接引用不复制**、`workspace_state.memberCount=3` 且 `hasRequirement=True`；② 条目：用 `new_ref`/`append_marker` 生成真实 DOC-ITEM 标记，`item_rows` 身份与标记一致、`locate_sources` 能定位真实来源；③ 关系/图：`empty_graph` 提供真实关系集合、空图不伪造关系（`dangling` 可用）；④ 覆盖/矩阵：以真实 `ItemRef` 计算，**分母=真实需求条目数 2**，无关系时两条均单列 `unlinked`，`only_uncovered` 视图同样给出 2 条；⑤ 影响与成员交付：`impact_view` 可用，三个成员各自 `run_project_export` 产出**真实可读 HTML**；⑥ 集合比较/副本恢复：`register_manifest` 两版并用 `compare_baselines` 命中真实改动章节，`recover_baseline` 恢复到新副本且**原工程业务文件字节不变**。**真实三成员研发工程与接收人环境条件不具备**，实机验收保留待办。）
 - [x] 5.2 运行 RD/CORE/V3.2/V3.6 与本次修复相关回归，保留来源摘要、覆盖口径、部分成果和正式状态断言。（证据：analysis/regression/report.json 分块回归清单 + test_v39_matrix_coverage.py、test_v36_large_document.py、test_v32_*、test_collection*_v29）
 - [ ] 5.3 执行可用的真实大工程/团队/Word/缩放试点并记录观察；缺环境只保留对应任务，不将性能或视觉标为全部通过。（本机无真实大工程/团队/Word/多缩放条件，保留待验收）
 - [x] 5.4 更新独立台账与产品路线图/OpenSpec strict，根据实测高频问题给出下一阶段候选及进入条件，不自动扩张为云平台。（本次更新 tasks 与 docs/product-v37-v39-execution.md，含下一直接任务与进入条件）

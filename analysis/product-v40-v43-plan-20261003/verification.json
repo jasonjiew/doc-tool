@@ -1,0 +1,134 @@
+{
+  "status": "pass",
+  "date": "2026-10-03",
+  "head": "7ba19dd",
+  "planningOnly": true,
+  "businessTestsRun": false,
+  "wordProbeOrRefreshRun": false,
+  "newBusinessImplementation": false,
+  "newQueue": {
+    "batches": 20,
+    "tasks": 80,
+    "checked": 0,
+    "nextTask": "40-A 1.1"
+  },
+  "changes": [
+    {
+      "name": "product-v40-runtime-and-word-reliability",
+      "planningArtifacts": "4/4",
+      "strictValid": true,
+      "applyState": "ready",
+      "taskCount": 20,
+      "checked": 0,
+      "capabilities": [
+        "bounded-word-operations",
+        "runtime-recovery-and-evidence"
+      ],
+      "requirements": 6,
+      "scenarios": 12
+    },
+    {
+      "name": "product-v41-enterprise-template-workflows",
+      "planningArtifacts": "4/4",
+      "strictValid": true,
+      "applyState": "ready",
+      "taskCount": 20,
+      "checked": 0,
+      "capabilities": [
+        "enterprise-template-library",
+        "template-recipe-and-trial"
+      ],
+      "requirements": 6,
+      "scenarios": 10
+    },
+    {
+      "name": "product-v42-incremental-quality-workbench",
+      "planningArtifacts": "4/4",
+      "strictValid": true,
+      "applyState": "ready",
+      "taskCount": 20,
+      "checked": 0,
+      "capabilities": [
+        "incremental-quality-evaluation",
+        "quality-workbench-actions"
+      ],
+      "requirements": 6,
+      "scenarios": 13
+    },
+    {
+      "name": "product-v43-delivery-and-revision-workbench",
+      "planningArtifacts": "4/4",
+      "strictValid": true,
+      "applyState": "ready",
+      "taskCount": 20,
+      "checked": 0,
+      "capabilities": [
+        "delivery-preparation-and-results",
+        "revision-comparison-and-handover"
+      ],
+      "requirements": 6,
+      "scenarios": 11
+    }
+  ],
+  "priorTaskSnapshot": {
+    "total": 84,
+    "checked": 75,
+    "changes": [
+      {
+        "name": "product-main-workflow-optimization",
+        "total": 24,
+        "checked": 23
+      },
+      {
+        "name": "product-v37-daily-workflow-ux",
+        "total": 20,
+        "checked": 17
+      },
+      {
+        "name": "product-v38-authoring-and-exchange-ux",
+        "total": 20,
+        "checked": 19
+      },
+      {
+        "name": "product-v39-rd-workspace-productivity",
+        "total": 20,
+        "checked": 16
+      }
+    ]
+  },
+  "historicalRegressionReport": {
+    "origin": "analysis/regression/report.json",
+    "readOnly": true,
+    "files": 180,
+    "totals": {
+      "passed": 2860,
+      "failed": 4,
+      "skipped": 15,
+      "error": 0
+    },
+    "nonzeroFiles": [
+      "test_gui_services.py",
+      "test_home_experience_iteration.py",
+      "test_iteration_scenarios.py",
+      "test_local_history.py",
+      "test_main_e_export_rounds.py",
+      "test_release_review_bundle.py",
+      "test_review_docx.py",
+      "test_validator_negative.py"
+    ],
+    "timedOutFiles": [
+      "test_core_export_ui.py"
+    ]
+  },
+  "localMarkdownLinks": {
+    "filesChecked": 32,
+    "linksChecked": 195,
+    "broken": []
+  },
+  "whitespace": {
+    "allListedMarkdownChecked": true,
+    "scopedGitDiffCheckExit": 0,
+    "output": "warning: in the working copy of 'docs/product-execution-confirmed-prompt.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-function-catalog.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-main-workflow-optimization.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-master-roadmap.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-next-execution.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-post-implementation-review-20261003.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-v37-v39-execution.md', CRLF will be replaced by LF the next time Git touches it\nwarning: in the working copy of 'docs/product-v37-v39-roadmap.md', CRLF will be replaced by LF the next time Git touches it\n"
+  },
+  "errors": []
+}

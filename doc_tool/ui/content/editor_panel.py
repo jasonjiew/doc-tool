@@ -14,7 +14,7 @@ import time
 
 #: 围栏代码块起始行（三个反引号或三个波浪线开头）：标题/列表工具据此跳过代码。
 _FENCE_LINE_RE = re.compile(r"^(?:\x60{3,}|~{3,})")
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from dataclasses import dataclass
 from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
@@ -2136,6 +2136,22 @@ class EditorPanel(QWidget):
 
     def current_rel_path(self) -> Optional[str]:
         return self._rel_path
+
+    def set_rel_path(self, rel_path: str) -> None:
+        """章节改名/移动后把本编辑器改挂到新路径（MAIN2-C 3.2）。
+
+        只更新路径与 mtime 基准，不改动正文、不清脏标记、不写盘：未保存内容与
+        撤销栈保持，保存目标改为新路径。
+        """
+        rel_path = str(rel_path or "")
+        if not rel_path:
+            return
+        self._rel_path = rel_path
+        self._mtime = self._file_mtime(rel_path)
+        self._dismissed_external.clear()
+        self._set_file_label(rel_path)
+        self._update_dirty()
+        self._update_save_state()
 
     def is_dirty(self) -> bool:
         return self._dirty

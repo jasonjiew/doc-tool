@@ -1,0 +1,142 @@
+[
+  {
+    "path": "docs/product-execution-confirmed-prompt.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-next-execution.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-master-roadmap.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-function-catalog.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-main-workflow-optimization.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-v37-v39-roadmap.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "path": "docs/product-v37-v39-execution.md",
+    "replacements": [
+      {
+        "old": "最新读取 HEAD `f6d70ed`",
+        "replacement": "最新读取 HEAD `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "最新规划复核提交 `f6d70ed`",
+        "replacement": "最新规划复核提交 `7ba19dd`",
+        "optional": true
+      },
+      {
+        "old": "各包A→E接续",
+        "replacement": "MAIN2按A→F、其他各包A→E接续",
+        "optional": true
+      }
+    ]
+  }
+]

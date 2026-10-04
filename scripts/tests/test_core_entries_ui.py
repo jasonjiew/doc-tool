@@ -50,6 +50,13 @@ class _FakeReimportService:
 
         return _Result()
 
+    preview_calls = []
+
+    def preview(self, source, **kwargs):
+        """MAIN2-B 之后入口先走隔离差异：夹具显式返回“未生成差异”。"""
+        _FakeReimportService.preview_calls.append((Path(source), dict(kwargs)))
+        return None, "夹具未实现差异预览"
+
 
 class EntryWiringTests(unittest.TestCase):
     @classmethod
@@ -69,6 +76,7 @@ class EntryWiringTests(unittest.TestCase):
         )
         self._add_recent_patch.start()
         _FakeReimportService.calls = []
+        _FakeReimportService.preview_calls = []
         # 离屏环境下模态对话框会永久阻塞，统一替换为记录器
         self._info_patch = patch(
             "doc_tool.ui.main_window.QMessageBox.information",
@@ -78,14 +86,35 @@ class EntryWiringTests(unittest.TestCase):
         self.window = MainWindow()
 
     def tearDown(self):
+        # 入口现在把「重新导入差异」放后台（MAIN2-B 2.1）：必须先等任务结束再关窗，
+        # 否则 closeEvent 会走「任务运行中」分支弹模态确认框，在离屏环境永久阻塞
+        # （这正是本用例在加入差异预览后挂起的原因）。
+        self._drain_runner()
         try:
-            self.window.close()
+            with patch(
+                "doc_tool.ui.main_window.QMessageBox.question",
+                return_value=__import__("PySide6.QtWidgets", fromlist=["QMessageBox"]).QMessageBox.StandardButton.Yes,
+            ):
+                self.window.close()
         except Exception:  # noqa: BLE001
             pass
         self._info_patch.stop()
         self._add_recent_patch.stop()
         self._recent_patch.stop()
         fixtures.cleanup(self.work)
+
+    def _drain_runner(self, timeout: float = 30.0) -> bool:
+        """等待后台任务进入终态（非交互测试必须显式处理，不能让它跨 tearDown）。"""
+        import time as _time
+
+        from PySide6.QtWidgets import QApplication
+
+        deadline = _time.monotonic() + timeout
+        while self.window.runner.is_running and _time.monotonic() < deadline:
+            self.window.runner.poll()
+            QApplication.processEvents()
+            _time.sleep(0.01)
+        return not self.window.runner.is_running
 
     def _record_openers(self):
         opened = {"path": [], "window": []}
@@ -139,7 +168,13 @@ class EntryWiringTests(unittest.TestCase):
             "doc_tool.application.content.reimport.ReimportService", _FakeReimportService
         ):
             self.window._on_import_document([docx])
-        self.assertEqual(_FakeReimportService.calls, [docx])
+            # MAIN2-B 之后入口先做**隔离差异预览**（后台任务）；确认真实服务被调用、
+            # 且差异未生成时不写正文、不打开选择窗口。
+            self.assertTrue(self._drain_runner(), "差异预览任务应有界结束")
+        self.assertTrue(_FakeReimportService.preview_calls, "入口必须调用真实差异预览服务")
+        self.assertEqual(_FakeReimportService.preview_calls[0][0], Path(docx))
+        self.assertEqual(_FakeReimportService.calls, [], "预览阶段不得写正文")
+        self.assertIn("差异预览未生成", self.window._status_label.text())
 
     def test_unsupported_input_warns_without_service_call(self):
         bogus = self.work / "x.zip"

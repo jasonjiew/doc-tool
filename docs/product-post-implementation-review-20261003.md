@@ -1,5 +1,7 @@
 # RD / V3.4～V3.6 实施后审查与修复
 
+最新接续：MAIN/V3.7～V3.9已勾选75/84，后续规划为 [V4.0～V4.3](product-v40-v43-roadmap.md)，[完整开发指令](product-v40-v43-execution-prompt.md)。本文保留此前d68b514上的修复和测试事实，不充当最新全量回归证明。
+
 日期：2026-10-03（Asia/Shanghai）。审查基于 `d68b514` 及现有未提交工作树，应用版本 `2.9.0`。保留此前实现与 EX-1～EX-3 导出修正；本次实际修改产品代码、补回归并进行离屏界面检查。下一阶段见 [V3.7～V3.9 路线图](product-v37-v39-roadmap.md)，持续执行见 [完整指令](product-execution-confirmed-prompt.md)。
 
 ## 1. 已修复的问题
@@ -55,4 +57,4 @@ UI 结果示例：[编辑器 1024 浅色](../analysis/product-post-review-202610
 
 审查期间大文件写入工具异常截断编辑器，已用写入前完整 Git 差异及 HEAD 恢复，恢复文件 Git blob 为 `c65c4a36ea76f9dd6b598197d781f4eaf522d232`，与写入前记录一致；随后重新应用审查修复并完成编译及回归。原有未提交实现保留，恢复备份在本地忽略目录 `tmp/product-post-review-backups/`。
 
-审查完成时下一直接任务为37-A 1.1；用户随后补充 [MAIN主功能优化](product-main-workflow-optimization.md)24项，当前正常队列为MAIN→V3.7→V3.8→V3.9（新增21批/84项）。已有执行先完成当前批次再插入MAIN；每批沿用已完成能力，仅补真实差额。普通可选环境缺失、单项失败和旧人工待验收保持局部处理，无依赖任务继续。
+审查完成时下一直接任务为37-A 1.1；随后补充 [MAIN主功能优化](product-main-workflow-optimization.md)24项，当时队列为MAIN→V3.7→V3.8→V3.9（21批/84项），现已勾选75/84。最新接续为 [V4.0～V4.3](product-v40-v43-roadmap.md)，正常40-A 1.1；已有执行先完成当前批次。沿用已完成能力，仅补真实差额，可选环境缺失/局部失败按实际影响处理，无依赖任务继续。

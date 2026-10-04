@@ -1,6 +1,6 @@
 # 当前产品功能总清单
 
-初始盘点日期：2026-10-01。基准提交：`1cc28ca`，应用版本 `2.9.0`，项目 schema 2。下方详细清单保留当时状态；最新2026-10-03实施增补见文末第13节，审查修复与下一步见第14节，核对提交为 `d68b514`。实时实施状态以对应 change/tasks.md 和实际验证为准。
+初始盘点日期：2026-10-01。基准提交：`1cc28ca`，应用版本 `2.9.0`，项目 schema 2。第1～12节保留初始盘点，第13～14节为此前实施/规划快照；MAIN/V3.7～V3.9 最新75/84见第15节，V4.0～V4.3 新规划见第16节，最新读取 HEAD `7ba19dd`。实时实施状态以对应 change/tasks.md 和实际验证为准。
 
 产品定位：面向企业研发文档团队，用 Markdown 维护结构化内容，以 Word 模板完成正式文档交付，逐步接通需求、设计和测试的关系管理。
 
@@ -195,7 +195,7 @@
 
 CORE/V3.0～V3.3已勾选151/157，默认导入、当前缓冲捕获、统一多格式出稿、模块复用、交接、持久队列和辅助写作代码已存在；初始清单中的“执行中/规划”不得据此作为重新开发这些服务的理由。UI已19/20、UI2已25/26，日常入口、非模态成果、项目条溢出、继续工作、导航/阅读、导出设置和窄面板已提交。
 
-复核发现的三处导出差额已修复：原捕获丢失时保留旧成果，不改读新正文；已知捕获身份必须匹配；选章/当前章再生成及换目录保留范围，失效时回到可见设置。可核验的旧 Word 仍能补 PDF，新增断言回归和实际 HTML 内容检查见 [复核与修正记录](product-execution-review-20261003.md)。RD/V3.4～V3.6 已实施80/84，后续开发从 MAIN 主功能优化接续，再进入 V3.7～V3.9，实机和人工验收仍单列。
+复核发现的三处导出差额已修复：原捕获丢失时保留旧成果，不改读新正文；已知捕获身份必须匹配；选章/当前章再生成及换目录保留范围，失效时回到可见设置。可核验的旧 Word 仍能补 PDF，新增断言回归和实际 HTML 内容检查见 [复核与修正记录](product-execution-review-20261003.md)。RD/V3.4～V3.6已实施80/84，当时接续MAIN/V3.7～V3.9；最新75/84状态见第15节，当前后续队列见第16节。实机和人工验收继续按实际条件单列。
 
 RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（薄适配与统一来源定位）与 `ui/rd_workspace.py`（成员/概览/设置、条目/关系、矩阵/影响、集合/成果），主窗口新增「内容 → 研发工作区…」(Ctrl+Alt+D) 入口与宿主适配，顺带补齐设置分组名称写入、关系端点草稿判定、集合导出包目录与过期复核标注。证据见 [RD 执行台账](product-rd-workspace-execution.md)；6.3 真实桌面/Word 试点待验收。
 
@@ -207,7 +207,7 @@ RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（�
 
 各包台账：[RD](product-rd-workspace-execution.md)、[V3.4](product-v34-table-execution.md)、[V3.5](product-v35-standard-pack-execution.md)、[V3.6](product-v36-large-document-execution.md)。旧实机、人工试点与归档收尾单列，缺依赖仅影响对应动作。
 
-## 14. 实施后修复与下一轮功能
+## 14. 实施后修复与当时下一轮规划（历史快照）
 
 本次已修正真实表格按钮、空行列与一次撤销、表格来源锚点及草稿继续；规范清空资源/当前冻结、未知字段及资源保留、ZIP清单、独立样例/旧轮重试、关闭保存；小窗口工具栏/滚动表单/深色主题；历史交接报告按实际JUnit计数。详见 [审查与证据](product-post-implementation-review-20261003.md)。当前默认测试172文件；本次运行27文件/552用例相关检查和最终规范/报告专项，没有声称重跑完整默认清单。
 
@@ -215,7 +215,7 @@ RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（�
 
 ## 15. 2026-10-03 MAIN + V3.7～V3.9 实施结果
 
-四包 21 批 84 项已完成可执行部分 **75/84**，剩余 9 项全部依赖真实外部条件（Word/企业底模/中文 IME/Excel 剪贴板/真实多成员工程/多缩放显示器）。
+四包 21 批 84 项实际勾选 **75/84**，尚有九项未完成。需要逐项区分可自动执行与真实环境部分；39-D 4.4 多规模/对象释放可合成量测，三成员和页面状态亦先核对自动覆盖，不能统称全部依赖外部条件。
 
 - MAIN 23/24：导入代码缩进、保留对象精确到章节文件与行号、多来源同名资源身份与引用映射、替换范围与活缓冲、围栏代码保护、章节复制新身份、预览后内容变化的跳过、检查范围与活内容、差异预览与撤销、关闭生命周期、长表表头、整份出稿补齐父章节正文、单格式失败隔离。唯一剩余：6.3 真实企业底模/Word/IME/Excel 试点。
 - V3.7 17/20：跳转返回恢复原页面/筛选/选中行、问题面板无结果时的清除筛选下一步；其余由既有套件固定。剩余：三成员实机、真实截屏、真实桌面/IME/缩放。
@@ -224,4 +224,18 @@ RD 研发工作区界面已实施 23/24：新增 `application/rd_surface.py`（�
 
 新增/变更能力位置：`doc_tool/adapters/importer.py`（段落原文与定位行）、`doc_tool/application/project_from_markdown.py`（资源身份、章节标题提取）、`doc_tool/application/effective_snapshot.py`（整份补齐父章节正文）、`doc_tool/application/project_export.py`（单格式失败隔离）、`doc_tool/application/content/{replace,refactor,table_grid}.py`、`doc_tool/application/pack_authoring.py`、`doc_tool/ui/navigation_history.py`、`doc_tool/ui/content/{replace_panel,lint_panel,issues_panel,editor_panel,table_grid_dialog,workspace,tree_panel}.py`、`scripts/build_docx.py`。
 
-测试覆盖与证据：分块回归 180 文件 **2860 passed / 4 failed / 15 skipped / 1 timeout**（失败项均为既有环境问题，见台账第 5 节）；本轮新增 11 个测试文件、59 个用例；性能实测见 `analysis/main-d/measure-check-hotpath.json`。详见 [任务台账](product-v37-v39-execution.md)。
+测试覆盖与证据：分块回归 180 文件 **2860 passed / 4 failed / 15 skipped / 1 timeout**（另有8个非零退出文件；原根因分类待40-A复现核实，不能统称均为既有环境问题）；本轮新增 11 个测试文件、59 个用例；性能实测见 `analysis/main-d/measure-check-hotpath.json`。详见 [任务台账](product-v37-v39-execution.md)。
+
+## 16. V4.0～V4.3 后续正式规划（未实施）
+
+更新：2026-10-03。最新读取 HEAD `7ba19dd`；MAIN/V3.7～V3.9 已勾选 **75/84**，余下九项按真实依赖分别补验收。当前新增队列 **V4.0→MAIN2→V4.1→V4.2→V4.3**，26 批/104 项、实施 0/104。先完成已有执行中的批次，再从 **40-A 1.1** 接续。见 [新路线图](product-v40-v43-roadmap.md)、[新台账](product-v40-v43-execution.md)、[完整持续指令](product-v40-v43-execution-prompt.md)。
+
+| 版本 | 新增工作流差额 | 复用现有功能 | 范围/状态 |
+|---|---|---|---|
+| V4.0 | 回归复现、Word有界阶段、取消/关闭/重开、可用格式和诊断 | 原Word/helper、TaskRunner、捕获/队列/索引/草稿 | 5批/20项，0/20 |
+| MAIN2 | 导入完整结果/接续、实际复导入差异、当前章节/图片操作、成品顺序/来源 | ImportRecord/reimport预览、buffer/章节/资产、pipeline/output_state/HTML | 6批/24项，0/24 |
+| V4.1 | 本地模板目录、实际设置预设、隔离小样、更换摘要 | 规范schema 1、RecipeStore、映射/LayoutProfile、制作与样例 | 5批/20项，0/20 |
+| V4.2 | 分阶段量测、明确依赖增量、问题分组、规则试跑/成组修正 | ContentIndexService/ChapterCache/ContentLinter、原问题/quick fix | 5批/20项，0/20 |
+| V4.3 | 交付准备、成员格式成果、两版比较/修订、接收人包/副本恢复 | delivery/result_index/snapshot_package、collection_ops、研发工作区 | 5批/20项，0/20 |
+
+新增 [MAIN2主线计划](product-mainline-optimization.md)明确24项实际差额，原四包80项保持，合计五包104项。快速导出仍默认整份当前内容，原引擎不重造；模板只编辑实际支持字段，比较用真实版本，部分成果保持真实状态。五个change规划/strict通过只表示方案可执行，业务/原生Word/性能尚待验证。

@@ -14,6 +14,8 @@
 from __future__ import annotations
 
 import re
+import posixpath
+import urllib.parse
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -126,17 +128,33 @@ def copy_chapter_markdown(text: str, *, title: str = "", project_id: str = "") -
     return content, mapping
 
 
-def copy_chapter(index: ContentIndex, rel_path: str, writer, *, title: str = "") -> ChapterCopyResult:
-    """把一章复制为同目录下的新章节：新路径 + 新条目身份 + 不覆盖任何现有文件。"""
+def copy_chapter(
+    index: ContentIndex,
+    rel_path: str,
+    writer,
+    *,
+    title: str = "",
+    source_text: Optional[str] = None,
+) -> ChapterCopyResult:
+    """把一章复制为同目录下的新章节：新路径 + 新条目身份 + 不覆盖任何现有文件。
+
+    ``source_text``（MAIN2-C 3.1）传入**当前有效正文**（编辑器活缓冲）时以它为准，
+    不再读 ``index.lines``：否则未保存的编辑会被旧索引内容顶替。不传时保持原行为。
+    """
     rel_path = str(rel_path or "").replace("\\", "/")
     if not rel_path:
         return ChapterCopyResult(ok=False, message="未指定要复制的章节。")
     files = list(index.all_files())
+    current = None if source_text is None else str(source_text)
     if rel_path not in files:
         return ChapterCopyResult(ok=False, source=rel_path, message="章节不在当前索引中。")
-    source_text = "\n".join(index.lines.get(rel_path, []))
-    if source_text and not source_text.endswith("\n"):
-        source_text += "\n"
+    if current is not None:
+        body = current
+    else:
+        body = "\n".join(index.lines.get(rel_path, []))
+    if body and not body.endswith("\n"):
+        body += "\n"
+    source_text = body
     stem = Path(rel_path).stem
     new_title = str(title or "").strip() or (stem + "（副本）")
     from doc_tool.application.content.tree import next_chapter_rel_path
@@ -231,14 +249,29 @@ class RefactorService:
                                 new_substr=new_number,
                             )
                         )
-                    elif ref.kind == REF_LINK and old_basename in ref.source_text:
-                        edits.append(
-                            EditOp(source, ref.source_line, old_basename, new_basename)
-                        )
             if renumbering:
                 title_edit = self._title_edit(old_rel_path, old_number, new_number)
                 if title_edit is not None:
                     edits.append(title_edit)
+
+        # 同时考虑链接来源章和目标章的新位置，跨目录移动后仍使用有效相对路径。
+        path_map = dict(normalized)
+        for source, refs in self._index.references.items():
+            new_source = path_map.get(source, source)
+            for ref in refs:
+                if ref.kind != REF_LINK or not ref.target or not ref.target_rel_path:
+                    continue
+                target = ref.target_rel_path
+                new_target = path_map.get(target, target)
+                if new_source == source and new_target == target:
+                    continue
+                relative = posixpath.relpath(new_target, posixpath.dirname(new_source) or ".")
+                old_link = str(ref.target)
+                # 既有链接采用百分号编码时保持相同形式；锚点由解析器留在原行中。
+                if urllib.parse.unquote(old_link) != old_link:
+                    relative = urllib.parse.quote(relative, safe="/.-_")
+                if old_link != relative:
+                    edits.append(EditOp(source, ref.source_line, old_link, relative))
 
         # 去重（同一文件同一行多处同文本替换合并为一次，避免重复替换同一子串）
         edits, edit_conflicts = self._dedupe(edits)

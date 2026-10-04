@@ -22,7 +22,7 @@ git restore / svn revert 恢复，而不是本地 .bak 清单。
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCursor, QKeySequence

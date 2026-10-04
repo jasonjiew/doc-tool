@@ -1,0 +1,829 @@
+{
+  "generatedAt": "2026-10-03T17:41:12",
+  "python": "3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]",
+  "command": "python -m pytest <file> -q -p no:cacheprovider",
+  "workers": 4,
+  "timeoutSeconds": 300,
+  "seconds": 727.05,
+  "files": [
+    {
+      "file": "test_iteration_scenarios.py",
+      "returncode": 5,
+      "seconds": 13.7,
+      "counts": {},
+      "timedOut": false,
+      "tail": "no tests ran in 3.79s"
+    },
+    {
+      "file": "test_safety_recovery.py",
+      "returncode": 0,
+      "seconds": 33.9,
+      "counts": {
+        "passed": 53
+      },
+      "timedOut": false,
+      "tail": ".....................................................                    [100%]\n53 passed in 23.55s"
+    },
+    {
+      "file": "test_self_heal.py",
+      "returncode": 0,
+      "seconds": 14.64,
+      "counts": {
+        "passed": 9
+      },
+      "timedOut": false,
+      "tail": ".........                                                                [100%]\n9 passed in 4.64s"
+    },
+    {
+      "file": "test_settings_migration.py",
+      "returncode": 0,
+      "seconds": 13.28,
+      "counts": {
+        "passed": 6
+      },
+      "timedOut": false,
+      "tail": "......                                                                   [100%]\n6 passed in 3.25s"
+    },
+    {
+      "file": "test_settings_v28.py",
+      "returncode": 0,
+      "seconds": 11.5,
+      "counts": {
+        "passed": 14
+      },
+      "timedOut": false,
+      "tail": "..............                                                           [100%]\n14 passed in 3.77s"
+    },
+    {
+      "file": "test_snippet_library.py",
+      "returncode": 0,
+      "seconds": 11.76,
+      "counts": {
+        "passed": 2
+      },
+      "timedOut": false,
+      "tail": "..                                                                       [100%]\n2 passed in 4.07s"
+    },
+    {
+      "file": "test_spec_gap_entries.py",
+      "returncode": 0,
+      "seconds": 24.02,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 16.84s"
+    },
+    {
+      "file": "test_stale_report_v28.py",
+      "returncode": 0,
+      "seconds": 16.11,
+      "counts": {
+        "passed": 12
+      },
+      "timedOut": false,
+      "tail": "............                                                             [100%]\n12 passed in 6.74s"
+    },
+    {
+      "file": "test_standard_pack_v28.py",
+      "returncode": 0,
+      "seconds": 14.88,
+      "counts": {
+        "passed": 17
+      },
+      "timedOut": false,
+      "tail": ".................                                                        [100%]\n17 passed in 5.50s"
+    },
+    {
+      "file": "test_step_list.py",
+      "returncode": 0,
+      "seconds": 12.18,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 5.55s"
+    },
+    {
+      "file": "test_style_mapping.py",
+      "returncode": 0,
+      "seconds": 12.34,
+      "counts": {
+        "passed": 14
+      },
+      "timedOut": false,
+      "tail": "..............                                                           [100%]\n14 passed in 5.27s"
+    },
+    {
+      "file": "test_table_format.py",
+      "returncode": 0,
+      "seconds": 11.45,
+      "counts": {
+        "passed": 7
+      },
+      "timedOut": false,
+      "tail": ".......                                                                  [100%]\n7 passed in 4.09s"
+    },
+    {
+      "file": "test_template_fill.py",
+      "returncode": 0,
+      "seconds": 20.19,
+      "counts": {
+        "passed": 59
+      },
+      "timedOut": false,
+      "tail": "...........................................................              [100%]\n59 passed in 12.85s"
+    },
+    {
+      "file": "test_template_fill_plan.py",
+      "returncode": 0,
+      "seconds": 30.09,
+      "counts": {
+        "passed": 2
+      },
+      "timedOut": false,
+      "tail": "..                                                                       [100%]\n2 passed in 24.18s"
+    },
+    {
+      "file": "test_template_fill_presets.py",
+      "returncode": 0,
+      "seconds": 12.25,
+      "counts": {
+        "passed": 1
+      },
+      "timedOut": false,
+      "tail": ".                                                                        [100%]\n1 passed in 4.35s"
+    },
+    {
+      "file": "test_trace_matrix_v29.py",
+      "returncode": 0,
+      "seconds": 10.1,
+      "counts": {
+        "passed": 12
+      },
+      "timedOut": false,
+      "tail": "............                                                             [100%]\n12 passed in 2.53s"
+    },
+    {
+      "file": "test_traceable_items_v29.py",
+      "returncode": 0,
+      "seconds": 12.51,
+      "counts": {
+        "passed": 23
+      },
+      "timedOut": false,
+      "tail": ".......................                                                  [100%]\n23 passed in 2.77s"
+    },
+    {
+      "file": "test_ui2_acceptance.py",
+      "returncode": 0,
+      "seconds": 69.12,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 59.31s"
+    },
+    {
+      "file": "test_ui2_export_settings.py",
+      "returncode": 0,
+      "seconds": 76.7,
+      "counts": {
+        "passed": 15
+      },
+      "timedOut": false,
+      "tail": "...............                                                          [100%]\n15 passed in 67.65s (0:01:07)"
+    },
+    {
+      "file": "test_ui2_home_continue.py",
+      "returncode": 0,
+      "seconds": 22.73,
+      "counts": {
+        "passed": 9
+      },
+      "timedOut": false,
+      "tail": ".........                                                                [100%]\n9 passed in 14.57s"
+    },
+    {
+      "file": "test_ui2_navigation.py",
+      "returncode": 0,
+      "seconds": 26.5,
+      "counts": {
+        "passed": 13
+      },
+      "timedOut": false,
+      "tail": ".............                                                            [100%]\n13 passed in 18.84s"
+    },
+    {
+      "file": "test_ui2_panel_productivity.py",
+      "returncode": 0,
+      "seconds": 19.52,
+      "counts": {
+        "passed": 9
+      },
+      "timedOut": false,
+      "tail": ".........                                                                [100%]\n9 passed in 12.63s"
+    },
+    {
+      "file": "test_ui2_reading_view.py",
+      "returncode": 0,
+      "seconds": 23.47,
+      "counts": {
+        "passed": 7
+      },
+      "timedOut": false,
+      "tail": ".......                                                                  [100%]\n7 passed in 16.26s"
+    },
+    {
+      "file": "test_ui2_visual_hierarchy.py",
+      "returncode": 0,
+      "seconds": 65.6,
+      "counts": {
+        "passed": 10
+      },
+      "timedOut": false,
+      "tail": "..........                                                               [100%]\n10 passed in 58.08s"
+    },
+    {
+      "file": "test_ui_polish_acceptance.py",
+      "returncode": 0,
+      "seconds": 56.28,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 48.88s"
+    },
+    {
+      "file": "test_ui_polish_advanced.py",
+      "returncode": 0,
+      "seconds": 32.29,
+      "counts": {
+        "passed": 17
+      },
+      "timedOut": false,
+      "tail": ".................                                                        [100%]\n17 passed in 25.68s"
+    },
+    {
+      "file": "test_ui_polish_entry_drop.py",
+      "returncode": 0,
+      "seconds": 16.29,
+      "counts": {
+        "passed": 12
+      },
+      "timedOut": false,
+      "tail": "............                                                             [100%]\n12 passed in 7.93s"
+    },
+    {
+      "file": "test_ui_polish_geometry.py",
+      "returncode": 0,
+      "seconds": 19.0,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 13.33s"
+    },
+    {
+      "file": "test_ui_polish_layout_session.py",
+      "returncode": 0,
+      "seconds": 24.25,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 18.00s"
+    },
+    {
+      "file": "test_ui_polish_quick_export.py",
+      "returncode": 0,
+      "seconds": 27.95,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 21.99s"
+    },
+    {
+      "file": "test_ui_polish_results.py",
+      "returncode": 0,
+      "seconds": 59.06,
+      "counts": {
+        "passed": 14
+      },
+      "timedOut": false,
+      "tail": "..............                                                           [100%]\n14 passed in 50.70s"
+    },
+    {
+      "file": "test_ui_polish_toolbar.py",
+      "returncode": 0,
+      "seconds": 20.44,
+      "counts": {
+        "passed": 13
+      },
+      "timedOut": false,
+      "tail": ".............                                                            [100%]\n13 passed in 11.98s"
+    },
+    {
+      "file": "test_v26_ui_workflows.py",
+      "returncode": 0,
+      "seconds": 16.57,
+      "counts": {
+        "passed": 2
+      },
+      "timedOut": false,
+      "tail": "..                                                                       [100%]\n2 passed in 9.20s"
+    },
+    {
+      "file": "test_v30_content_reuse.py",
+      "returncode": 0,
+      "seconds": 142.45,
+      "counts": {
+        "passed": 36
+      },
+      "timedOut": false,
+      "tail": "....................................                                     [100%]\n36 passed in 133.98s (0:02:13)"
+    },
+    {
+      "file": "test_v30_offline_pilot.py",
+      "returncode": 0,
+      "seconds": 24.71,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 16.21s"
+    },
+    {
+      "file": "test_v30_pipeline_wiring.py",
+      "returncode": 0,
+      "seconds": 33.72,
+      "counts": {
+        "passed": 7
+      },
+      "timedOut": false,
+      "tail": ".......                                                                  [100%]\n7 passed in 25.66s"
+    },
+    {
+      "file": "test_v30_preview_instances.py",
+      "returncode": 0,
+      "seconds": 28.35,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 20.89s"
+    },
+    {
+      "file": "test_v30_reuse_entry.py",
+      "returncode": 0,
+      "seconds": 261.1,
+      "counts": {
+        "passed": 40
+      },
+      "timedOut": false,
+      "tail": "........................................                                 [100%]\n40 passed in 253.01s (0:04:13)"
+    },
+    {
+      "file": "test_v30_reuse_ui.py",
+      "returncode": 0,
+      "seconds": 24.28,
+      "counts": {
+        "passed": 6
+      },
+      "timedOut": false,
+      "tail": "......                                                                   [100%]\n6 passed in 16.76s"
+    },
+    {
+      "file": "test_v31_command_registry.py",
+      "returncode": 0,
+      "seconds": 21.67,
+      "counts": {
+        "passed": 13
+      },
+      "timedOut": false,
+      "tail": ".............                                                            [100%]\n13 passed in 13.41s"
+    },
+    {
+      "file": "test_v31_flow_entry.py",
+      "returncode": 0,
+      "seconds": 27.6,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 20.59s"
+    },
+    {
+      "file": "test_v31_real_document_handoff.py",
+      "returncode": 0,
+      "seconds": 15.23,
+      "counts": {
+        "passed": 1
+      },
+      "timedOut": false,
+      "tail": ".                                                                        [100%]\n1 passed in 7.24s"
+    },
+    {
+      "file": "test_v31_registry_display.py",
+      "returncode": 0,
+      "seconds": 24.35,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 16.63s"
+    },
+    {
+      "file": "test_v31_registry_integration.py",
+      "returncode": 0,
+      "seconds": 21.29,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 14.02s"
+    },
+    {
+      "file": "test_v31_team_flow.py",
+      "returncode": 0,
+      "seconds": 25.53,
+      "counts": {
+        "passed": 6
+      },
+      "timedOut": false,
+      "tail": "......                                                                   [100%]\n6 passed in 18.77s"
+    },
+    {
+      "file": "test_v31_team_workflow.py",
+      "returncode": 0,
+      "seconds": 103.53,
+      "counts": {
+        "passed": 32
+      },
+      "timedOut": false,
+      "tail": "................................                                         [100%]\n32 passed in 96.92s (0:01:36)"
+    },
+    {
+      "file": "test_v32_batch_delivery.py",
+      "returncode": 1,
+      "seconds": 142.56,
+      "counts": {
+        "failed": 1,
+        "passed": 21
+      },
+      "timedOut": false,
+      "tail": "scripts/tests/test_v32_batch_delivery.py::ResultIndexTests::test_archive_selection_marks_partial_range\n  C:\\Users\\18098\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\zipfile\\__init__.py:1655: UserWarning: Duplicate name: 'selection-manifest.json'\n    return self._open_to_write(zinfo, force_zip64=force_zip64)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED scripts/tests/test_v32_batch_delivery.py::PackageTests::test_package_moves_to_new_directory_and_formalizes_from_packaged_snapshot\n1 failed, 21 passed, 3 warnings in 136.60s (0:02:16)"
+    },
+    {
+      "file": "test_v32_collection_bridge.py",
+      "returncode": 0,
+      "seconds": 29.56,
+      "counts": {
+        "passed": 7
+      },
+      "timedOut": false,
+      "tail": "============================== warnings summary ===============================\nscripts/tests/test_v32_collection_bridge.py::ArchiveSelectionRegistrationTests::test_complete_selection_registers_collection\nscripts/tests/test_v32_collection_bridge.py::ArchiveSelectionRegistrationTests::test_partial_selection_is_marked_and_not_registered_as_complete\n  C:\\Users\\18098\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\zipfile\\__init__.py:1655: UserWarning: Duplicate name: 'selection-manifest.json'\n    return self._open_to_write(zinfo, force_zip64=force_zip64)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n7 passed, 2 warnings in 22.90s"
+    },
+    {
+      "file": "test_v32_cross_process_promote.py",
+      "returncode": 0,
+      "seconds": 11.32,
+      "counts": {
+        "skipped": 2
+      },
+      "timedOut": false,
+      "tail": "ss                                                                       [100%]\n2 skipped in 4.06s"
+    },
+    {
+      "file": "test_v32_delivery_entry.py",
+      "returncode": 0,
+      "seconds": 133.56,
+      "counts": {
+        "passed": 25
+      },
+      "timedOut": false,
+      "tail": ".........................                                                [100%]\n25 passed in 126.34s (0:02:06)"
+    },
+    {
+      "file": "test_v32_delivery_progress.py",
+      "returncode": 0,
+      "seconds": 47.97,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 38.28s"
+    },
+    {
+      "file": "test_v32_delivery_ui.py",
+      "returncode": 0,
+      "seconds": 33.79,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 27.85s"
+    },
+    {
+      "file": "test_v32_entry_points.py",
+      "returncode": 0,
+      "seconds": 43.51,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 36.87s"
+    },
+    {
+      "file": "test_v32_package_version.py",
+      "returncode": 0,
+      "seconds": 25.69,
+      "counts": {
+        "passed": 7
+      },
+      "timedOut": false,
+      "tail": ".......                                                                  [100%]\n7 passed in 18.50s"
+    },
+    {
+      "file": "test_v32_real_word_formalize.py",
+      "returncode": 0,
+      "seconds": 16.13,
+      "counts": {
+        "skipped": 3
+      },
+      "timedOut": false,
+      "tail": "sss                                                                      [100%]\n3 skipped in 8.90s"
+    },
+    {
+      "file": "test_v32_variant_export.py",
+      "returncode": 0,
+      "seconds": 30.27,
+      "counts": {
+        "passed": 6
+      },
+      "timedOut": false,
+      "tail": "......                                                                   [100%]\n6 passed in 22.99s"
+    },
+    {
+      "file": "test_v32_word_busy_retry.py",
+      "returncode": 0,
+      "seconds": 50.75,
+      "counts": {
+        "passed": 9
+      },
+      "timedOut": false,
+      "tail": ".........                                                                [100%]\n9 passed in 43.85s"
+    },
+    {
+      "file": "test_v33_adoption_editor.py",
+      "returncode": 0,
+      "seconds": 24.22,
+      "counts": {
+        "passed": 1
+      },
+      "timedOut": false,
+      "tail": ".                                                                        [100%]\n1 passed in 17.77s"
+    },
+    {
+      "file": "test_v33_authoring_assistance.py",
+      "returncode": 0,
+      "seconds": 42.12,
+      "counts": {
+        "passed": 29
+      },
+      "timedOut": false,
+      "tail": ".............................                                         [100%]\n29 passed, 3 subtests passed in 35.69s"
+    },
+    {
+      "file": "test_v33_background_index.py",
+      "returncode": 0,
+      "seconds": 26.75,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 19.03s"
+    },
+    {
+      "file": "test_v33_editor_wiring.py",
+      "returncode": 0,
+      "seconds": 28.1,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 20.38s"
+    },
+    {
+      "file": "test_v33_module_update_cancel.py",
+      "returncode": 0,
+      "seconds": 26.21,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 19.40s"
+    },
+    {
+      "file": "test_v33_panel_reachability.py",
+      "returncode": 0,
+      "seconds": 21.0,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 14.14s"
+    },
+    {
+      "file": "test_v33_registry.py",
+      "returncode": 0,
+      "seconds": 17.38,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 10.69s"
+    },
+    {
+      "file": "test_v33_three_document_pilot.py",
+      "returncode": 0,
+      "seconds": 15.56,
+      "counts": {
+        "passed": 1
+      },
+      "timedOut": false,
+      "tail": ".                                                                        [100%]\n1 passed in 8.82s"
+    },
+    {
+      "file": "test_v34_table_authoring.py",
+      "returncode": 0,
+      "seconds": 29.08,
+      "counts": {
+        "passed": 25
+      },
+      "timedOut": false,
+      "tail": ".........................                                                [100%]\n25 passed in 20.51s"
+    },
+    {
+      "file": "test_v34_v35_entries.py",
+      "returncode": 0,
+      "seconds": 24.69,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 16.08s"
+    },
+    {
+      "file": "test_v35_standard_pack.py",
+      "returncode": 0,
+      "seconds": 72.76,
+      "counts": {
+        "passed": 20
+      },
+      "timedOut": false,
+      "tail": "....................                                                     [100%]\n20 passed in 64.18s (0:01:04)"
+    },
+    {
+      "file": "test_v36_large_document.py",
+      "returncode": 0,
+      "seconds": 35.7,
+      "counts": {
+        "passed": 31
+      },
+      "timedOut": false,
+      "tail": "...............................                                          [100%]\n31 passed in 28.10s"
+    },
+    {
+      "file": "test_v37_navigation_context.py",
+      "returncode": 0,
+      "seconds": 13.04,
+      "counts": {
+        "passed": 5
+      },
+      "timedOut": false,
+      "tail": ".....                                                                    [100%]\n5 passed in 3.97s"
+    },
+    {
+      "file": "test_v38_pack_skeleton_mode.py",
+      "returncode": 0,
+      "seconds": 11.62,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 3.24s"
+    },
+    {
+      "file": "test_v38_table_paste_paging.py",
+      "returncode": 0,
+      "seconds": 16.11,
+      "counts": {
+        "passed": 4
+      },
+      "timedOut": false,
+      "tail": "....                                                                     [100%]\n4 passed in 6.66s"
+    },
+    {
+      "file": "test_v39_matrix_coverage.py",
+      "returncode": 0,
+      "seconds": 14.62,
+      "counts": {
+        "passed": 3
+      },
+      "timedOut": false,
+      "tail": "...                                                                      [100%]\n3 passed in 5.28s"
+    },
+    {
+      "file": "test_v40_word_operations.py",
+      "returncode": 0,
+      "seconds": 29.48,
+      "counts": {
+        "passed": 20
+      },
+      "timedOut": false,
+      "tail": "....................                                                     [100%]\n20 passed in 20.59s"
+    },
+    {
+      "file": "test_validate_adaptation.py",
+      "returncode": 0,
+      "seconds": 10.27,
+      "counts": {
+        "passed": 8
+      },
+      "timedOut": false,
+      "tail": "........                                                                 [100%]\n8 passed in 3.05s"
+    },
+    {
+      "file": "test_validator_negative.py",
+      "returncode": 5,
+      "seconds": 8.6,
+      "counts": {},
+      "timedOut": false,
+      "tail": "no tests ran in 2.19s"
+    },
+    {
+      "file": "test_vcs_changes.py",
+      "returncode": 0,
+      "seconds": 72.23,
+      "counts": {
+        "passed": 83
+      },
+      "timedOut": false,
+      "tail": "........................................................................ [ 86%]\n...........                                                              [100%]\n83 passed in 66.30s (0:01:06)"
+    },
+    {
+      "file": "test_versioned_review_v28.py",
+      "returncode": 0,
+      "seconds": 8.4,
+      "counts": {
+        "passed": 17
+      },
+      "timedOut": false,
+      "tail": ".................                                                        [100%]\n17 passed in 2.56s"
+    },
+    {
+      "file": "test_word_compatibility_audit.py",
+      "returncode": 0,
+      "seconds": 13.59,
+      "counts": {
+        "passed": 27
+      },
+      "timedOut": false,
+      "tail": "...........................                                              [100%]\n27 passed in 5.99s"
+    },
+    {
+      "file": "test_word_release.py",
+      "returncode": 0,
+      "seconds": 19.19,
+      "counts": {
+        "passed": 39
+      },
+      "timedOut": false,
+      "tail": ".......................................                                  [100%]\n39 passed in 11.35s"
+    },
+    {
+      "file": "test_workspace_v29.py",
+      "returncode": 0,
+      "seconds": 12.67,
+      "counts": {
+        "passed": 18
+      },
+      "timedOut": false,
+      "tail": "..................                                                       [100%]\n18 passed in 5.21s"
+    }
+  ],
+  "totals": {
+    "passed": 1001,
+    "failed": 1,
+    "skipped": 5,
+    "error": 0
+  },
+  "failedFiles": [
+    "test_iteration_scenarios.py",
+    "test_v32_batch_delivery.py",
+    "test_validator_negative.py"
+  ],
+  "timedOutFiles": []
+}

@@ -339,11 +339,16 @@ class IntakeCommandGroupTests(unittest.TestCase):
         self.assertEqual(self.window._import_action.shortcut().toString(), "Ctrl+N")
         # 旧「新建项目（导入向导）」重复入口已合并，不再单独出现。
         self.assertNotIn("新建项目（导入向导）…", labels)
+        # 「导入」主入口只有一个；导入**结果**是可重开的查看入口，不属于导入类动作。
+        intake_like = [
+            label for label in labels
+            if "导入" in label and "结果" not in label
+        ]
         self.assertEqual(
-            [label for label in labels if "导入" in label],
-            [self.window._import_action.text()],
+            intake_like, [self.window._import_action.text()],
             "导入类入口只保留一个：{0}".format(labels),
         )
+        self.assertIn("导入结果与待处理项…", labels, "导入结果可重开查看")
 
     def test_palette_import_entry_uses_the_same_handler(self):
         seen = []
@@ -400,10 +405,33 @@ class IntakeCommandGroupTests(unittest.TestCase):
 
         self.assertEqual(len(opened), 1, "Markdown 应组成一份项目并打开")
         self.assertTrue((Path(opened[0]) / "project.yml").is_file())
-        self.assertEqual(seen.get("docx"), str(docx), "DOCX 逐份进入导入向导")
+        self.assertEqual(seen.get("docx"), str(docx), "单份 DOCX 仍逐份进入导入向导")
         self.assertEqual(len(warnings), 1, "不支持格式只警告一次且不进入任何服务")
         for path, data in before.items():
             self.assertEqual(path.read_bytes(), data, "入口调整不得改写源文件：{0}".format(path))
+
+    def test_multiple_docx_route_to_batch_without_opening_wizard(self):
+        """MAIN2-A 1.3：多份 Word 走批次（一文件一项目），不逐份弹向导。"""
+        first = fixtures.standard_docx(self.work / "第一份.docx")
+        second = fixtures.standard_docx(self.work / "第二份.docx")
+        wizard_calls = []
+        batches = []
+
+        with patch(
+            "doc_tool.ui.main_window.MainWindow._start_word_batch",
+            side_effect=lambda sources: batches.append(list(sources)),
+        ), patch(
+            "doc_tool.ui.wizard.ImportWizard",
+            side_effect=lambda *a, **k: wizard_calls.append(a) or None,
+        ):
+            self.window._on_import_document([first, second])
+
+        self.assertEqual(len(batches), 1, "两份 Word 应进入同一个批次")
+        self.assertEqual(
+            [Path(item).name for item in batches[0]], ["第一份.docx", "第二份.docx"],
+            "批次必须保持输入顺序",
+        )
+        self.assertEqual(wizard_calls, [], "批次路径不得再逐份弹向导")
 
 
 if __name__ == "__main__":

@@ -90,7 +90,10 @@ def build_tree(
             seen_dir_ids.add(type_id)
         for rel in sorted(by_type[document_type], key=_path_sort_key):
             parts = rel.split("/")
-            dirs = parts[1:-1]
+            # 单类型项目（公共版通用单项目）的 rel_path 首段就是章节目录，而不是
+            # 文档类型；此时首段必须参与目录层级，否则章节目录节点整体丢失
+            # （目录级右键入口与批量操作目标都无从选择）。
+            dirs = parts[:-1] if parts[0] not in known_types else parts[1:-1]
             file_name = parts[-1]
             if not dirs:
                 # 文件直接位于类型根下：flatten 时作为顶层文件，否则挂在类型节点下。

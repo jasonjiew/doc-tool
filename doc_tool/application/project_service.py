@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from doc_tool.domain.branding import USER_CONFIG_DIR_NAME
 from doc_tool.domain.errors import (

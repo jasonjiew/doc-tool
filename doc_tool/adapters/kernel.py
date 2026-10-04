@@ -379,6 +379,7 @@ def refresh_with_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
+    report: Optional[dict] = None,
 ) -> Tuple[bool, str]:
     """以项目上下文调用 ``refresh_fields.supervise``。
 
@@ -388,13 +389,22 @@ def refresh_with_project(
 
     任务 7.2：刷新由专用 ``DispatchEx("Word.Application")`` 进程完成，
     不复用、不关闭、不终止用户已打开的 Word。超时只 kill 本次专用进程树。
+
+    V4.0 40-B：传入 ``report`` 时写入本轮真实阶段/预算/归属/清理事实
+    （``refresh_fields.LAST_REPORT`` 的同源内容），供结果页说明“卡在哪一步”。
     """
     ensure_kernel_importable()
+    import refresh_fields  # noqa: E402
     from refresh_fields import supervise  # noqa: E402
 
     config = config_from_project(manifest, paths, output_override)
     output_path = config["paths"]["output"]
-    return supervise(
+    outcome = supervise(
         output_path=output_path,
         timeout=manifest.refreshTimeoutSeconds,
     )
+    if report is not None:
+        fresh = getattr(refresh_fields, "LAST_REPORT", {}) or {}
+        report.clear()
+        report.update(fresh)
+    return outcome

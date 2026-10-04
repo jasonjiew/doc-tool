@@ -145,6 +145,9 @@ def open_preview(
             entry.blocked_reason = "\u5b58\u5728\u672a\u4fdd\u5b58\u7f16\u8f91\uff0c\u8df3\u8fc7\u4ee5\u907f\u514d\u8986\u76d6"
         elif entry.conflict:
             entry.blocked_reason = item.reason or "\u51b2\u7a81\u9879\u9700\u4eba\u5de5\u786e\u8ba4"
+        if entry.dirty or entry.conflict:
+            # 被阻止的项在数据模型里就不预选：界面与 apply_session 看到同一事实。
+            entry.selected = False
         if local_contents and incoming_contents:
             old = local_contents.get(item.rel_path)
             new = incoming_contents.get(item.rel_path)

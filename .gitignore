@@ -116,3 +116,10 @@ analysis/ui-experience-next-audit-20261002/sample-import.docx
 analysis/ui-experience-next-after-20261002/isolated-user/
 analysis/ui-experience-next-after-20261002/sample-project/
 analysis/ui-experience-next-after-20261002/sample-import.docx
+
+# LLM 编辑工作流的补丁规格中间产物（不属产品源码；重建依据见
+# docs/product-v3.0.0-code-review-and-fixes.md）
+tools/_patch*.json
+
+# DeepSeek Harness 本地临时目录
+.dsh-tmp/

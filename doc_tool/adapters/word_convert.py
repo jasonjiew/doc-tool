@@ -30,7 +30,21 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
+
+from doc_tool.domain.word_operations import (
+    STAGE_BUSY_LOCK,
+    STAGE_LABELS,
+    STAGE_OPEN,
+    STAGE_PENDING,
+    STAGE_PROCESS,
+    STAGE_QUIT,
+    STAGE_SAVE,
+    STAGE_START,
+    WordOperationReport,
+    budgets_for_timeout,
+    stop_and_cleanup,
+)
 
 MODE_DOCX_TO_PDF = "docx_to_pdf"
 MODE_PDF_TO_DOCX = "pdf_to_docx"
@@ -132,20 +146,72 @@ class WordConversionOutcome:
 
 
 class _WordHandle:
-    """在工作线程与应用线程之间传递本次 Word 进程 PID，供超时后清理。"""
+    """在工作线程与应用线程之间传递本次 Word 进程 PID，供超时后清理。
+
+    V4.0 40-B：同时记录**当前阶段**和**归属证据**，超时后由监督者据此判断
+    能否安全清理，以及“卡在哪一步”的真实事实（不假称已停止）。
+    """
 
     def __init__(self) -> None:
         self._pid: Optional[int] = None
         self._lock = threading.Lock()
+        self._busy = False
+        self._stage = ""
+        self._owned_proven = False
+
+    # --- 阶段（供 UI 显示“现在在做什么”、超时归类） ---
+
+    @property
+    def stage(self) -> str:
+        with self._lock:
+            return self._stage
+
+    @property
+    def busy(self) -> bool:
+        """是否正处于一次 Word 会话中（忙锁的真实所有者）。"""
+        with self._lock:
+            return self._busy
+
+    def begin(self, stage: str) -> None:
+        with self._lock:
+            self._busy = True
+            self._stage = stage
+
+    def set_stage(self, stage: str) -> None:
+        with self._lock:
+            self._stage = stage
+
+    def end(self) -> None:
+        with self._lock:
+            self._busy = False
+            self._stage = ""
+
+    # --- 归属 ---
 
     def attach(self, word, pids_before: Optional[set] = None) -> None:
         pid = _word_pid(word, pids_before)
         with self._lock:
             self._pid = pid
+            if pid:
+                self._owned_proven = True
 
     def detach(self) -> None:
         with self._lock:
             self._pid = None
+
+    def ownership(self, report=None):
+        """本次实例的归属证据；无法证明时返回未知（不清理用户 Word）。"""
+        from doc_tool.domain.word_operations import (
+            ownership_from_object, ownership_from_pid_diff,
+        )
+
+        with self._lock:
+            pid = self._pid
+            proven = self._owned_proven
+        if pid and proven:
+            before = report.ownership.pidsBefore if report is not None else None
+            return ownership_from_pid_diff(pid, before)
+        return ownership_from_object(None, None)
 
     def kill(self) -> None:
         with self._lock:
@@ -208,7 +274,7 @@ def _word_pid(word, pids_before: Optional[set] = None) -> Optional[int]:
         try:
             pids_after = _get_winword_pids()
             diff = pids_after - pids_before
-            if diff:
+            if len(diff) == 1:
                 return next(iter(diff))
         except Exception:
             pass
@@ -436,7 +502,21 @@ def _run_session(
     handle: _WordHandle,
     with_toc: bool = False,
     page_range: Optional[Tuple[int, int]] = None,
+    report=None,
+    progress_cb=None,
 ) -> WordConversionOutcome:
+    def _stage(name: str, detail: str = "") -> None:
+        """记录阶段开始（40-B）：UI 与超时分类读同一份真实事实。"""
+        handle.set_stage(name)
+        if report is not None:
+            report.stage(name, detail, outcome=STAGE_PENDING)
+        if progress_cb is not None:
+            # 进度回调只用于展示真实阶段；回调本身失败不影响 Word 动作。
+            try:
+                progress_cb(name, detail)
+            except Exception:  # noqa: BLE001
+                pass
+
     try:
         import pythoncom
         import win32com.client
@@ -451,9 +531,17 @@ def _run_session(
     try:
         pythoncom.CoInitialize()
         try:
+            _stage(STAGE_BUSY_LOCK, "等待可用的 Word 会话")
+            started_busy = time.monotonic()
             pids_before = _get_winword_pids()
+            if report is not None:
+                report.ownership.pidsBefore = sorted(pids_before)
+            _stage(STAGE_START, "启动专用 Word 实例")
+            started_start = time.monotonic()
             word = win32com.client.DispatchEx("Word.Application")
             handle.attach(word, pids_before)
+            if report is not None:
+                report.timed(STAGE_START, started_start, "专用 Word 实例已建立")
             word.Visible = False
             word.DisplayAlerts = 0  # wdAlertsNone
             try:
@@ -464,11 +552,17 @@ def _run_session(
             if parent:
                 os.makedirs(parent, exist_ok=True)
 
+            _stage(STAGE_OPEN, "打开 {0}".format(source.name))
+            started_open = time.monotonic()
             opened = _open_word_document(word, source, mode)
             if handle._pid is None:
                 handle.attach(word)
+            if report is not None:
+                report.timed(STAGE_OPEN, started_open, "已打开源文档")
 
             if mode in PDF_EXPORT_MODES:
+                _stage(STAGE_PROCESS, "刷新分页并导出 PDF")
+                started_process = time.monotonic()
                 # 页数是廉价的（实测 1.2 秒），给用户一个体量读数；DOCX 源
                 # 额外 Repaginate 保证导出前分页一致。
                 pages = _page_count(opened)
@@ -484,6 +578,8 @@ def _run_session(
                 problem = _export_pdf(opened, target, page_range)
                 opened.Close(SaveChanges=False)
                 opened = None
+                if report is not None:
+                    report.timed(STAGE_SAVE, started_process, "已写出 PDF")
                 if problem:
                     return _outcome(
                         mode, source, target, False, REASON_CONVERT_FAILED, problem,
@@ -503,9 +599,13 @@ def _run_session(
 
             if mode == MODE_IMPORT_TO_DOCX:
                 # RTF/ODT 导入：原样另存为 DOCX，不做排版改动。
+                _stage(STAGE_SAVE, "另存为 DOCX")
+                started_save = time.monotonic()
                 opened.SaveAs2(str(target), FileFormat=_WD_FORMAT_DOCX)
                 opened.Close(SaveChanges=False)
                 opened = None
+                if report is not None:
+                    report.timed(STAGE_SAVE, started_save, "已写出 DOCX")
                 problem, paragraphs = _verify_docx_output(word, target)
                 if problem:
                     return _outcome(mode, source, target, False, REASON_OUTPUT_MISSING, problem)
@@ -515,10 +615,17 @@ def _run_session(
                 )
 
             # HTML → Word：排版收口（图片内嵌、纸张页边距、可选目录）→ 另存 → 复打开校验。
+            _stage(STAGE_PROCESS, "排版收口（图片内嵌、纸张页边距、目录）")
+            started_process = time.monotonic()
             notes = _apply_word_layout(opened, with_toc)
+            _stage(STAGE_SAVE, "另存为 DOCX")
+            started_save = time.monotonic()
             opened.SaveAs2(str(target), FileFormat=_WD_FORMAT_DOCX)
             opened.Close(SaveChanges=False)
             opened = None
+            if report is not None:
+                report.timed(STAGE_PROCESS, started_process, notes or "排版收口完成")
+                report.timed(STAGE_SAVE, started_save, "已写出 DOCX")
             problem, paragraphs = _verify_docx_output(word, target)
             if problem:
                 return _outcome(mode, source, target, False, REASON_OUTPUT_MISSING, problem)
@@ -535,11 +642,16 @@ def _run_session(
             if word is not None:
                 # 先 Quit、失败才按 PID 杀进程树；不能先 detach——pid 一旦
                 # 清空，Quit 失败分支的 kill 就拿不到目标，Word 进程会泄漏。
+                _stage(STAGE_QUIT, "退出 Word")
+                started_quit = time.monotonic()
                 try:
                     word.Quit(SaveChanges=False)
+                    if report is not None:
+                        report.timed(STAGE_QUIT, started_quit, "Word 已退出")
                 except Exception:
                     handle.kill()
                 handle.detach()
+                handle.end()
             try:
                 pythoncom.CoUninitialize()
             except Exception:
@@ -582,12 +694,19 @@ def convert_document(
     timeout_seconds: Optional[float] = None,
     with_toc: bool = False,
     page_range: Optional[Tuple[int, int]] = None,
+    report: Optional[WordOperationReport] = None,
+    budgets=None,
+    progress_cb: Optional[Callable[[str, str], None]] = None,
 ) -> WordConversionOutcome:
     """把 ``source`` 转成 ``target``。方向由 ``mode`` 指定。
 
     始终在独立线程里跑一次 Word COM：COM 调用不可中断，超时只能终止本次专用
     Word 进程，让挂起的调用抛错自行结束（daemon 线程随之退出）。
     ``page_range`` 仅对 PDF 导出模式生效，形如 ``(起始页, 结束页)``（1 起）。
+
+    V4.0 40-B：``report`` 为可选的阶段/预算/归属记录；``budgets`` 可显式覆盖
+    阶段预算（默认按既有单值超时换算，保持历史调用方语义）。超时后按
+    **停止预算**确认终止并登记清理事实，无法证明归属时不清理用户 Word。
     """
     if mode not in CONVERT_MODES:
         raise ValueError("未知转换方向: {0}".format(mode))
@@ -598,11 +717,27 @@ def convert_document(
     if not source.is_file():
         return _outcome(mode, source, target, False, REASON_CONVERT_FAILED, "源文件不存在")
 
+    own_report = report is None
+    if report is None:
+        report = WordOperationReport(
+            operation="word-convert:{0}".format(mode),
+            source=str(source), target=str(target),
+            budgets=budgets if budgets is not None else budgets_for_timeout(timeout_seconds),
+        )
+    elif budgets is not None:
+        report.budgets = budgets
+
     handle = _WordHandle()
     box: list = []
 
     def _worker() -> None:
-        box.append(_run_session(source, target, mode, handle, with_toc, page_range))
+        try:
+            box.append(_run_session(
+                source, target, mode, handle, with_toc, page_range,
+                report=report, progress_cb=progress_cb,
+            ))
+        finally:
+            handle.end()
 
     started = time.monotonic()
     thread = threading.Thread(target=_worker, name="doc-tool-word-convert", daemon=True)
@@ -611,23 +746,44 @@ def convert_document(
     elapsed = time.monotonic() - started
 
     if thread.is_alive():
-        handle.kill()
-        thread.join(15)
+        stage = handle.stage or STAGE_PROCESS
+        report.set_ownership(handle.ownership(report))
+        report.note_timeout(
+            stage,
+            "阶段「{0}」超过预算，已按停止预算终止本次专用进程".format(
+                STAGE_LABELS.get(stage, stage)
+            ),
+        )
+        stop = stop_and_cleanup(report, kill=handle.kill)
+        thread.join(max(0.0, float(report.budgets.cleanup)))
         if thread.is_alive():
+            report.note_residual(
+                "转换线程在停止预算内仍在回收中（Word 已按归属证据处理）"
+            )
             return _outcome(
                 mode, source, target, False, REASON_TIMEOUT,
-                "Word 进程未响应，已终止，但转换线程仍在回收中",
+                "Word 进程未响应，已按归属清理，但转换线程仍在回收中",
                 elapsed_seconds=elapsed,
             )
+        detail = "Word「{0}」超过 {1:g} 秒，{2}".format(
+            STAGE_LABELS.get(stage, stage), float(timeout_seconds), stop.summary_line(),
+        )
         return _outcome(
-            mode, source, target, False, REASON_TIMEOUT,
-            "Word 转换超过 {0} 秒，已终止本次专用进程".format(int(timeout_seconds)),
+            mode, source, target, False, REASON_TIMEOUT, detail,
             elapsed_seconds=elapsed,
         )
+    handle.end()
     outcome = box[0] if box else _outcome(
         mode, source, target, False, REASON_CONVERT_FAILED, "Word 转换线程未返回结果"
     )
     outcome.elapsed_seconds = elapsed
+    # 失败且未记录阶段时补一条真实事实，避免诊断出现“未知阶段”。
+    if not outcome.ok and not report.stages:
+        report.stage(
+            STAGE_START if outcome.reason == REASON_WORD_UNAVAILABLE else STAGE_PROCESS,
+            outcome.detail,
+            outcome="failed",
+        )
     return outcome
 
 

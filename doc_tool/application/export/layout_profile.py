@@ -82,6 +82,8 @@ class LayoutOutcome:
     oversized: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     message: str = ""
+    #: MAIN2-E 5.2：本轮是否真的改写了 DOCX 字节（用于决定是否再次刷新/标待刷新）。
+    rewritten: bool = False
 
     def summary_lines(self) -> List[str]:
         lines: List[str] = []
@@ -247,6 +249,7 @@ def apply_layout_to_docx(
     try:
         document.save(str(path))
         outcome.ok = True
+        outcome.rewritten = True
         outcome.message = "排版已应用"
     except Exception as exc:  # noqa: BLE001
         outcome.message = "排版保存失败，已保留原产物：{0}".format(exc)

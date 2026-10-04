@@ -11,7 +11,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from doc_tool.application.content.index import ContentIndexService
 from doc_tool.application.content.references import ReferenceScanner
@@ -318,6 +318,124 @@ class ReimportService:
         for level, style_id in self.manifest.headingStyles.items():
             merged.setdefault(str(style_id), int(level))
         return merged or None
+
+    def _extract_incoming(
+        self, new_source: Path, incoming: Path, staging: Path,
+        extractor: Optional[Callable[[Path, Path], None]] = None,
+    ) -> None:
+        """把新源抽取到隔离目录（不触碰正式正文）。
+
+        ``reimport`` 与 :meth:`preview` 共用同一段抽取逻辑：两边看到的新增/修改/
+        删除必然一致，不会出现“预览说改了 A、应用却改了 B”。
+        """
+        if extractor is not None:
+            extractor(new_source, incoming)
+            return
+        from doc_tool.adapters.importer import extract_content, split_into_tree
+        from doc_tool.adapters.preflight import preflight
+
+        heading_map = self._heading_style_map(new_source)
+        preflight(new_source, heading_style_map=heading_map)
+        extract_content(
+            new_source,
+            incoming,
+            staging / "images",
+            staging / "tables",
+            self.manifest.documentType,
+            heading_style_map=heading_map,
+        )
+        split_into_tree(incoming)
+
+    def preview(
+        self,
+        new_source: Path,
+        *,
+        dirty_paths: Optional[Sequence[str]] = None,
+        local_contents: Optional[Dict[str, str]] = None,
+        selected: Optional[Sequence[str]] = None,
+        extractor: Optional[Callable[[Path, Path], None]] = None,
+    ):
+        """后台生成隔离差异会话（**不写正式正文，也不改源记录**）。
+
+        复用 :mod:`reimport_preview` 的 ``open_preview``：差异条目带新增/修改/删除、
+        冲突/脏项标记与逐项 diff；脏章（未保存编辑）默认不参与应用。
+        """
+        import shutil
+        import tempfile
+
+        from doc_tool.application.content.reimport_preview import open_preview
+
+        new_source = Path(new_source)
+        # 上一轮预览的隔离副本不再需要：新会话会重建，先释放避免 .state 无限增长。
+        self._release_preview_staging()
+        staging = Path(tempfile.mkdtemp(
+            prefix="doc-tool-reimport-preview-", dir=str(self.paths.state_dir)
+        ))
+        incoming = staging / "content"
+        incoming.mkdir(parents=True)
+        try:
+            try:
+                self._extract_incoming(new_source, incoming, staging, extractor)
+            except Exception as exc:  # noqa: BLE001 - 预览失败不改变项目状态
+                shutil.rmtree(staging, ignore_errors=True)
+                return None, "新源文档无法解析：{0}".format(exc)
+            changes = compare_chapters(
+                self._writer().content_root, incoming, self._base_hashes()
+            )
+            incoming_contents = self._read_incoming_contents(
+                incoming, changes, selected
+            )
+            self._preview_root = incoming
+            self._preview_staging = staging
+            session = open_preview(
+                changes,
+                service=self,
+                source_path=new_source,
+                baseline_available=bool(self._base_hashes()),
+                selected=selected,
+                dirty_paths=dirty_paths,
+                local_contents=local_contents,
+                incoming_contents=incoming_contents,
+            )
+            return session, ""
+        except Exception as exc:  # noqa: BLE001 - 预览失败保留原项目状态
+            shutil.rmtree(staging, ignore_errors=True)
+            return None, "生成差异预览失败：{0}".format(exc)
+
+    def _read_incoming_contents(
+        self, incoming: Path, changes, selected: Optional[Sequence[str]] = None,
+    ) -> Dict[str, str]:
+        """读取新源侧章节正文（只为 diff；读不到就跳过该项，不阻断预览）。"""
+        wanted = (
+            {str(item) for item in selected}
+            if selected else {getattr(item, "rel_path", "") for item in changes}
+        )
+        contents: Dict[str, str] = {}
+        for rel_path in wanted:
+            if not rel_path:
+                continue
+            target = incoming / rel_path
+            if not target.is_file():
+                continue
+            try:
+                contents[rel_path] = target.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+        return contents
+
+    def _release_preview_staging(self) -> None:
+        """删除上一轮预览的隔离目录（不影响正式正文与源记录）。"""
+        import shutil
+
+        staging = getattr(self, "_preview_staging", None)
+        if staging:
+            shutil.rmtree(str(staging), ignore_errors=True)
+        self._preview_staging = None
+        self._preview_root = None
+
+    def preview_source_path(self) -> str:
+        """最近一次预览的隔离新源目录（供无冲突项应用时复制资源）。"""
+        return str(getattr(self, "_preview_root", "") or "")
 
     def reimport(
         self,

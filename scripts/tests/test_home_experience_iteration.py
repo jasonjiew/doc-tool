@@ -190,10 +190,15 @@ class HomeExperienceIterationTests(unittest.TestCase):
         self.assertFalse(home._recent_cards[2].isHidden())
 
     def test_project_bar_close_button_lifecycle(self):
-        """测试 ProjectBar 上的关闭项目按钮显隐与点击回调。"""
+        """测试 ProjectBar 的关闭项目动作可用性与点击回调。
+
+        按钮显隐自 UI2 由 ``ActionOverflow`` 按真实宽度决定：未显示的工具栏
+        （宽度为 0）会把次要动作收进「更多」菜单，因此这里断言**动作可达且
+        可用**，而不是断言控件原地可见——那是布局细节，不是用户契约。
+        """
         closed = []
         bar = ProjectBar(on_close_project=lambda: closed.append(True))
-        self.assertTrue(bar._close_btn.isHidden())
+        self.assertTrue(bar._close_btn.isHidden(), "无项目时不显示关闭按钮")
 
         summary = type("FakeSummary", (), {"manifest": None, "project_root": Path("D:/proj")})()
         state = WorkbenchState(
@@ -202,13 +207,19 @@ class HomeExperienceIterationTests(unittest.TestCase):
             readiness_text="就绪",
         )
         bar.render(summary, state)
-        self.assertFalse(bar._close_btn.isHidden())
+        self.assertTrue(bar._close_action.isEnabled(), "空闲时关闭项目可用")
+        # 动作必须真实挂在可点击载体上：原地按钮或「更多」菜单二者之一。
+        self.assertTrue(
+            bar._close_btn.isVisibleTo(bar) or "close" in bar._overflow.hidden_keys,
+            "关闭项目动作应在地工具栏或「更多」菜单中可达",
+        )
 
-        bar._close_btn.click()
+        bar._close_action.trigger()
         self.assertEqual(closed, [True])
 
         bar.reset()
         self.assertTrue(bar._close_btn.isHidden())
+        self.assertFalse(bar._close_action.isEnabled(), "无项目时关闭动作不可用")
 
     def test_main_window_close_project_lifecycle(self):
         """测试 MainWindow.close_project 闭环回到 EmptyState 视图。"""

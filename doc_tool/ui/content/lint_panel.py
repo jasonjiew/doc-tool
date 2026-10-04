@@ -42,6 +42,10 @@ from doc_tool.application.content.lint import (
     can_quick_fix,
     filter_lint_issues,
 )
+from doc_tool.application.content.quality_workbench import (
+    GroupedFixItem,
+    GroupedFixPlan,
+)
 
 #: 差异预览里的换行（面板不依赖平台默认换行）。
 NL = chr(10)
@@ -51,6 +55,10 @@ _SEVERITY_LABELS = SEVERITY_LABELS
 
 #: V3.6 36-D：问题列表单页渲染条数（“显示更多”逐页增加，内容不截断）。
 ISSUE_PAGE_SIZE = 200
+
+#: MAIN2-C 3.4：正文/路径变化后的既有过期（重检）文案——唯一来源。
+STALE_RECHECK_MESSAGE = "正文已变化，请重新检查后修复"
+STALE_REAPPLY_MESSAGE = "正文已变化，未撤销修复；请使用编辑器撤销"
 
 
 class LintTreeItem(QTreeWidgetItem):
@@ -121,9 +129,13 @@ class LintPanel(QWidget):
         self._confirm_fix = confirm_fix
         self._scope_paths: Optional[List[str]] = None
         self._text_overrides: Dict[str, str] = {}
+        #: MAIN2-C 3.4：被外部章节操作（复制/改名/移动）作废、需重检的章节。
+        self._stale_paths: List[str] = []
         self._scope_note = "整份文档"
         #: 本次检查会话内已应用的修复（rel_path → 修复前正文），用于「撤销上次修复」。
         self._fix_history: List[tuple] = []
+        #: V4.2 42-D 4.4：个人视图「暂不处理」条目（只影响当前视图）。
+        self._suppressed: List[tuple] = []
 
         # 唯一外层布局：术语卡片 + 结果表 + 状态行。原先各 _build_*
         # 各自创建 QVBoxLayout(self)，只有第一个会被安装，结果表因此不可见。
@@ -335,8 +347,17 @@ class LintPanel(QWidget):
         elif fix == "manual":
             fixable_opt = False
 
+        # 个人视图「暂不处理」必须先于筛选生效：否则条目仍留在列表与「共 N 项」里。
+        visible = [
+            item for item in self._issues
+            if (
+                str(getattr(item, "rel_path", "") or ""),
+                int(getattr(item, "line_no", 0) or 0),
+                str(getattr(item, "source", "") or ""),
+            ) not in self._suppressed
+        ]
         filtered_list = filter_lint_issues(
-            self._issues,
+            visible,
             category=cat,
             severity=sev,
             quick_fixable=fixable_opt,
@@ -711,14 +732,39 @@ class LintPanel(QWidget):
             return str(self._text_overrides[rel_path]), True
         return self._writer.resolve(rel_path).read_text(encoding="utf-8"), False
 
+    def mark_chapters_changed(self, rel_paths) -> int:
+        """章节复制/改名/移动后把旧检查结果标为过期（复用同一条重检判定）。
+
+        面板内的 ``_text_overrides`` 是「结果对应的正文快照」这一既有依据：
+        路径已变化（改名/移动）或正文已变化（复制出的新章、活缓冲被换掉）时
+        丢掉该快照，随后 ``_current_text`` 会沿用原有规则提示「正文已变化，
+        请重新检查后修复」，不新增第二套状态字段。返回本次作废的章节数。
+        """
+        paths = [str(rel) for rel in (rel_paths or []) if rel]
+        if not paths:
+            return 0
+        marked = 0
+        for rel_path in paths:
+            self._text_overrides.pop(rel_path, None)
+            if rel_path not in self._stale_paths:
+                self._stale_paths.append(rel_path)
+            marked += 1
+        if hasattr(self, "_status_label"):
+            self._status_label.setText(
+                "{0} 个章节的结果已标过期：{1}".format(
+                    marked, STALE_RECHECK_MESSAGE
+                )
+            )
+        return marked
+
     def _current_text(self, rel_path: str) -> str:
         """检查后的编辑需重新检查，避免按陈旧问题位置修复。"""
         content, from_buffer = self._read_current_text(rel_path)
         expected = self._text_overrides.get(rel_path)
         if expected is not None and content != expected:
-            raise ValueError("正文已变化，请重新检查后修复")
+            raise ValueError(STALE_RECHECK_MESSAGE)
         if expected is None and from_buffer:
-            raise ValueError("正文已变化，请重新检查后修复")
+            raise ValueError(STALE_RECHECK_MESSAGE)
         if from_buffer:
             self._text_overrides[rel_path] = content
         else:
@@ -730,7 +776,7 @@ class LintPanel(QWidget):
         if expected is not None:
             current, from_buffer = self._read_current_text(rel_path)
             if current != expected:
-                self._status_label.setText("正文已变化，请重新检查后修复")
+                self._status_label.setText(STALE_RECHECK_MESSAGE)
                 return False
             if from_buffer:
                 self._text_overrides[rel_path] = current
@@ -802,6 +848,132 @@ class LintPanel(QWidget):
         if hasattr(self, "_undo_fix_btn"):
             self._undo_fix_btn.setEnabled(True)
 
+    # --- V4.2 42-D 4.3/4.4：按章选择应用、暂不处理个人视图 ---
+
+    def selected_fix_plan(self, rel_paths) -> "GroupedFixPlan":
+        """按章预览所选问题的确定性修正差异（**不写盘**）。
+
+        只把 ``can_quick_fix`` 为真、且当前正文与结果对应快照一致的问题放进
+        ``items``；正文已变化/不支持修正的项进 ``skipped`` 并写明原因。
+        """
+        wanted = {str(item) for item in (rel_paths or ())}
+        plan = GroupedFixPlan()
+        for issue in self._issues:
+            if wanted and issue.rel_path not in wanted:
+                continue
+            if not can_quick_fix(issue):
+                plan.skipped.append(GroupedFixItem(
+                    rel_path=issue.rel_path, line_no=issue.line_no or 0,
+                    before="", after="", ruleId=getattr(issue, "source", "") or "",
+                    applicable=False, reason="该问题不支持确定性修正",
+                ))
+                continue
+            try:
+                content = self._current_text(issue.rel_path)
+            except Exception as exc:  # noqa: BLE001 - 读不到正文只跳过该项
+                plan.skipped.append(GroupedFixItem(
+                    rel_path=issue.rel_path, line_no=issue.line_no or 0,
+                    before="", after="", ruleId=getattr(issue, "source", "") or "",
+                    applicable=False, reason="正文不可读：{0}".format(exc),
+                ))
+                continue
+            updated, success, _msg = apply_quick_fix(content, issue)
+            if not success:
+                plan.skipped.append(GroupedFixItem(
+                    rel_path=issue.rel_path, line_no=issue.line_no or 0,
+                    before="", after="", ruleId=getattr(issue, "source", "") or "",
+                    applicable=False, reason="确定性修正未命中",
+                ))
+                continue
+            before_line = ""
+            after_line = ""
+            lines_before = content.splitlines()
+            lines_after = updated.splitlines()
+            index = max(0, int(issue.line_no or 1) - 1)
+            if index < len(lines_before):
+                before_line = lines_before[index]
+            if index < len(lines_after):
+                after_line = lines_after[index]
+            plan.items.append(GroupedFixItem(
+                rel_path=issue.rel_path, line_no=issue.line_no or 0,
+                before=before_line, after=after_line,
+                ruleId=getattr(issue, "source", "") or "",
+            ))
+        return plan
+
+    def apply_selected_fixes(self, rel_paths) -> int:
+        """按章应用所选确定性修正；冲突项局部跳过，其余继续。返回成功项数。"""
+        plan = self.selected_fix_plan(rel_paths)
+        applied = 0
+        by_path = plan.by_chapter()
+        for rel_path, items in sorted(by_path.items()):
+            try:
+                content = self._current_text(rel_path)
+            except Exception as exc:  # noqa: BLE001 - 读不到正文跳过该章
+                self._status_label.setText("跳过 {0}：{1}".format(rel_path, exc))
+                continue
+            updated = content
+            hit = 0
+            for item in items:
+                issue = next(
+                    (i for i in self._issues
+                     if i.rel_path == rel_path and (i.line_no or 0) == item.line_no
+                     and can_quick_fix(i)),
+                    None,
+                )
+                if issue is None:
+                    continue
+                candidate, success, _msg = apply_quick_fix(updated, issue)
+                if not success:
+                    plan.skipped.append(item)
+                    continue
+                updated = candidate
+                hit += 1
+            if hit <= 0 or updated == content:
+                continue
+            if not self._write_fixed_text(rel_path, updated, expected=content):
+                plan.skipped.append(GroupedFixItem(
+                    rel_path=rel_path, line_no=0, before="", after="",
+                    applicable=False, reason="正文已变化，已跳过该章",
+                ))
+                continue
+            self._remember_fix(rel_path, content, updated)
+            plan.applied.append(rel_path)
+            applied += hit
+        self._after_fix_applied()
+        if applied:
+            self._status_label.setText("已按章应用 {0} 项修正（可撤销）".format(applied))
+        elif plan.skipped:
+            self._status_label.setText("没有可应用的修正：{0}".format(
+                plan.skipped[0].reason or "冲突项已跳过"
+            ))
+        return applied
+
+    def suppress_issue(self, issue) -> None:
+        """个人视图「暂不处理」：只隐藏本条，不改正式报告与业务状态。"""
+        key = (
+            str(getattr(issue, "rel_path", "") or ""),
+            int(getattr(issue, "line_no", 0) or 0),
+            str(getattr(issue, "source", "") or ""),
+        )
+        if key not in self._suppressed:
+            self._suppressed.append(key)
+            self._render_results()
+
+    def visible_issues(self):
+        """当前版本视图（已排除「暂不处理」项）；完整报告仍为 ``self._issues``。"""
+        return [
+            item for item in self._issues
+            if (
+                str(getattr(item, "rel_path", "") or ""),
+                int(getattr(item, "line_no", 0) or 0),
+                str(getattr(item, "source", "") or ""),
+            ) not in self._suppressed
+        ]
+
+    def suppressed_count(self) -> int:
+        return len(self._suppressed)
+
     def undo_last_fix(self) -> bool:
         """仅在正文仍对应修复结果时撤销，保留修复后的手工编辑。"""
         if not self._writable or self._writer is None or not self._fix_history:
@@ -810,7 +982,7 @@ class LintPanel(QWidget):
         try:
             current, from_buffer = self._read_current_text(rel_path)
             if current != after:
-                self._status_label.setText("正文已变化，未撤销修复；请使用编辑器撤销")
+                self._status_label.setText(STALE_REAPPLY_MESSAGE)
                 return False
             if from_buffer:
                 self._text_overrides[rel_path] = current

@@ -187,6 +187,7 @@ def resolve_export_directory(
     candidates: List[Optional[Path]] = [preferred]
     candidates.extend(fallbacks)
     first = True
+    failures: List[str] = []
     for candidate in candidates:
         if candidate is None:
             first = False
@@ -194,16 +195,26 @@ def resolve_export_directory(
         try:
             path = Path(candidate)
             path.mkdir(parents=True, exist_ok=True)
-            probe = path / ".doctool-write-probe"
-            probe.write_text("", encoding="utf-8")
+            probe = path / (".doctool-write-probe-" + uuid.uuid4().hex)
+            with probe.open("x", encoding="utf-8"):
+                pass
             probe.unlink()
-        except OSError:
+        except OSError as exc:
+            # 保留每个候选目录的真实失败原因：冻结产物里曾出现「三个候选全失败
+            # 但同一目录在 env-check 里可写」的矛盾，没有原因就无法定位。
+            failures.append("{0}：{1}: {2}".format(
+                candidate, type(exc).__name__, exc,
+            ))
             first = False
             continue
         if first:
             return path, None
         return path, "原导出目录不可用，已改用 {0}".format(path)
-    raise OSError("没有可写的导出目录，请选择新的目录。")
+    raise OSError(
+        "没有可写的导出目录，请选择新的目录。{0}".format(
+            "；已尝试：" + "｜".join(failures) if failures else ""
+        )
+    )
 
 
 def fresh_output_path(path: Path, protected: Iterable[Path] = ()) -> Path:

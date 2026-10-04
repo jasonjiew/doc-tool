@@ -146,13 +146,46 @@ def _referenced_image_paths(index) -> set:
     return referenced
 
 
-def scan_unused(assets_root, index) -> List[Tuple[str, int]]:
+#: Markdown 图片引用：``![alt](target)`` 与带尺寸后缀的 ``![alt](target =WxH)``。
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*([^)\s]+)")
+
+
+def _buffer_referenced_paths(index, buffer_texts) -> set:
+    """活缓冲里出现的图片引用（MAIN2-D 4.1）：``{(doc_type, target), ...}``。
+
+    刚插入但尚未保存的引用只存在于编辑器内存里；不叠加这一层，未保存引用的
+    资产会被误判为“可清理”。只读内存文本，不写盘。
+    """
+    referenced = set()
+    if not buffer_texts:
+        return referenced
+    files = getattr(index, "files", {}) or {}
+    for rel_path, text in dict(buffer_texts or {}).items():
+        entry = files.get(rel_path)
+        doc_type = getattr(entry, "document_type", "") if entry is not None else ""
+        if not doc_type:
+            for candidate in getattr(index, "document_types", []) or []:
+                doc_type = candidate
+                break
+        for raw in _MD_IMAGE_RE.findall(str(text or "")):
+            target = raw.strip()
+            if target.startswith("<") and target.endswith(">"):
+                target = target[1:-1]
+            name = target.rsplit("/", 1)[-1]
+            referenced.add((doc_type, target))
+            referenced.add((doc_type, name))
+    return referenced
+
+
+def scan_unused(assets_root, index, *, buffer_texts=None) -> List[Tuple[str, int]]:
     """列出未被任何 Markdown 引用的图片：``[(rel_target, size_bytes)]``。
 
     ``rel_target`` 形如 ``requirement/images/img_NNNN.png``（相对 assets/）。
-    被引用项不在清单中，避免误删。
+    被引用项不在清单中，避免误删。``buffer_texts`` 给出未保存的编辑器正文时，
+    其中的引用同样计入（刚插入未保存的图不得被列为可清理）。
     """
     referenced = _referenced_image_paths(index)
+    referenced |= _buffer_referenced_paths(index, buffer_texts)
     unused: List[Tuple[str, int]] = []
     for doc_type in sorted(index.document_types):
         images = images_dir(assets_root, doc_type)
@@ -179,9 +212,14 @@ def scan_unused(assets_root, index) -> List[Tuple[str, int]]:
     return unused
 
 
-def list_missing(index, assets_root) -> List[MissingImage]:
-    """列出引用存在但文件缺失的图片（复用引用悬空检测）。"""
+def list_missing(index, assets_root, *, buffer_texts=None) -> List[MissingImage]:
+    """列出引用存在但文件缺失的图片（复用引用悬空检测）。
+
+    ``buffer_texts`` 给出未保存正文时，其中**新出现**的悬空引用同样列出
+    （按行号定位到编辑器当前内容），已保存部分保持原口径。
+    """
     missing: List[MissingImage] = []
+    seen = set()
     for refs in index.references.values():
         for ref in refs:
             if ref.kind == "image" and ref.dangling:
@@ -193,6 +231,32 @@ def list_missing(index, assets_root) -> List[MissingImage]:
                         target=ref.target,
                     )
                 )
+                seen.add((ref.source, ref.source_line, ref.target))
+    for rel_path, text in dict(buffer_texts or {}).items():
+        entry = (getattr(index, "files", {}) or {}).get(rel_path)
+        doc_type = getattr(entry, "document_type", "") if entry is not None else ""
+        if not doc_type:
+            types = list(getattr(index, "document_types", []) or [])
+            doc_type = types[0] if types else ""
+        for index_no, line in enumerate(str(text or "").splitlines(), start=1):
+            for raw in _MD_IMAGE_RE.findall(line):
+                target = raw.strip().strip("<>")
+                if not target:
+                    continue
+                if resolve_asset_path(assets_root, doc_type, target).is_file():
+                    continue
+                # 与磁盘侧扫描同规则：也接受 assets/<类型>/images/<文件名>。
+                if resolve_asset_path(
+                    assets_root, doc_type, "images/" + Path(target).name
+                ).is_file():
+                    continue
+                key = (rel_path, index_no, target)
+                if key in seen:
+                    continue
+                missing.append(MissingImage(
+                    source=rel_path, line=index_no, text=line, target=target,
+                ))
+                seen.add(key)
     return missing
 
 

@@ -9,9 +9,10 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -25,6 +26,11 @@ from doc_tool.application.issues import (
 )
 from doc_tool.application.content.lint import ContentLinter, TermStore
 from doc_tool.application.content.quality_rules import QualityRulesConfig
+from doc_tool.application.content.batch_chapter_ops import (
+    BATCH_COPY,
+    BATCH_MOVE,
+    apply_batch_plan,
+)
 from doc_tool.application.content.refactor import RefactorService
 from doc_tool.application.content.references import ReferenceScanner
 from doc_tool.application.content.replace import ReplaceService
@@ -232,6 +238,8 @@ class ContentWorkspace(QWidget):
         #: 本轮索引捕获标识（V3.6 36-D）：搜索结果带上它，旧轮结果可被识别。
         self._index_capture_id = ""
         self._index_capture_seq = 0
+        #: MAIN2-C 3.4：章节操作代次——每轮写盘后自增，晚到请求据此作废。
+        self._chapter_op_gen = 0
         self._index_service = _index_service_for(self._content_root, state_dir=self._state_dir)
         self._writer = ContentWriter(
             self._content_root, self._state_dir, assets_root=self._assets_root, writable=self._writable
@@ -285,6 +293,8 @@ class ContentWorkspace(QWidget):
             on_delete_file=self._on_delete_file,
             on_rename_file=self._on_rename_file,
             on_copy_file=self._on_copy_file,
+            on_batch_copy=self._on_batch_copy,
+            on_batch_move=self._on_batch_move,
             on_renumber_dir=self._on_renumber_dir,
             on_move_node=self._on_move_node,
             on_clear_markers=self._on_clear_markers,
@@ -546,6 +556,11 @@ class ContentWorkspace(QWidget):
             on_open=self._open_and_locate,
             writable=self._writable,
             is_dirty=self._editor_is_dirty,
+            # MAIN2-D 4.1/4.2：清单/缺失/未用扫描叠加活缓冲的当前引用；单项
+            # 修复在已打开章节写编辑缓冲（可一次撤销），未打开章节走原写入服务。
+            buffer_texts=self._asset_buffer_texts,
+            live_text_provider=self._live_buffer_text,
+            buffer_applier=self._apply_buffer_text,
         )
         self._panels.addTab(images, "图片")
         self._remove_placeholder("图片")
@@ -636,6 +651,8 @@ class ContentWorkspace(QWidget):
         self.tabs_host.open_file(rel_path, text, line_no=line_no)
         # 先记录当前文件再定位树节点，避免树选中的延迟事件递归打开同一文件
         self._tree.set_current(rel_path)
+        # MAIN2-C 3.3：导航打开是单章动作，清掉残留多选，避免批量操作误带上一章。
+        self._tree.clear_selection()
         self._tree.select_file(rel_path)
         if self._on_navigate is not None:
             self._on_navigate(rel_path, line_no, source or "导航")
@@ -786,8 +803,22 @@ class ContentWorkspace(QWidget):
         document_type = ""
         if self._index is not None and len(self._index.document_types) == 1:
             document_type = next(iter(self._index.document_types))
+        panel = getattr(self, "_issues_panel", None)
+        # 上一轮完整结果作为基线，供「新增/消失/保留」比较（首次检查无基线为未知）。
+        previous = None
+        if self._lint_issues or self._pipeline_issues or self._validation_issues:
+            previous = list(
+                self._pipeline_issues + self._validation_issues + self._lint_issues
+            )
         self._lint_issues = issues_from_lint(issues, document_type)
         self._render_issues()
+        if panel is not None:
+            panel.set_baseline_issues(previous)
+            panel.set_check_context(
+                scope_text="当前内容索引的全部正文",
+                checked_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+                staleness="fresh",
+            )
 
     def refresh_issues(
         self,
@@ -1456,6 +1487,28 @@ class ContentWorkspace(QWidget):
             return False
         return bool(editor.apply_buffer_text(new_text))
 
+    def _asset_buffer_texts(self) -> Dict[str, str]:
+        """当前打开标签的未保存正文（供图片清单/缺失扫描叠加当前引用）。
+
+        只读编辑器内存文本，不写盘、不清除脏标记（MAIN2-D 4.1）。
+        """
+        texts: Dict[str, str] = {}
+        try:
+            rel_paths = list(self.tabs_host.open_rel_paths())
+        except Exception:  # noqa: BLE001 - 编辑器未就绪时按无缓冲
+            return texts
+        for rel_path in rel_paths:
+            editor = self.tabs_host.editor_for(rel_path)
+            if editor is None:
+                continue
+            try:
+                if not editor.is_dirty():
+                    continue
+                texts[rel_path] = editor.plain_text()
+            except Exception:  # noqa: BLE001 - 单章读取失败不影响其余章节
+                continue
+        return texts
+
     def _scoped_linter(self, scope_paths, overrides):
         """按范围与未保存缓冲建立检查器（MAIN-D 4.1）。
 
@@ -1538,25 +1591,51 @@ class ContentWorkspace(QWidget):
         if not ok:
             return
         title = (title or "").strip() or default_title
+        # MAIN2-C 3.1：复制当前**有效正文**（编辑器活缓冲优先），不再只用旧索引内容。
         try:
-            result = copy_chapter(self._index, rel_path, self._writer, title=title)
+            result = copy_chapter(
+                self._index, rel_path, self._writer, title=title,
+                source_text=self._current_chapter_text(rel_path),
+            )
         except Exception as exc:  # noqa: BLE001 - 复制失败给出可读原因，不改动原章
             QMessageBox.warning(self, "复制失败", str(exc))
             return
         if not result.ok:
             QMessageBox.warning(self, "复制失败", result.message or "写入失败")
             return
-        self._vcs.invalidate_cache()
-        try:
-            self._index_service.rebuild_file(self._index, result.target)
-        except Exception:  # noqa: BLE001 - 索引刷新失败不改变复制结果
-            pass
-        items = build_tree(self._index.all_files())
-        self._tree.set_items(items)
-        self._apply_status_map()
+        # MAIN2-C 3.4：走统一写后路径（重扫索引 + 引用 + 标检查结果过期 +
+        # 请求校验），保证复制出的新章立刻进入预览/检查/出稿范围。
+        self._after_write(changed_paths=[result.target])
         if self._on_status is not None:
             self._on_status(result.summary_line())
         self.open_file(result.target)
+
+    def _current_chapter_text(self, rel_path: str) -> Optional[str]:
+        """当前有效正文：编辑器活缓冲优先，未打开时返回 None（由索引兜底）。
+
+        只读内存文本，不写盘、不清除脏标记（MAIN2-C 3.1）。
+        """
+        workspace = getattr(self, "_tabs", None)
+        if workspace is None:
+            workspace = getattr(self, "tabs_host", None)
+        editor = None
+        if workspace is not None and hasattr(workspace, "editor_for"):
+            try:
+                editor = workspace.editor_for(rel_path)
+            except Exception:  # noqa: BLE001 - 查询失败退回到索引内容
+                editor = None
+        if editor is None:
+            return None
+        for attr in ("plain_text", "toPlainText", "text"):
+            getter = getattr(editor, attr, None)
+            if callable(getter):
+                try:
+                    text = getter()
+                except Exception:  # noqa: BLE001 - 读取失败退回到索引内容
+                    continue
+                if isinstance(text, str):
+                    return text
+        return None
 
     def _on_delete_file(self, rel_path: str) -> None:
         """确认后把文件移入回收站并刷新树与索引。"""
@@ -1592,10 +1671,7 @@ class ContentWorkspace(QWidget):
             # 级联重编号改变了多个文件路径 → 全量刷新并自动校验
             self._after_write()
         else:
-            self._index_service.rebuild_file(self._index, rel_path)
-            items = build_tree(self._index.all_files())
-            self._tree.set_items(items)
-            self._apply_status_map()
+            self._after_write(changed_paths=[rel_path])
         # 删除/重编号后同步评审意见关联状态（关联章节已变更标注）。
         self._mark_review_association()
 
@@ -1669,10 +1745,11 @@ class ContentWorkspace(QWidget):
                 self, "重编号失败", "部分写回失败，请查看备份与改动清单"
             )
             return True
-        # 旧路径已改名：关闭其标签并清除草稿，避免旧路径标签保存时
-        # 重建已改名的文件、或崩溃恢复复活旧路径的废弃内容。
-        for old, _new in renames:
-            self.tabs_host.close_file(old)
+        # 旧路径已改名（MAIN2-C 3.2）：沿用同一个编辑器实例改挂到新路径，
+        # 保留未保存正文/撤销栈/光标；同时清除旧路径草稿。
+        for old, new in renames:
+            if not self.tabs_host.remap_path(old, new):
+                self.tabs_host.close_file(old)
             self._autosave.clear(old)
         self._mark_review_association(dict(renames))
         return True
@@ -1750,13 +1827,17 @@ class ContentWorkspace(QWidget):
                 self, "重编号失败", "部分写回失败，请查看备份与改动清单"
             )
             return
-        # 旧路径已改名：关闭其标签并清除草稿，避免旧路径标签保存时
-        # 重建已改名的文件、或崩溃恢复复活旧路径的废弃内容。
-        for old, _new in renames:
-            self.tabs_host.close_file(old)
+        # 旧路径已改名（MAIN2-C 3.2）：沿用同一个编辑器实例改挂到新路径，
+        # 保留未保存正文/撤销栈/光标；同时清除旧路径草稿。
+        for old, new in renames:
+            if not self.tabs_host.remap_path(old, new):
+                self.tabs_host.close_file(old)
             self._autosave.clear(old)
         self._mark_review_association({old: new for old, new in renames})
-        self._after_write()
+        self._after_write(
+            changed_paths=[new for _old, new in renames],
+            removed_paths=[old for old, _new in renames],
+        )
 
     def _on_rename_file(self, rel_path: str) -> None:
         """内联重命名文件并联动更新引用（复用 RefactorService）。"""
@@ -1822,11 +1903,15 @@ class ContentWorkspace(QWidget):
             return
         # 重命名后同步评审意见关联（旧路径意见更新到新路径并标注已变更）。
         self._mark_review_association({rel_path: plan.new_rel_path})
-        self.tabs_host.close_file(rel_path)
-        # 旧路径已改名（或被放弃的未保存编辑不再存在）：清除其草稿，
-        # 避免下次打开在崩溃恢复提示中复活旧路径的废弃内容。
+        # MAIN2-C 3.2：沿用同一个编辑器实例改挂到新路径——保留未保存正文、
+        # 撤销栈、光标与返回位置；关闭标签会丢掉这些上下文。
+        if not self.tabs_host.remap_path(rel_path, plan.new_rel_path):
+            self.tabs_host.close_file(rel_path)
+        # 旧路径的草稿不再有意义：清除，避免崩溃恢复复活已改名的旧路径内容。
         self._autosave.clear(rel_path)
-        self._after_write()
+        self._after_write(
+            changed_paths=[plan.new_rel_path], removed_paths=[rel_path]
+        )
 
     def _on_move_node(
         self, source_node: str, target_parent: str, before_node: Optional[str]
@@ -1907,10 +1992,16 @@ class ContentWorkspace(QWidget):
         if not all(result.written for result in results):
             QMessageBox.warning(self, "章节移动失败", "写入未完成，已尝试回滚")
             return False
-        for old, _new in plan.renames:
-            self.tabs_host.close_file(old)
+        # MAIN2-C 3.2/3.4：沿用同一个编辑器实例改挂到新路径，保留未保存正文、
+        # 表格草稿、撤销栈与光标；只有改挂不成功时才关闭旧标签。
+        for old, new in plan.renames:
+            if not self.tabs_host.remap_path(old, new):
+                self.tabs_host.close_file(old)
             self._autosave.clear(old)
-        self._after_write()
+        self._after_write(
+            changed_paths=[new for _old, new in plan.renames],
+            removed_paths=[old for old, _new in plan.renames],
+        )
         self._tree.restore_expanded([relocation.get(node, node) for node in expanded])
         if current:
             new_current = relocation.get(current, current)
@@ -1987,9 +2078,24 @@ class ContentWorkspace(QWidget):
             project_id = ""
         return {"projectId": project_id, "captureId": self._index_capture_id}
 
-    def _after_write(self) -> None:
-        """替换/重命名写回后：刷新索引并请求校验管线。"""
+    def _after_write(self, changed_paths=None, removed_paths=None) -> None:
+        """章节写回后：刷新索引/引用、标检查结果过期，再请求校验管线。
+
+        ``changed_paths``：正文或路径已变化的章节（复制出的新章、改名/移动的新路径）；
+        ``removed_paths``：原路径已不存在的章节（改名/移动）。两者都复用检查面板
+        既有的「正文已变化，请重新检查」过期判定，不新增第二套状态。
+        """
         self._vcs.invalidate_cache()
+        # MAIN2-C 3.4：先标过期再刷新——顺序反了会把刚按当前正文重算出的结果
+        # 立刻又标成过期（面板的 run_check 会重建 _text_overrides）。
+        stale = [
+            rel for rel in list(changed_paths or []) + list(removed_paths or [])
+            if rel
+        ]
+        if stale:
+            self._mark_stale_check_results(stale)
+        # 代次自增——晚到的旧请求据此判定「已过期」而不写盘。
+        self._chapter_op_gen += 1
         if self._index is not None:
             self._index_service.refresh(self._index)
             ReferenceScanner(self._index, assets_root=self._assets_root).scan_all()
@@ -2014,6 +2120,134 @@ class ContentWorkspace(QWidget):
                 continue
         if self._on_request_validate is not None:
             self._on_request_validate()
+
+    def _mark_stale_check_results(self, rel_paths) -> None:
+        """把已算出的检查结果标为过期（复用检查面板既有的重检判定）。
+
+        章节复制/改名/移动后，旧结果对应的是操作前的正文与路径，直接拿它做
+        「一键修复」会按过时行号改错位置。这里清掉面板内记的正文快照，面板随后
+        按同一条既有规则提示「正文已变化，请重新检查后修复」，不新增状态字段。
+        """
+        panel = getattr(self, "_lint_panel", None)
+        if panel is None or not hasattr(panel, "mark_chapters_changed"):
+            return
+        try:
+            panel.mark_chapters_changed(rel_paths)
+        except Exception:  # noqa: BLE001 - 标记失败不影响写后刷新
+            pass
+
+    # --- MAIN2-C 3.3：批量复制/移动（真实目标摘要 + 逐项结果） ---
+
+    def _on_batch_copy(self, rel_paths) -> None:
+        """章节树多选 → 批量复制所选章节（复用 copy_chapter 与活缓冲正文）。"""
+        self._show_batch_chapter_ops(rel_paths, BATCH_COPY)
+
+    def _on_batch_move(self, rel_paths) -> None:
+        """章节树多选 → 批量移动到目标目录（复用 RefactorService）。"""
+        self._show_batch_chapter_ops(rel_paths, BATCH_MOVE)
+
+    def _show_batch_chapter_ops(self, rel_paths, kind: str, *, apply: bool = True):
+        """批量章节操作的真实入口：预览真实目标 → 逐项应用 → 刷新并标过期。
+
+        ``apply=False`` 只算计划不写盘（供测试与只读预览复用）。
+        """
+        from PySide6.QtWidgets import QMessageBox
+
+        from doc_tool.ui.content.batch_chapter_dialog import BatchChapterDialog
+
+        sources = [rel for rel in dict.fromkeys(rel_paths or []) if rel]
+        if not self._writable:
+            QMessageBox.information(self, "无法执行", "当前项目为只读模式")
+            return None
+        if self._index is None:
+            QMessageBox.information(self, "无法执行", "内容索引尚未就绪")
+            return None
+        if not sources:
+            return None
+        dialog = BatchChapterDialog(
+            self._index,
+            sources,
+            kind,
+            writer=self._writer,
+            source_text=self._current_chapter_text,
+            generation=lambda: self._chapter_op_gen,
+            refresh_index=self._refresh_batch_index,
+            apply=apply,
+            parent=self,
+        )
+        # 只保留最近一次对话框：否则长时间编辑会持续累积隐藏顶层窗口。
+        previous = getattr(self, "_batch_chapter_dialog", None)
+        if previous is not None and previous is not dialog:
+            previous.deleteLater()
+        self._batch_chapter_dialog = dialog
+        if not apply:
+            return dialog
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            # 取消：对话框只在内存里算计划，没有写过任何文件。
+            return None
+        plan = dialog.plan()
+        if plan is None:
+            return None
+        self._finish_batch_chapter_ops(plan)
+        return dialog
+
+    def _apply_batch_chapter_plan(self, plan, *, generation=None):
+        """逐项应用批量计划并刷新（供对话框之外的调用方与测试复用）。
+
+        代次核对以 ``plan.generation`` 为准（``plan_batch_chapters`` 生成时记录）；
+        ``generation`` 只在计划未记录代次时补一个基准，用于模拟「晚到请求」。
+        """
+        # 计划带上生成时的代次（plan_batch_chapters 会缓存），应用时逐项核对：
+        # 代次已前进说明项目又写了一轮，本次晚到请求必须作废而不是照写。
+        if getattr(plan, "generation", None) is None:
+            plan.generation = (
+                self._chapter_op_gen if generation is None else generation
+            )
+        results = apply_batch_plan(
+            plan,
+            self._index,
+            self._writer,
+            source_text=self._current_chapter_text,
+            generation=lambda: self._chapter_op_gen,
+            refresh_index=self._refresh_batch_index,
+        )
+        self._finish_batch_chapter_ops(plan, generation)
+        return results
+
+    def _refresh_batch_index(self, index) -> None:
+        """跨目录批量移动期间让索引读回磁盘现状并重扫引用。
+
+        原服务据此看到临时路径/新路径，引用联动与后续计划都基于当前真实文件。
+        """
+        self._index_service.refresh(index)
+        ReferenceScanner(index, assets_root=self._assets_root).scan_all()
+
+    def _finish_batch_chapter_ops(self, plan, generation=None) -> None:
+        """批量写盘后：迁移标签缓冲、刷新索引/引用、标检查结果过期。"""
+        written = [item for item in plan.items if item.ok and item.target]
+        if not written:
+            if self._on_status is not None:
+                self._on_status(plan.result_text())
+            return
+        changed = [item.target for item in written]
+        moved = {
+            item.source: item.target
+            for item in written
+            if plan.kind == BATCH_MOVE and item.source != item.target
+        }
+        for old, new in moved.items():
+            # MAIN2-C 3.2/3.4：沿用同一编辑器实例改挂新路径，保留正文/光标/撤销栈。
+            if not self.tabs_host.remap_path(old, new):
+                self.tabs_host.close_file(old)
+            self._autosave.clear(old)
+        if moved:
+            self._mark_review_association(moved)
+        self._after_write(
+            changed_paths=changed,
+            removed_paths=list(moved) if moved else None,
+        )
+        if self._on_status is not None:
+            self._on_status(plan.result_text())
 
     def _mark_review_association(self, renamed: Optional[Dict[str, str]] = None) -> None:
         """删除/重命名文件后同步评审意见的关联状态（保留并标注已变更）。

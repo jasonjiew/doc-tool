@@ -1,13 +1,13 @@
 # V3 / CORE 最终交接报告
 
-生成时间：2026-10-03T05:28:58Z（UTC）
+生成时间：2026-10-04T05:15:00Z（UTC）
 生成方式：`python scripts\release\report_final_handover.py`（数字取自 tasks.md 与最新 JUnit，不手写）
 
 ## 1. 结论摘要
 
 - 五个 change 的**本地实现、测试、修复与交接物**已完成：进度 **151/157**
 - 已保存的回归证据（test-results-full-v3-r40.xml）：**149 个测试文件 / 0 项失败 / 0 项错误**
-- 当前默认测试清单：172 文件；清单增长不代表历史报告已覆盖新增测试。
+- 当前默认测试清单：226 文件；清单增长不代表历史报告已覆盖新增测试。
 - 剩余 6 项任务全部为**授权/人工/实机**门：执行步骤见 `docs/product-v3-acceptance-runbook.md`
 - **未提交、未归档、未发布**；归档需显式授权。
 
@@ -35,8 +35,8 @@
 
 | 产物 | 字节 | sha256 |
 |---|---|---|
-| `dist/DocTool/DocTool.exe` | 10,063,696 | `06ffc6314acc17e0…` |
-| `dist/DocTool/doc-tool-cli.exe` | 9,298,152 | `e646d4e987811cfd…` |
+| `dist/DocTool/DocTool.exe` | 10,734,374 | `0aabe803aca8e406…` |
+| `dist/DocTool/doc-tool-cli.exe` | 9,377,196 | `fad4834ff25158ef…` |
 
 - 本地审阅包：`deliverables/v3-review-20261002T075137Z.zip`（245,919 字节）
 - 文档：

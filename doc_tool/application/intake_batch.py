@@ -264,6 +264,66 @@ def retry_word_batch(
     return result
 
 
+def _merge_batch_into(previous: BatchResult, result: BatchResult) -> BatchResult:
+    """把一次补做的结果合并回原批次视图（保留成功项与取消事实）。"""
+    ordered: List[BatchItemResult] = []
+    replaced = {item.source: item for item in result.items}
+    for item in previous.items:
+        ordered.append(replaced.pop(item.source, item))
+    ordered.extend(replaced.values())
+    result.items = ordered
+    result.cancelled = bool(previous.cancelled or result.cancelled)
+    if not result.settings:
+        result.settings = dict(previous.settings or {})
+    return result
+
+
+def retry_selected_word_items(
+    previous: BatchResult,
+    sources: Sequence[object],
+    *,
+    policy: Optional[IntakePolicy] = None,
+    cancel_token: Optional[CancellationToken] = None,
+    progress: Optional[Callable[[int, int, BatchItemResult], None]] = None,
+) -> BatchResult:
+    """只补做**所选**失败/待转换/未开始项，保留已完成项目与输入设置。
+
+    与 :func:`retry_word_batch` 的差别：这里允许用户只挑其中几项接续（例如
+    只重试一个被占用的文件），不会重复创建已成功的项目，也不会丢掉其余未选项。
+    """
+    wanted = [str(item) for item in sources]
+    selected = [
+        item for item in previous.items
+        if item.source in wanted and item.status != ITEM_OK
+    ]
+    settings = dict(previous.settings or {})
+    effective_policy = policy or IntakePolicy(
+        mode=str(settings.get("policy") or "normal"),
+    )
+    if not selected:
+        merged = BatchResult(
+            items=list(previous.items),
+            parent_dir=str(previous.parent_dir or settings.get("parentDir") or ""),
+            cancelled=bool(previous.cancelled),
+            settings=settings,
+        )
+        merged.finishedAt = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        return merged
+    result = run_word_batch(
+        [item.source for item in selected],
+        parent_dir=settings.get("parentDir") or previous.parent_dir,
+        policy=effective_policy,
+        document_no=str(settings.get("documentNo") or ""),
+        document_version=str(settings.get("documentVersion") or "1.0"),
+        cancel_token=cancel_token,
+        progress=progress,
+    )
+    for item in result.items:
+        if item.status in (ITEM_FAILED, ITEM_PENDING_CONVERT, ITEM_CANCELLED):
+            item.attempts = 2
+    return _merge_batch_into(previous, result)
+
+
 def run_markdown_batch(
     sources: Sequence[object],
     *,
@@ -327,5 +387,5 @@ def run_markdown_batch(
 __all__ = [
     "ITEM_OK", "ITEM_FAILED", "ITEM_PENDING_CONVERT", "ITEM_SKIPPED", "ITEM_CANCELLED",
     "BatchItemResult", "BatchResult", "run_word_batch", "retry_word_batch",
-    "run_markdown_batch",
+    "retry_selected_word_items", "run_markdown_batch",
 ]
