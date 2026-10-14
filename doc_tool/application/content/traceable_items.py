@@ -169,7 +169,22 @@ def build_item_index(
     index = ItemIndex()
     for rel_path, text in documents:
         heading_no = ""
+        in_code_fence = False
+        fence_char = ""
         for line_no, line in enumerate(str(text or "").splitlines(), start=1):
+            stripped = line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                current_fence = stripped[:3]
+                if not in_code_fence:
+                    in_code_fence = True
+                    fence_char = current_fence
+                    continue
+                elif fence_char == current_fence:
+                    in_code_fence = False
+                    fence_char = ""
+                    continue
+            if in_code_fence:
+                continue
             heading_match = re.match(r"^\s{0,3}#{1,6}\s+(.*)$", line)
             if heading_match:
                 heading_no = _leading_number(heading_match.group(1))

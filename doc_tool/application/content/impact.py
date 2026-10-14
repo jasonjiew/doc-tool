@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 from doc_tool.application.content.relations import Relation, RelationGraph
-from doc_tool.application.content.traceable_items import ItemKey, ItemRef
+from doc_tool.application.content.traceable_items import DOC_ITEM_RE, ItemKey, ItemRef, parse_marker
 
 #: \u5f71\u54cd\u7c7b\u578b\u3002
 IMPACT_CONTENT = "content"
@@ -164,6 +164,108 @@ def spec_factor_hash(values: Dict[str, str]) -> str:
         digest.update(str(values.get(key, "")).encode("utf-8"))
         digest.update(b"\x00")
     return digest.hexdigest()
+
+
+def extract_snapshots(documents: Sequence[Tuple[str, str]]) -> Dict[ItemKey, ItemSnapshot]:
+    """从 Markdown 文档列表 [(rel_path, text)] 提取所有条目的语义快照。
+
+    特性：
+    1. 支持单章内包含多个 DOC-ITEM 标记；
+    2. 忽略以 ``` 或 ~~~ 开始的代码块内的标记；
+    3. 每个条目绑定到其原子正文块（从标记/段落至下一个标记或同级/高级别标题）；
+    4. 提取最近的前导标题作为标题语义；
+    5. 提取正文中的图片引用与本地链接资源；
+    6. 移动/重编号不改变语义 hash。
+    """
+    snapshots: Dict[ItemKey, ItemSnapshot] = {}
+
+    for rel_path, text in documents:
+        lines = str(text or "").splitlines()
+        in_code_fence = False
+        fence_char = ""
+        is_code_line = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                current_fence = stripped[:3]
+                if not in_code_fence:
+                    in_code_fence = True
+                    fence_char = current_fence
+                    is_code_line.append(True)
+                elif fence_char == current_fence:
+                    in_code_fence = False
+                    fence_char = ""
+                    is_code_line.append(True)
+                else:
+                    is_code_line.append(True)
+            else:
+                is_code_line.append(in_code_fence)
+
+        headings = []
+        item_markers = []
+        for i, line in enumerate(lines):
+            if is_code_line[i]:
+                continue
+            h_match = re.match(r"^\s{0,3}(#{1,6})\s+(.*)$", line)
+            if h_match:
+                cleaned_h = DOC_ITEM_RE.sub("", h_match.group(2)).strip()
+                headings.append((i, len(h_match.group(1)), cleaned_h))
+            for m in DOC_ITEM_RE.finditer(line):
+                ref, err = parse_marker(m.group(0))
+                if ref is not None:
+                    item_markers.append((i, ref))
+
+        if not item_markers:
+            continue
+
+        for idx, (marker_line_idx, ref) in enumerate(item_markers):
+            preceding_headings = [h for h in headings if h[0] <= marker_line_idx]
+            current_heading = preceding_headings[-1] if preceding_headings else None
+            title = current_heading[2] if current_heading else ""
+            heading_level = current_heading[1] if current_heading else 1
+
+            is_heading_line = any(h[0] == marker_line_idx for h in headings)
+            start_line = marker_line_idx + 1 if is_heading_line else marker_line_idx
+            end_line = len(lines)
+            if idx + 1 < len(item_markers):
+                next_marker_line = item_markers[idx + 1][0]
+                end_line = min(end_line, next_marker_line)
+
+            subsequent_headings = [h for h in headings if h[0] > marker_line_idx and h[1] <= heading_level]
+            if subsequent_headings:
+                end_line = min(end_line, subsequent_headings[0][0])
+
+            body_lines = []
+            for line_no in range(start_line, end_line):
+                if is_code_line[line_no]:
+                    body_lines.append(lines[line_no])
+                else:
+                    cleaned = DOC_ITEM_RE.sub("", lines[line_no])
+                    body_lines.append(cleaned)
+            body_text = "\n".join(body_lines).strip()
+
+            resources = []
+            chunk = "\n".join(lines[start_line:end_line])
+            img_matches = re.findall(r"!\[.*?\]\((.*?)\)", chunk)
+            for img in img_matches:
+                clean_img = img.split()[0].strip()
+                if clean_img and not clean_img.startswith(("http://", "https://", "data:")):
+                    resources.append(clean_img.replace("\\", "/"))
+
+            link_matches = re.findall(r"(?<!\!)\[.*?\]\((.*?)\)", chunk)
+            for link in link_matches:
+                clean_link = link.split()[0].strip()
+                if clean_link and not clean_link.startswith(("http://", "https://", "mailto:", "#")):
+                    resources.append(clean_link.replace("\\", "/"))
+
+            snapshots[ref.key] = ItemSnapshot(
+                key=ref.key,
+                title=title,
+                body=body_text,
+                resources=tuple(sorted(set(resources))),
+            )
+
+    return snapshots
 
 
 def diff_snapshots(

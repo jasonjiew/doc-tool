@@ -3,15 +3,15 @@
 > **Docs-as-Code for Enterprise Documents**  
 > 把大型 Word 文档工程化拆解为可版本追踪、可多人协同、可严谨审查的 Markdown 章节树，并在出稿时一键可靠重建为符合企业规范的正式 DOCX 交付物。
 
-[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/wangjie0721666-web/doc-tool)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/wangjie0721666-web/doc-tool)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **当前代码版本**：`v2.9.0`（V2.7～V2.9 规范变更已归档；实际入口、回归与实机验证范围见功能清单，不能据此认定全部验收或公开发布完成）
+- **当前代码版本**：`v3.0.0`（包含 AI / CLI 免安装研发流程接入与全功能便携分发）
 - **代码仓库**：<https://github.com/wangjie0721666-web/doc-tool>
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
-- **详细指南**：[docs/使用说明.md](docs/使用说明.md)
-- **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)（2026-10-01 代码基线为 2.9.0；规划、入口及实机验证状态分别列明）
+- **详细指南**：[docs/使用说明.md](docs/使用说明.md) / [docs/COLLEAGUE_AI_CLI_GUIDE.md](docs/COLLEAGUE_AI_CLI_GUIDE.md)
+- **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)
 
 ---
 
@@ -116,14 +116,28 @@ graph LR
 
 ## 快速上手
 
-### 两种分发方式（推荐安装版）
+### 两种分发方式
 
 | 分发方式 | 文件名示例 | 说明与推荐场景 |
 | :--- | :--- | :--- |
-| **安装版（推荐）** | `DocTool-Setup-2.6.0.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
-| **免安装便携版** | `DocTool-2.6.0-portable.zip` | 解压即用。首次先双击「`安装证书.cmd`」导入企业根证书，之后双击「`启动DocTool.cmd`」启动。适合受限受管办公机。 |
+| **安装版** | `DocTool-Setup-3.0.0.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
+| **免安装便携版（推荐）** | `DocTool-3.0.0-portable.zip` | 解压即用，无需安装系统 Python 或 pip。内置桌面 GUI（`DocTool.exe`）与无头 CLI（`doc-tool-cli.exe`）。原地加载启动（绝不复制到 `%TEMP%`）。双击「`启动DocTool.cmd`」启动 GUI；AI/脚本通过 `doc-tool-cli.exe` 执行只读基线核对、影响分析与 MR 附件生成。 |
 
-> **诊断提示**：若在特殊加密环境遇到启动问题，双击安装目录或便携包根目录下的 `diagnose.cmd`，将生成的 `DocTool-diagnose.txt` 发送给维护人员。
+> **诊断提示**：若在特殊加密或受管环境遇到启动问题，双击安装目录或便携包根目录下的 `diagnose.cmd`，将生成的 `DocTool-diagnose.txt` 发送给维护人员。
+
+### AI Agent 与 CLI 自动化调用（免安装）
+
+便携包内置 `doc-tool-cli.exe`，支持在任意无源码、无 Python 环境下进行机器调用：
+
+```powershell
+$env:DOC_TOOL_CLI = 'D:/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe'
+& $env:DOC_TOOL_CLI --version
+& $env:DOC_TOOL_CLI capabilities --format json
+& $env:DOC_TOOL_CLI baseline-check --project '<文档项目绝对路径>' --format json
+& $env:DOC_TOOL_CLI item-list --project '<文档项目绝对路径>' --format json
+& $env:DOC_TOOL_CLI change-report --manifest '<变更清单.json>' --format markdown
+```
+完整参数契约与使用说明详见：[docs/COLLEAGUE_AI_CLI_GUIDE.md](docs/COLLEAGUE_AI_CLI_GUIDE.md)。
 
 ### 核心出稿工作流（4步交付）
 

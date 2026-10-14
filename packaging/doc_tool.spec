@@ -29,6 +29,24 @@ from PyInstaller.utils.hooks import (
 SPEC_DIR = Path(SPECPATH).resolve()
 REPO_ROOT = SPEC_DIR.parent
 
+# 固化构建元数据：打包时自动生成/刷新 doc_tool/_build_metadata.py
+try:
+    import subprocess
+    from datetime import datetime, timezone
+    commit_res = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], cwd=str(REPO_ROOT), capture_output=True, text=True, check=False)
+    baked_commit = commit_res.stdout.strip() if commit_res.returncode == 0 and commit_res.stdout.strip() else "83094d0a0eb3"
+    meta_path = REPO_ROOT / "doc_tool" / "_build_metadata.py"
+    meta_content = (
+        '# -*- coding: utf-8 -*-\n'
+        '"""固化的构建元数据（打包时自动生成）。"""\n\n'
+        f'COMMIT = "{baked_commit}"\n'
+        f'BUILD_TIME = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n'
+        'BUILD_SOURCE = "devflow-portable-package"\n'
+    )
+    meta_path.write_text(meta_content, encoding="utf-8")
+except Exception:
+    pass
+
 sys.path.insert(0, str(REPO_ROOT))
 from doc_tool.domain.version import APP_VERSION
 

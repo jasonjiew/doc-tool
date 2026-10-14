@@ -69,39 +69,58 @@ PROJECT_SCHEMA_VERSION = 2
 SUPPORTED_PROJECT_SCHEMA_VERSIONS = (1, 2)
 
 
+try:
+    from doc_tool import _build_metadata as _meta  # type: ignore
+    BAKED_COMMIT = str(getattr(_meta, "COMMIT", "") or "").strip()
+    BAKED_BUILD_TIME = str(getattr(_meta, "BUILD_TIME", "") or "").strip()
+    BAKED_SOURCE = str(getattr(_meta, "BUILD_SOURCE", "") or "").strip()
+except ImportError:
+    BAKED_COMMIT = ""
+    BAKED_BUILD_TIME = ""
+    BAKED_SOURCE = ""
+
+
 @lru_cache(maxsize=1)
 def get_commit_id() -> str:
-    """返回当前工作树来源的短提交标识，无法确定时返回 ``"dev"``。
+    """返回当前构建来源的短提交标识，无法确定时返回 ``"dev"``。
 
-    构建信息只用于诊断和发布追溯，不作为运行期逻辑分支条件。
+    打包冻结态优先使用固定提交，避免读取用户工作区的 Git HEAD。
+    源码开发时优先使用当前仓库 Git HEAD。
     """
+    if getattr(sys, "frozen", False):
+        if BAKED_COMMIT:
+            return BAKED_COMMIT
+        return "frozen-release"
+
     repo_root = _find_repo_root()
-    if repo_root is None:
-        return "dev"
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short=12", "HEAD"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        commit = result.stdout.strip()
-        if result.returncode == 0 and commit:
-            dirty = subprocess.run(
-                ["git", "status", "--porcelain"],
+    if repo_root is not None:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--short=12", "HEAD"],
                 cwd=repo_root,
                 capture_output=True,
                 text=True,
                 timeout=5,
                 check=False,
             )
-            if dirty.stdout.strip():
-                commit += "-dirty"
-            return commit
-    except (OSError, subprocess.SubprocessError):
-        pass
+            commit = result.stdout.strip()
+            if result.returncode == 0 and commit:
+                dirty = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                if dirty.stdout.strip():
+                    commit += "-dirty"
+                return commit
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    if BAKED_COMMIT:
+        return BAKED_COMMIT
     return "dev"
 
 
@@ -120,13 +139,44 @@ def _find_repo_root() -> str | None:
 
 def get_build_info() -> Dict[str, str]:
     """返回可复制、脱敏的构建与环境诊断摘要。"""
+    frozen = bool(getattr(sys, "frozen", False))
+    commit = get_commit_id()
+    if frozen:
+        build_source = BAKED_SOURCE or "frozen-bundle"
+        build_time = BAKED_BUILD_TIME or "unspecified"
+    else:
+        if commit != "dev":
+            build_source = "git"
+        elif BAKED_SOURCE:
+            build_source = BAKED_SOURCE
+        else:
+            build_source = "source-tree"
+        build_time = BAKED_BUILD_TIME or "dev"
+
     return {
         "appVersion": APP_VERSION,
-        "commit": get_commit_id(),
+        "commit": commit,
         "projectSchemaVersion": str(PROJECT_SCHEMA_VERSION),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "machine": platform.machine(),
+        "frozen": "true" if frozen else "false",
+        "buildSource": build_source,
+        "buildTime": build_time,
+    }
+
+
+def get_tool_metadata() -> Dict[str, Any]:
+    """返回规范的工具身份与构建元数据（用于所有 CLI JSON 输出报告）。"""
+    from doc_tool.domain.branding import CLI_NAME
+    info = get_build_info()
+    return {
+        "name": CLI_NAME,
+        "appVersion": info.get("appVersion", APP_VERSION),
+        "commit": info.get("commit", "dev"),
+        "buildSource": info.get("buildSource", "source-tree"),
+        "buildTime": info.get("buildTime", "unspecified"),
+        "frozen": info.get("frozen") == "true",
     }
 
 

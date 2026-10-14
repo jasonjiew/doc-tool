@@ -56,6 +56,12 @@ class Signoff:
     role: str
     created_at: str
     note: str = ""
+    # --- 扩展确认对象绑定（向后兼容） ---
+    baseline_id: str = ""
+    content_hash: str = ""
+    commit_id: str = ""
+    project_id: str = ""
+    source_record: str = ""
 
 
 class ReviewStore:
@@ -81,7 +87,13 @@ class ReviewStore:
         return result
 
     def signoffs(self) -> List[Signoff]:
-        return [Signoff(**item) for item in self._read(self.signoffs_file, "signoffs") if isinstance(item, dict)]
+        valid_keys = {f.name for f in fields(Signoff)}
+        res = []
+        for item in self._read(self.signoffs_file, "signoffs"):
+            if isinstance(item, dict):
+                filtered = {k: v for k, v in item.items() if k in valid_keys}
+                res.append(Signoff(**filtered))
+        return res
 
     def _save_comments(self, comments: Sequence[ReviewComment]) -> None:
         atomic_write(self.comments_file, json.dumps({"comments": [asdict(item) for item in comments]}, ensure_ascii=False, indent=2))
@@ -212,10 +224,32 @@ class ReviewStore:
                 item.association_changed = True
         self._save_comments(comments)
 
-    def append_signoff(self, author: str, role: str, note: str = "") -> Signoff:
+    def append_signoff(
+        self,
+        author: str,
+        role: str,
+        note: str = "",
+        *,
+        baseline_id: str = "",
+        content_hash: str = "",
+        commit_id: str = "",
+        project_id: str = "",
+        source_record: str = "",
+    ) -> Signoff:
         if not str(author).strip() or not str(role).strip():
-            raise ValueError("签字人和角色不能为空。")
-        item = Signoff(str(uuid.uuid4()), author.strip(), role.strip(), _now(), note.strip())
+            raise ValueError("确认人与角色不能为空")
+        item = Signoff(
+            signoff_id=str(uuid.uuid4()),
+            author=author.strip(),
+            role=role.strip(),
+            created_at=_now(),
+            note=note.strip(),
+            baseline_id=str(baseline_id or "").strip(),
+            content_hash=str(content_hash or "").strip(),
+            commit_id=str(commit_id or "").strip(),
+            project_id=str(project_id or "").strip(),
+            source_record=str(source_record or "").strip(),
+        )
         signoffs = self.signoffs()
         signoffs.append(item)
         atomic_write(self.signoffs_file, json.dumps({"signoffs": [asdict(value) for value in signoffs]}, ensure_ascii=False, indent=2))

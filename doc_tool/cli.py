@@ -44,6 +44,64 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")
+
+    # --- 研发流程接入与免安装薄入口 ---
+    cap_p = sub.add_parser("capabilities", help="显示工具版本、固化构建来源与命令契约")
+    cap_p.add_argument("--format", choices=("json", "human"), default="json")
+    cap_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    bcheck_p = sub.add_parser("baseline-check", help="核对清单、修订记录、指定版本声明、冻结基线与确认对象")
+    bcheck_p.add_argument("--project", default="", help="单项目目录")
+    bcheck_p.add_argument("--workspace", default="", help="工作区目录（与 --project 二选一）")
+    bcheck_p.add_argument("--declare-file", action="append", default=[], help="要核对的版本声明文件（如 README.md），可重复")
+    bcheck_p.add_argument("--format", choices=("json", "human"), default="json")
+    bcheck_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    ilist_p = sub.add_parser("item-list", help="查询项目/工作区内的稳定条目（DOC-ITEM）")
+    ilist_p.add_argument("--project", default="", help="单项目目录")
+    ilist_p.add_argument("--workspace", default="", help="工作区目录（与 --project 二选一）")
+    ilist_p.add_argument("--chapter", default="", help="限定章节相对路径过滤")
+    ilist_p.add_argument("--query", default="", help="关键词过滤")
+    ilist_p.add_argument("--page", type=int, default=1, help="页码（从 1 起）")
+    ilist_p.add_argument("--page-size", type=int, default=50, help="每页条目数（默认 50）")
+    ilist_p.add_argument("--format", choices=("json", "human"), default="json")
+    ilist_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    ishow_p = sub.add_parser("item-show", help="查看单个稳定条目的内容、摘要与关系")
+    ishow_p.add_argument("--project", default="", help="单项目目录")
+    ishow_p.add_argument("--workspace", default="", help="工作区目录（与 --project 二选一）")
+    ishow_p.add_argument("--item", required=True, help="条目身份（projectId/itemId 或 itemId）")
+    ishow_p.add_argument("--format", choices=("json", "human"), default="json")
+    ishow_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    rstatus_p = sub.add_parser("review-status", help="查询评审意见、关系复核与签审失效状态（只读）")
+    rstatus_p.add_argument("--project", default="", help="单项目目录")
+    rstatus_p.add_argument("--workspace", default="", help="工作区目录（与 --project 二选一）")
+    rstatus_p.add_argument("--baseline", default="", help="基线快照目录或版本")
+    rstatus_p.add_argument("--format", choices=("json", "human"), default="json")
+    rstatus_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    tplan_p = sub.add_parser("trace-plan", help="预览旧编号迁移至 DOC-ITEM 的建议与歧义项（只读）")
+    tplan_p.add_argument("--project", default="", help="单项目目录")
+    tplan_p.add_argument("--workspace", default="", help="工作区目录（与 --project 二选一）")
+    tplan_p.add_argument("--format", choices=("json", "markdown", "human"), default="json")
+    tplan_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+
+    creport_p = sub.add_parser("change-report", help="接收多仓库 Git 证据、测试与人工验收，生成 MR 附件与机器报告")
+    creport_p.add_argument("--change-id", default="change-report", help="变更 ID")
+    creport_p.add_argument("--openspec", default="", help="关联的 OpenSpec 提案或目录")
+    creport_p.add_argument("--gitlab-mr", default="", help="GitLab MR 引用")
+    creport_p.add_argument("--git-evidence", action="append", default=[], help="Git 证据 JSON 路径，可重复")
+    creport_p.add_argument("--junit", action="append", default=[], help="JUnit XML 路径，可重复")
+    creport_p.add_argument("--manual-test", action="append", default=[], help="人工验收文件（JSON/Markdown），可重复")
+    creport_p.add_argument("--project", default="", help="文档项目目录")
+    creport_p.add_argument("--baseline", default="", help="文档基线快照目录")
+    creport_p.add_argument("--item", action="append", default=[], help="受控变更条目 projectId/itemId，可重复")
+    creport_p.add_argument("--no-doc-change-reason", default="", help="无需修改文档的合规理由")
+    creport_p.add_argument("--format", choices=("json", "markdown", "human"), default="json")
+    creport_p.add_argument("--report-file", default="", help="保存报告到指定文件路径")
+    creport_p.add_argument("--manifest", default="", help="聚合变更清单 JSON 文件路径")
+
     # 公共 CLI 只提供项目上下文构建（通用与旧版专用项目均可）；
     # 仓库内置 `build requirement|design|all` 旧入口已退出公共产品面（任务 7.3）。
     build_p = sub.add_parser("build", help="构建并校验文档（项目上下文）")
@@ -1386,33 +1444,43 @@ def _collect_graph(root: Path, *, workspace: bool):
     return graph, documents
 
 def _detect_changes(root: Path, baseline: str) -> dict:
-    """无显式 --item 时：从基线快照与当前内容比对推出变更。
+    """从基线快照与当前内容比对推出变更。
 
-    缺少可用基线时**不推断**，返回空并由调用方提醒。
+    使用共享层 extract_snapshots，支持：
+    - 基线版本标识与显式快照目录解析；
+    - 同一章节内多个条目的原子正文提取；
+    - 整文件删除、新增文件与条目移动；
+    - 缺少可用基线时不推测，返回空。
     """
     if not baseline:
         return {}
-    from doc_tool.application.content.impact import ItemSnapshot, diff_snapshots
+    from doc_tool.application.content.impact import extract_snapshots, diff_snapshots
 
     base_dir = Path(baseline)
     if not base_dir.is_dir():
-        return {}
-    documents = _project_documents(root)
-    before = {}
-    after = {}
-    for rel_path, text in documents:
-        snapshot = _snapshot_from_text(rel_path, text)
-        if snapshot is None:
-            continue
-        key, item = snapshot
-        after[key] = item
-        base_file = base_dir / rel_path
-        if base_file.is_file():
-            base_snapshot = _snapshot_from_text(rel_path, base_file.read_text(encoding="utf-8"))
-            if base_snapshot is not None:
-                before[base_snapshot[0]] = base_snapshot[1]
+        cand1 = root / ".state" / "baselines" / baseline / "content"
+        cand2 = root / ".state" / "baselines" / baseline
+        if cand1.is_dir():
+            base_dir = cand1
+        elif cand2.is_dir():
+            base_dir = cand2
+        else:
+            return {}
+
+    current_docs = _project_documents(root)
+    base_docs = []
+    if (base_dir / "project.yml").is_file():
+        base_docs = _project_documents(base_dir)
+    elif base_dir.is_dir():
+        for p in sorted(base_dir.rglob("*.md")):
+            if p.is_file() and not any(part == ".state" for part in p.relative_to(base_dir).parts):
+                base_docs.append((p.relative_to(base_dir).as_posix(), p.read_text(encoding="utf-8")))
+
+    before = extract_snapshots(base_docs)
+    after = extract_snapshots(current_docs)
     changed, _spec = diff_snapshots(before, after)
     return changed
+
 
 def _snapshot_from_text(rel_path: str, text: str):
     """从 Markdown 文本提取一条条目快照（字段级，不依赖编号）。"""
@@ -1634,6 +1702,290 @@ def _force_utf8_stdio() -> None:
         except (OSError, ValueError):
             pass
 
+
+def _write_report_file_if_needed(path_str: str, text: str) -> None:
+    if path_str:
+        p = Path(path_str)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+
+
+def _capabilities_command(args) -> int:
+    from doc_tool.application.capabilities import get_capabilities_report
+    payload = get_capabilities_report()
+    fmt = getattr(args, "format", "json")
+    if fmt == "human":
+        lines = [
+            f"DocTool CLI {payload['tool']['appVersion']} (commit: {payload['tool']['commit']}, buildSource: {payload['tool']['buildSource']})",
+            f"Python: {payload['tool']['python']}, 平台: {payload['tool']['platform']}",
+            f"支持命令数: {len(payload['commands'])}",
+        ]
+        output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return 0
+
+
+def _baseline_check_command(args) -> int:
+    from doc_tool.application.baseline_check import check_baselines
+    if bool(args.project) == bool(args.workspace) and (args.project or args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace", file=sys.stderr)
+        return 2
+    target = Path(args.project or args.workspace or ".")
+    if not target.is_dir():
+        print(f"[FAIL] 路径不存在：{target}", file=sys.stderr)
+        return 2
+
+    declare_files = []
+    for f in getattr(args, "declare_file", []):
+        pf = Path(f)
+        if not pf.is_file():
+            print(f"[FAIL] 声明文件不存在：{f}", file=sys.stderr)
+            return 2
+        declare_files.append(pf)
+    payload = check_baselines(target, declare_files=declare_files, workspace=bool(args.workspace))
+    fmt = getattr(args, "format", "json")
+    if fmt == "human":
+        lines = [
+            f"基线核对结果: {payload['status'].upper()} (冲突: {payload['conflict']})",
+        ]
+        for p in payload.get("projects", []):
+            lines.append(f"- [{p['documentNo']}] {p['documentName']}: manifest={p['manifestVersion']}, revRecord={p['revisionRecordVersion']}")
+            for iss in p.get("issues", []):
+                lines.append(f"  * {iss}")
+        output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return payload.get("exitCode", 0)
+
+
+def _item_list_command(args) -> int:
+    from doc_tool.application.item_query import list_items
+    if bool(args.project) == bool(args.workspace) and (args.project or args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace", file=sys.stderr)
+        return 2
+    target = Path(args.project or args.workspace or ".")
+    if not target.is_dir():
+        print(f"[FAIL] 路径不存在：{target}", file=sys.stderr)
+        return 2
+
+    payload = list_items(
+        target,
+        workspace=bool(args.workspace),
+        chapter=getattr(args, "chapter", "") or None,
+        query=getattr(args, "query", "") or None,
+        page=getattr(args, "page", 1),
+        page_size=getattr(args, "page_size", 50),
+    )
+    fmt = getattr(args, "format", "json")
+    if fmt == "human":
+        lines = [
+            f"条目列表 (共 {payload['total']} 项，第 {payload['page']}/{payload['totalPages']} 页):",
+        ]
+        for it in payload["items"]:
+            lines.append(f"- [{it['kind']}] {it['itemId']} ({it['relPath']}:{it['lineNo']}) {it['title']}")
+        output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return 0 if payload["status"] == "passed" else 1
+
+
+def _item_show_command(args) -> int:
+    from doc_tool.application.item_query import show_item
+    if bool(args.project) == bool(args.workspace) and (args.project or args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace", file=sys.stderr)
+        return 2
+    target = Path(args.project or args.workspace or ".")
+    if not target.is_dir():
+        print(f"[FAIL] 路径不存在：{target}", file=sys.stderr)
+        return 2
+
+    payload = show_item(target, args.item, workspace=bool(args.workspace))
+    fmt = getattr(args, "format", "json")
+    if fmt == "human":
+        if not payload["found"]:
+            output = f"[FAIL] {'; '.join(payload['issues'])}"
+        else:
+            it = payload["item"]
+            lines = [
+                f"条目: {it['projectId']}/{it['itemId']} ({it['kind']})",
+                f"位置: {it['relPath']}:{it['lineNo']} | 标题: {it['title']}",
+                f"正文摘要 (sha256): {it['digest']}",
+                f"正文内容:\n{it['body']}",
+                f"关联关系: {len(it['relations'])} 条",
+            ]
+            output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return 0 if payload["status"] == "passed" else 1
+
+
+def _review_status_command(args) -> int:
+    from doc_tool.application.item_query import review_status
+    if bool(args.project) == bool(args.workspace) and (args.project or args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace", file=sys.stderr)
+        return 2
+    target = Path(args.project or args.workspace or ".")
+    if not target.is_dir():
+        print(f"[FAIL] 路径不存在：{target}", file=sys.stderr)
+        return 2
+
+    payload = review_status(target, baseline=getattr(args, "baseline", "") or None, workspace=bool(args.workspace))
+    fmt = getattr(args, "format", "json")
+    if fmt == "human":
+        lines = [
+            f"评审与签审状态: {payload['status'].upper()}",
+            f"未决意见: {payload['commentsSummary']['unresolved']} / 总计 {payload['commentsSummary']['total']}",
+            f"待复核关系: {len(payload['pendingReviews'])}",
+            f"签审记录: {len(payload['signoffs'])} 项",
+        ]
+        for s in payload["signoffs"]:
+            lines.append(f"- 签审人: {s['author']} ({s['role']}) - 状态: {s['status']} {s['staleReason']}")
+        output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return 0 if payload["status"] == "passed" else 1
+
+
+def _trace_plan_command(args) -> int:
+    from doc_tool.application.item_query import generate_stable_trace_plan
+    if bool(args.project) == bool(args.workspace) and (args.project or args.workspace):
+        print("[FAIL] 请二选一地指定 --project 或 --workspace", file=sys.stderr)
+        return 2
+    target = Path(args.project or args.workspace or ".")
+    if not target.is_dir():
+        print(f"[FAIL] 路径不存在：{target}", file=sys.stderr)
+        return 2
+
+    payload = generate_stable_trace_plan(target, workspace=bool(args.workspace))
+    fmt = getattr(args, "format", "json")
+    if fmt in ("markdown", "human"):
+        lines = [
+            f"## 旧编号迁移计划 ({payload['planId']})",
+            "",
+            f"- 可确认条目: {payload['confidentCount']} 项；歧义条目: {payload['ambiguousCount']} 项",
+            f"- 预览保护: 零正文写入",
+            "",
+            "| 章节相对路径 | 行号 | 旧编号 | 建议稳定条目 ID | 理由 |",
+            "|--------------|------|--------|-----------------|------|",
+        ]
+        for c in payload["confident"]:
+            lines.append(f"| {c['relPath']} | {c['lineNo']} | {c['legacyNo']} | {c['proposedId']} | {c['reason']} |")
+        for a in payload["ambiguous"]:
+            lines.append(f"| {a['relPath']} | {a['lineNo']} | {a['legacyNo']} | [歧义待复核] | {a['reason']} |")
+        output = "\n".join(lines)
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return 0 if payload["status"] == "passed" else 1
+
+
+def _change_report_command(args) -> int:
+    from doc_tool.application.change_report import generate_change_report
+
+    change_id = getattr(args, "change_id", "change-report")
+    openspec_ref = getattr(args, "openspec", "")
+    gitlab_mr_ref = getattr(args, "gitlab_mr", "")
+    git_evs = [Path(f) for f in getattr(args, "git_evidence", [])]
+    junits = [Path(f) for f in getattr(args, "junit", [])]
+    manuals = [Path(f) for f in getattr(args, "manual_test", [])]
+
+    p_arg = getattr(args, "project", "")
+    p_root = None
+    if p_arg:
+        p_path = Path(p_arg)
+        if not p_path.is_dir():
+            print(f"[FAIL] 项目路径不存在：{p_arg}", file=sys.stderr)
+            return 2
+        p_root = p_path
+
+    baseline = getattr(args, "baseline", "") or None
+    affected_items = list(getattr(args, "item", []))
+    no_doc_change_reason = getattr(args, "no_doc_change_reason", "")
+
+    manifest_file = getattr(args, "manifest", "")
+    if manifest_file:
+        m_path = Path(manifest_file)
+        if not m_path.is_file():
+            print(f"[FAIL] Manifest 文件不存在：{manifest_file}", file=sys.stderr)
+            return 2
+        try:
+            m_data = json.loads(m_path.read_text(encoding="utf-8"))
+            if isinstance(m_data, dict):
+                if change_id == "change-report" and m_data.get("change_id"):
+                    change_id = m_data["change_id"]
+                if not openspec_ref and (m_data.get("openspec") or m_data.get("openspec_change_id")):
+                    openspec_ref = m_data.get("openspec") or m_data.get("openspec_change_id")
+                if not gitlab_mr_ref and m_data.get("gitlab_mr"):
+                    gitlab_mr_ref = m_data["gitlab_mr"]
+                if not affected_items and (m_data.get("affected_doc_items") or m_data.get("affected_items")):
+                    affected_items.extend(m_data.get("affected_doc_items") or m_data.get("affected_items", []))
+                if not no_doc_change_reason and m_data.get("no_doc_change_reason"):
+                    no_doc_change_reason = m_data["no_doc_change_reason"]
+                if p_root is None and m_data.get("project"):
+                    cand = Path(m_data["project"])
+                    if cand.is_dir():
+                        p_root = cand
+                if baseline is None and m_data.get("baseline"):
+                    baseline = m_data["baseline"]
+                if m_data.get("git_evidence"):
+                    for gef in m_data["git_evidence"]:
+                        if Path(gef).is_file():
+                            git_evs.append(Path(gef))
+                elif m_data.get("repositories"):
+                    git_evs.append(Path(manifest_file))
+                if m_data.get("junit"):
+                    for jf in m_data["junit"]:
+                        if Path(jf).is_file():
+                            junits.append(Path(jf))
+                elif m_data.get("test_evidence"):
+                    for te in m_data["test_evidence"]:
+                        xml_path = te.get("junit_xml_path") if isinstance(te, dict) else ""
+                        if xml_path and Path(xml_path).is_file():
+                            junits.append(Path(xml_path))
+                if m_data.get("manual_test"):
+                    for mf in m_data["manual_test"]:
+                        if Path(mf).is_file():
+                            manuals.append(Path(mf))
+                elif m_data.get("manual_acceptance"):
+                    manuals.append(Path(manifest_file))
+        except Exception as exc:
+            print(f"[FAIL] Manifest JSON 解析失败：{exc}", file=sys.stderr)
+            return 2
+
+    payload = generate_change_report(
+        change_id=change_id,
+        openspec_ref=openspec_ref,
+        gitlab_mr_ref=gitlab_mr_ref,
+        git_evidence_files=git_evs,
+        junit_files=junits,
+        manual_evidence_files=manuals,
+        project_root=p_root,
+        baseline=baseline,
+        affected_items=affected_items,
+        no_doc_change_reason=no_doc_change_reason,
+    )
+    fmt = getattr(args, "format", "json")
+    if fmt in ("markdown", "human"):
+        output = payload["mrMarkdown"]
+    else:
+        output = json.dumps(payload, ensure_ascii=False, indent=2)
+    print(output)
+    _write_report_file_if_needed(getattr(args, "report_file", ""), output)
+    return payload.get("exitCode", 0)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     _force_utf8_stdio()
     parser = build_parser()
@@ -1644,6 +1996,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "capabilities":
+        return _capabilities_command(args)
+    if args.command == "baseline-check":
+        return _baseline_check_command(args)
+    if args.command == "item-list":
+        return _item_list_command(args)
+    if args.command == "item-show":
+        return _item_show_command(args)
+    if args.command == "review-status":
+        return _review_status_command(args)
+    if args.command == "trace-plan":
+        return _trace_plan_command(args)
+    if args.command == "change-report":
+        return _change_report_command(args)
     if args.command == "impact":
         return _impact_command(args)
     if args.command == "trace":
