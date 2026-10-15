@@ -389,6 +389,9 @@ def _current_stage(result: PipelineResult) -> str:
 def _prepare_revision_sync(
     manifest: ProjectManifest,
     paths: ProjectPaths,
+    *,
+    auto_revision: bool = False,
+    revision_author: str = "系统",
 ) -> Optional[dict]:
     """按 ``_revision_record.md`` 末行版本号算出文档版本号同步计划（锁内只读）。
 
@@ -419,10 +422,20 @@ def _prepare_revision_sync(
             document_type=manifest.documentType,
             source_path=source_p if (source_p and source_p.is_file()) else None,
         )
+        original_md_text = md_path.read_text(encoding="utf-8") if md_path.is_file() else None
+        auto_entry = None
+        if auto_revision:
+            from doc_tool.application.content.revision_record import append_smart_revision_entry
+
+            auto_entry = append_smart_revision_entry(
+                manifest, paths, author=revision_author or "系统"
+            )
         return {
             "md_path": md_path,
             "new_version": document_version_from_record(md_path),
             "original_version": manifest.documentVersion,
+            "original_md_text": original_md_text if auto_entry else None,
+            "auto_entry": auto_entry,
             "has_table": has_revision_table(md_path),
             "applied": False,
         }
@@ -482,6 +495,13 @@ def _rollback_revision_sync(
     修订记录文件本身从未被改写，只需回退内存中的清单版本号；清单只在发布
     成功后落盘，因此回退后不会有中途版本号进入 ``project.yml``。
     """
+    if revision_sync and revision_sync.get("original_md_text") is not None:
+        try:
+            from doc_tool.application.content.writer import atomic_write
+
+            atomic_write(revision_sync["md_path"], revision_sync["original_md_text"])
+        except Exception:
+            pass
     if not (revision_sync or {}).get("applied"):
         return
     try:
@@ -521,6 +541,13 @@ def run_pipeline(
     app_version: str = "",
     progress: Optional[ProgressCallback] = None,
     word_available: Optional[bool] = None,
+    *,
+    merge_policy=None,
+    chapter_scope: Optional[List[str]] = None,
+    variant_id: Optional[str] = None,
+    output_override: Optional[str] = None,
+    auto_revision: bool = False,
+    revision_author: str = "系统",
 ) -> PipelineResult:
     """执行构建→前校验→Word 刷新→后校验管线，返回结构化结果。
 
@@ -632,11 +659,20 @@ def run_pipeline(
         # 诊断构建也同步：版本号是 _revision_record.md 的派生值，预览产物的
         # 封面与文件名必须和正式合并一致，否则改完修订记录先诊断一次会看到
         # 旧版本号。清单只在发布成功后落盘。
-        revision_sync = _prepare_revision_sync(manifest, paths)
+        revision_sync = _prepare_revision_sync(
+            manifest,
+            paths,
+            auto_revision=auto_revision,
+            revision_author=revision_author,
+        )
         result = _run_pipeline_inner(
             manifest, paths, skip_word_refresh, baseline, cancel_token,
             result, log, build_with_project, refresh_with_project,
             validate_with_project, on_progress, revision_sync,
+            merge_policy=merge_policy,
+            chapter_scope=chapter_scope,
+            variant_id=variant_id,
+            output_override=output_override,
         )
         if not result.success:
             _rollback_revision_sync(revision_sync, manifest, log)
@@ -671,30 +707,42 @@ def run_pipeline(
         release_lock(paths)
 
 
-def _project_reuse_resolver(paths):
-    """按项目声明构造正文展开器（无声明返回 None，行为与旧版一致）。"""
+def _project_reuse_resolver(paths, variables: Optional[Dict[str, str]] = None):
+    """按项目声明构造正文展开器（兼顾模块复用与变量替换；无声明时返回 None）。"""
+    resolver = None
     try:
         from doc_tool.application.content.reuse_hook import build_project_resolver
 
         root = getattr(paths, "root", None)
-        if root is None:
-            return None
-        resolver = build_project_resolver(root)
+        if root is not None:
+            resolver = build_project_resolver(root)
     except Exception:  # noqa: BLE001 - 复用能力异常不阻断构建
+        resolver = None
+
+    effective_vars = dict(variables or {})
+    if resolver is None and not effective_vars:
         return None
-    if resolver is None:
-        return None
+
     original = resolver
 
     def _counting_resolver(rel_path, source_text):
-        resolved = original(rel_path, source_text)
+        resolved = source_text
+        if original is not None:
+            cand = original(rel_path, resolved)
+            if isinstance(cand, str) and cand:
+                resolved = cand
+        if effective_vars and "{{" in resolved:
+            from doc_tool.application.chapter_order import resolve_variables
+
+            var_res = resolve_variables(resolved, effective_vars)
+            resolved = var_res.text
         if isinstance(resolved, str) and resolved and resolved != source_text:
             _counting_resolver.changed += 1
         return resolved
 
     _counting_resolver.changed = 0  # type: ignore[attr-defined]
-    _counting_resolver.notes = getattr(original, "notes", {})  # type: ignore[attr-defined]
-    _counting_resolver.resources = getattr(original, "resources", {})  # type: ignore[attr-defined]
+    _counting_resolver.notes = getattr(original, "notes", {}) if original else {}  # type: ignore[attr-defined]
+    _counting_resolver.resources = getattr(original, "resources", {}) if original else {}  # type: ignore[attr-defined]
     return _counting_resolver
 
 
@@ -743,6 +791,11 @@ def _run_pipeline_inner(
     validate_with_project,
     on_progress: ProgressCallback = _noop_progress,
     revision_sync: Optional[dict] = None,
+    *,
+    merge_policy=None,
+    chapter_scope: Optional[List[str]] = None,
+    variant_id: Optional[str] = None,
+    output_override: Optional[str] = None,
 ) -> PipelineResult:
     """管线内部执行（锁已获取），分离以便 finally 释放锁。
 
@@ -806,6 +859,62 @@ def _run_pipeline_inner(
         _sync_revision_version(revision_sync, manifest, result, log),
     )
 
+    # --- 解析变体与章节合并范围 ---
+    effective_scope: List[str] = list(chapter_scope or [])
+    effective_order: Optional[List[str]] = (
+        list(manifest.chapters) if getattr(manifest, "chapters", None) else None
+    )
+    effective_vars: Dict[str, str] = dict(getattr(manifest, "variables", None) or {})
+    if variant_id:
+        from doc_tool.application.content.variants import (
+            VariantsConfig,
+            effective_chapters,
+            effective_variables,
+            unknown_variant_message,
+        )
+
+        variants_cfg = VariantsConfig.load(paths.root)
+        variant = variants_cfg.get(variant_id)
+        if variant is None:
+            msg = unknown_variant_message(variants_cfg, variant_id)
+            err = BuildError(user_message=msg)
+            result.error_code = err.code
+            result.events.append(
+                StageEvent(STAGE_PREPARE, "failed", detail=msg, error_code=err.code)
+            )
+            _record_stage(STAGE_PREPARE, "failed")
+            return result
+        discovered_rels = []
+        if content_root is not None and content_root.is_dir():
+            for md_p in collect_chapter_markdown_paths(content_root):
+                try:
+                    discovered_rels.append(Path(md_p).relative_to(content_root).as_posix())
+                except ValueError:
+                    discovered_rels.append(Path(md_p).name)
+        kept_chapters, excluded_chapters, _var_warns = effective_chapters(
+            discovered_rels, manifest.chapters, variant
+        )
+        for warning in _var_warns:
+            result.events.append(StageEvent(STAGE_PREPARE, "warning", detail=warning))
+        if effective_scope:
+            from doc_tool.domain.merge_policy import matches_chapter_scope
+
+            kept_chapters = [path for path in kept_chapters if matches_chapter_scope(path, effective_scope)]
+            if not kept_chapters:
+                msg = "变体与指定章节范围没有交集，未生成文档。"
+                err = BuildError(user_message=msg)
+                result.error_code = err.code
+                result.events.append(StageEvent(STAGE_PREPARE, "failed", detail=msg, error_code=err.code))
+                _record_stage(STAGE_PREPARE, "failed")
+                return result
+        effective_order = kept_chapters
+        if excluded_chapters or effective_scope:
+            effective_scope = kept_chapters
+        effective_vars, _ = effective_variables(effective_vars, variant)
+
+    # 局部范围合并或排除章节的变体构建不与整本原 Word 基线强制对比
+    effective_baseline = baseline and not bool(effective_scope)
+
     # --- 计算正式输出路径与临时输出路径 ---
     output_name = build_output_filename(
         manifest.documentNo,
@@ -813,14 +922,20 @@ def _run_pipeline_inner(
         manifest.documentVersion,
         manifest.documentType,
     )
-    formal_output = paths.output_dir / output_name
+    if output_override:
+        formal_output = Path(output_override)
+    elif variant_id:
+        formal_output = paths.output_dir / "variants" / variant_id / output_name
+    else:
+        formal_output = paths.output_dir / output_name
+    formal_output.parent.mkdir(parents=True, exist_ok=True)
     paths.output_dir.mkdir(parents=True, exist_ok=True)
     # 临时文件与正式输出同目录，保证 os.replace 在同一卷上原子。
     # 必须以 ``.docx`` 结尾：validate_pre/post 会经统一安全入口
     # ``read_docx_package`` 打开它做严格校验，该入口硬校验扩展名（拒绝非
     # ``.docx``），旧命名 ``.<名>.tmp`` 会让每次校验都报「文件扩展名不是
     # .docx」，管线永远无法发布。隐藏点前缀 + ``.tmp-`` 标记仍标示临时性。
-    temp_output = paths.output_dir / (".tmp-" + output_name)
+    temp_output = formal_output.parent / (".tmp-" + formal_output.name)
 
     def _cleanup_temp() -> None:
         try:
@@ -874,7 +989,7 @@ def _run_pipeline_inner(
         markdown_paths = collect_chapter_markdown_paths(paths.content_root)
         # V3.0 3.4：项目声明了正文模块引用时，在 Mermaid/资源预处理之前展开，
         # 使预览/检查/Word/HTML 使用同一份解析结果；无声明时为 None（零开销）。
-        reuse_resolver = _project_reuse_resolver(paths)
+        reuse_resolver = _project_reuse_resolver(paths, variables=effective_vars)
         prepared_sources, prepare_temp_dir = prepare_documents(
             markdown_paths,
             cancel_check=lambda: token.is_cancelled,
@@ -987,7 +1102,9 @@ def _run_pipeline_inner(
             manifest, paths, output_override=str(temp_output),
             on_warning=expression_warnings.append,
             prepared=prepared_sources or None,
-            # V2.8（2.1/2.2）：显式声明的章节顺序接入内核，与界面/索引同源。
+            merge_policy=merge_policy,
+            chapter_scope=effective_scope or None,
+            chapter_order=effective_order,
         )
         if Path(built_path).resolve() != temp_output.resolve() or not temp_output.is_file():
             raise BuildError(
@@ -1049,10 +1166,13 @@ def _run_pipeline_inner(
             manifest,
             paths,
             output_override=str(temp_output),
-            baseline=baseline,
+            baseline=effective_baseline,
             require_refreshed=False,
             asset_overrides=asset_overrides,
             prepared_texts=prepared_texts,
+            merge_policy=merge_policy,
+            chapter_scope=effective_scope or None,
+            chapter_order=effective_order,
         )
         expanded = int(getattr(reuse_resolver, "changed", 0) or 0)
         failures = _validation_failure_lines(manifest, paths) if not ok and expanded else []
@@ -1241,9 +1361,12 @@ def _run_pipeline_inner(
         try:
             ok = validate_with_project(
                 manifest, paths, output_override=str(temp_output),
-                baseline=baseline, require_refreshed=True,
+                baseline=effective_baseline, require_refreshed=True,
                 asset_overrides=asset_overrides,
                 prepared_texts=prepared_texts,
+                merge_policy=merge_policy,
+                chapter_scope=effective_scope or None,
+                chapter_order=effective_order,
             )
             result.events.append(StageEvent(
                 STAGE_VALIDATE_POST,

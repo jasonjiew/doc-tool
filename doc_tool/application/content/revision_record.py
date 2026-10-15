@@ -803,3 +803,333 @@ def autolink_revision_record(
     if updated_rows > 0 and not dry_run:
         atomic_write(md_path, new_text)
     return updated_rows, total_links, new_text
+
+
+# ---------------------------------------------------------------------------
+# 智能修订摘要生成与版本自动演进 (Direction 6)
+# ---------------------------------------------------------------------------
+
+
+def bump_revision_version(version: str, level: str = "patch") -> str:
+    """将版本号智能演进到下一版本（保留 ``V``/``v`` 前缀与段数形态）。
+
+    示例：
+    - ``1.0`` -> ``1.1``
+    - ``V3.8`` -> ``V3.9``
+    - ``1.0.2`` -> ``1.0.3``（``level="minor"`` 时 -> ``1.1.0``）
+    """
+    raw = (version or "").strip()
+    if not raw:
+        return "V1.0"
+    m = re.match(r"^(?P<prefix>[Vv]\s*)?(?P<nums>\d+(?:\.\d+)*)(?P<suffix>.*)$", raw)
+    if not m:
+        return raw + ".1"
+    prefix = m.group("prefix") or ""
+    parts = [int(x) for x in m.group("nums").split(".")]
+    suffix = m.group("suffix") or ""
+    if len(parts) == 1:
+        parts.append(1)
+    elif level == "major":
+        parts[0] += 1
+        for i in range(1, len(parts)):
+            parts[i] = 0
+    elif level == "minor" and len(parts) >= 3:
+        parts[1] += 1
+        for i in range(2, len(parts)):
+            parts[i] = 0
+    else:
+        parts[-1] += 1
+    return "{0}{1}{2}".format(prefix, ".".join(str(p) for p in parts), suffix)
+
+
+def _display_section_title(rel_path: str) -> str:
+    p = Path(rel_path)
+    stem = p.stem
+    if stem == "_index" and p.parent.name:
+        stem = p.parent.name
+    return stem.strip()
+
+
+def _summarize_block_diff_detail(old_text: str, new_text: str) -> str:
+    """对比单章节基线与当前文本的块级变化，生成简明局部说明（如「更新表格 1 处」）。"""
+    from doc_tool.domain.blocks import (
+        KIND_CODE,
+        KIND_COMPLEX_TABLE,
+        KIND_IMAGE,
+        KIND_TABLE,
+        parse_blocks,
+    )
+
+    old_doc = parse_blocks(old_text or "", "<base>")
+    new_doc = parse_blocks(new_text or "", "<now>")
+
+    def _sigs(doc, kinds):
+        res = []
+        for b in doc.blocks:
+            if b.kind in kinds:
+                if b.kind == KIND_TABLE:
+                    res.append(repr(b.rows))
+                elif b.kind == KIND_COMPLEX_TABLE:
+                    res.append("{0}:{1}".format(b.filename, repr(getattr(b, "proxy_rows", []))))
+                elif b.kind == KIND_IMAGE:
+                    res.append("{0}:{1}".format(b.relative_path, b.caption))
+                elif b.kind == KIND_CODE:
+                    res.append(b.text.strip())
+        return res
+
+    details: List[str] = []
+    old_tbls = _sigs(old_doc, (KIND_TABLE, KIND_COMPLEX_TABLE))
+    new_tbls = _sigs(new_doc, (KIND_TABLE, KIND_COMPLEX_TABLE))
+    if old_tbls != new_tbls:
+        if len(new_tbls) > len(old_tbls):
+            details.append("新增表格 {0} 处".format(len(new_tbls) - len(old_tbls)))
+        elif len(new_tbls) < len(old_tbls):
+            details.append("删除表格 {0} 处".format(len(old_tbls) - len(new_tbls)))
+        else:
+            changed_cnt = sum(1 for a, b in zip(old_tbls, new_tbls) if a != b)
+            details.append("更新表格 {0} 处".format(max(1, changed_cnt)))
+
+    old_imgs = _sigs(old_doc, (KIND_IMAGE,))
+    new_imgs = _sigs(new_doc, (KIND_IMAGE,))
+    if old_imgs != new_imgs:
+        if len(new_imgs) > len(old_imgs):
+            details.append("新增图片 {0} 处".format(len(new_imgs) - len(old_imgs)))
+        else:
+            details.append("更新图片")
+
+    old_codes = _sigs(old_doc, (KIND_CODE,))
+    new_codes = _sigs(new_doc, (KIND_CODE,))
+    if old_codes != new_codes:
+        details.append("更新代码示例")
+
+    return "、".join(details)
+
+
+def generate_smart_revision_summary(
+    manifest,
+    paths,
+    *,
+    auto_link: bool = True,
+) -> Tuple[str, List[str]]:
+    """对比当前章节树与基线快照（``reimport_base.json`` / ``ContentSnapshot``），智能生成修订摘要。
+
+    Returns:
+        ``(summary_text, changed_rel_paths)``；若无任何章节变更，``summary_text`` 为空串。
+    """
+    import hashlib
+    import json
+
+    content_root = paths.resolve(manifest.relative_content_root())
+    if not content_root.is_dir():
+        return "", []
+
+    doc_prefix = manifest.documentType.strip("/") + "/"
+    base_hashes: Dict[str, str] = {}
+    base_texts: Dict[str, str] = {}
+
+    reimport_base = paths.state_dir / "reimport_base.json"
+    if reimport_base.is_file():
+        try:
+            payload = json.loads(reimport_base.read_text(encoding="utf-8"))
+            for rel, h in dict(payload.get("files") or {}).items():
+                rel_s = str(rel).replace("\\", "/")
+                if rel_s.startswith(doc_prefix):
+                    rel_s = rel_s[len(doc_prefix):]
+                if Path(rel_s).name not in _REVISION_RECORD_NAMES:
+                    base_hashes[rel_s] = str(h)
+            for rel, txt in dict(payload.get("contents") or {}).items():
+                rel_s = str(rel).replace("\\", "/")
+                if rel_s.startswith(doc_prefix):
+                    rel_s = rel_s[len(doc_prefix):]
+                if isinstance(txt, str):
+                    base_texts[rel_s] = txt
+        except Exception:
+            pass
+
+    if not base_hashes:
+        try:
+            from doc_tool.application.content.snapshot import ContentSnapshot
+
+            snap = ContentSnapshot(paths.state_dir)
+            if snap.load():
+                for rel, entry in snap.entries.items():
+                    rel_s = str(rel).replace("\\", "/")
+                    if rel_s.startswith(doc_prefix):
+                        rel_s = rel_s[len(doc_prefix):]
+                    if Path(rel_s).name in _REVISION_RECORD_NAMES:
+                        continue
+                    if not rel_s.endswith(_MD_SUFFIXES):
+                        continue
+                    sha_val = getattr(entry, "sha1", None) or (
+                        entry.get("sha1") if isinstance(entry, dict) else None
+                    )
+                    if sha_val:
+                        base_hashes[rel_s] = str(sha_val)
+        except Exception:
+            pass
+
+    current_files: Dict[str, Tuple[str, str]] = {}
+    for md_path in sorted(content_root.rglob("*")):
+        if not md_path.is_file() or md_path.suffix.lower() not in _MD_SUFFIXES:
+            continue
+        if md_path.name in _REVISION_RECORD_NAMES or md_path.name.startswith("."):
+            continue
+        rel = md_path.relative_to(content_root).as_posix()
+        raw_bytes = md_path.read_bytes()
+        sha1 = hashlib.sha1(raw_bytes).hexdigest()
+        txt = raw_bytes.decode("utf-8", errors="replace")
+        current_files[rel] = (sha1, txt)
+
+    if not base_hashes:
+        if not current_files:
+            return "", []
+        labels = [_display_section_title(r) for r in list(current_files.keys())[:3]]
+        more = "等 {0} 个章节".format(len(current_files)) if len(current_files) > 3 else ""
+        summary_raw = "整理并更新 " + "、".join(labels) + more
+        if auto_link:
+            summary_raw = link_revision_summary(summary_raw, SectionCatalog(content_root))
+        return summary_raw, list(current_files.keys())
+
+    added: List[str] = []
+    modified: List[Tuple[str, str]] = []
+    deleted: List[str] = []
+    changed_paths: List[str] = []
+
+    for rel in sorted(set(current_files) | set(base_hashes)):
+        if rel not in base_hashes:
+            added.append(_display_section_title(rel))
+            changed_paths.append(rel)
+        elif rel not in current_files:
+            deleted.append(_display_section_title(rel))
+            changed_paths.append(rel)
+        else:
+            cur_sha, cur_txt = current_files[rel]
+            b_sha = base_hashes[rel]
+            b_txt = base_texts.get(rel)
+            norm_cur = cur_txt.replace("\r\n", "\n")
+            norm_cur_sha = hashlib.sha1(norm_cur.encode("utf-8")).hexdigest()
+            crlf_cur_sha = hashlib.sha1(norm_cur.replace("\n", "\r\n").encode("utf-8")).hexdigest()
+            is_same = (
+                cur_sha == b_sha
+                or norm_cur_sha == b_sha
+                or crlf_cur_sha == b_sha
+                or (b_txt is not None and norm_cur == b_txt.replace("\r\n", "\n"))
+            )
+            if not is_same:
+                detail = _summarize_block_diff_detail(b_txt, cur_txt) if b_txt is not None else ""
+                modified.append((_display_section_title(rel), detail))
+                changed_paths.append(rel)
+
+    if not changed_paths:
+        return "", []
+
+    clauses: List[str] = []
+    if added:
+        shown = "、".join(added[:3])
+        if len(added) > 3:
+            shown += "等 {0} 节".format(len(added))
+        clauses.append("新增 " + shown)
+    if modified:
+        mod_parts: List[str] = []
+        for lbl, dtl in modified[:4]:
+            if dtl:
+                mod_parts.append("{0}（{1}）".format(lbl, dtl))
+            else:
+                mod_parts.append(lbl)
+        shown = "、".join(mod_parts)
+        if len(modified) > 4:
+            shown += "等 {0} 节".format(len(modified))
+        clauses.append("修改 " + shown)
+    if deleted:
+        shown = "、".join(deleted[:3])
+        if len(deleted) > 3:
+            shown += "等 {0} 节".format(len(deleted))
+        clauses.append("删除 " + shown)
+
+    summary_raw = "；".join(clauses)
+    if auto_link:
+        summary_raw = link_revision_summary(summary_raw, SectionCatalog(content_root))
+    return summary_raw, changed_paths
+
+
+def append_smart_revision_entry(
+    manifest,
+    paths,
+    *,
+    author: str = "系统",
+    date: Optional[str] = None,
+    version: Optional[str] = None,
+    summary: Optional[str] = None,
+    auto_link: bool = True,
+) -> Optional[Dict[str, str]]:
+    """根据基线差异自动生成修订摘要、演进版本号并追加到 ``_revision_record.md``。
+
+    若未检测到任何章节变更且未显式传入 ``summary``，返回 ``None``（不产生空修订行）。
+    """
+    import datetime
+
+    content_root = paths.resolve(manifest.relative_content_root())
+    md_path = content_root / "_revision_record.md"
+
+    auto_summary, _changed = generate_smart_revision_summary(
+        manifest, paths, auto_link=auto_link
+    )
+    effective_summary = (
+        summary.strip()
+        if (summary and summary.strip() and summary.strip().lower() != "auto")
+        else auto_summary
+    )
+    if not effective_summary:
+        return None
+    if auto_link and summary and summary.strip().lower() != "auto":
+        effective_summary = link_revision_summary(effective_summary, SectionCatalog(content_root))
+
+    prev_ver = last_revision_version(md_path) if md_path.is_file() else None
+    if not prev_ver:
+        base_doc_ver = (manifest.documentVersion or "1.0").strip()
+        prev_ver = base_doc_ver if base_doc_ver.lower().startswith("v") else "V" + base_doc_ver
+
+    if version and version.strip() and version.strip().lower() != "auto":
+        target_ver = version.strip()
+    else:
+        target_ver = bump_revision_version(prev_ver)
+
+    entry_date = (date or datetime.date.today().isoformat()).strip()
+    entry_author = (author or "系统").strip()
+    safe_summary = effective_summary.replace("\r", " ").replace("\n", "；").replace("|", r"\|")
+    new_row_line = "| {0} | {1} | {2} | {3} |".format(
+        target_ver, safe_summary, entry_date, entry_author
+    )
+
+    if not md_path.is_file() or not has_revision_table(md_path):
+        content = (
+            "# 修订记录\n\n"
+            "| 版本 | 修改摘要 | 修改时间 | 修改人 |\n"
+            "| --- | --- | --- | --- |\n"
+            "{0}\n"
+        ).format(new_row_line)
+        atomic_write(md_path, content)
+    else:
+        lines = md_path.read_text(encoding="utf-8").splitlines()
+        last_table_idx = -1
+        in_table = False
+        for idx, line in enumerate(lines):
+            if line.strip().startswith("|"):
+                in_table = True
+                last_table_idx = idx
+            elif in_table:
+                break
+        if last_table_idx >= 0:
+            lines.insert(last_table_idx + 1, new_row_line)
+        else:
+            lines.append(new_row_line)
+        atomic_write(md_path, "\n".join(lines) + "\n")
+
+    norm_ver = normalize_revision_version(target_ver)
+    return {
+        "version": target_ver,
+        "normalized_version": norm_ver,
+        "summary": effective_summary,
+        "date": entry_date,
+        "author": entry_author,
+    }

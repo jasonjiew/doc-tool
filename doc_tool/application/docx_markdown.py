@@ -121,7 +121,11 @@ def docx_to_markdown(
         images_dir.mkdir(parents=True, exist_ok=True)
         tables_dir.mkdir(parents=True, exist_ok=True)
         try:
-            result = extract_content(source, content_dir, images_dir, tables_dir, "general")
+            # Workbench-only proxy metadata must not leak into public Markdown.
+            result = extract_content(
+                source, content_dir, images_dir, tables_dir, "general",
+                emit_complex_table_proxy=False,
+            )
         except ValueError as exc:
             text = str(exc)
             if "Heading 1" in text:

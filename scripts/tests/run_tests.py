@@ -169,6 +169,11 @@ DEFAULT_TESTS = [
     "test_v43_member_format_results.py",
     "test_v43_revision_compare.py",
     "test_v43_three_member_loop.py",
+    # 导入拆树、合并策略与智能主流程回归。
+    "test_merge_policy_and_three_way_reimport.py",
+    "test_smart_mainflow_features.py",
+    "test_split_rules_and_policy.py",
+    "test_review_20261015_regressions.py",
 ]
 
 

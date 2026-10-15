@@ -30,7 +30,13 @@ from doc_tool.domain.blocks import (
 )
 
 
+from doc_tool.domain.smart_features import normalize_caption_label
 from doc_tool.kernel_shared.docx_blocks import bookmark_name_for
+
+#: 自然中文图表引用语法：``见图《登录流程》`` / ``如表“参数表”`` / ``参见图「架构图」``。
+NATURAL_XREF_RE = re.compile(
+    r"(?P<lead>参见|详见|参看|见|如|按|参考|对照)?(?P<kind_word>图|插图|表|表格)\s*[《「“\"](?P<label>[^》」”\"\n]{1,60})[》」”\"]"
+)
 
 KIND_FIGURE = "fig"
 #: 表格题注条目类型（与 ``blocks.KIND_TABLE`` 的块种类不同：这里是题注维度）。
@@ -99,6 +105,7 @@ class CaptionRegistry:
     """按全文顺序登记题注并解析引用。"""
 
     entries: Dict[str, CaptionEntry] = field(default_factory=dict)
+    by_label: Dict[Tuple[str, str], CaptionEntry] = field(default_factory=dict)
     order: List[str] = field(default_factory=list)
     duplicates: List[Tuple[str, SourceLocation]] = field(default_factory=list)
     figure_count: int = 0
@@ -149,9 +156,19 @@ class CaptionRegistry:
         # 首次登记的对象才是引用的目标；重复标识不再覆盖，避免引用漂移。
         # 每次登记都进入 _all_entries，保证编号与输出唯一化按出现顺序推进。
         self.entries.setdefault(ident, entry)
+        norm_lbl = normalize_caption_label(label)
+        if norm_lbl:
+            self.by_label.setdefault((kind, norm_lbl), entry)
         self._all_entries.append(entry)
         self.order.append(ident)
         return entry
+
+    def resolve_by_label(self, kind: str, label: str) -> Optional[CaptionEntry]:
+        """按题注标题文本（忽略外围书名号/引号）查找已登记题注条目。"""
+        norm_lbl = normalize_caption_label(label)
+        if not norm_lbl:
+            return None
+        return self.by_label.get((kind, norm_lbl))
 
     def sequential_number(self, entry: CaptionEntry) -> int:
         """同一标识重复出现时按出现顺序递增编号（输出层唯一化，不改源码）。"""
@@ -192,6 +209,9 @@ class CaptionRegistry:
         entry = self.entries.get(ident)
         if entry is not None:
             return ReferenceResolution(kind=kind, ident=token, location=location, entry=entry)
+        by_lbl = self.resolve_by_label(kind, token)
+        if by_lbl is not None:
+            return ReferenceResolution(kind=kind, ident=token, location=location, entry=by_lbl)
         candidates = tuple(self.find_candidates(ident))
         if len(candidates) == 1:
             return ReferenceResolution(
@@ -225,7 +245,18 @@ def resolve_inline_references(text: str, registry: Optional[CaptionRegistry]) ->
     def replace(match):
         return registry.resolve_token(match.group("kind"), match.group("slug"))
 
-    return REFERENCE_RE.sub(replace, text)
+    def replace_natural(match):
+        lead = match.group("lead") or ""
+        kind_word = match.group("kind_word") or ""
+        label = match.group("label") or ""
+        target_kind = KIND_FIGURE if "图" in kind_word else KIND_TABLE_CAPTION
+        entry = registry.resolve_by_label(target_kind, label)
+        if entry is None:
+            return match.group(0)
+        return "{0}{1}".format(lead, entry.display)
+
+    resolved = REFERENCE_RE.sub(replace, text)
+    return NATURAL_XREF_RE.sub(replace_natural, resolved)
 
 
 def build_registry(documents: Iterable[ParsedDocument]) -> CaptionRegistry:

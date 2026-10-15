@@ -15,6 +15,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
 from doc_tool.application.content.writer import atomic_write, atomic_write_bytes
+from doc_tool.domain.split_rules import SplitPolicy
 
 PRESET_FILE_NAME = "intake-presets.json"
 PRESET_SCHEMA_VERSION = 1
@@ -48,6 +49,18 @@ class ResolvedPreset:
     def has_mapping(self) -> bool:
         return bool(self.mapping)
 
+    @property
+    def split_policy(self) -> Optional[SplitPolicy]:
+        raw = (self.settings or {}).get("splitPolicy")
+        if isinstance(raw, SplitPolicy):
+            return raw
+        if isinstance(raw, dict):
+            return SplitPolicy.from_dict(raw)
+        profile = (self.settings or {}).get("splitProfile")
+        if isinstance(profile, str) and profile.strip():
+            return SplitPolicy.from_profile(profile.strip())
+        return None
+
     def summary_line(self) -> str:
         if not self.name:
             return "未使用映射预设（自动识别）"
@@ -69,6 +82,18 @@ class IntakePreset:
     mapping: Dict[str, int] = field(default_factory=dict)
     styleNames: Dict[str, str] = field(default_factory=dict)
     settings: Dict[str, object] = field(default_factory=dict)
+
+    @property
+    def split_policy(self) -> Optional[SplitPolicy]:
+        raw = (self.settings or {}).get("splitPolicy")
+        if isinstance(raw, SplitPolicy):
+            return raw
+        if isinstance(raw, dict):
+            return SplitPolicy.from_dict(raw)
+        profile = (self.settings or {}).get("splitProfile")
+        if isinstance(profile, str) and profile.strip():
+            return SplitPolicy.from_profile(profile.strip())
+        return None
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -203,8 +228,9 @@ class IntakePresets:
                 "预设中 {0} 项样式在当前文档不存在，已回退自动识别".format(len(resolved.unmatched))
             )
         if not resolved.mapping:
-            resolved.used_fallback = True
-            resolved.warnings.append("预设完全失配，按自动识别/单章继续")
+            if preset.mapping or resolved.split_policy is None:
+                resolved.used_fallback = True
+                resolved.warnings.append("预设完全失配，按自动识别/单章继续")
         return resolved
 
 
@@ -280,21 +306,41 @@ def resolve_for_source(preset_name: str, src) -> tuple:
     return resolved, info, warnings
 
 
-def save_from_import(name: str, src, mapping=None, *, style_names=None) -> tuple:
-    """把本次导入实际使用的映射保存为命名预设（按名称更新，不重复）。
+def save_from_import(
+    name: str,
+    src,
+    mapping=None,
+    *,
+    style_names=None,
+    split_policy=None,
+) -> tuple:
+    """把本次导入实际使用的映射与打散策略保存为命名预设（按名称更新，不重复）。
 
-    返回 ``(saved_name, warnings)``；没有可用映射时如实提醒且不写空预设。
+    返回 ``(saved_name, warnings)``；既无可用映射也无显式打散策略时如实提醒且不写空预设。
     """
     warnings: List[str] = []
     target = str(name or "").strip()
     if not target:
         return "", warnings
     resolved_mapping = {str(k): int(v) for k, v in dict(mapping or {}).items()}
+    active_policy: Optional[SplitPolicy] = None
+    if isinstance(split_policy, SplitPolicy):
+        active_policy = split_policy
+    elif isinstance(split_policy, dict):
+        active_policy = SplitPolicy.from_dict(split_policy)
+    elif isinstance(split_policy, str) and split_policy.strip():
+        active_policy = SplitPolicy.from_profile(split_policy.strip())
+
     if not resolved_mapping:
         try:
             from doc_tool.adapters.preflight import preflight as _auto_preflight
 
-            auto = _auto_preflight(str(src), allow_missing_headings=True, heading_style_map=None)
+            auto = _auto_preflight(
+                str(src),
+                allow_missing_headings=True,
+                heading_style_map=None,
+                split_policy=active_policy,
+            )
             resolved_mapping = {
                 str(k): int(v)
                 for k, v in dict(getattr(auto, "heading_style_map", None) or {}).items()
@@ -307,18 +353,25 @@ def save_from_import(name: str, src, mapping=None, *, style_names=None) -> tuple
                 }
         except Exception:  # noqa: BLE001
             resolved_mapping = {}
-    if not resolved_mapping:
+    if not resolved_mapping and active_policy is None:
         warnings.append(
             "未保存预设「{0}」：本次为自动识别，没有可保存的样式映射".format(target)
         )
         return "", warnings
     names = style_names if style_names else source_style_names(src)
     names = {str(k): str(v) for k, v in dict(names or {}).items() if str(k) in resolved_mapping}
+    settings: Dict[str, object] = {}
+    if active_policy is not None:
+        settings["splitPolicy"] = active_policy.to_dict()
+        settings["splitProfile"] = active_policy.profile
     try:
         presets = IntakePresets()
         existing = presets.find(target)
         saved = presets.save(
-            target, resolved_mapping, style_names=names,
+            target,
+            resolved_mapping,
+            style_names=names,
+            settings=settings,
             preset_id=getattr(existing, "presetId", "") or "",
         )
     except Exception as exc:  # noqa: BLE001

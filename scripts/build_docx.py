@@ -66,6 +66,7 @@ from doc_tool.domain.blocks import (
     KIND_SECTION,
     KIND_TABLE,
     SourceLocation,
+    REFERENCE_RE,
     parse_blocks,
     parse_blocks_file,
 )
@@ -372,8 +373,27 @@ def append_inline(
 ) -> None:
     if expressions is not None:
         cursor = 0
-        pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\[\^([^\]]+)\]")
+        pattern = re.compile(
+            r"\[([^\]]+)\]\(([^)]+)\)"
+            r"|\[\^([^\]]+)\]"
+            r"|(?P<sec_lead>详见|参见|参看|见)(?P<sec_link>[《「“\"](?P<sec_title>[^》」”\"\n]{2,40})[》」”\"]\s*(?:章节|一节|小节|章|节))"
+        )
         for match in pattern.finditer(text):
+            if match.group("sec_title") is not None:
+                sec_title = match.group("sec_title").strip()
+                resolved_bm = expressions.find_bookmark_for_section(sec_title)
+                if not resolved_bm:
+                    continue
+                if match.start() > cursor:
+                    append_inline(paragraph, text[cursor:match.start()], None)
+                sec_lead = match.group("sec_lead") or ""
+                if sec_lead:
+                    append_inline(paragraph, sec_lead, None)
+                expressions.append_hyperlink(
+                    paragraph, match.group("sec_link"), "#" + sec_title, source_path, line_no
+                )
+                cursor = match.end()
+                continue
             if match.start() > cursor:
                 append_inline(paragraph, text[cursor:match.start()], None)
             if match.group(3) is not None:
@@ -437,42 +457,113 @@ def set_active_registry(registry) -> None:
     _ACTIVE_REGISTRY = registry
 
 
-def reference_segments(text: str):
-    """把段落文本切成 ``[(kind, value), ...]``。
+def synthesize_static_toc_cache(document_root, config, chapter_entries, *, expressions=None):
+    """Build a real, refreshable TOC cache without fabricating page numbers."""
+    from doc_tool.domain.merge_policy import format_heading_with_number, resolve_merge_policy
+    from doc_tool.kernel_shared.toc_cache import update_static_toc_cache
 
-    ``kind`` 为 ``"text"`` 时 ``value`` 是原文；为 ``"ref"`` 时 ``value`` 是
-    ``(bookmark, number_text, cached_text)``，用于输出 ``REF`` 域与静态缓存值。
-    歧义/缺失引用保留可读占位文本，不生成已知失效的域。
-    """
-    if _ACTIVE_REGISTRY is None or not text or "@" not in text:
+    warnings = expressions.warnings if expressions is not None else config.setdefault("_mergeWarnings", [])
+
+    def warn(message):
+        if message not in warnings:
+            warnings.append(message)
+
+    policy = resolve_merge_policy(config)
+    labels = {}
+    if expressions is not None:
+        for entry, _ in chapter_entries:
+            number = ".".join(str(part) for part in entry.number)
+            bookmark = expressions.section_number_map.get(number)
+            if bookmark:
+                labels[bookmark] = format_heading_with_number(
+                    entry.title, entry.number, top_level_format=policy.top_level_format
+                )
+    styles = {str(style): int(level) for level, style in config["headingStyles"].items()}
+    body = document_root.find(qn("body"))
+    headings = []
+    if body is not None:
+        for paragraph in body:
+            if paragraph.tag != qn("p"):
+                continue
+            style = paragraph.find("./" + qn("pPr") + "/" + qn("pStyle"))
+            level = styles.get(style.get(qn("val"))) if style is not None else None
+            if level is None:
+                continue
+            names = [node.get(qn("name")) for node in paragraph.iter(qn("bookmarkStart")) if node.get(qn("name"))]
+            bookmark = next((name for name in names if name in labels), names[0] if names else None)
+            text = "".join(node.text or "" for node in paragraph.iter(qn("t"))).strip()
+            if text and bookmark:
+                headings.append((level, labels.get(bookmark, text), bookmark))
+    return update_static_toc_cache(document_root, headings, warn)
+
+
+_COMBINED_XREF_RE = re.compile(
+    REFERENCE_RE.pattern +
+    r"|(?P<nat_lead>见|如|参见|详见|参看)(?P<nat_kind>图|插图|表|表格)\s*[《「“\"](?P<nat_label>[^》」”\"\n]{1,60})[》」”\"]"
+)
+
+
+def reference_segments(text: str):
+    """把段落文本切成 ``[(kind, value), ...]``（支持 ``@fig-x`` 与自然中文引用 ``见图《xxx》``）。"""
+    if _ACTIVE_REGISTRY is None or not text:
         return [("text", text)]
-    from doc_tool.domain.blocks import REFERENCE_RE
-    from doc_tool.domain.captions import SourceLocation, resolve_inline_references
+    if "@" not in text and not any(ch in text for ch in ("《", "「", "“", '"')):
+        return [("text", text)]
+    from doc_tool.domain.captions import (
+        KIND_FIGURE as CAP_FIG,
+        KIND_TABLE_CAPTION as CAP_TBL,
+        SourceLocation,
+    )
 
     segments = []
     cursor = 0
-    for match in REFERENCE_RE.finditer(text):
+    for match in _COMBINED_XREF_RE.finditer(text):
+        if match.group("kind") is not None:
+            if match.start() > cursor:
+                segments.append(("text", text[cursor:match.start()]))
+            kind = match.group("kind")
+            token = match.group("slug")
+            resolution = _ACTIVE_REGISTRY.resolve(
+                kind, token, SourceLocation("", 0, 0)
+            )
+            if resolution.resolved and resolution.entry is not None:
+                entry = resolution.entry
+                segments.append(
+                    (
+                        "ref",
+                        (
+                            entry.bookmark,
+                            str(entry.number),
+                            resolution.display_text,
+                        ),
+                    )
+                )
+            else:
+                segments.append(("text", resolution.display_text))
+            cursor = match.end()
+            continue
+
+        nat_lead = match.group("nat_lead") or ""
+        nat_kind = match.group("nat_kind") or ""
+        nat_label = match.group("nat_label") or ""
+        target_kind = CAP_FIG if "图" in nat_kind else CAP_TBL
+        entry = _ACTIVE_REGISTRY.resolve_by_label(target_kind, nat_label)
+        if entry is None:
+            continue
         if match.start() > cursor:
             segments.append(("text", text[cursor:match.start()]))
-        kind = match.group("kind")
-        token = match.group("slug")
-        resolution = _ACTIVE_REGISTRY.resolve(
-            kind, token, SourceLocation("", 0, 0)
-        )
-        if resolution.resolved and resolution.entry is not None:
-            entry = resolution.entry
-            segments.append(
+        if nat_lead:
+            segments.append(("text", nat_lead))
+        segments.append(
+            (
+                "ref",
                 (
-                    "ref",
-                    (
-                        entry.bookmark,
-                        str(entry.number),
-                        resolution.display_text,
-                    ),
-                )
+                    entry.bookmark,
+                    str(entry.number),
+                    entry.display,
+                ),
             )
-        else:
-            segments.append(("text", resolution.display_text))
+        )
         cursor = match.end()
     if cursor < len(text):
         segments.append(("text", text[cursor:]))
@@ -480,12 +571,8 @@ def reference_segments(text: str):
 
 
 def resolve_references(text: str) -> str:
-    """把正文中的 ``@fig-x`` / ``@tbl-x`` 解析为可读显示文本。
-
-    解析结论与校验/预览同源（同一注册表、同一规则）：命中对象显示
-    「图 2 标题」，歧义或缺失保留可读占位文本，不猜测目标。
-    """
-    if _ACTIVE_REGISTRY is None or not text or "@" not in text:
+    """把正文中的 ``@fig-x`` / ``@tbl-x`` 及自然中文引用解析为可读显示文本。"""
+    if _ACTIVE_REGISTRY is None or not text:
         return text
     from doc_tool.domain.captions import resolve_inline_references
 
@@ -1117,13 +1204,15 @@ class NumberingManager:
 HEADING_NUM_ID = 1
 
 
-def _heading_num_id(numbering: Optional[NumberingManager]) -> Optional[int]:
-    """标题该套用的编号实例；模板没有该定义时返回 None（不发 ``w:numPr``）。
+def _heading_num_id(
+    numbering: Optional[NumberingManager], config: Optional[Dict] = None
+) -> Optional[int]:
+    """标题该套用的编号实例；模板没有该定义或启用了字面量标题编号时返回 None（不发 ``w:numPr``）。"""
+    if config is not None:
+        from docx_common import should_use_literal_heading_numbers
 
-    模板不含 numId 1 时（例如没有任何列表的极简模板）硬套编号，会让每个标题
-    都引用不存在的编号实例，产出非法文档且校验直接失败。这种模板一般自带
-    标题样式编号或压根不需要编号，跳过即可。
-    """
+        if should_use_literal_heading_numbers(config):
+            return None
     if numbering is None or not numbering.has_num(HEADING_NUM_ID):
         return None
     return HEADING_NUM_ID
@@ -1183,7 +1272,14 @@ def make_table_from_md(
         if len(widths) < column_count:
             widths.extend([2400] * (column_count - len(widths)))
     else:
-        widths = [2400] * column_count
+        from doc_tool.domain.smart_features import compute_smart_column_widths
+
+        target_dxa = (
+            int(available_width)
+            if available_width
+            else (int(table_width) if table_width and table_width > 0 else 9000)
+        )
+        widths = compute_smart_column_widths(rows, total_width_dxa=target_dxa)
     if available_width:
         widths = shared.fit_table_widths(widths, column_count, int(available_width))
 
@@ -1359,6 +1455,24 @@ def landscape_split(blocks, primary_sect_pr, landscape_prototype, first_sect_pr=
             current = []
             orientation = shared.section_properties_orientation(primary_sect_pr)
             continue
+        if (
+            orientation != shared.ORIENT_LANDSCAPE
+            and block.kind == KIND_TABLE
+            and getattr(block, "meta", None) is None
+            and getattr(block, "rows", None)
+        ):
+            col_cnt = max((len(r) for r in block.rows), default=0)
+            if col_cnt >= 7:
+                from doc_tool.domain.smart_features import (
+                    estimate_unannotated_table_natural_width,
+                )
+
+                if estimate_unannotated_table_natural_width(block.rows) > 10500:
+                    if current:
+                        sections.append((orientation, current))
+                        current = []
+                    sections.append((shared.ORIENT_LANDSCAPE, [block]))
+                    continue
         current.append(block)
     if current or not sections:
         sections.append((orientation, current))
@@ -1569,12 +1683,19 @@ def usable_page_width_emu(section_properties) -> int:
 def image_size_emu(path: str, reference: ImageReference, max_width: int) -> Tuple[int, int]:
     with Image.open(path) as image:
         pixel_width, pixel_height = image.size
+        has_dpi_meta = "dpi" in image.info
         dpi_value = image.info.get("dpi", (96, 96))
     if pixel_width <= 0 or pixel_height <= 0:
         raise AutomationError("图片尺寸无效: {0}".format(path))
     if reference.width_px and reference.height_px:
         width = reference.width_px * 9525
         height = reference.height_px * 9525
+    elif reference.width_px and not reference.height_px:
+        width = reference.width_px * 9525
+        height = max(1, int(round(width * (pixel_height / float(pixel_width)))))
+    elif reference.height_px and not reference.width_px:
+        height = reference.height_px * 9525
+        width = max(1, int(round(height * (pixel_width / float(pixel_height)))))
     else:
         try:
             dpi_x, dpi_y = float(dpi_value[0]), float(dpi_value[1])
@@ -1584,6 +1705,9 @@ def image_size_emu(path: str, reference: ImageReference, max_width: int) -> Tupl
             dpi_x = 96.0
         if not 36 <= dpi_y <= 600:
             dpi_y = 96.0
+        # 无显式 DPI 元数据的高分宽幅截图（如 Retina 截图 >= 1400px）自动按 144 DPI 缩放
+        if not has_dpi_meta and pixel_width >= 1400:
+            dpi_x = dpi_y = 144.0
         width = int(round(pixel_width / dpi_x * 914400))
         height = int(round(pixel_height / dpi_y * 914400))
     if width > max_width:
@@ -2600,7 +2724,9 @@ def _render_table_block(
     return inserted
 
 
-def _render_complex_table_block(block, insert_before, items, relationships, config) -> int:
+def _render_complex_table_block(
+    block, insert_before, items, relationships, config, registry=None
+) -> int:
     """复杂表格：复用原始 XML 与既有关系校验，不改写原表。"""
     filename = block.filename
     if not filename:
@@ -2634,8 +2760,20 @@ def _render_complex_table_block(block, insert_before, items, relationships, conf
                 raise AutomationError(
                     "复杂表格关系目标不存在: {0} -> {1}".format(rid, target)
                 )
+    if getattr(block, "proxy_rows", None):
+        from doc_tool.domain.smart_features import apply_complex_table_proxy_edits
+
+        apply_complex_table_proxy_edits(table_element, block.proxy_rows)
     insert_element(insert_before, table_element)
-    return 1
+    inserted = 1
+    entry = registry.get(block.ident) if (registry is not None and getattr(block, "ident", "")) else None
+    if entry is not None:
+        insert_element(
+            insert_before,
+            _caption_paragraph(entry, registry, config, bookmark_id=_bookmark_id_for(entry.bookmark)),
+        )
+        inserted += 1
+    return inserted
 
 
 _CAPTION_BOOKMARK_BASE = [0]
@@ -2776,7 +2914,7 @@ def process_parsed_document(
                 continue
             if block.kind == KIND_COMPLEX_TABLE:
                 inserted += _render_complex_table_block(
-                    block, insert_before, items, relationships, config
+                    block, insert_before, items, relationships, config, registry=registry
                 )
                 table_count += 1
                 continue
@@ -3028,6 +3166,9 @@ def build(
         # 生成图（Mermaid 等）落在任务临时目录；渲染图片时以它为准。
         config["preparedAssetRoot"] = prepared_asset_root
 
+    from doc_tool.domain.merge_policy import resolve_merge_policy, shift_inline_headings_for_depth
+
+    merge_policy = resolve_merge_policy(config)
     parsed_documents = []
     for _entry, markdown_path in chapter_entries:
         if not markdown_path:
@@ -3044,6 +3185,17 @@ def build(
                 raise AutomationError(
                     "Markdown 无法读取 {0}: {1}".format(markdown_path, exc)
                 )
+        if merge_policy.auto_shift_inline_headings:
+            markdown_text, shift_delta = shift_inline_headings_for_depth(
+                markdown_text, _entry.depth, enabled=True
+            )
+            if shift_delta > 0:
+                warnings_list = config.setdefault("_mergeWarnings", [])
+                msg = "{0}: 行内标题已自动下移 {1} 级以匹配章节深度 {2}".format(
+                    markdown_path, shift_delta, _entry.depth
+                )
+                if msg not in warnings_list:
+                    warnings_list.append(msg)
         parsed_documents.append(parse_blocks(markdown_text, markdown_path))
     registry = build_registry(parsed_documents)
     set_active_registry(registry)
@@ -3087,7 +3239,7 @@ def build(
                     config["headingStyles"],
                     entry.title,
                     entry.depth,
-                    num_id=_heading_num_id(numbering),
+                    num_id=_heading_num_id(numbering, config),
                     list_level=entry.depth - 1,
                     expressions=expressions,
                     bookmark_key=(
@@ -3140,6 +3292,10 @@ def build(
         print("[{0}] 解除 HYPERLINK 域 {1} 个（目标书签不存在，转为静态文本）".format(
             doc_type, total_hyperlinks
         ))
+    if merge_policy.synthesize_static_fields:
+        synthesize_static_toc_cache(
+            document_root, config, chapter_entries, expressions=expressions
+        )
     set_update_fields(items, document_root)
     numbering.save()
     expressions.save_footnotes()

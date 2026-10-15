@@ -207,6 +207,10 @@ def config_from_project(
     manifest: ProjectManifest,
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
+    *,
+    merge_policy=None,
+    chapter_scope: Optional[Sequence[str]] = None,
+    chapter_order: Optional[Sequence[str]] = None,
 ) -> Dict:
     """从项目清单和路径构造内核期望的配置字典。
 
@@ -259,6 +263,22 @@ def config_from_project(
         "_config_path": str(paths.manifest_file),
         "refresh": {"timeoutSeconds": manifest.refreshTimeoutSeconds},
     }
+    from doc_tool.domain.merge_policy import resolve_merge_policy
+
+    raw_policy = merge_policy if merge_policy is not None else getattr(manifest, "mergePolicy", None)
+    effective_policy = resolve_merge_policy(
+        {"mergePolicy": raw_policy, "chapterScope": chapter_scope}
+    )
+    config["mergePolicy"] = effective_policy
+    effective_order = (
+        list(chapter_order)
+        if chapter_order is not None
+        else list(getattr(manifest, "chapters", None) or [])
+    )
+    if effective_order:
+        config["chapterOrder"] = effective_order
+    if effective_policy.chapter_scope:
+        config["chapterScope"] = list(effective_policy.chapter_scope)
     # 源 DOCX 存在时作为基线，供 validate --baseline 使用。
     source_docx = paths.resolve(manifest.relative_source_docx())
     if source_docx.exists():
@@ -272,6 +292,10 @@ def build_with_project(
     output_override: Optional[Union[str, Path]] = None,
     on_warning: Optional[Callable[[str], None]] = None,
     prepared=None,
+    *,
+    merge_policy=None,
+    chapter_scope: Optional[Sequence[str]] = None,
+    chapter_order: Optional[Sequence[str]] = None,
 ) -> str:
     """以项目上下文调用 ``build_docx.build``，返回输出 DOCX 路径。
 
@@ -284,7 +308,14 @@ def build_with_project(
     ensure_kernel_importable()
     from build_docx import build  # noqa: E402
 
-    config = config_from_project(manifest, paths, output_override)
+    config = config_from_project(
+        manifest,
+        paths,
+        output_override,
+        merge_policy=merge_policy,
+        chapter_scope=chapter_scope,
+        chapter_order=chapter_order,
+    )
     output = build(config=config, prepared=prepared)
     if on_warning is not None:
         for warning in config.get("_expressionWarnings", []):
@@ -342,6 +373,10 @@ def validate_with_project(
     report_override: Optional[Union[str, Path]] = None,
     asset_overrides: Optional[Dict[str, str]] = None,
     prepared_texts: Optional[Dict[str, str]] = None,
+    *,
+    merge_policy=None,
+    chapter_scope: Optional[Sequence[str]] = None,
+    chapter_order: Optional[Sequence[str]] = None,
 ) -> bool:
     """以项目上下文调用 ``validate_docx.validate``，返回是否通过。
 
@@ -351,7 +386,14 @@ def validate_with_project(
     ensure_kernel_importable()
     from validate_docx import validate  # noqa: E402
 
-    config = config_from_project(manifest, paths, output_override)
+    config = config_from_project(
+        manifest,
+        paths,
+        output_override,
+        merge_policy=merge_policy,
+        chapter_scope=chapter_scope,
+        chapter_order=chapter_order,
+    )
     if asset_overrides:
         # 预处理生成图所在的临时资源目录（按源 Markdown 绝对路径）。
         config["assetRootOverrides"] = dict(asset_overrides)

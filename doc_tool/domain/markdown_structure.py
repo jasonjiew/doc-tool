@@ -237,6 +237,13 @@ def check_table_structure(lines: Sequence[str]) -> List[StructureFinding]:
         raw = str(lines[index])
         stripped = raw.strip()
 
+        if stripped == "<!-- TABLE_PROXY_BEGIN -->":
+            cursor = index + 1
+            while cursor < total and str(lines[cursor]).strip() != "<!-- TABLE_PROXY_END -->":
+                cursor += 1
+            index = cursor + 1 if cursor < total else total
+            continue
+
         if stripped.startswith(TABLE_META_PREFIX):
             line_no = index + 1
             meta_valid = parse_table_meta(stripped) is not None

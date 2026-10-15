@@ -32,6 +32,11 @@ from doc_tool.domain.markdown_structure import (
     parse_table_meta,
     split_table_row,
 )
+from doc_tool.domain.smart_features import (
+    TABLE_PROXY_BEGIN,
+    TABLE_PROXY_END,
+    stable_auto_ident,
+)
 
 
 # --- 块种类 ---------------------------------------------------------------
@@ -75,11 +80,19 @@ _ORDERED_LIST_RE = re.compile(r"^(\s*)(\d{1,3})[.、]\s+(.+)$")
 
 #: 表格题注：``Table: 参数表 {#tbl-params}`` / ``表: 参数表 {#tbl-params}``。
 _TABLE_CAPTION_RE = re.compile(
-    r"^(?:Table|表|表格)\s*[:：]\s*(?P<label>.*?)\s*\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*$"
+    r"^(?:Table|表|表格)(?:\s*\d+(?:[-.]\d+)*)?\s*[:：]\s*(?P<label>.*?)\s*\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*$"
 )
 #: 图题注：``Figure: 登录流程 {#fig-login}``。
 _FIGURE_CAPTION_RE = re.compile(
-    r"^(?:Figure|图|插图)\s*[:：]\s*(?P<label>.*?)\s*\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*$"
+    r"^(?:Figure|图|插图)(?:\s*\d+(?:[-.]\d+)*)?\s*[:：]\s*(?P<label>.*?)\s*\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*$"
+)
+#: 自然语言表格题注（免 {#id}）：``表：参数表`` / ``Table: 参数表`` / ``表 2-1：参数表``。
+_NATURAL_TABLE_CAPTION_RE = re.compile(
+    r"^(?P<prefix>Table|表|表格)(?:\s*(?P<num>\d+(?:[-.]\d+)*))?\s*[:：]\s*(?P<label>[^\s{#][^{#]{0,78}?)\s*$"
+)
+#: 自然语言图题注（免 {#id}）：``图：登录流程`` / ``Figure: 登录流程`` / ``图 1-1：登录流程``。
+_NATURAL_FIGURE_CAPTION_RE = re.compile(
+    r"^(?:Figure|图|插图)(?:\s*(?P<num>\d+(?:[-.]\d+)*))?\s*[:：]\s*(?P<label>[^\s{#][^{#]{0,78}?)\s*$"
 )
 #: 仅标识写法：``{#tbl-params} 参数表``。
 _BARE_IDENT_RE = re.compile(r"^\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*(?P<label>.*)$")
@@ -87,8 +100,9 @@ _BARE_IDENT_RE = re.compile(r"^\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*(?P<label>.*)
 #: 围栏开标记（CommonMark 允许 0-3 个前导空格）。
 _FENCE_OPEN_RE = re.compile(r"^(?P<indent> {0,3})(?P<mark>`{3,}|~{3,})(?P<info>.*)$")
 
-#: 正文交叉引用语法：``@fig-login`` / ``@tbl-params``。
-REFERENCE_RE = re.compile(r"@(?P<kind>fig|tbl)-(?P<slug>[A-Za-z0-9_\-:.]+)")
+#: 正文交叉引用语法：``@fig-login`` / ``@tbl-params`` / ``@fig-中文标题``。
+# Prefer canonical ASCII IDs so adjacent Chinese prose is not consumed.
+REFERENCE_RE = re.compile(r"@(?P<kind>fig|tbl)-(?P<slug>[A-Za-z0-9_\-:.]+|[\w\-:.]+)")
 INLINE_IDENT_RE = re.compile(r"\{#(?P<ident>[A-Za-z0-9_\-:.]+)\}\s*$")
 
 #: 图片行（含可选 ``=WxH`` 与 ``{#fig-id}``）。
@@ -219,6 +233,7 @@ class ComplexTable(Block):
     filename: str = ""
     ident: str = ""
     caption: str = ""
+    proxy_rows: List[List[str]] = field(default_factory=list)
     kind: str = KIND_COMPLEX_TABLE
 
 
@@ -301,7 +316,7 @@ def split_caption_ident(text: str) -> Tuple[str, str]:
 
 
 def parse_table_caption(line: str) -> Optional[Tuple[str, str, str]]:
-    """解析表格题注行，返回 ``(前缀, 标签, 标识)``；不是题注返回 None。"""
+    """解析表格题注行，返回 ``(前缀, 标签, 标识)``；支持显式 ``{#id}`` 与自然题注。"""
     stripped = line.strip()
     match = _TABLE_CAPTION_RE.match(stripped)
     if match:
@@ -314,11 +329,18 @@ def parse_table_caption(line: str) -> Optional[Tuple[str, str, str]]:
         label = split_caption_ident(match.group("label"))[0]
         if label:
             return "", label, match.group("ident")
+    nat = _NATURAL_TABLE_CAPTION_RE.match(stripped)
+    if nat:
+        label = nat.group("label").strip()
+        if label and not label.endswith(("。", "；", "！", "？")):
+            prefix = nat.group("prefix") or "表"
+            num = (nat.group("num") or "").strip()
+            return prefix, label, stable_auto_ident("tbl", label, num)
     return None
 
 
 def parse_figure_caption(line: str) -> Optional[Tuple[str, str]]:
-    """解析图题注行，返回 ``(标签, 标识)``；不是题注返回 None。"""
+    """解析图题注行，返回 ``(标签, 标识)``；支持显式 ``{#id}`` 与自然题注。"""
     stripped = line.strip()
     match = _FIGURE_CAPTION_RE.match(stripped)
     if match:
@@ -327,6 +349,12 @@ def parse_figure_caption(line: str) -> Optional[Tuple[str, str]]:
     match = _BARE_IDENT_RE.match(stripped)
     if match and match.group("ident").startswith("fig-"):
         return split_caption_ident(match.group("label"))[0], match.group("ident")
+    nat = _NATURAL_FIGURE_CAPTION_RE.match(stripped)
+    if nat:
+        label = nat.group("label").strip()
+        if label and not label.endswith(("。", "；", "！", "？")):
+            num = (nat.group("num") or "").strip()
+            return label, stable_auto_ident("fig", label, num)
     return None
 
 
@@ -367,6 +395,12 @@ def parse_image_line(line: str) -> Optional[Figure]:
                 target = outer.group("target").strip()
                 width = int(outer.group("w"))
                 height = int(outer.group("h"))
+    inline_caption = ""
+    if not inline_ident and alt:
+        parsed_alt_cap = parse_figure_caption(alt)
+        if parsed_alt_cap is not None:
+            inline_caption, inline_ident = parsed_alt_cap
+            alt = inline_caption
     return Figure(
         location=SourceLocation("", 0, 0),
         alt=alt,
@@ -374,6 +408,7 @@ def parse_image_line(line: str) -> Optional[Figure]:
         width_px=width,
         height_px=height,
         ident=inline_ident,
+        caption=inline_caption,
     )
 
 
@@ -457,6 +492,27 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
         while cursor < total and not lines[cursor].strip():
             cursor += 1
         return cursor
+
+    def _consume_complex_proxy(start: int) -> Tuple[List[List[str]], int]:
+        """若紧随复杂表格标记之后存在 ``<!-- TABLE_PROXY_BEGIN -->``，消费代理管道表。"""
+        if start >= total or lines[start].strip() != TABLE_PROXY_BEGIN:
+            return [], start
+        cursor = start + 1
+        proxy_lines: List[str] = []
+        while cursor < total:
+            cur_s = lines[cursor].strip()
+            if cur_s == TABLE_PROXY_END:
+                cursor += 1
+                break
+            if cur_s.startswith("|"):
+                proxy_lines.append(lines[cursor])
+                cursor += 1
+                continue
+            if not cur_s:
+                cursor += 1
+                continue
+            break
+        return parse_pipe_table(proxy_lines), cursor
 
     while index < total:
         raw = lines[index]
@@ -571,15 +627,20 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
                 index=int(complex_table.group(1)),
                 filename=complex_table.group(2) or "",
             )
-            if index + 1 < total:
-                caption = parse_table_caption(lines[index + 1])
+            cursor = index + 1
+            proxy_rows, cursor = _consume_complex_proxy(cursor)
+            if proxy_rows:
+                block.proxy_rows = proxy_rows
+                block.location = _location(path, line_no, cursor)
+            if cursor < total:
+                caption = parse_table_caption(lines[cursor])
                 if caption is not None:
-                    block.ident = _register_ident(caption[2], index + 2, "表格题注")
+                    block.ident = _register_ident(caption[2], cursor + 1, "表格题注")
                     block.caption = caption[1]
-                    block.location = _location(path, line_no, index + 2)
-                    index += 1
+                    block.location = _location(path, line_no, cursor + 1)
+                    cursor += 1
             document.blocks.append(block)
-            index += 1
+            index = cursor
             continue
 
         # --- 表格元数据 ---
@@ -613,27 +674,40 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
             index += 1
             continue
 
-        # --- 表前题注（下一行是表格/复杂表格） ---
+        # --- 表前题注（下一行是表格/复杂表格/带元数据表格） ---
         caption = parse_table_caption(stripped)
         if caption is not None:
             nxt_index = _skip_blanks(index + 1)
             nxt = lines[nxt_index].strip() if nxt_index < total else ""
-            if nxt.startswith("|") or _COMPLEX_TABLE_RE.match(nxt):
+            meta_before_tbl = parse_table_meta(nxt) if nxt.startswith("<!-- TBL:") else None
+            has_meta_tbl = (
+                meta_before_tbl is not None
+                and nxt_index + 1 < total
+                and lines[nxt_index + 1].strip().startswith("|")
+            )
+            if nxt.startswith("|") or _COMPLEX_TABLE_RE.match(nxt) or has_meta_tbl:
                 ident = _register_ident(caption[2], line_no, "表格题注")
                 cursor = nxt_index
                 if _COMPLEX_TABLE_RE.match(nxt):
                     marker = _COMPLEX_TABLE_RE.match(nxt)
+                    after_marker = cursor + 1
+                    proxy_rows, after_marker = _consume_complex_proxy(after_marker)
                     document.blocks.append(
                         ComplexTable(
-                            location=_location(path, line_no, cursor + 1),
+                            location=_location(path, line_no, after_marker),
                             index=int(marker.group(1)),
                             filename=marker.group(2) or "",
                             ident=ident,
                             caption=caption[1],
+                            proxy_rows=proxy_rows,
                         )
                     )
-                    index = cursor + 1
+                    index = after_marker
                     continue
+                meta_line_val = None
+                if has_meta_tbl:
+                    meta_line_val = cursor + 1
+                    cursor += 1
                 block_lines = []
                 while cursor < total and lines[cursor].strip().startswith("|"):
                     block_lines.append(lines[cursor])
@@ -642,6 +716,8 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
                     TableBlock(
                         location=_location(path, line_no, cursor),
                         rows=parse_pipe_table(block_lines),
+                        meta=meta_before_tbl,
+                        meta_line=meta_line_val,
                         ident=ident,
                         caption=caption[1],
                         caption_prefix=caption[0],

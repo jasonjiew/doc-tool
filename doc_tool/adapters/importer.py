@@ -39,6 +39,21 @@ from doc_tool.domain.ooxml import (
     read_docx_package,
     resolve_heading_styles_from_xml,
 )
+from doc_tool.domain.smart_features import (
+    bind_imported_captions_and_references,
+    extract_paragraph_smart_text,
+    format_complex_table_proxy_lines,
+    infer_code_language,
+    is_code_like_paragraph,
+)
+from doc_tool.domain.split_rules import (
+    NUMBERING_PRESERVE_SEMANTIC,
+    SplitPolicy,
+    build_paragraph_level_map,
+    match_text_heading_rule,
+    recognize_document_headings,
+    strip_heading_prefix,
+)
 
 
 # --- OOXML 命名空间 ---
@@ -118,6 +133,8 @@ def generate_template(
     target_template: Union[str, Path],
     heading_style_map: Optional[Dict[str, int]] = None,
     allow_missing_headings: bool = False,
+    paragraph_levels: Optional[Dict[int, int]] = None,
+    split_policy: Optional[SplitPolicy] = None,
 ) -> TemplateMeta:
     """从源 DOCX 生成项目模板（任务 4.1）。
 
@@ -187,13 +204,25 @@ def generate_template(
                         used_styles.add(alt)
                         break
 
+    active_policy = SplitPolicy.from_dict(split_policy) if isinstance(split_policy, dict) else split_policy
+    if paragraph_levels is None and active_policy is not None and active_policy.enable_heuristic_rules:
+        matches = recognize_document_headings(
+            {"word/document.xml": document_xml, "word/styles.xml": styles_xml},
+            heading_style_map,
+            policy=active_policy,
+        )
+        paragraph_levels = build_paragraph_level_map(matches)
+
     children = list(body)
-    start_idx = _find_first_heading1(children, heading_style_map)
+    start_idx = _find_first_heading1(children, heading_style_map, paragraph_levels=paragraph_levels)
     if start_idx is None:
         if allow_missing_headings:
-            start_idx = _find_first_heading(children, heading_style_map)
+            start_idx = _find_first_heading(children, heading_style_map, paragraph_levels=paragraph_levels)
             if start_idx is not None and not user_heading_map:
-                first_lvl = _para_level(children[start_idx], heading_style_map)
+                first_lvl = (
+                    (paragraph_levels or {}).get(start_idx)
+                    or _para_level(children[start_idx], heading_style_map)
+                )
                 if first_lvl and first_lvl > 1:
                     offset = first_lvl - 1
                     decisions = {
@@ -287,24 +316,34 @@ def _para_level(el, heading_style_map: Dict[str, int], offset: int = 0) -> Optio
 
 
 def _find_first_heading1(
-    children: List, heading_style_map: Dict[str, int]
+    children: List,
+    heading_style_map: Dict[str, int],
+    paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> Optional[int]:
     for i, el in enumerate(children):
         if etree.QName(el).localname != 'p':
             continue
-        if _para_level(el, heading_style_map) == 1:
+        lvl = (paragraph_levels or {}).get(i) if paragraph_levels else None
+        if lvl is None:
+            lvl = _para_level(el, heading_style_map)
+        if lvl == 1:
             if _para_text(el).strip() or _para_has_image(el):
                 return i
     return None
 
 
 def _find_first_heading(
-    children: List, heading_style_map: Dict[str, int]
+    children: List,
+    heading_style_map: Dict[str, int],
+    paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> Optional[int]:
     for i, el in enumerate(children):
         if etree.QName(el).localname != 'p':
             continue
-        if _para_level(el, heading_style_map) is not None:
+        lvl = (paragraph_levels or {}).get(i) if paragraph_levels else None
+        if lvl is None:
+            lvl = _para_level(el, heading_style_map)
+        if lvl is not None:
             if _para_text(el).strip() or _para_has_image(el):
                 return i
     return None
@@ -351,6 +390,10 @@ def extract_content(
     allow_missing_headings: bool = False,
     retain_pre_title_body: bool = False,
     pre_title_title: str = "前言",
+    paragraph_levels: Optional[Dict[int, int]] = None,
+    split_policy: Optional[SplitPolicy] = None,
+    smart_extract: bool = True,
+    emit_complex_table_proxy: bool = True,
 ) -> ExtractionResult:
     """从源 DOCX 提取正文 Markdown、图片与复杂表格（任务 4.2）。
 
@@ -397,15 +440,32 @@ def extract_content(
     else:
         heading_style_map = dict(heading_style_map)
     rel_map = _parse_rel_map(rels_xml)
+    rel_url_map = {
+        rid: info.get("target", "")
+        for rid, info in rel_map.items()
+        if isinstance(info, dict) and info.get("target")
+    }
+
+    active_policy = SplitPolicy.from_dict(split_policy) if isinstance(split_policy, dict) else split_policy
+    if paragraph_levels is None and active_policy is not None and active_policy.enable_heuristic_rules:
+        matches = recognize_document_headings(
+            {"word/document.xml": document_xml, "word/styles.xml": styles_xml},
+            heading_style_map,
+            policy=active_policy,
+        )
+        paragraph_levels = build_paragraph_level_map(matches)
 
     children = list(body)
     offset = 0
-    start_idx = _find_first_heading1(children, heading_style_map)
+    start_idx = _find_first_heading1(children, heading_style_map, paragraph_levels=paragraph_levels)
     if start_idx is None:
         if allow_missing_headings:
-            start_idx = _find_first_heading(children, heading_style_map)
+            start_idx = _find_first_heading(children, heading_style_map, paragraph_levels=paragraph_levels)
             if start_idx is not None:
-                first_lvl = _para_level(children[start_idx], heading_style_map)
+                first_lvl = (
+                    (paragraph_levels or {}).get(start_idx)
+                    or _para_level(children[start_idx], heading_style_map)
+                )
                 if first_lvl and first_lvl > 1:
                     offset = first_lvl - 1
             if start_idx is None:
@@ -441,14 +501,25 @@ def extract_content(
             st = _para_style(el)
             txt = _para_text(el)
             raw_txt = _para_text_raw(el)
-            lvl = _para_level(el, heading_style_map, offset=offset)
+            lvl = (paragraph_levels or {}).get(element_index) if paragraph_levels else None
+            if lvl is not None and offset > 0:
+                lvl = max(1, lvl - offset)
+            if lvl is None:
+                lvl = _para_level(el, heading_style_map, offset=offset)
+            if (
+                lvl is not None
+                and active_policy is not None
+                and active_policy.numbering_mode == NUMBERING_PRESERVE_SEMANTIC
+                and txt
+            ):
+                txt = strip_heading_prefix(txt, mode=NUMBERING_PRESERVE_SEMANTIC)
             has_img = _para_has_image(el)
 
             if lvl == 1:
                 if not txt and not has_img:
                     continue
                 if cur_file is not None and cur_lines is not None:
-                    _write_chapter(cur_file, cur_lines)
+                    _write_chapter(cur_file, cur_lines, smart_extract=smart_extract)
                 cur_chapter = re.sub(r"\r\n|\r|\n", " ", txt) or "正文"
                 fname = "{0:02d}-{1}.md".format(len(chapter_order) + 1, _safe_name(cur_chapter))
                 cur_file = content_dir / fname
@@ -493,7 +564,10 @@ def extract_content(
                 # 源段落中的关系顺序紧随其后，禁止因 ``elif`` 静默丢掉文本。
                 para_line = len(cur_lines) + 1
                 if txt:
-                    _emit_paragraph(el, txt, cur_lines, raw_txt)
+                    _emit_paragraph(
+                        el, txt, cur_lines, raw_txt,
+                        rel_url_map=rel_url_map, smart_extract=smart_extract,
+                    )
                     cur_lines.append("")
                 img_counter, img_map = _emit_images(
                     el, rel_map, media_files, images_dir,
@@ -510,7 +584,10 @@ def extract_content(
                 _emit_unsupported(el, txt, cur_chapter, element_index, cur_lines, unsupported_map)
             else:
                 para_line = len(cur_lines) + 1
-                _emit_paragraph(el, txt, cur_lines, raw_txt)
+                _emit_paragraph(
+                    el, txt, cur_lines, raw_txt,
+                    rel_url_map=rel_url_map, smart_extract=smart_extract,
+                )
                 cur_lines.append("")
                 _emit_unsupported(
                     el, txt, cur_chapter, element_index, cur_lines, unsupported_map, para_line,
@@ -526,10 +603,11 @@ def extract_content(
             tbl_counter, tbl_map, cur_lines = _emit_table(
                 el, tables_dir, tbl_counter, tbl_map,
                 cur_chapter, document_type, cur_lines,
+                emit_complex_table_proxy=emit_complex_table_proxy,
             )
 
     if cur_file is not None and cur_lines is not None:
-        _write_chapter(cur_file, cur_lines)
+        _write_chapter(cur_file, cur_lines, smart_extract=smart_extract)
 
     # 写资源映射与元数据
     _write_yaml(content_dir.parent.parent / "assets" / document_type / "image-map.yml",
@@ -820,7 +898,17 @@ def _placeholder_marker(feature: str, source: str) -> str:
     return placeholder_text(feature, source)
 
 
-def _emit_paragraph(el, txt, cur_lines, raw: Optional[str] = None) -> None:
+_CODE_LINE_TAG = "<!-- SMART_CODE_LINE -->"
+
+
+def _emit_paragraph(
+    el,
+    txt,
+    cur_lines,
+    raw: Optional[str] = None,
+    rel_url_map: Optional[Dict[str, str]] = None,
+    smart_extract: bool = True,
+) -> None:
     """写入正文段落；``raw`` 给出未 strip 的原文，用于保留代码缩进。
 
     ``txt`` 仍参与项目符号/编号识别与空段落判定；只有「确有前导空白」时才改用
@@ -850,6 +938,11 @@ def _emit_paragraph(el, txt, cur_lines, raw: Optional[str] = None) -> None:
         else:
             cur_lines.append(indent + "- " + txt_clean)
     else:
+        if smart_extract and not _unsupported_features(el) and is_code_like_paragraph(el):
+            code_line = raw.rstrip("\r\n") if (raw is not None and raw.strip()) else txt
+            code_line = re.sub(r"\r\n|\r|\n", "\n", code_line)
+            cur_lines.append(_CODE_LINE_TAG + code_line)
+            return
         pf = _para_fmt_marker(el)
         if pf:
             cur_lines.append(pf)
@@ -858,6 +951,10 @@ def _emit_paragraph(el, txt, cur_lines, raw: Optional[str] = None) -> None:
             candidate = re.sub(r"\r\n|\r|\n", "<br>", raw.rstrip())
             if candidate.lstrip() != candidate:
                 body = candidate
+        if smart_extract and body == txt and not _unsupported_features(el):
+            rich = extract_paragraph_smart_text(el, rel_url_map, smart_inline=True)
+            if rich and rich.strip():
+                body = rich.strip()
         cur_lines.append(body)
 
 
@@ -889,7 +986,16 @@ def qn_attr(tag: str) -> str:
     return _qn(tag)
 
 
-def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type, cur_lines):
+def _emit_table(
+    el,
+    tables_dir,
+    tbl_counter,
+    tbl_map,
+    cur_chapter,
+    document_type,
+    cur_lines,
+    emit_complex_table_proxy: bool = True,
+):
     tbl_counter += 1
     line_no = len(cur_lines) + 1
     if _table_is_simple(el):
@@ -942,6 +1048,10 @@ def _emit_table(el, tables_dir, tbl_counter, tbl_map, cur_chapter, document_type
     (tables_dir / xml_name).write_bytes(
         etree.tostring(el, encoding="UTF-8", xml_declaration=True))
     cur_lines.append("<!-- TABLE:{0}:{1} -->".format(tbl_counter, xml_name))
+    if emit_complex_table_proxy:
+        proxy_lines = format_complex_table_proxy_lines(el)
+        if proxy_lines:
+            cur_lines.extend(proxy_lines)
     cur_lines.append("")
     tbl_map.append({
         "source_index": tbl_counter,
@@ -1186,9 +1296,47 @@ def _table_fmt_meta(el) -> Dict:
     return out
 
 
-def _write_chapter(path: Path, lines: List[str]) -> None:
+def _cluster_smart_code_lines(lines: List[str]) -> List[str]:
+    """将连续标记为 ``_CODE_LINE_TAG`` 的等宽/代码样式段落聚合成围栏代码块。"""
+    if not any(line.startswith(_CODE_LINE_TAG) for line in lines):
+        return lines
+    out: List[str] = []
+    idx = 0
+    total = len(lines)
+    while idx < total:
+        line = lines[idx]
+        if not line.startswith(_CODE_LINE_TAG):
+            out.append(line)
+            idx += 1
+            continue
+        code_buf: List[str] = []
+        cursor = idx
+        while cursor < total:
+            cur = lines[cursor]
+            if cur.startswith(_CODE_LINE_TAG):
+                code_buf.append(cur[len(_CODE_LINE_TAG):])
+                cursor += 1
+            elif not cur.strip() and cursor + 1 < total and lines[cursor + 1].startswith(_CODE_LINE_TAG):
+                cursor += 1
+            else:
+                break
+        lang = infer_code_language(code_buf)
+        ticks = re.findall(r"`+", "\n".join(code_buf))
+        fence = "`" * max(3, max((len(run) for run in ticks), default=0) + 1)
+        out.append("{0}{1}".format(fence, lang))
+        out.extend(code_buf)
+        out.append(fence)
+        idx = cursor
+    return out
+
+
+def _write_chapter(path: Path, lines: List[str], *, smart_extract: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+    processed = list(lines)
+    if smart_extract:
+        processed = _cluster_smart_code_lines(processed)
+        bind_imported_captions_and_references(processed)
+    path.write_text("\n".join(processed).strip() + "\n", encoding="utf-8")
 
 
 def _write_yaml(path: Path, data: Dict) -> None:
@@ -1206,15 +1354,31 @@ class SplitResult:
     dirs: int = 0
     mds: int = 0
     indexes: int = 0
+    max_depth_reached: int = 0
+    bridged_jumps: int = 0
+    coalesced_nodes: int = 0
+    rule_promoted_nodes: int = 0
+    profile: str = "standard"
 
 
 class _Node:
     """章节树节点。"""
 
-    def __init__(self, depth: int, title: str, line_idx: int) -> None:
+    def __init__(
+        self,
+        depth: int,
+        title: str,
+        line_idx: int,
+        max_split_depth: int = 3,
+        raw_depth: Optional[int] = None,
+        is_item_anchor: bool = False,
+    ) -> None:
         self.depth = depth
+        self.raw_depth = raw_depth if raw_depth is not None else depth
         self.title = title
         self.line_idx = line_idx
+        self.max_split_depth = max_split_depth
+        self.is_item_anchor = is_item_anchor
         self.content: List[str] = []
         self.children: List[_Node] = []
         self.num: List[int] = []
@@ -1222,7 +1386,7 @@ class _Node:
     def is_dir(self) -> bool:
         if self.depth == 1:
             return True
-        if self.depth == 2:
+        if 2 <= self.depth < self.max_split_depth:
             return len(self.children) > 0
         return False
 
@@ -1235,72 +1399,162 @@ class _Node:
         return _sanitize(self.display_name())
 
 
-def split_into_tree(content_dir: Union[str, Path]) -> SplitResult:
-    """把大章节 Markdown 拆分为章节目录树（任务 4.3）。
+_FENCE_LINE_RE = re.compile(r"^\s*(?P<mark>`{3,}|~{3,})(?P<info>.*)$")
 
-    拆分规则（以原 Word 标题层级为最终依据）：
-    - 一级标题 -> 文件夹 ``第N章 标题/``
-    - 二级标题 -> 有三级子节点则文件夹，否则独立 MD
-    - 三级标题 -> 独立 MD ``N.M.K 标题.md``
-    - 四级及以上 -> 保留在所属三级/二级 MD 内（标题行原样）
 
-    父章节自身正文写入同目录 ``_index.md`` 且位于子章节之前。只处理
-    ``content_dir`` 中的顶层大章节 Markdown；迁移完成后删除这些大章节文件。
-    不会删除或修改 ``content_dir`` 以外的任何正式项目内容。
+def split_into_tree(
+    content_dir: Union[str, Path],
+    policy: Optional[Union[SplitPolicy, Dict]] = None,
+) -> SplitResult:
+    """把大章节 Markdown 拆分为章节目录树（任务 4.3 + 多规则打散策略增强）。
 
-    Args:
-        content_dir: 待拆分的内容目录（暂存工作区）。
-
-    Returns:
-        拆分统计。
+    支持通过 ``policy``（:class:`SplitPolicy`）控制：
+    - ``max_split_depth``（1~4）：最大拆分为独立 ``.md`` 的目录/文件深度；
+    - ``min_leaf_chars``：防碎片最小字数阈值，将过短纯文本子叶子内聚回父文件；
+    - ``bridge_jumped_levels``：跳级标题（如 ``#`` 下直接出现 ``###``）自动桥接承接；
+    - ``numbering_mode``：标准重编号或保留公文/附录/业务条目语义前缀；
+    - ``enable_heuristic_rules`` / ``split_item_anchors``：对正文内未标 ``#`` 的编号/条目行按规则切分。
     """
     src_dir = Path(content_dir)
+    active_policy = SplitPolicy.from_dict(policy) if isinstance(policy, dict) else (policy or SplitPolicy())
     if not src_dir.is_dir():
-        return SplitResult()
+        return SplitResult(profile=active_policy.profile)
 
-    md_files = sorted(f for f in os.listdir(str(src_dir)) if f.endswith(".md"))
+    md_files = sorted(
+        f for f in os.listdir(str(src_dir))
+        if f.endswith(".md") and not f.startswith("_")
+    )
     if not md_files:
-        return SplitResult()
+        return SplitResult(profile=active_policy.profile)
 
-    stats = SplitResult()
+    stats = SplitResult(profile=active_policy.profile)
     chapter_count = 0
     for f in md_files:
-        roots = _parse_file(src_dir / f)
+        roots = _parse_file(src_dir / f, active_policy, stats)
+        if active_policy.min_leaf_chars > 0:
+            _coalesce_tiny_children(roots, active_policy, stats)
         _assign_numbers(roots, chapter_count)
         for r in roots:
             _emit(r, src_dir, stats)
         chapter_count += len(roots)
 
-    # 删除已迁移进目录树的大章节 Markdown（仅本目录顶层文件）
     for f in md_files:
         os.remove(str(src_dir / f))
     return stats
 
 
-def _parse_file(path: Path) -> List[_Node]:
+def _is_prose_candidate_for_rule(s: str) -> bool:
+    """过滤不应参与正文启发式标题匹配的特殊 Markdown 行（注释、表格、图片、列表、空段标记）。"""
+    if not s:
+        return False
+    if s.startswith(("<!--", "|", "![", "- ", "* ", "+ ", ">", "<EMPTY_PAR", "[[")):
+        return False
+    return True
+
+
+def _parse_file(
+    path: Path,
+    policy: Optional[SplitPolicy] = None,
+    stats: Optional[SplitResult] = None,
+) -> List[_Node]:
+    active_policy = policy or SplitPolicy()
+    max_depth = active_policy.max_split_depth
     lines = path.read_text(encoding="utf-8").split("\n")
     roots: List[_Node] = []
     stack: List[_Node] = []
+    fence: Optional[str] = None
+
     for idx, raw in enumerate(lines):
         s = raw.strip()
+        fence_match = _FENCE_LINE_RE.match(raw)
+        if fence_match:
+            mark = fence_match.group("mark")
+            if fence is None:
+                fence = mark
+            elif mark[0] == fence[0] and len(mark) >= len(fence) and not fence_match.group("info").strip():
+                fence = None
+            if stack:
+                stack[-1].content.append(raw)
+            elif roots:
+                roots[0].content.append(raw)
+            continue
+        if fence is not None:
+            if stack:
+                stack[-1].content.append(raw)
+            elif roots:
+                roots[0].content.append(raw)
+            continue
+
         m = re.match(r"^(#{1,6})\s+(.*)$", s)
+        raw_depth: Optional[int] = None
+        title = ""
+        from_rule = False
+
         if m:
-            depth = len(m.group(1))
+            raw_depth = len(m.group(1))
             title = m.group(2).strip()
+        is_anchor = False
+        if m:
+            pass
+        elif (
+            (active_policy.enable_heuristic_rules or active_policy.split_item_anchors)
+            and _is_prose_candidate_for_rule(s)
+        ):
+            non_anchor_parents = [n for n in stack if not n.is_item_anchor]
+            parent_lvl = non_anchor_parents[-1].depth if non_anchor_parents else 1
+            rule_match = match_text_heading_rule(
+                s,
+                body_index=idx,
+                rules=active_policy.recognition_rules,
+                clusters=active_policy.numbering_clusters,
+                skeleton_titles=active_policy.skeleton_titles,
+                max_chars=active_policy.max_heading_chars,
+                parent_level=parent_lvl,
+                split_item_anchors=active_policy.split_item_anchors,
+            )
+            if rule_match is not None:
+                raw_depth = rule_match.level
+                title = rule_match.text
+                from_rule = True
+                is_anchor = rule_match.rule_id == "item_anchor"
+
+        if raw_depth is not None:
+            if active_policy.numbering_mode == NUMBERING_PRESERVE_SEMANTIC:
+                title = strip_heading_prefix(title, mode=NUMBERING_PRESERVE_SEMANTIC)
+
             is_valid_tree_split = False
-            if depth == 1:
+            effective_depth = raw_depth
+
+            if raw_depth == 1:
                 is_valid_tree_split = True
-            elif depth == 2:
-                is_valid_tree_split = bool(stack) and stack[0].depth == 1
-            elif depth == 3:
+                effective_depth = 1
+            elif 2 <= raw_depth <= max_depth:
                 cand_stack = list(stack)
-                while cand_stack and depth <= cand_stack[-1].depth:
+                while cand_stack and raw_depth <= cand_stack[-1].raw_depth:
                     cand_stack.pop()
-                is_valid_tree_split = bool(cand_stack) and cand_stack[-1].depth == 2
+                if cand_stack and cand_stack[0].depth == 1:
+                    parent = cand_stack[-1]
+                    if raw_depth == parent.depth + 1:
+                        is_valid_tree_split = True
+                        effective_depth = raw_depth
+                    elif parent.depth + 1 <= max_depth and active_policy.bridge_jumped_levels:
+                        is_valid_tree_split = True
+                        effective_depth = parent.depth + 1
+                        if stats is not None and effective_depth != raw_depth:
+                            stats.bridged_jumps += 1
 
             if is_valid_tree_split:
-                node = _Node(depth, title, idx)
-                while stack and depth <= stack[-1].depth:
+                if from_rule and stats is not None:
+                    stats.rule_promoted_nodes += 1
+                node = _Node(
+                    effective_depth,
+                    title or "未命名章节",
+                    idx,
+                    max_split_depth=max_depth,
+                    raw_depth=raw_depth,
+                    is_item_anchor=is_anchor,
+                )
+                while stack and effective_depth <= stack[-1].depth:
                     stack.pop()
                 if stack:
                     stack[-1].children.append(node)
@@ -1308,21 +1562,89 @@ def _parse_file(path: Path) -> List[_Node]:
                     roots.append(node)
                 stack.append(node)
             else:
+                target_parent_depth = stack[-1].depth if stack else 1
+                inline_depth = max(raw_depth, target_parent_depth + 1)
+                inline_line = ("#" * min(6, inline_depth)) + " " + title if from_rule or inline_depth != raw_depth else raw
                 if stack:
-                    stack[-1].content.append(raw)
+                    stack[-1].content.append(inline_line)
                 elif roots:
-                    roots[0].content.append(raw)
+                    roots[0].content.append(inline_line)
         else:
             if stack:
                 stack[-1].content.append(raw)
             elif roots:
                 roots[0].content.append(raw)
+
     if not roots and any(l.strip() for l in lines):
         title = _safe_name(path.stem) or "正文"
-        root_node = _Node(1, title, 0)
+        root_node = _Node(1, title, 0, max_split_depth=max_depth)
         root_node.content = lines
         roots.append(root_node)
     return roots
+
+
+def _leaf_prose_chars(lines: List[str]) -> Tuple[int, bool]:
+    """统计节点正文的纯文本字数，并检测是否包含图片/表格/占位等结构块。"""
+    chars = 0
+    has_rich_block = False
+    for line in lines:
+        s = line.strip()
+        if not s or s == "<EMPTY_PAR/>":
+            continue
+        if (
+            s.startswith("![")
+            or s.startswith("<!-- TABLE:")
+            or s.startswith("<!-- TBL:")
+            or s.startswith("|")
+            or s.startswith("[[")
+        ):
+            has_rich_block = True
+        if not s.startswith("<!--"):
+            chars += len(s)
+    return chars, has_rich_block
+
+
+def _coalesce_tiny_children(
+    nodes: List[_Node],
+    policy: SplitPolicy,
+    stats: Optional[SplitResult] = None,
+) -> None:
+    """自底向上防碎片内聚：当父章节（depth >= 2）下的全部叶子均短于阈值且无图表时，内聚回父文件。"""
+    threshold = int(policy.min_leaf_chars or 0)
+    if threshold <= 0:
+        return
+
+    for node in nodes:
+        if node.children:
+            _coalesce_tiny_children(node.children, policy, stats)
+        if node.depth < 2 or not node.children:
+            continue
+        if any(child.children for child in node.children):
+            continue
+        all_tiny = True
+        for child in node.children:
+            chars, has_rich = _leaf_prose_chars(child.content)
+            if has_rich or chars >= threshold:
+                all_tiny = False
+                break
+        if not all_tiny:
+            continue
+
+        heading_prefix = "#" * min(6, node.depth + 1)
+        for child in node.children:
+            if node.content and node.content[-1].strip():
+                node.content.append("")
+            node.content.append("{0} {1}".format(heading_prefix, child.title))
+            node.content.append("")
+            body = list(child.content)
+            while body and not body[0].strip():
+                body.pop(0)
+            while body and not body[-1].strip():
+                body.pop()
+            node.content.extend(body)
+            if stats is not None:
+                stats.coalesced_nodes += 1
+        node.children = []
 
 
 def _assign_numbers(roots: List[_Node], chapter_start: int = 0) -> None:
@@ -1337,6 +1659,8 @@ def _assign_numbers(roots: List[_Node], chapter_start: int = 0) -> None:
 
 
 def _emit(node: _Node, out_dir: Path, stats: SplitResult) -> None:
+    if node.depth > stats.max_depth_reached:
+        stats.max_depth_reached = node.depth
     name = node.full_name()
     node_path = out_dir / name
     if node.is_dir():

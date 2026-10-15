@@ -570,17 +570,31 @@ def _parse_blocks_for_validation(path: str):
     return parse_blocks(text, path)
 
 
-def _document_for_expectation(path: str, config: Dict):
+def _document_for_expectation(path: str, config: Dict, depth: Optional[int] = None):
     """预期事件用的文档实体。
 
     V2.7：构建时可能先把 Mermaid 围栏换成图片引用（预处理），
     此时必须按「实际装配的内容」推导预期事件，否则把图当成代码块。
     """
+    from doc_tool.domain.merge_policy import (
+        resolve_merge_policy,
+        shift_inline_headings_for_depth,
+    )
+
+    policy = resolve_merge_policy(config)
     overrides = config.get("preparedTexts") or {}
     prepared_text = overrides.get(os.path.abspath(path))
-    if prepared_text is not None:
-        return parse_blocks(prepared_text, path)
-    return _parse_blocks_for_validation(path)
+    if prepared_text is None:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                prepared_text = handle.read()
+        except (OSError, UnicodeError) as exc:
+            raise AutomationError("Markdown 无法读取 {0}: {1}".format(path, exc))
+    if depth is not None and policy.auto_shift_inline_headings:
+        prepared_text, _ = shift_inline_headings_for_depth(
+            prepared_text, depth, enabled=True
+        )
+    return parse_blocks(prepared_text, path)
 
 
 def expected_events_for_document(
@@ -599,7 +613,14 @@ def expected_events_for_document(
                 raise AutomationError("{0} 复杂表格标记缺少 XML 文件名".format(source))
             table_path = resolve_resource(config["paths"]["table_root"], block.filename, "复杂表格")
             element = _expected_table_xml(table_path, available_bookmarks=available_bookmarks)
+            if getattr(block, "proxy_rows", None):
+                from doc_tool.domain.smart_features import apply_complex_table_proxy_edits
+
+                apply_complex_table_proxy_edits(element, block.proxy_rows)
             events.append(Event("C", normalize_matrix(table_matrix(element)), source, canonical_xml(element)))
+            caption_event = _expected_caption_event(block, registry, source)
+            if caption_event is not None:
+                events.append(caption_event)
             continue
         if block.kind == KIND_IMAGE:
             # V2.7：Mermaid 等生成图在任务临时目录，按章节覆盖资源根，
@@ -701,7 +722,7 @@ def expected_content_events(
 
     entries = list(iter_chapter_entries(config))
     documents = [
-        _document_for_expectation(markdown_path, config)
+        _document_for_expectation(markdown_path, config, depth=_entry.depth)
         for _entry, markdown_path in entries
         if markdown_path
     ]
@@ -777,17 +798,60 @@ def compare_expected_events(
     return errors
 
 
-def compare_baseline_events(source: List[Event], rebuilt: List[Event]) -> List[str]:
-    """Compare business order while treating all tables as their text matrices."""
+def align_baseline_source_events(source: List[Event], rebuilt: List[Event]) -> List[Event]:
+    """Use the same logical code containers for comparison and issue classification."""
+    if len(source) > len(rebuilt):
+        aligned_source: List[Event] = []
+        s_idx = 0
+        r_idx = 0
+        while s_idx < len(source) and r_idx < len(rebuilt):
+            r_ev = rebuilt[r_idx]
+            if (
+                r_ev.kind == "T"
+                and isinstance(r_ev.value, tuple)
+                and len(r_ev.value) == 1
+                and len(r_ev.value[0]) == 1
+                and source[s_idx].kind in ("P", "X")
+            ):
+                target_code = str(r_ev.value[0][0]).strip()
+                matched_span = 0
+                acc_lines: List[str] = []
+                for span in range(1, min(32, len(source) - s_idx + 1)):
+                    cand = source[s_idx + span - 1]
+                    if cand.kind not in ("P", "X"):
+                        break
+                    acc_lines.append(str(cand.value).strip())
+                    if _is_event_text_equivalent("\n".join(acc_lines), target_code) or _is_event_text_equivalent(" ".join(acc_lines), target_code):
+                        matched_span = span
+                        break
+                if matched_span >= 1:
+                    aligned_source.append(r_ev)
+                    s_idx += matched_span
+                    r_idx += 1
+                    continue
+            aligned_source.append(source[s_idx])
+            s_idx += 1
+            r_idx += 1
+        while s_idx < len(source):
+            aligned_source.append(source[s_idx])
+            s_idx += 1
+        source = aligned_source
+    return source
+
+
+def compare_baseline_events(
+    source: List[Event], rebuilt: List[Event], *,
+    report_representation_changes: bool = False,
+    max_errors: Optional[int] = 20,
+) -> List[str]:
+    """Compare logical business events; safety gates request uncapped findings."""
     def signature(event: Event):
         kind = "T" if event.kind in ("T", "C") else event.kind
         if kind == "L":
-            # 列表项忽略 numId：源 Word 与重建产物的 numId 是各自独立实例，
-            # 与 ``compare_expected_events`` 的 ``value[:2]`` 容错保持一致，
-            # 否则任何含列表的文档基线校验都会误报内容不一致。
-            return kind, event.value[:2]
+            return kind, event.value[:2]  # numId is independent in each package.
         return kind, event.value
 
+    source = align_baseline_source_events(source, rebuilt)
     errors: List[str] = []
     if len(source) != len(rebuilt):
         errors.append("业务元素数量不一致: source={0}, rebuild={1}".format(len(source), len(rebuilt)))
@@ -795,10 +859,10 @@ def compare_baseline_events(source: List[Event], rebuilt: List[Event]) -> List[s
         sig_l = signature(left)
         sig_r = signature(right)
         if sig_l != sig_r:
-            # 容错：表格矩阵等价放行
             if sig_l[0] == "T" and sig_r[0] == "T" and _is_matrix_equivalent(sig_l[1], sig_r[1]):
                 continue
-            # 容错：同 kind 文本语义等价放行
+            if not report_representation_changes and {sig_l[0], sig_r[0]} <= {"P", "X"} and _is_event_text_equivalent(sig_l[1], sig_r[1]):
+                continue
             if sig_l[0] == sig_r[0]:
                 if sig_l[0] == "L" and sig_l[1][1:] == sig_r[1][1:] and _is_event_text_equivalent(sig_l[1][0], sig_r[1][0]):
                     continue
@@ -806,13 +870,12 @@ def compare_baseline_events(source: List[Event], rebuilt: List[Event]) -> List[s
                     continue
                 if sig_l[0] in ("P", "X") and _is_event_text_equivalent(sig_l[1], sig_r[1]):
                     continue
-
             errors.append(
                 "#{0} 基线内容/位置不一致: source {1}={2!r}; rebuild {3}={4!r}".format(
                     index, left.kind, left.value, right.kind, right.value
                 )
             )
-        if len(errors) >= 20:
+        if max_errors is not None and len(errors) >= max_errors:
             break
     return errors
 
@@ -1375,15 +1438,17 @@ def expected_heading_titles(events: List[Event], max_level: int = 3) -> List[str
 
 
 def expected_toc_labels(config: Dict, max_level: int = 3) -> List[str]:
+    from doc_tool.domain.merge_policy import format_heading_with_number, resolve_merge_policy
+
+    policy = resolve_merge_policy(config)
     result = []
     for entry, _ in iter_chapter_entries(config):
         if entry.depth > max_level:
             continue
-        if entry.depth == 1:
-            prefix = "第{0}章".format(entry.number[0])
-        else:
-            prefix = ".".join(str(value) for value in entry.number)
-        result.append(normalize_business_text(prefix + " " + entry.title))
+        label = format_heading_with_number(
+            entry.title, entry.number, top_level_format=policy.top_level_format
+        )
+        result.append(normalize_business_text(label))
     return result
 
 
@@ -1609,7 +1674,8 @@ def validate(
         else:
             source = DocxPackage(baseline_path, heading_styles=config["headingStyles"])
             source_events = source.body_events(allow_missing_headings=allow_missing)
-            baseline_errors = compare_baseline_events(source_events, actual)
+            source_events = align_baseline_source_events(source_events, actual)
+            baseline_errors = compare_baseline_events(source_events, actual, max_errors=None)
             blocking_baseline = [
                 e for e in baseline_errors
                 if is_baseline_error_blocking(e, source_events, actual)

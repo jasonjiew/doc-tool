@@ -132,6 +132,7 @@ def roundtrip_diff(
     rebuilt_docx: Union[str, Path],
     heading_styles: Optional[Dict[int, str]] = None,
     allow_missing_headings: bool = False,
+    heading_promotion_mode: Optional[str] = None,
 ) -> RoundtripReport:
     """对源 Word 与重建 Word 执行业务元素往返对比。
 
@@ -151,18 +152,32 @@ def roundtrip_diff(
     from doc_tool.adapters.kernel import ensure_kernel_importable
 
     ensure_kernel_importable()
-    from validate_docx import DocxPackage, compare_baseline_events  # noqa: E402
+    from validate_docx import DocxPackage, align_baseline_source_events, compare_baseline_events  # noqa: E402
 
     source = DocxPackage(str(source_docx), heading_styles=heading_styles)
     rebuilt = DocxPackage(str(rebuilt_docx), heading_styles=heading_styles)
     source_events = source.body_events(allow_missing_headings=allow_missing_headings)
     rebuilt_events = rebuilt.body_events(allow_missing_headings=allow_missing_headings)
-    errors = compare_baseline_events(source_events, rebuilt_events)
+    # Classification must use the exact sequence that produced error indexes.
+    source_events = align_baseline_source_events(source_events, rebuilt_events)
+    errors = compare_baseline_events(
+        source_events, rebuilt_events,
+        report_representation_changes=True, max_errors=None,
+    )
     issues: List[RoundtripIssue] = []
     for error in errors:
-        issues.append(_classify_error(error, source_events, rebuilt_events))
-        if len(issues) >= _MAX_ISSUES:
-            break
+        issue = _classify_error(
+            error, source_events, rebuilt_events,
+            heading_promotion_mode=heading_promotion_mode,
+        )
+        if len(issues) < _MAX_ISSUES:
+            issues.append(issue)
+        elif issue.severity == SEVERITY_BLOCK:
+            # The display cap must never hide a later content-loss finding.
+            warning = next((index for index, item in enumerate(issues) if item.severity != SEVERITY_BLOCK), None)
+            if warning is not None:
+                issues[warning] = issue
+    issues.sort(key=lambda item: item.severity != SEVERITY_BLOCK)
     return RoundtripReport(len(source_events), len(rebuilt_events), tuple(issues))
 
 
@@ -170,6 +185,8 @@ def _classify_error(
     error: str,
     source_events,
     rebuilt_events,
+    *,
+    heading_promotion_mode: Optional[str] = None,
 ) -> RoundtripIssue:
     """把 ``compare_baseline_events`` 的差异串按损失类型分级。"""
     if error.startswith("业务元素数量不一致"):
@@ -205,6 +222,22 @@ def _classify_error(
     reb_desc = "{0}={1!r}".format(right_kind, right_event.value)
 
     if left_kind == "H" or right_kind == "H":
+        # An explicitly selected heading policy can change representation, not
+        # business content. Counts, images, and unrelated prose remain BLOCK.
+        if heading_promotion_mode is not None and left_kind in {"H", "P", "L"} and right_kind in {"H", "P", "L"}:
+            from doc_tool.domain.split_rules import strip_heading_prefix
+            from docx_common import _is_event_text_equivalent
+
+            source_title = strip_heading_prefix(_event_text(left_event), mode=heading_promotion_mode)
+            rebuilt_title = strip_heading_prefix(_event_text(right_event), mode=heading_promotion_mode)
+            if _is_event_text_equivalent(source_title, rebuilt_title):
+                return RoundtripIssue(
+                    SEVERITY_WARN,
+                    "标题识别或层级表示差异（文本保留）：{0}".format(detail),
+                    position,
+                    source_desc=src_desc,
+                    rebuilt_desc=reb_desc,
+                )
         return RoundtripIssue(
             SEVERITY_BLOCK,
             "标题层级或文本变化：{0}".format(detail),
@@ -269,6 +302,8 @@ def _classify_error(
 def _event_text(event) -> str:
     """事件比较文本：L 事件 value 是 (text, ilvl, ...) 元组，其余是字符串。"""
     value = event.value
+    if event.kind == "H" and isinstance(value, tuple) and len(value) == 2:
+        return str(value[1])
     return str(value[0]) if event.kind == "L" and isinstance(value, tuple) and value else str(value)
 
 

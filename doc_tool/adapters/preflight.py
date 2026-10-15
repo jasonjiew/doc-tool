@@ -45,6 +45,12 @@ from doc_tool.domain.ooxml import (
     parse_xml_safe,
     read_docx_package,
 )
+from doc_tool.domain.split_rules import (
+    RuleHeadingMatch,
+    SplitPolicy,
+    build_paragraph_level_map,
+    recognize_document_headings,
+)
 
 
 # --- OOXML 命名空间 ---
@@ -129,6 +135,12 @@ class ImportPreview:
     style_census: Dict[str, StyleCensus] = field(default_factory=dict)
     #: 标题前正文摘要（CORE 2.2）：``{"kind": "p"|"image"|"table", "text": ...}``。
     pre_title_blocks: List[Dict[str, object]] = field(default_factory=list)
+    #: 多规则引擎扫描出的候选标题列表（含编号簇/numPr/骨架对齐/业务条目）。
+    rule_headings: List[RuleHeadingMatch] = field(default_factory=list)
+    #: 段落级标题层级映射 ``{body_index: level}``（支持无样式或混合规则拆章）。
+    paragraph_levels: Dict[int, int] = field(default_factory=dict)
+    #: 基于文档特征自动推荐的目录打散策略档位。
+    recommended_split_policy: Optional[SplitPolicy] = None
 
     @property
     def has_heading1(self) -> bool:
@@ -143,6 +155,7 @@ def preflight(
     heading_style_map: Optional[Dict[str, int]] = None,
     allow_missing_headings: bool = False,
     tolerate_missing_resources: bool = False,
+    split_policy: Optional[SplitPolicy] = None,
 ) -> ImportPreview:
     """对任意文件名的 DOCX 执行完整预检，返回预览模型。
 
@@ -197,7 +210,22 @@ def preflight(
                 heading_style_map = _parse_heading_styles(parts)
             else:
                 heading_style_map = dict(heading_style_map)
-            headings = _build_heading_tree(parts, heading_style_map)
+            active_policy = SplitPolicy.from_dict(split_policy) if isinstance(split_policy, dict) else split_policy
+            rule_headings = recognize_document_headings(
+                parts, heading_style_map, policy=active_policy,
+            )
+            if active_policy is not None and active_policy.enable_heuristic_rules:
+                headings = [
+                    HeadingInfo(
+                        level=m.level,
+                        style_id=m.style_id,
+                        text=m.text,
+                        body_index=m.body_index,
+                    )
+                    for m in rule_headings
+                ]
+            else:
+                headings = _build_heading_tree(parts, heading_style_map)
 
             # 若文档中没有 Level 1 标题，但存在 Level 2~6 标题，在允许宽松扫描时
             # 自动将顶层标题层级平移归一化到 Level 1，使章节能正确闭合并构建
@@ -256,6 +284,15 @@ def preflight(
             for h in headings:
                 level_counts[h.level] = level_counts.get(h.level, 0) + 1
 
+            paragraph_levels = {int(h.body_index): int(h.level) for h in headings}
+            total_paras = sum(int(c.usage_count or 0) for c in style_census.values())
+            recommended_policy = active_policy or SplitPolicy.recommend(
+                headings_count=len(headings),
+                level_counts=level_counts,
+                rule_matches=rule_headings,
+                total_paragraphs=total_paras,
+            )
+
             pre_title_blocks = _collect_pre_title_blocks(parts, headings)
             warnings: List[str] = list(resource_warnings)
             if not heading_style_map:
@@ -287,6 +324,9 @@ def preflight(
                 import_report=build_import_report(fidelity_report),
                 style_census=style_census,
                 pre_title_blocks=pre_title_blocks,
+                rule_headings=rule_headings,
+                paragraph_levels=paragraph_levels,
+                recommended_split_policy=recommended_policy,
             )
     except OOXMLSecurityError as exc:
         raise _map_security_error(exc) from exc

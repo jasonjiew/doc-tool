@@ -274,7 +274,7 @@ class MainAImportQualityTests(unittest.TestCase):
         manifest = ProjectManifest.load(root)
         paths = ProjectPaths(root)
 
-        # 本地修改「1.1 目的」（模拟未保存前的本地编辑），「设计」不动
+        # 在引言追加独立段落，「设计」不动；追加与新源改写不是重叠编辑
         target_chapters = {
             rel: path for rel, path in (
                 (p.relative_to(root / "content").as_posix(), p)
@@ -300,18 +300,56 @@ class MainAImportQualityTests(unittest.TestCase):
         self.assertIn("第二版设计正文。", design.read_text(encoding="utf-8"))
         purpose_after = [p for rel, p in after.items() if "引言" in rel][0]
         text = purpose_after.read_text(encoding="utf-8")
-        # 冲突项默认保留本地，不被新源覆盖
+        # 块级三方合并必须同时保留本地追加与新源改写，不能沿用整章冲突预期。
         self.assertIn("本地新增说明。", text)
-        self.assertNotIn("第二版目的正文。", text)
-        # 只应用明确选择后才覆盖
+        self.assertIn("第二版目的正文。", text)
+        self.assertNotIn("第一版目的正文。", text)
+        self.assertEqual(text, original_purpose.replace("第一版目的正文。", "第二版目的正文。") + NL + "本地新增说明。" + NL)
+        purpose_change = next(item for item in result.changes if "引言" in item.rel_path)
+        self.assertTrue(purpose_change.auto_merged)
+        self.assertFalse(purpose_change.conflict)
+        # 同一版本再次导入不能抹掉已经保留的本地补充。
         service2 = ReimportService(ProjectManifest.load(root), ProjectPaths(root))
-        chosen = {rel: True for rel in after if "引言" in rel}
-        result2 = service2.reimport(second, choices=chosen)
+        result2 = service2.reimport(second)
         self.assertTrue(result2.success, result2.message)
         purpose_final = [p for rel, p in (
             (p.relative_to(root / "content").as_posix(), p) for p in (root / "content").rglob("*.md")
         ) if "引言" in rel][0]
-        self.assertIn("第二版目的正文。", purpose_final.read_text(encoding="utf-8"))
+        self.assertEqual(purpose_final.read_text(encoding="utf-8"), text)
+
+
+    def test_reimport_overlapping_text_requires_an_explicit_incoming_choice(self):
+        first = self.tmp / "overlap-v1.docx"
+        _build_simple_docx(first, [("h1", "引言"), ("p", "原始目的正文。")])
+        outcome = run_intake(first, parent_dir=self.out, target_name="重叠编辑项目")
+        self.assertTrue(outcome.ok, outcome.errors)
+        root = Path(outcome.project_root)
+        purpose = next(path for path in (root / "content").rglob("*.md") if "引言" in path.as_posix())
+        local_text = purpose.read_text(encoding="utf-8").replace("原始目的正文。", "本地改写目的正文。")
+        purpose.write_text(local_text, encoding="utf-8")
+        # Both choices start with the same v1 ancestor. A rejected v2 import
+        # must not determine the baseline used by the explicit-choice branch.
+        explicit_root = self.out / "explicit-choice"
+        shutil.copytree(root, explicit_root)
+        second = self.tmp / "overlap-v2.docx"
+        _build_simple_docx(second, [("h1", "引言"), ("p", "源文档改写目的正文。")])
+
+        service = ReimportService(ProjectManifest.load(root), ProjectPaths(root))
+        result = service.reimport(second)
+        self.assertTrue(result.success, result.message)
+        self.assertEqual(purpose.read_text(encoding="utf-8"), local_text)
+        change = next(item for item in result.changes if "引言" in item.rel_path)
+        self.assertTrue(change.conflict)
+        self.assertFalse(change.auto_merged)
+        self.assertIn(change.rel_path, result.block_conflicts)
+
+        explicit_service = ReimportService(ProjectManifest.load(explicit_root), ProjectPaths(explicit_root))
+        chosen = explicit_service.reimport(second, choices={change.rel_path: True})
+        self.assertTrue(chosen.success, chosen.message)
+        chosen_text = (explicit_root / purpose.relative_to(root)).read_text(encoding="utf-8")
+        self.assertIn("源文档改写目的正文。", chosen_text)
+        self.assertNotIn("本地改写目的正文。", chosen_text)
+        self.assertEqual(purpose.read_text(encoding="utf-8"), local_text)
 
 
 def _build_simple_docx(path: Path, blocks) -> Path:

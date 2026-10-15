@@ -139,6 +139,8 @@ class ProjectManifest:
     qualitySource: str = ""
     #: v2 章节顺序的容错提醒（越界/重复等跳过原因）。
     chapterWarnings: list = field(default_factory=list)
+    #: 正式合并策略配置（MergePolicy 字典表示，可选）。
+    mergePolicy: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         try:
@@ -271,6 +273,7 @@ class ProjectManifest:
             ("variables", dict(self.variables or {})),
             ("standardPack", dict(self.standardPack or {})),
             ("qualitySource", self.qualitySource),
+            ("mergePolicy", dict(self.mergePolicy or {})),
         ):
             if value:
                 data[key] = value
@@ -426,6 +429,11 @@ class ProjectManifest:
                 variables=dict(data.get("variables") or {}),
                 standardPack=dict(data.get("standardPack") or {}),
                 qualitySource=str(data.get("qualitySource", "") or ""),
+                mergePolicy=(
+                    dict(data.get("mergePolicy") or {})
+                    if isinstance(data.get("mergePolicy"), dict)
+                    else {}
+                ),
             )
         except KeyError as exc:
             raise ProjectManifestError(

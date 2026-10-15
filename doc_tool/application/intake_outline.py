@@ -61,6 +61,8 @@ class OutlinePlan:
     adjustments: List[OutlineDecision] = field(default_factory=list)
     sections: List[SectionCandidate] = field(default_factory=list)
     normalized_style_map: Dict[str, int] = field(default_factory=dict)
+    paragraph_level_map: Dict[int, int] = field(default_factory=dict)
+    recommended_split_policy: Dict[str, object] = field(default_factory=dict)
     single_chapter: bool = False
     pre_title_mode: str = PRE_TITLE_NONE
     pre_title_note: str = ""
@@ -102,6 +104,8 @@ class OutlinePlan:
             "preTitleMode": self.pre_title_mode,
             "preTitleNote": self.pre_title_note,
             "normalizedStyleMap": dict(self.normalized_style_map),
+            "paragraphLevelMap": {int(k): int(v) for k, v in (self.paragraph_level_map or {}).items()},
+            "recommendedSplitPolicy": dict(self.recommended_split_policy or {}),
             "hasWeakCandidates": self.has_weak_candidates,
             "jumpLevels": list(self.jump_levels),
             "decisions": [item.to_dict() for item in self.decisions],
@@ -157,6 +161,27 @@ def weak_candidates_from_census(preview, decisions: Sequence[HeadingDecision]) -
             confidence=0.4,
             note="疑似标题样式（{0} 处，示例：{1}）".format(
                 getattr(info, "usage_count", 0), getattr(info, "sample_text", "") or "—"
+            ),
+        ))
+    known_indices = {int(item.source_index) for item in decisions}
+    for match in getattr(preview, "rule_headings", []) or []:
+        if not getattr(match, "is_heuristic", False):
+            continue
+        bidx = int(getattr(match, "body_index", -1))
+        if bidx in known_indices:
+            continue
+        known_indices.add(bidx)
+        candidates.append(HeadingDecision(
+            title=str(getattr(match, "text", "") or "").strip(),
+            level=int(getattr(match, "level", 2) or 2),
+            style_id=str(getattr(match, "style_id", "") or ""),
+            source=SOURCE_HEURISTIC,
+            action="candidate",
+            confidence=float(getattr(match, "confidence", 0.8) or 0.8),
+            source_index=bidx,
+            note="多规则命中：{0}/{1}".format(
+                getattr(match, "rule_id", "rule"),
+                getattr(match, "cluster", "") or "default",
             ),
         ))
     return candidates
@@ -240,6 +265,16 @@ def decision_style_map(decisions: Sequence[HeadingDecision]) -> Dict[str, int]:
         if not decision.style_id:
             continue
         mapping.setdefault(decision.style_id, decision.level)
+    return mapping
+
+
+def decision_paragraph_map(decisions: Sequence[HeadingDecision]) -> Dict[int, int]:
+    """按标题决定生成段落级 {source_index: level} 映射（支持无样式与单章局部跳级整理）。"""
+    mapping: Dict[int, int] = {}
+    for decision in decisions:
+        if decision.source == SOURCE_SINGLE or decision.action == "candidate":
+            continue
+        mapping[int(decision.source_index)] = int(decision.level)
     return mapping
 
 
@@ -343,11 +378,16 @@ def build_plan(
         normalized, adjustments, jumps = normalize_levels(
             decisions, allow_flatten=normalize and not effective_policy.is_strict
         )
+        rec_policy = getattr(preview, "recommended_split_policy", None)
         outline = OutlinePlan(
             decisions=normalized,
             adjustments=adjustments,
             sections=sections_from_decisions(normalized),
             normalized_style_map=decision_style_map(normalized),
+            paragraph_level_map=decision_paragraph_map(normalized),
+            recommended_split_policy=(
+                rec_policy.to_dict() if hasattr(rec_policy, "to_dict") else dict(rec_policy or {})
+            ),
             jump_levels=jumps,
         )
         if effective_policy.is_strict:
@@ -386,6 +426,6 @@ __all__ = [
     "PRE_TITLE_RETAIN", "PRE_TITLE_TEMPLATE", "PRE_TITLE_NONE", "PRE_TITLE_CHAPTER_TITLE",
     "OutlineDecision", "OutlinePlan", "heading_decisions_from_preview",
     "weak_candidates_from_census", "normalize_levels", "strict_level_gaps",
-    "decision_style_map", "sections_from_decisions", "single_chapter_plan",
+    "decision_style_map", "decision_paragraph_map", "sections_from_decisions", "single_chapter_plan",
     "decide_pre_title_mode", "build_plan",
 ]

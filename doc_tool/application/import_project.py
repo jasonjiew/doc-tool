@@ -41,6 +41,7 @@ from doc_tool.adapters.importer import (
     split_into_tree,
 )
 from doc_tool.adapters.preflight import preflight
+from doc_tool.domain.split_rules import SplitPolicy
 from doc_tool.domain.cancellation import CancellationToken
 from doc_tool.domain.errors import (
     CancelledError,
@@ -118,6 +119,10 @@ class ImportRequest:
     write_intake_record: bool = True
     #: CORE 4.1：只接管这些章节（按标题匹配，空表示整份）；祖先结构自动保留。
     selected_section_titles: List[str] = field(default_factory=list)
+    #: 多规则标题识别与目录树打散策略（SplitPolicy / dict / 预设档位名）。
+    split_policy: Optional[object] = None
+    #: 段落级标题级别覆盖（body_index -> 级别 1~6），优先于样式级映射。
+    paragraph_levels: Optional[Dict[int, int]] = None
 
 
 @dataclass
@@ -196,6 +201,14 @@ def import_first_time(
         )
         # CORE R5：命名映射预设（唯一实现在 intake_presets；未命中项回退自动识别）
         effective_heading_map = request.heading_style_map
+        active_split_policy: Optional[SplitPolicy] = None
+        if isinstance(request.split_policy, SplitPolicy):
+            active_split_policy = request.split_policy
+        elif isinstance(request.split_policy, dict):
+            active_split_policy = SplitPolicy.from_dict(request.split_policy)
+        elif isinstance(request.split_policy, str) and request.split_policy.strip():
+            active_split_policy = SplitPolicy.from_profile(request.split_policy.strip())
+
         resolved_preset = None
         if request.intakePresetName:
             from doc_tool.application.intake_presets import resolve_for_source
@@ -206,11 +219,14 @@ def import_first_time(
             result.warnings.extend(preset_warnings)
             if effective_heading_map is None and resolved_preset is not None and resolved_preset.mapping:
                 effective_heading_map = dict(resolved_preset.mapping)
+            if active_split_policy is None and resolved_preset is not None and resolved_preset.split_policy is not None:
+                active_split_policy = resolved_preset.split_policy
         preview = preflight(
             str(actual_source),
             heading_style_map=effective_heading_map,
-            allow_missing_headings=allow_missing,
+            allow_missing_headings=allow_missing or bool(active_split_policy and active_split_policy.enable_heuristic_rules),
             tolerate_missing_resources=not strict_mode,
+            split_policy=active_split_policy,
         )
         fidelity_report = getattr(preview, "fidelity", None)
         if request.document_type not in READABLE_DOCUMENT_TYPES:
@@ -244,11 +260,15 @@ def import_first_time(
             decision_style_map,
         )
 
-        effective_heading_map = request.heading_style_map
         outline_plan = None
         intake_plan = None
         retain_pre_title = False
-        if request.normalize_heading_levels or request.decide_pre_title_body:
+        # Legacy style-based imports calculate their own offset. An already
+        # normalized preview map would hide that offset and discard source styles.
+        effective_paragraph_levels: Dict[int, int] = {}
+        if active_split_policy is not None and active_split_policy.enable_heuristic_rules:
+            effective_paragraph_levels.update(getattr(preview, "paragraph_levels", None) or {})
+        if request.normalize_heading_levels or request.decide_pre_title_body or active_split_policy is not None:
             policy = IntakePolicy.strict() if strict_mode else IntakePolicy.normal()
             _plan, outline_plan = build_plan(
                 preview,
@@ -271,12 +291,23 @@ def import_first_time(
                 effective_heading_map = {
                     style_id: int(normalized.get(style_id, level))
                     for style_id, level in base_map.items()
-                } or request.heading_style_map
+                } or effective_heading_map
+                if getattr(outline_plan, "paragraph_level_map", None):
+                    effective_paragraph_levels.update(outline_plan.paragraph_level_map)
                 preflight_metrics["levelAdjustments"] = outline_plan.remapped_count
+            elif (
+                active_split_policy is not None
+                and active_split_policy.enable_heuristic_rules
+                and getattr(outline_plan, "paragraph_level_map", None)
+            ):
+                effective_paragraph_levels.update(outline_plan.paragraph_level_map)
             if request.decide_pre_title_body:
                 retain_pre_title = outline_plan.pre_title_mode == PRE_TITLE_RETAIN
                 preflight_metrics["preTitleMode"] = outline_plan.pre_title_mode
             intake_plan = _plan
+        if request.paragraph_levels:
+            for k, v in request.paragraph_levels.items():
+                effective_paragraph_levels[int(k)] = int(v)
         if preview.warnings:
             preflight_metrics["warnings"] = list(preview.warnings)
         _record(result, STAGE_PREFLIGHT, "succeeded", metrics=preflight_metrics)
@@ -305,11 +336,17 @@ def import_first_time(
         # 5. 生成模板 (4.1)
         _check_cancel()
         _record(result, STAGE_GENERATE_TEMPLATE, "started")
+        allow_missing_effective = allow_missing or bool(
+            (active_split_policy and active_split_policy.enable_heuristic_rules)
+            or effective_paragraph_levels
+        )
         template_meta = generate_template(
             paths.source_docx,
             paths.template_docx,
             heading_style_map=effective_heading_map,
-            allow_missing_headings=allow_missing,
+            allow_missing_headings=allow_missing_effective,
+            paragraph_levels=effective_paragraph_levels or None,
+            split_policy=active_split_policy,
         )
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
             "headingStyles": len(template_meta.heading_styles),
@@ -326,9 +363,11 @@ def import_first_time(
             paths.tables_dir(request.document_type),
             request.document_type,
             heading_style_map=effective_heading_map,
-            allow_missing_headings=allow_missing,
+            allow_missing_headings=allow_missing_effective,
             retain_pre_title_body=retain_pre_title,
             pre_title_title=request.pre_title_chapter_title,
+            paragraph_levels=effective_paragraph_levels or None,
+            split_policy=active_split_policy,
         )
         _record(result, STAGE_EXTRACT_CONTENT, "succeeded", metrics={
             "chapters": extraction.chapter_count,
@@ -340,7 +379,10 @@ def import_first_time(
         # 7. 章节拆分 (4.3)
         _check_cancel()
         _record(result, STAGE_SPLIT_CONTENT, "started")
-        split_result = split_into_tree(paths.content_dir(request.document_type))
+        split_result = split_into_tree(
+            paths.content_dir(request.document_type),
+            policy=active_split_policy,
+        )
         # MAIN-A 1.2：拆分后把章节内行号细化为「真实章节文件 + 文件内行号」，
         # 结果页「定位正文/替换图片」才能落到实际位置。
         try:
@@ -353,6 +395,11 @@ def import_first_time(
             "dirs": split_result.dirs,
             "mds": split_result.mds,
             "indexes": split_result.indexes,
+            "maxDepth": split_result.max_depth_reached,
+            "bridgedJumps": split_result.bridged_jumps,
+            "coalescedNodes": split_result.coalesced_nodes,
+            "rulePromotedNodes": split_result.rule_promoted_nodes,
+            "profile": split_result.profile,
         })
 
         # CORE 4.1：按勾选范围裁剪章节树；未选正文不加入，范围外引用集中说明。
@@ -395,7 +442,18 @@ def import_first_time(
         # 8. 结构校验 (4.5)
         _check_cancel()
         _record(result, STAGE_VALIDATE_STRUCTURE, "started")
-        manifest = _build_manifest(request, paths, template_meta, sha256, is_headless=(not any(h.level == 1 for h in preview.headings)), allow_missing_headings=allow_missing)
+        has_level1 = any(h.level == 1 for h in preview.headings) or any(
+            lvl == 1 for lvl in effective_paragraph_levels.values()
+        )
+        manifest = _build_manifest(
+            request,
+            paths,
+            template_meta,
+            sha256,
+            is_headless=(not has_level1),
+            allow_missing_headings=allow_missing_effective,
+            max_tree_depth=max(3, split_result.max_depth_reached),
+        )
         _validate_structure(manifest, paths)
         _record(result, STAGE_VALIDATE_STRUCTURE, "succeeded")
 
@@ -434,6 +492,7 @@ def import_first_time(
             roundtrip_report = _run_roundtrip_check(
                 request, paths.source_docx, trial_output, manifest.headingStyles,
                 heading_style_map_override=effective_heading_map,
+                split_policy=active_split_policy,
             )
         except RoundtripCheckError as exc:
             if strict_mode:
@@ -451,7 +510,10 @@ def import_first_time(
         if roundtrip_report is not None:
             should_block = (
                 (request.require_exact_roundtrip and roundtrip_report.issues)
-                or (roundtrip_report.has_block and not request.ignore_roundtrip_block)
+                or (
+                    roundtrip_report.has_block
+                    and not request.ignore_roundtrip_block
+                )
             )
             if should_block:
                 raise RoundtripCheckError.from_report(
@@ -533,7 +595,11 @@ def import_first_time(
                 str(key): str(getattr(value, "name", "") or "") for key, value in census.items()
             }
             saved, save_warnings = save_from_import(
-                request.intakeSavePreset, actual_source, mapping, style_names=names,
+                request.intakeSavePreset,
+                actual_source,
+                mapping,
+                style_names=names,
+                split_policy=active_split_policy,
             )
             result.warnings.extend(save_warnings)
             if saved:
@@ -632,6 +698,7 @@ def _build_manifest(
     sha256: str,
     is_headless: bool = False,
     allow_missing_headings: bool = False,
+    max_tree_depth: int = 3,
 ) -> ProjectManifest:
     doc_type = request.document_type
     if request.heading_style_map:
@@ -653,6 +720,11 @@ def _build_manifest(
             heading_styles = {
                 level: sid for sid, level in template_meta.heading_styles.items()
             }
+    decisions_map = getattr(template_meta, "heading_style_decisions", None) or {}
+    fallback_style = template_meta.body_style or "Normal"
+    for lvl in range(1, max(3, int(max_tree_depth or 3)) + 1):
+        if lvl not in heading_styles:
+            heading_styles[lvl] = str(decisions_map.get(lvl) or fallback_style)
     doc_ver = str(request.document_version or "").strip()
     if not doc_ver:
         from doc_tool.application.content.revision_record import document_version_from_record
@@ -908,6 +980,7 @@ def _run_roundtrip_check(
     trial_output: str,
     manifest_heading_styles: Optional[Dict[int, str]] = None,
     heading_style_map_override: Optional[Dict[str, int]] = None,
+    split_policy: Optional[SplitPolicy] = None,
 ):
     """执行源 Word 与试构建重建 Word 的往返差异对比。
 
@@ -927,8 +1000,15 @@ def _run_roundtrip_check(
         }
     elif manifest_heading_styles:
         heading_styles = {int(level): str(sid) for level, sid in manifest_heading_styles.items()}
+    promotion_options = {}
+    if (split_policy and split_policy.enable_heuristic_rules) or request.paragraph_levels:
+        promotion_options["heading_promotion_mode"] = (split_policy or SplitPolicy()).numbering_mode
     try:
-        return roundtrip_diff(source_docx, trial_output, heading_styles=heading_styles, allow_missing_headings=bool(request.allow_missing_headings))
+        return roundtrip_diff(
+            source_docx, trial_output, heading_styles=heading_styles,
+            allow_missing_headings=bool(request.allow_missing_headings),
+            **promotion_options,
+        )
     except Exception as exc:
         raise RoundtripCheckError(
             "往返对比失败：{0}".format(exc),
@@ -968,14 +1048,21 @@ def _seed_reimport_base(paths: ProjectPaths, doc_type: str) -> None:
     """
     content_root = paths.content_dir(doc_type)
     files = {}
+    contents = {}
     for path in content_root.rglob("*.md"):
         if not path.is_file() or _is_revision_record(path.name):
             continue
         rel = path.relative_to(content_root).as_posix()
-        files[rel] = hashlib.sha1(path.read_bytes()).hexdigest()
+        raw = path.read_bytes()
+        files[rel] = hashlib.sha1(raw).hexdigest()
+        try:
+            contents[rel] = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
     paths.state_dir.mkdir(parents=True, exist_ok=True)
     (paths.state_dir / "reimport_base.json").write_text(
-        json.dumps({"files": files}, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps({"files": files, "contents": contents}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 

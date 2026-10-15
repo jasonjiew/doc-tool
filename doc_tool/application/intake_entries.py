@@ -270,6 +270,8 @@ def build_docx_request(
     decide_pre_title_body: bool = True,
     pre_title_chapter_title: str = "前言",
     selected_sections: Optional[Sequence[str]] = None,
+    split_policy: Optional[object] = None,
+    paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> ImportRequest:
     """把导入计划翻译成既有 ImportRequest（策略经适配，不作为隐藏状态）。
 
@@ -294,6 +296,8 @@ def build_docx_request(
         decide_pre_title_body=bool(decide_pre_title_body),
         pre_title_chapter_title=pre_title_chapter_title,
         selected_section_titles=[str(item) for item in (selected_sections or [])],
+        split_policy=split_policy,
+        paragraph_levels=dict(paragraph_levels) if paragraph_levels else None,
     )
 
 
@@ -319,6 +323,8 @@ def run_intake(
     selected_sections: Optional[Sequence[str]] = None,
     preset_name: str = "",
     save_preset: str = "",
+    split_policy: Optional[object] = None,
+    paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> IntakeOutcome:
     """按路由真实调用对应服务并返回统一结果（不抛出业务异常）。"""
     src = Path(source)
@@ -363,14 +369,18 @@ def run_intake(
             resolved_preset = _resolve_intake_preset(src, preset_name, outcome)
             if resolved_preset is not None and resolved_preset.mapping and heading_style_map is None:
                 heading_style_map = dict(resolved_preset.mapping)
+            if split_policy is None and resolved_preset is not None and getattr(resolved_preset, "split_policy", None) is not None:
+                split_policy = resolved_preset.split_policy
         result = _run_word_intake(
             src, target, plan, outcome,
             policy=policy, heading_style_map=heading_style_map,
             document_type=document_type, cancel_token=cancel_token, on_event=on_event,
             selected_sections=selected_sections,
+            split_policy=split_policy,
+            paragraph_levels=paragraph_levels,
         )
         if save_preset:
-            _save_intake_preset(src, save_preset, result, heading_style_map, outcome)
+            _save_intake_preset(src, save_preset, result, heading_style_map, outcome, split_policy=split_policy)
         return result
     if route.kind == KIND_DOC:
         return _run_word_intake(
@@ -378,6 +388,8 @@ def run_intake(
             policy=policy, heading_style_map=heading_style_map,
             document_type=document_type, cancel_token=cancel_token, on_event=on_event,
             selected_sections=selected_sections,
+            split_policy=split_policy,
+            paragraph_levels=paragraph_levels,
         )
     if route.kind == KIND_MARKDOWN:
         return _run_markdown_intake(
@@ -428,7 +440,15 @@ def _resolve_intake_preset(src: Path, preset_name: str, outcome) -> Optional[obj
     return resolved
 
 
-def _save_intake_preset(src: Path, name: str, result, heading_style_map, outcome) -> None:
+def _save_intake_preset(
+    src: Path,
+    name: str,
+    result,
+    heading_style_map,
+    outcome,
+    *,
+    split_policy: Optional[object] = None,
+) -> None:
     """把本次导入使用的映射保存为命名预设（唯一实现在 intake_presets）。"""
     if result is None or not getattr(result, "ok", False):
         return
@@ -439,7 +459,7 @@ def _save_intake_preset(src: Path, name: str, result, heading_style_map, outcome
         preset_info = getattr(result, "preset", None) or {}
         if isinstance(preset_info, dict):
             mapping = {str(k): int(v) for k, v in (preset_info.get("mapping") or {}).items()}
-    saved, warnings = save_from_import(name, src, mapping)
+    saved, warnings = save_from_import(name, src, mapping, split_policy=split_policy)
     for item in warnings:
         outcome.warnings.append(item)
     if saved:
@@ -458,17 +478,33 @@ def _run_word_intake(
     cancel_token: Optional[CancellationToken],
     on_event,
     selected_sections: Optional[Sequence[str]] = None,
+    split_policy: Optional[object] = None,
+    paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> IntakeOutcome:
     effective_policy = policy or IntakePolicy.normal()
     # 先做一次计划预检：预览内容摘要、章节候选与标题前正文范围，
     # 让界面看到的整理结果与服务端实际采用的决定一致（design D2/D5）。
-    outline_plan = _plan_outline(src, target, plan, effective_policy, document_type, outcome)
+    outline_plan = _plan_outline(
+        src,
+        target,
+        plan,
+        effective_policy,
+        document_type,
+        outcome,
+        split_policy=split_policy,
+    )
     if outline_plan is None and not outcome.errors:
         outcome.errors.append("源文档无法解析，未创建项目（源文件未被修改）。")
         return outcome
     request = build_docx_request(
-        src, target, policy=effective_policy, heading_style_map=heading_style_map,
-        document_type=document_type, selected_sections=selected_sections,
+        src,
+        target,
+        policy=effective_policy,
+        heading_style_map=heading_style_map,
+        document_type=document_type,
+        selected_sections=selected_sections,
+        split_policy=split_policy,
+        paragraph_levels=paragraph_levels,
     )
     if selected_sections:
         from doc_tool.application.intake_scope import selection_from_titles
@@ -511,6 +547,8 @@ def _plan_outline(
     policy: IntakePolicy,
     document_type: str,
     outcome: IntakeOutcome,
+    *,
+    split_policy: Optional[object] = None,
 ):
     """用预检结果构造大纲整理计划，并把决定写回 IntakePlan（不产生副作用）。"""
     from doc_tool.adapters.preflight import preflight
@@ -522,6 +560,7 @@ def _plan_outline(
             str(src),
             allow_missing_headings=bool(policy.allow_missing_headings),
             tolerate_missing_resources=not policy.is_strict,
+            split_policy=split_policy,
         )
     except DocToolError as exc:
         outcome.errors.append(exc.user_message)

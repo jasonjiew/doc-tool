@@ -132,9 +132,24 @@ def display_number(number: Sequence[int]) -> str:
     return ".".join(str(value) for value in number)
 
 
-def parse_title(name: str) -> Tuple[Optional[Tuple[int, ...]], str]:
+def parse_title(
+    name: str,
+    *,
+    parent_number: Tuple[int, ...] = (),
+    allow_extended: bool = False,
+    allow_unnumbered: bool = False,
+) -> Tuple[Optional[Tuple[int, ...]], str]:
     """Parse a chapter-number prefix while restoring filename-safe glyphs."""
     text = "".join(FULLWIDTH_REV.get(char, char) for char in name)
+    if allow_extended or allow_unnumbered:
+        from doc_tool.domain.merge_policy import parse_merge_title
+
+        return parse_merge_title(
+            text,
+            parent_number=parent_number,
+            allow_extended=allow_extended,
+            allow_unnumbered=allow_unnumbered,
+        )
     match = re.fullmatch(r"第(\d+)章\s+(.+)", text)
     if match:
         return (int(match.group(1)),), match.group(2).strip()
@@ -223,8 +238,113 @@ def load_config(doc_type: str, base: str = BASE) -> Dict:
     return config
 
 
-def scan_entries(directory: str, depth: int) -> List[ChapterEntry]:
-    entries: List[ChapterEntry] = []
+def template_has_heading_numbering(config: Optional[Dict]) -> bool:
+    """检查模板是否配置了标题自动编号（numbering.xml 的 numId=1 或标题样式内含 numPr）。"""
+    if not config or not isinstance(config, dict):
+        return True
+    cached = config.get("_templateHasHeadingNumbering")
+    if isinstance(cached, bool):
+        return cached
+    template_path = (config.get("paths") or {}).get("template")
+    if not template_path or not os.path.isfile(template_path):
+        config["_templateHasHeadingNumbering"] = True
+        return True
+    try:
+        from doc_tool.domain.ooxml import parse_xml_safe, read_docx_package
+
+        w_ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        with read_docx_package(template_path) as package:
+            names = set(package.namelist())
+            if "word/numbering.xml" in names:
+                num_root = parse_xml_safe(package.read("word/numbering.xml"), "word/numbering.xml")
+                if any(node.get(w_ns + "numId") == "1" for node in num_root.findall(w_ns + "num")):
+                    config["_templateHasHeadingNumbering"] = True
+                    return True
+            if "word/styles.xml" in names:
+                styles_root = parse_xml_safe(package.read("word/styles.xml"), "word/styles.xml")
+                heading_style_ids = set(str(v) for v in (config.get("headingStyles") or {}).values())
+                for style in styles_root.findall(w_ns + "style"):
+                    sid = style.get(w_ns + "styleId") or ""
+                    if sid in heading_style_ids and style.find(".//" + w_ns + "numPr") is not None:
+                        config["_templateHasHeadingNumbering"] = True
+                        return True
+    except Exception:
+        config["_templateHasHeadingNumbering"] = True
+        return True
+    config["_templateHasHeadingNumbering"] = False
+    return False
+
+
+def should_use_literal_heading_numbers(config: Optional[Dict]) -> bool:
+    """根据 MergePolicy 与模板特征判断是否需要在标题文本中直接合成章节编号前缀。"""
+    from doc_tool.domain.merge_policy import (
+        HEADING_NUM_AUTO,
+        HEADING_NUM_LITERAL,
+        resolve_merge_policy,
+    )
+
+    policy = resolve_merge_policy(config)
+    if policy.heading_number_mode == HEADING_NUM_LITERAL:
+        return True
+    if policy.heading_number_mode == HEADING_NUM_AUTO:
+        return not template_has_heading_numbering(config)
+    return False
+
+
+def _match_chapter_order_rank(
+    path: str,
+    name: str,
+    stem: str,
+    content_root: Optional[str],
+    chapter_order: Sequence[str],
+) -> Optional[int]:
+    """返回目录项在 ``chapter_order`` 中的最小匹配序号；未命中时返回 ``None``。"""
+    rel_path = ""
+    if content_root:
+        try:
+            rel_path = os.path.relpath(path, content_root).replace("\\", "/").strip("/")
+        except ValueError:
+            rel_path = ""
+    rel_no_ext = rel_path[:-3] if rel_path.lower().endswith(".md") else rel_path
+    for idx, raw_decl in enumerate(chapter_order):
+        decl = str(raw_decl).strip().replace("\\", "/").strip("/")
+        if not decl:
+            continue
+        decl_no_ext = decl[:-3] if decl.lower().endswith(".md") else decl
+        if rel_path and (rel_path == decl or rel_no_ext == decl_no_ext):
+            return idx
+        if rel_no_ext and decl_no_ext.startswith(rel_no_ext + "/"):
+            return idx
+        if "/" not in decl and (name == decl or stem == decl_no_ext):
+            return idx
+    return None
+
+
+def scan_entries(
+    directory: str,
+    depth: int,
+    *,
+    policy=None,
+    parent_number: Tuple[int, ...] = (),
+    content_root: Optional[str] = None,
+    chapter_order: Optional[Sequence[str]] = None,
+    literal_numbers: bool = False,
+    warnings: Optional[List[str]] = None,
+) -> List[ChapterEntry]:
+    from doc_tool.domain.merge_policy import (
+        RENUMBER_AUTO_CONTIGUOUS,
+        RENUMBER_PRESERVE,
+        STRICT_MERGE_POLICY,
+        format_heading_with_number,
+        matches_chapter_scope,
+    )
+
+    active_policy = policy if policy is not None else STRICT_MERGE_POLICY
+    renumber_mode = active_policy.effective_renumber_mode()
+    allow_extended = active_policy.allow_extended_titles()
+    allow_unnumbered = active_policy.allow_unnumbered_titles()
+
+    raw_items: List[Tuple[Optional[Tuple[int, ...]], str, str, str, str]] = []
     invalid: List[str] = []
     for name in os.listdir(directory):
         if name.startswith(".") or name.startswith("_"):
@@ -242,16 +362,91 @@ def scan_entries(directory: str, depth: int) -> List[ChapterEntry]:
         else:
             invalid.append(path)
             continue
-        number, title = parse_title(stem)
-        if number is None:
+
+        if active_policy.chapter_scope and content_root:
+            try:
+                rel_candidate = os.path.relpath(path, content_root).replace("\\", "/")
+            except ValueError:
+                rel_candidate = name
+            if not matches_chapter_scope(rel_candidate, active_policy.chapter_scope):
+                continue
+
+        number, title = parse_title(
+            stem,
+            parent_number=parent_number,
+            allow_extended=allow_extended,
+            allow_unnumbered=allow_unnumbered,
+        )
+        if number is None and not allow_unnumbered:
             invalid.append(path)
             continue
-        entries.append(ChapterEntry(kind, number, title, path, depth))
+        raw_items.append((number, title, kind, path, name))
+
     if invalid:
         raise AutomationError(
             "章节目录只能包含带编号的文件夹/Markdown；以下条目无效:\n- " + "\n- ".join(invalid)
         )
-    entries.sort(key=lambda entry: entry.number)
+
+    raw_items.sort(
+        key=lambda item: (
+            0 if item[0] is not None else 1,
+            item[0] if item[0] is not None else (),
+            item[4].lower(),
+        )
+    )
+
+    reordered_by_chapter_order = False
+    if active_policy.respect_chapter_order and chapter_order:
+        ranked = []
+        any_matched = False
+        for orig_idx, item in enumerate(raw_items):
+            _num, _title, _kind, path, name = item
+            stem = name[:-3] if name.lower().endswith(".md") else name
+            rank = _match_chapter_order_rank(path, name, stem, content_root, chapter_order)
+            if rank is not None:
+                any_matched = True
+            ranked.append((rank if rank is not None else len(chapter_order), orig_idx, item))
+        if any_matched:
+            ranked_sorted = sorted(ranked, key=lambda x: (x[0], x[1]))
+            new_items = [x[2] for x in ranked_sorted]
+            if [x[3] for x in new_items] != [x[3] for x in raw_items]:
+                reordered_by_chapter_order = True
+            raw_items = new_items
+
+    entries: List[ChapterEntry] = []
+    for position, (parsed_number, title, kind, path, _name) in enumerate(raw_items, start=1):
+        expected_number = parent_number + (position,)
+        if (
+            renumber_mode == RENUMBER_AUTO_CONTIGUOUS
+            or reordered_by_chapter_order
+            or (active_policy.respect_chapter_order and bool(chapter_order))
+        ):
+            if parsed_number != expected_number and warnings is not None:
+                orig_label = display_number(parsed_number) if parsed_number else "无编号"
+                msg = "{0}: 章节编号已由 {1} 自动顺延为 {2}".format(
+                    path, orig_label, display_number(expected_number)
+                )
+                if msg not in warnings:
+                    warnings.append(msg)
+            final_number = expected_number
+        elif renumber_mode == RENUMBER_PRESERVE:
+            if parsed_number is None:
+                final_number = expected_number
+            elif len(parsed_number) != depth or (parent_number and parsed_number[:-1] != parent_number):
+                final_number = parent_number + (parsed_number[-1],)
+            else:
+                final_number = parsed_number
+        else:
+            final_number = parsed_number if parsed_number is not None else expected_number
+
+        final_title = (
+            format_heading_with_number(
+                title, final_number, top_level_format=active_policy.top_level_format
+            )
+            if literal_numbers
+            else title
+        )
+        entries.append(ChapterEntry(kind, final_number, final_title, path, depth))
     return entries
 
 
@@ -373,12 +568,23 @@ def _validate_markdown(
         stripped = line.strip()
         heading = re.match(r"^(#{1,9})\s+(.+)$", stripped)
         if heading and len(heading.group(1)) <= depth:
-            add(
-                line_number,
-                "内部标题层级必须深于文件章节层级 H{0}: {1}".format(depth, stripped),
-                "请把该标题至少多加一级 #（不浅于 H{0}）。".format(depth + 1),
-                "heading_level",
-            )
+            from doc_tool.domain.merge_policy import resolve_merge_policy
+
+            policy = resolve_merge_policy(config)
+            if policy.auto_shift_inline_headings:
+                warn_list = config.setdefault("_mergeWarnings", [])
+                warn_msg = "{0}:{1} 行内标题 {2} 浅于章节层级 H{3}，已在合并时自动下移层级".format(
+                    path, line_number, stripped, depth
+                )
+                if warn_msg not in warn_list:
+                    warn_list.append(warn_msg)
+            else:
+                add(
+                    line_number,
+                    "内部标题层级必须深于文件章节层级 H{0}: {1}".format(depth, stripped),
+                    "请把该标题至少多加一级 #（不浅于 H{0}）。".format(depth + 1),
+                    "heading_level",
+                )
 
         table_marker = re.fullmatch(r"<!--\s*TABLE:(\d+):?([\w.\-]+)?\s*-->", stripped)
         if stripped.startswith("<!-- TABLE:") and not table_marker:
@@ -478,6 +684,16 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
         locations.append(entry)
         errors.append(format_location(entry))
 
+    from doc_tool.domain.merge_policy import (
+        RENUMBER_PRESERVE,
+        resolve_merge_policy,
+    )
+
+    policy = resolve_merge_policy(config)
+    chapter_order = config.get("chapterOrder") or ()
+    literal_numbers = should_use_literal_heading_numbers(config)
+    merge_warnings = config.setdefault("_mergeWarnings", [])
+
     def walk(directory: str, parent: Tuple[int, ...], depth: int) -> None:
         if depth > max_heading:
             add(
@@ -489,13 +705,30 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
             )
             return
         try:
-            entries = scan_entries(directory, depth)
+            entries = scan_entries(
+                directory,
+                depth,
+                policy=policy,
+                parent_number=parent,
+                content_root=root,
+                chapter_order=chapter_order,
+                literal_numbers=literal_numbers,
+                warnings=merge_warnings,
+            )
         except AutomationError as exc:
             add(directory, None, str(exc), "", "chapter_scan")
             return
         for position, entry in enumerate(entries, start=1):
             expected = parent + (position,)
-            if len(entry.number) != depth or entry.number[:-1] != parent or entry.number != expected:
+            if policy.effective_renumber_mode() == RENUMBER_PRESERVE:
+                invalid_num = len(entry.number) != depth or entry.number[:-1] != parent
+            else:
+                invalid_num = (
+                    len(entry.number) != depth
+                    or entry.number[:-1] != parent
+                    or entry.number != expected
+                )
+            if invalid_num:
                 expected_number = display_number(expected)
                 actual_number = display_number(entry.number)
                 suffix = "" if entry.kind == "dir" else ".md"
@@ -515,7 +748,15 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
                     _validate_markdown(index_path, depth, config, errors, locations)
                 walk(entry.path, entry.number, depth + 1)
                 try:
-                    child_entries = scan_entries(entry.path, depth + 1)
+                    child_entries = scan_entries(
+                        entry.path,
+                        depth + 1,
+                        policy=policy,
+                        parent_number=entry.number,
+                        content_root=root,
+                        chapter_order=chapter_order,
+                        literal_numbers=literal_numbers,
+                    )
                 except AutomationError:
                     child_entries = []
                 if not child_entries and not os.path.isfile(index_path):
@@ -530,6 +771,16 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
                 _validate_markdown(entry.path, depth, config, errors, locations)
 
     walk(root, tuple(), 1)
+    if policy.chapter_scope and not flattened and not errors:
+        add(
+            root,
+            None,
+            "指定的章节合并范围未匹配到任何有效章节: {0}".format(
+                ", ".join(policy.chapter_scope)
+            ),
+            "请检查 chapterScope 中的章节路径或前缀。",
+            "chapter_scope_empty",
+        )
     if errors:
         raise AutomationError(
             "构建前检查失败:\n- " + "\n- ".join(errors),
@@ -540,18 +791,33 @@ def validate_content_tree(config: Dict) -> List[ChapterEntry]:
 
 def iter_chapter_entries(config: Dict) -> Iterable[Tuple[ChapterEntry, Optional[str]]]:
     """Yield headings in document order and the Markdown file attached to each."""
-    root = config["paths"]["content_root"]
+    from doc_tool.domain.merge_policy import resolve_merge_policy
 
-    def walk(directory: str, depth: int):
-        for entry in scan_entries(directory, depth):
+    root = config["paths"]["content_root"]
+    policy = resolve_merge_policy(config)
+    chapter_order = config.get("chapterOrder") or ()
+    literal_numbers = should_use_literal_heading_numbers(config)
+    merge_warnings = config.setdefault("_mergeWarnings", [])
+
+    def walk(directory: str, parent: Tuple[int, ...], depth: int):
+        for entry in scan_entries(
+            directory,
+            depth,
+            policy=policy,
+            parent_number=parent,
+            content_root=root,
+            chapter_order=chapter_order,
+            literal_numbers=literal_numbers,
+            warnings=merge_warnings,
+        ):
             if entry.kind == "dir":
                 index_path = os.path.join(entry.path, "_index.md")
                 yield entry, index_path if os.path.isfile(index_path) else None
-                yield from walk(entry.path, depth + 1)
+                yield from walk(entry.path, entry.number, depth + 1)
             else:
                 yield entry, entry.path
 
-    yield from walk(root, 1)
+    yield from walk(root, tuple(), 1)
 
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -760,8 +1026,14 @@ def _normalize_formula_text(s: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
+_CAPTION_NUM_NORM_RE = re.compile(
+    r"^(?P<kind>图|插图|表|表格|Figure|Table)\s*\d+(?:[-.]\d+)*\s*[:：.\s]\s*(?P<label>.+)$",
+    re.I,
+)
+
+
 def _is_event_text_equivalent(val1: object, val2: object) -> bool:
-    """判断两个事件文本是否在语义上等价（放行格式表示层细节）。"""
+    """判断两个事件文本是否在语义上等价（放行格式表示层细节与题注全局重编号）。"""
     s1 = str(val1)
     s2 = str(val2)
     if s1 == s2:
@@ -772,7 +1044,25 @@ def _is_event_text_equivalent(val1: object, val2: object) -> bool:
         return True
     f1 = _normalize_formula_text(n1)
     f2 = _normalize_formula_text(n2)
-    return f1 == f2
+    if f1 == f2:
+        return True
+    # 题注行重编号等价：例如源文档「图 1-1 系统架构」与重建后 SEQ 域「图 1 系统架构」
+    c1 = _CAPTION_NUM_NORM_RE.match(s1.strip())
+    c2 = _CAPTION_NUM_NORM_RE.match(s2.strip())
+    if c1 and c2:
+        k1 = "fig" if c1.group("kind").lower().startswith(("图", "插", "fig")) else "tbl"
+        k2 = "fig" if c2.group("kind").lower().startswith(("图", "插", "fig")) else "tbl"
+        if k1 == k2 and _normalize_event_text(c1.group("label")) == _normalize_event_text(c2.group("label")):
+            return True
+    # Only numbering is representational; never discard arbitrary prose
+    # after a reference, otherwise changed business content passes the gate.
+    ref_pat = re.compile(r"(图|表格|表)\s*\d+(?:[-.]\d+)*")
+    if ref_pat.search(s1) and ref_pat.search(s2):
+        r1 = _normalize_event_text(ref_pat.sub(r"\1#", s1))
+        r2 = _normalize_event_text(ref_pat.sub(r"\1#", s2))
+        if r1 == r2:
+            return True
+    return False
 
 
 def _is_matrix_equivalent(m1, m2) -> bool:
