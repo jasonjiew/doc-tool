@@ -183,6 +183,40 @@ class DevFlowCliContractsTests(unittest.TestCase):
         self.assertEqual(st3["signoffs"][1]["status"], "stale")
         self.assertIn("内容已发生变更", st3["signoffs"][1]["staleReason"])
 
+    def test_table_business_ids_fallback_in_item_list_show_and_trace_plan(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            p_root = Path(tmp_dir)
+            (p_root / "project.yml").write_text(
+                "schemaVersion: 1\nprojectId: proj-table-01\ndocumentNo: REQ-001\n"
+                "documentName: 需求规格\ndocumentVersion: '1.0'\npaths:\n  contentRoot: content\n",
+                encoding="utf-8",
+            )
+            c_dir = p_root / "content"
+            c_dir.mkdir(parents=True)
+            (c_dir / "3.1.1 模块A.md").write_text(
+                "#### 需求编号与说明\n\n"
+                "| 需求编号 | 模块名称 | 需求描述 |\n"
+                "| --- | --- | --- |\n"
+                "| REQ-00101 | 列表 | 支持列表查询 |\n"
+                "| Function-100101 | 导出 | 支持报表导出 |\n"
+                "| Design-300101 | 接口 | 接口设计说明 |\n",
+                encoding="utf-8",
+            )
+            listed = list_items(p_root)
+            self.assertEqual(listed["total"], 3)
+            aliases = {it["alias"] for it in listed["items"]}
+            self.assertEqual(aliases, {"REQ-00101", "Function-100101", "Design-300101"})
+
+            shown = show_item(p_root, "REQ-00101")
+            self.assertTrue(shown["found"])
+            self.assertEqual(shown["item"]["alias"], "REQ-00101")
+            self.assertEqual(shown["item"]["kind"], "requirement")
+
+            plan = generate_stable_trace_plan(p_root)
+            self.assertEqual(plan["confidentCount"], 3)
+            legacy_nos = {c["legacyNo"] for c in plan["confident"]}
+            self.assertEqual(legacy_nos, {"REQ-00101", "Function-100101", "Design-300101"})
+
 
 if __name__ == "__main__":
     unittest.main()

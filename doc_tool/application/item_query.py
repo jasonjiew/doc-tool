@@ -19,6 +19,7 @@ from doc_tool.application.content.traceable_items import (
     _leading_number,
     _nearest_heading,
     build_item_index,
+    extract_table_business_row,
 )
 from doc_tool.application.review.review_store import ReviewStore
 from doc_tool.domain.manifest import ProjectManifest
@@ -65,10 +66,15 @@ def _collect_workspace_docs(root: Path) -> Tuple[List[Tuple[str, str]], List[Pat
     relation_paths = []
     space = load_workspace(root)
     workspace_id = space.workspace_id if hasattr(space, "workspace_id") else root.name
+    member_roots: List[Path] = []
     for member in space.valid_members:
         project_root = space.member_project_root(member)
-        if project_root is None:
-            continue
+        if project_root is not None:
+            member_roots.append(project_root)
+    if not member_roots and not (root / "workspace.yml").is_file():
+        from doc_tool.application.baseline_check import _discover_project_roots
+        member_roots = _discover_project_roots(root)
+    for project_root in member_roots:
         documents.extend(_collect_project_docs(project_root))
         p = project_root / RELATIONS_NAME
         if p.is_file():
@@ -76,6 +82,61 @@ def _collect_workspace_docs(root: Path) -> Tuple[List[Tuple[str, str]], List[Pat
     if (root / RELATIONS_NAME).is_file():
         relation_paths.append(root / RELATIONS_NAME)
     return documents, relation_paths, workspace_id
+
+
+def _populate_table_fallback_items(
+    documents: Sequence[Tuple[str, str]],
+    target_id: str,
+    index: ItemIndex,
+    snapshots: Dict[ItemKey, Any],
+) -> None:
+    """当文档尚未写入 DOC-ITEM 注释时，自动从 Markdown 表格识别 REQ/Function/Design 业务条目。"""
+    import re
+    from doc_tool.application.content.impact import ItemSnapshot
+
+    proj_id = str(target_id or "default-project")
+    for rel_path, text in documents:
+        heading_no = ""
+        heading_title = ""
+        in_code_fence = False
+        fence_char = ""
+        for line_no, line in enumerate(str(text or "").splitlines(), start=1):
+            stripped = line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                cur_fence = stripped[:3]
+                if not in_code_fence:
+                    in_code_fence = True
+                    fence_char = cur_fence
+                    continue
+                elif fence_char == cur_fence:
+                    in_code_fence = False
+                    fence_char = ""
+                    continue
+            if in_code_fence:
+                continue
+            h_match = re.match(r"^\s{0,3}#{1,6}\s+(.*)$", line)
+            if h_match:
+                h_text = h_match.group(1).strip()
+                heading_title = h_text
+                lead = _leading_number(h_text)
+                if lead:
+                    heading_no = lead
+                continue
+            row = extract_table_business_row(line)
+            if row is None:
+                continue
+            biz_id, kind, row_title, row_body = row
+            det_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{proj_id}:table:{biz_id}"))
+            ref = ItemRef(project_id=proj_id, item_id=det_id, kind=kind, alias=biz_id)
+            loc = ItemLocation(rel_path=rel_path, line_no=line_no, heading_no=heading_no)
+            index.add(ref, loc)
+            if ref.key not in snapshots:
+                snapshots[ref.key] = ItemSnapshot(
+                    key=ref.key,
+                    title=row_title or heading_title or biz_id,
+                    body=row_body,
+                    resources=(),
+                )
 
 
 def list_items(
@@ -101,6 +162,8 @@ def list_items(
 
     index = build_item_index(documents)
     snapshots = extract_snapshots(documents)
+    if index.count() == 0:
+        _populate_table_fallback_items(documents, target_id, index, snapshots)
 
     raw_items = []
     for key, ref in index.items.items():
@@ -197,8 +260,15 @@ def show_item(
         target_id = root.name
         rel_paths = [root / RELATIONS_NAME] if (root / RELATIONS_NAME).is_file() else []
 
+    if (root / "project.yml").is_file() and not workspace:
+        try:
+            target_id = ProjectManifest.load(root).projectId
+        except Exception:
+            pass
     index = build_item_index(documents)
     snapshots = extract_snapshots(documents)
+    if index.count() == 0:
+        _populate_table_fallback_items(documents, target_id, index, snapshots)
 
     matched_keys = []
     for key, ref in index.items.items():
@@ -426,6 +496,10 @@ def generate_stable_trace_plan(
             if DOC_ITEM_RE.search(line):
                 continue
             legacy = _leading_number(line)
+            if not legacy:
+                table_row = extract_table_business_row(line)
+                if table_row is not None:
+                    legacy = table_row[0]
             if not legacy:
                 continue
             key = f"{heading_no}@{legacy}"

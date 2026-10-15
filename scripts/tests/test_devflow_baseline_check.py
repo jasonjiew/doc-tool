@@ -138,6 +138,16 @@ class DevFlowBaselineCheckTests(unittest.TestCase):
         self.assertGreater(len(res_corrupt["frozenBaseline"]["corrupted"]), 0)
         self.assertIn("不匹配", res_corrupt["frozenBaseline"]["corrupted"][0])
 
+    def test_nested_multi_level_discovery_and_invalid_manifest_graceful(self):
+        nested_parent = self.root / "requirements" / "sub_proj"
+        nested_parent.mkdir(parents=True)
+        (nested_parent / "project.yml").write_text("documentType: requirement\n", encoding="utf-8")
+
+        res_ws = check_baselines(self.root, workspace=True)
+        self.assertEqual(len(res_ws["projects"]), 2)
+        statuses = {p["projectRoot"]: p["status"] for p in res_ws["projects"]}
+        self.assertEqual(statuses[nested_parent.as_posix()], "error")
+
 
 if __name__ == "__main__":
     unittest.main()

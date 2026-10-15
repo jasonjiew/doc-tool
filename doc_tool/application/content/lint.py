@@ -24,11 +24,34 @@ from doc_tool.domain.content_index import ContentIndex
 
 TERMS_FILE_NAME = "terms.json"
 
-# 待办/占位残留标记。
+# 待办/占位残留标记（排除 JSON/脱敏示例中的 444XXX、"deviceCode":XXX 与小写模板变量 xxx）。
 _TODO_RE = re.compile(
-    r"TODO|TBD|FIXME|XXX|待补充|待完善|待定|占位|placeholder",
+    r"(?<![A-Za-z0-9_])(?:TODO|TBD|FIXME|placeholder)(?![A-Za-z0-9_])"
+    r"|(?-i:(?<![A-Za-z0-9_:\"'=])XXX(?!(?:[A-Za-z0-9_]|\s*[,}\]])))"
+    r"|待补充|待完善|待定|占位(?![符内容图位])",
     re.IGNORECASE,
 )
+
+_CHAPTER_SEGMENT_PREFIX_RE = re.compile(
+    r"^(?:第(?:\d+|[一二三四五六七八九十百零]+)[章节][\s、._-]*|\d+(?:\.\d+)*[\s、._-]*)"
+)
+
+
+def _extract_path_section_titles(rel_path: str) -> List[str]:
+    """从章节相对路径的目录段和文件名提取章节标题文本（与 split_into_tree 拆树语义对齐）。"""
+    parts = [p for p in str(rel_path or "").replace("\\", "/").split("/") if p]
+    if parts and parts[0] in ("requirement", "design", "general"):
+        parts = parts[1:]
+    titles: List[str] = []
+    for idx, part in enumerate(parts):
+        is_last = idx == len(parts) - 1
+        stem = Path(part).stem if is_last else part
+        if not stem or stem.startswith("_") or stem.startswith("."):
+            continue
+        cleaned = _CHAPTER_SEGMENT_PREFIX_RE.sub("", stem).strip()
+        if cleaned:
+            titles.append(cleaned)
+    return titles
 
 
 def _suggest_section_position(title: str) -> str:
@@ -89,7 +112,7 @@ class LintRunReport:
 _LINT_RESULT_CACHE: "Dict[tuple, tuple]" = {}
 _LINT_RESULT_CACHE_MAX = 64
 #: 解析器版本参与键：解析逻辑变化必须使旧结果失效。
-LINT_PARSER_VERSION = "lint-v2-quality-contracts"
+LINT_PARSER_VERSION = "lint-v3-mainflow-optimized"
 
 #: 规则依赖分类（V4.2 42-B 2.3）。
 #:
@@ -326,27 +349,60 @@ class ContentLinter:
         return issues
 
     def check_duplicate_titles(self, severity: str = "warning") -> List[LintIssue]:
-        """完全相同的标题文本（规范化后）出现在多处时标记。"""
-        by_key: "defaultdict[str, list]" = defaultdict(list)
-        for rel_path, headings in self._index.headings.items():
-            for heading in headings:
-                by_key[heading.key].append((rel_path, heading.line_no, heading.text))
+        """重复标题检查（与 numbering_uniqueness 作用域对齐）。
+
+        1. 同文件内：检查文件内完全相同的（level, 规范化文本）重复。
+        2. 跨文件：仅对一级标题（level == 1）或显式带章节编号（如 ``## 3.1 概述``）的
+           标题检查跨文件重复，避免模块化文档中各章节通用的无编号子标题（如 ``#### 列表``、
+           ``#### 搜索``、``#### 流程图``、``#### 接口设计``）产生跨文件海量误报。
+        """
+        from doc_tool.application.content.references import leading_number
 
         issues: List[LintIssue] = []
-        for key, occurrences in by_key.items():
+        cross_file_by_key: "defaultdict[str, list]" = defaultdict(list)
+        reported_positions: set = set()
+
+        for rel_path in self._index.all_files():
+            headings = self._index.headings.get(rel_path, [])
+            file_by_key: "defaultdict[str, list]" = defaultdict(list)
+            for heading in headings:
+                file_by_key[heading.key].append((rel_path, heading.line_no, heading.text))
+                if heading.level == 1 or leading_number(heading.text):
+                    cross_file_by_key[heading.key].append((rel_path, heading.line_no, heading.text))
+
+            for _key, occurrences in file_by_key.items():
+                if len(occurrences) < 2:
+                    continue
+                for r_path, line_no, text in occurrences[1:]:
+                    pos = (r_path, line_no)
+                    if pos not in reported_positions:
+                        reported_positions.add(pos)
+                        issues.append(
+                            LintIssue(
+                                rule="duplicate_title",
+                                rel_path=r_path,
+                                line_no=line_no,
+                                message="重复标题：{0}".format(text),
+                                rule_id="duplicate_title", severity=severity,
+                            )
+                        )
+
+        for _key, occurrences in cross_file_by_key.items():
             if len(occurrences) < 2:
                 continue
-            # 只保留首个以外的重复出现
-            for rel_path, line_no, text in occurrences[1:]:
-                issues.append(
-                    LintIssue(
-                        rule="duplicate_title",
-                        rel_path=rel_path,
-                        line_no=line_no,
-                        message="重复标题：{0}".format(text),
-                        rule_id="duplicate_title", severity=severity,
+            for r_path, line_no, text in occurrences[1:]:
+                pos = (r_path, line_no)
+                if pos not in reported_positions:
+                    reported_positions.add(pos)
+                    issues.append(
+                        LintIssue(
+                            rule="duplicate_title",
+                            rel_path=r_path,
+                            line_no=line_no,
+                            message="重复标题：{0}".format(text),
+                            rule_id="duplicate_title", severity=severity,
+                        )
                     )
-                )
         return issues
 
     def check_todo(self, severity: str = "warning") -> List[LintIssue]:
@@ -400,12 +456,18 @@ class ContentLinter:
         from doc_tool.application.content.tree import strip_number_prefix
 
         # 工具自身的重编号/章节树会为标题加编号前缀（如 ``1.2 范围``），
-        # 必备章节按去掉编号前缀后的标题文本匹配，避免对合法文档误报。
+        # 同时 Word 导入拆树（split_into_tree）会将 1~3 级标题拆为目录名与文件名
+        # （如 ``第1章 引言/1.2 范围.md``、``1.4 总体描述.md``）。
+        # 因此必备章节同时从文件内标题与章节路径段（去前缀后）收集，避免对拆树文档误报。
         titles = {
             strip_number_prefix(heading.text.strip())
             for values in self._index.headings.values()
             for heading in values
         }
+        for rel_path in set(self._index.all_files()) | set(self._index.lines.keys()):
+            for seg_title in _extract_path_section_titles(rel_path):
+                titles.add(seg_title)
+                titles.add(strip_number_prefix(seg_title))
         issues = []
         for required in rule.params.get("titles", []):
             title = strip_number_prefix(str(required).strip())
@@ -608,20 +670,35 @@ class ContentLinter:
 
     def check_sensitive_info(self, rule) -> List[LintIssue]:
         issues = []
+        default_names = {"手机号", "身份证号", "明文口令"}
         for pattern_data in rule.params.get("patterns", []):
             data = pattern_data if isinstance(pattern_data, dict) else {"name": str(pattern_data), "regex": str(pattern_data)}
+            pat_name = str(data.get("name", "自定义模式"))
             try:
                 pattern = re.compile(str(data.get("regex", "")))
             except re.error:
                 continue
             for rel_path, lines in self._index.lines.items():
+                in_example_context = False
                 for line_no, line in enumerate(lines, start=1):
-                    if pattern.search(line):
-                        issues.append(LintIssue(
-                            "sensitive_info", rel_path, line_no,
-                            "发现敏感信息模式：{0}".format(data.get("name", "自定义模式")),
-                            "sensitive_info", rule.severity,
-                        ))
+                    stripped = line.strip()
+                    if re.match(r"^(?:#{1,6}\s+)?(?:请求示例|响应示例|加密格式|示例)\s*[:：]?$", stripped):
+                        in_example_context = True
+                    elif stripped.startswith("#"):
+                        in_example_context = False
+                    if not pattern.search(line):
+                        continue
+                    # 对内置敏感模式排除明确的接口文档示例、密文说明与 Base64 密文串
+                    if pat_name in default_names:
+                        if in_example_context or "示例：" in line or "示例:" in line or "密文" in line or "加密模式" in line:
+                            continue
+                        if pat_name == "明文口令" and re.search(r"[:：=]\s*[A-Za-z0-9+/]{16,}={1,2}\s*$", stripped):
+                            continue
+                    issues.append(LintIssue(
+                        "sensitive_info", rel_path, line_no,
+                        "发现敏感信息模式：{0}".format(pat_name),
+                        "sensitive_info", rule.severity,
+                    ))
         return issues
 
     def check_heading_format(self, severity: str = "warning") -> List[LintIssue]:
@@ -822,7 +899,7 @@ def can_quick_fix(issue: LintIssue) -> bool:
     elif issue.rule_id == "term_case":
         return True
     elif issue.rule_id == "markdown_structure":
-        if "缺少分隔行" in issue.message:
+        if "缺少分隔行" in issue.message or "个列宽，表格实际" in issue.message:
             return True
     return False
 
@@ -896,6 +973,31 @@ def apply_quick_fix(content: str, issue: LintIssue) -> Tuple[str, bool, str]:
             elif content.endswith("\n"):
                 result += "\n"
             return result, True, "已在第 {0} 行表头下方插入标准分隔行".format(issue.line_no)
+
+    elif issue.rule_id == "markdown_structure" and "个列宽，表格实际" in issue.message:
+        m_cols = re.search(r"表格实际\s*(\d+)\s*列", issue.message)
+        if m_cols and 0 <= line_idx < len(lines):
+            target_cols = int(m_cols.group(1))
+            orig = lines[line_idx]
+            m_meta = re.search(r"\bcols=([\d,]+)", orig)
+            if m_meta and target_cols >= 1:
+                old_vals = [int(x) for x in m_meta.group(1).split(",") if x.strip().isdigit()]
+                total_w = sum(old_vals) if old_vals else target_cols * 1500
+                if len(old_vals) > target_cols:
+                    kept = old_vals[: target_cols - 1]
+                    last_w = max(200, total_w - sum(kept))
+                    new_vals = kept + [last_w]
+                else:
+                    avg_w = max(200, int(total_w / max(1, len(old_vals)))) if old_vals else 1500
+                    new_vals = old_vals + [avg_w] * (target_cols - len(old_vals))
+                new_cols_str = "cols=" + ",".join(str(x) for x in new_vals)
+                lines[line_idx] = orig[: m_meta.start()] + new_cols_str + orig[m_meta.end() :]
+                result = newline.join(lines)
+                if content.endswith("\r\n"):
+                    result += "\r\n"
+                elif content.endswith("\n"):
+                    result += "\n"
+                return result, True, "已将第 {0} 行表格元数据 cols= 调整为 {1} 个列宽值".format(issue.line_no, target_cols)
 
     return content, False, "该条目暂不支持自动修复"
 

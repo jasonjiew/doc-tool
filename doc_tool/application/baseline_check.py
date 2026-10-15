@@ -154,7 +154,25 @@ def check_project_baseline(
             "conflict": False,
         }
 
-    manifest = ProjectManifest.load(project_root)
+    try:
+        manifest = ProjectManifest.load(project_root)
+    except Exception as exc:
+        return {
+            "projectId": project_root.name,
+            "projectRoot": project_root.as_posix(),
+            "documentNo": "",
+            "documentName": project_root.name,
+            "manifestVersion": "",
+            "revisionRecordVersion": None,
+            "revisionRecordLine": None,
+            "declaredVersions": [],
+            "frozenBaseline": {"exists": False, "version": "", "corrupted": [], "frozenAt": ""},
+            "currentContentHash": "",
+            "signoffs": [],
+            "status": "error",
+            "issues": [f"清单文件解析失败（{project_root / 'project.yml'}）：{exc}"],
+            "conflict": False,
+        }
     content_root = _resolve_content_root(manifest, project_root)
     manifest_ver = _normalize_ver(manifest.documentVersion)
     document_no = getattr(manifest, "documentNo", "")
@@ -285,29 +303,57 @@ def check_project_baseline(
     }
 
 
+_SKIP_DISCOVERY_DIRS = {
+    ".git", ".state", "output", "tmp", "node_modules", "__pycache__", ".venv", ".pytest_cache"
+}
+
+
+def _discover_project_roots(root: Path, max_depth: int = 3) -> List[Path]:
+    """在指定目录下递归发现包含 project.yml 的文档工程目录（最多向下 max_depth 层）。"""
+    if (root / "project.yml").is_file():
+        return [root]
+    found: List[Path] = []
+
+    def _walk(cur: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            children = sorted(cur.iterdir())
+        except OSError:
+            return
+        for sub in children:
+            if not sub.is_dir() or sub.name in _SKIP_DISCOVERY_DIRS or sub.name.startswith("."):
+                continue
+            if (sub / "project.yml").is_file():
+                found.append(sub)
+            else:
+                _walk(sub, depth + 1)
+
+    _walk(root, 1)
+    return found
+
+
 def check_baselines(
     root: Path,
     *,
     declare_files: Optional[Sequence[Path]] = None,
     workspace: bool = False,
 ) -> Dict[str, Any]:
-    """统一基线核对服务，支持单项目或工作区成员批量核对。"""
+    """统一基线核对服务，支持单项目、多级目录集合或工作区成员批量核对。"""
     projects_to_check = []
     if workspace:
-        from doc_tool.application.workspace import load_workspace
+        if (root / "workspace.yml").is_file():
+            from doc_tool.application.workspace import load_workspace
 
-        space = load_workspace(root)
-        for member in space.valid_members:
-            p_root = space.member_project_root(member)
-            if p_root is not None and (p_root / "project.yml").is_file():
-                projects_to_check.append(p_root)
-    else:
-        if (root / "project.yml").is_file():
-            projects_to_check.append(root)
+            space = load_workspace(root)
+            for member in space.valid_members:
+                p_root = space.member_project_root(member)
+                if p_root is not None and (p_root / "project.yml").is_file():
+                    projects_to_check.append(p_root)
         else:
-            for sub in sorted(root.iterdir()):
-                if sub.is_dir() and (sub / "project.yml").is_file():
-                    projects_to_check.append(sub)
+            projects_to_check.extend(_discover_project_roots(root))
+    else:
+        projects_to_check.extend(_discover_project_roots(root))
 
     if not projects_to_check:
         from doc_tool.domain.version import get_tool_metadata

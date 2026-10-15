@@ -54,6 +54,21 @@ class RenumberPlanTests(unittest.TestCase):
         self.assertFalse(plan.renames)
         self.assertEqual(plan.unchanged, ["1 概述.md", "2 设计.md"])
 
+    def test_dotted_prefix_preserved_on_reorder(self):
+        plan = plan_reorder([
+            "第3章 功能需求/3.7 移动端/3.7.25 患者端首页.md",
+            "第3章 功能需求/3.7 移动端/3.7.23 登录注册.md",
+        ])
+        mapping = dict(plan.renames)
+        self.assertEqual(
+            mapping["第3章 功能需求/3.7 移动端/3.7.25 患者端首页.md"],
+            "第3章 功能需求/3.7 移动端/3.7.1 患者端首页.md",
+        )
+        self.assertEqual(
+            mapping["第3章 功能需求/3.7 移动端/3.7.23 登录注册.md"],
+            "第3章 功能需求/3.7 移动端/3.7.2 登录注册.md",
+        )
+
     def test_subdirectory_paths_preserved(self):
         plan = plan_reorder(["a/2 设计.md", "a/1 概述.md"])
         mapping = dict(plan.renames)

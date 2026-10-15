@@ -686,6 +686,41 @@ class OffscreenTraceabilityUiTests(unittest.TestCase):
         self.assertEqual(issue.rule_id, "todo_residual")
         self.assertEqual(issue.severity, "error")
 
+    def test_mainflow_batch1_path_sections_subheading_scope_and_cols_quickfix(self):
+        from doc_tool.application.content.lint import LintIssue, apply_quick_fix, can_quick_fix
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "content" / "requirement"
+            (root / "第1章 引言").mkdir(parents=True)
+            (root / "第1章 引言" / "1.2 范围.md").write_text("本系统范围说明。\n", encoding="utf-8")
+            (root / "第1章 引言" / "1.4 总体描述.md").write_text("总体描述正文，参见第1.2节。\n", encoding="utf-8")
+            (root / "第3章 功能需求" / "3.1 模块A").mkdir(parents=True)
+            (root / "第3章 功能需求" / "3.1 模块A" / "3.1.1 子模块1.md").write_text(
+                "#### 列表\n内容1\n#### 搜索\n内容2\n{\"deviceCode\":XXX}\n身份证密文：444XXX\n解除xxx绑定\n",
+                encoding="utf-8",
+            )
+            (root / "第3章 功能需求" / "3.1 模块A" / "3.1.2 子模块2.md").write_text(
+                "#### 列表\n内容3\n#### 搜索\n内容4\n",
+                encoding="utf-8",
+            )
+            index = ContentIndexService(root).build()
+            config = QualityRulesConfig(Path(tmp) / ".state", "requirement")
+            linter = ContentLinter(index, config)
+            issues = linter.check_all([])
+            self.assertFalse([i for i in issues if i.rule_id == "required_section"])
+            self.assertFalse([i for i in issues if i.rule_id == "duplicate_title"])
+            self.assertFalse([i for i in issues if i.rule_id == "todo_residual"])
+            self.assertFalse([i for i in issues if i.rule_id == "broken_section_ref"])
+
+            tbl_issue = LintIssue(
+                "markdown_structure", "a.md", 1,
+                "表格元数据声明 5 个列宽，表格实际 4 列；多出的列宽会被忽略。请把 cols= 改为 4 个宽度值。",
+                "markdown_structure", "warning",
+            )
+            self.assertTrue(can_quick_fix(tbl_issue))
+            fixed, ok, _msg = apply_quick_fix("<!-- TBL:cols=1000,1000,1000,1000,1000 -->\n| A | B | C | D |\n|---|---|---|---|\n", tbl_issue)
+            self.assertTrue(ok)
+            self.assertIn("cols=1000,1000,1000,2000", fixed)
+
 
 if __name__ == "__main__":
     unittest.main()

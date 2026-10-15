@@ -110,9 +110,17 @@ class ReferenceScanner:
 
     def _build_maps(self) -> None:
         for rel_path in self._index.all_files():
-            number = section_no_of_file(rel_path)
-            if number is not None and number not in self._section_files:
-                self._section_files[number] = rel_path
+            file_number = section_no_of_file(rel_path)
+            if file_number is not None and file_number not in self._section_files:
+                self._section_files[file_number] = rel_path
+            # 同时登记路径中上级目录段的章节编号（如 "第3章 功能需求/3.2 后台管理/3.2.1 用户.md" 中的 "3.2"）
+            for seg in str(rel_path).replace("\\", "/").split("/")[:-1]:
+                seg_num = leading_number(seg)
+                if seg_num is not None and seg_num not in self._section_files:
+                    self._section_files[seg_num] = rel_path
+            # 为文件内未显式编号的子标题补充基于文件章节号的隐式层级编号（如 3.1.13 下的第 5 个子标题 -> 3.1.13.5）
+            counters: Dict[int, int] = {}
+            base_level: Optional[int] = None
             for heading in self._index.headings.get(rel_path, []):
                 self._anchors[rel_path].append((heading.anchor_id, heading.text))
                 number = leading_number(heading.text)
@@ -120,6 +128,21 @@ class ReferenceScanner:
                     self._heading_sections[number].append(
                         (rel_path, heading.anchor_id)
                     )
+                elif file_number is not None:
+                    if base_level is None or heading.level < base_level:
+                        base_level = heading.level
+                    rel_depth = heading.level - base_level + 1
+                    counters[rel_depth] = counters.get(rel_depth, 0) + 1
+                    for deeper in list(counters.keys()):
+                        if deeper > rel_depth:
+                            del counters[deeper]
+                    suffix = ".".join(str(counters[d]) for d in range(1, rel_depth + 1) if d in counters)
+                    if suffix:
+                        implicit_num = "{0}.{1}".format(file_number, suffix)
+                        if not self._heading_sections.get(implicit_num):
+                            self._heading_sections[implicit_num].append(
+                                (rel_path, heading.anchor_id)
+                            )
 
     # --- 对外入口 ---
 

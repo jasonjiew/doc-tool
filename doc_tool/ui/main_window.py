@@ -2958,15 +2958,10 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             self._show_error("内核不可用", str(exc)[:200])
             return
-        # 前置检查已过、Word 与内核均可用：此时才把「跳过检查」标注写入发布说明，
-        # 保证不会因后续中止留下未发布却标注跳过的陈旧审计记录。
+        # 前置检查跳过记录仅保存在会话状态，不再向 Git 跟踪的 project.yml 重复追加「跳过检查清单」造成清单污染。
         if getattr(self, "_pending_publish_skip_note", None):
-            note = self._pending_publish_skip_note
-            summary.manifest.publishNotes = (summary.manifest.publishNotes + "\n" + note).strip()
-            try:
-                summary.manifest.save(summary.project_root, backup=True)
-            except Exception:
-                pass
+            self._last_publish_skip_note = self._pending_publish_skip_note
+            self._pending_publish_skip_note = None
         self._stage_progress_enabled = TASK_UI["merge"]["stage_progress"]
         spec = TaskSpec(
             name="merge",
@@ -3030,13 +3025,19 @@ class MainWindow(QMainWindow):
         manifest = summary.manifest
         state_dir = summary.paths.state_dir
         index = workspace.index()
+        tabs_host = getattr(workspace, "tabs_host", None)
+        unsaved_changes = (
+            len(collect_unsaved(tabs_host.editors()))
+            if tabs_host is not None and hasattr(tabs_host, "editors")
+            else 0
+        )
+        self._pending_publish_skip_note = None
         holder: dict = {}
 
         def compute() -> None:
             from doc_tool.application.content.baselines import pre_publish_checks
             from doc_tool.application.content.lint import ContentLinter, TermStore
             from doc_tool.application.content.quality_rules import QualityRulesConfig
-            from doc_tool.application.content.writer import ChangeManifest
             from doc_tool.application.review.review_store import ReviewStore
 
             try:
@@ -3058,7 +3059,7 @@ class MainWindow(QMainWindow):
                     ),
                     default=None,
                 )
-                pending_changes = ChangeManifest(state_dir).entry_count()
+                pending_changes = unsaved_changes
                 holder["checks"] = pre_publish_checks(
                     quality_errors=quality_errors,
                     unresolved_reviews=review_store.unresolved_count,

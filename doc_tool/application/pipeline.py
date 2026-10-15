@@ -1382,6 +1382,8 @@ def _run_pipeline_inner(
         if not skip_word_refresh:
             try:
                 baseline_count = _refresh_content_baseline(paths)
+                from doc_tool.application.content.writer import ChangeManifest
+                ChangeManifest(paths.state_dir).clear()
                 log.info(STAGE_PUBLISH, "content_baseline_refreshed", {
                     "files": baseline_count,
                 })

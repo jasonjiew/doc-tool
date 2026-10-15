@@ -151,8 +151,14 @@ def _renumber_path(relative: str, index: int) -> str:
     stem = path.stem
     match = _LEADING_NUMBER_RE.match(stem)
     if match:
-        rest = stem[match.end():].strip() or match.group(1)
-        new_stem = "{0} {1}".format(index, rest)
+        old_num = match.group(1)
+        rest = stem[match.end():].strip() or old_num
+        if "." in old_num:
+            parent_prefix = old_num.rsplit(".", 1)[0]
+            new_num = "{0}.{1}".format(parent_prefix, index)
+        else:
+            new_num = str(index)
+        new_stem = "{0} {1}".format(new_num, rest)
     else:
         new_stem = "{0} {1}".format(index, stem.strip())
     parent = path.parent.as_posix()

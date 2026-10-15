@@ -31,6 +31,35 @@ MARKER_PREFIX = "DOC-ITEM"
 #: 条目身份键（projectId, itemId）。
 ItemKey = Tuple[str, str]
 
+#: 真实业务文档表格中的条目编号模式（如 REQ-00101、Function-100101、Design-300101、DES-001）。
+TABLE_BUSINESS_ID_RE = re.compile(
+    r"^(?P<prefix>REQ|Function|Design|DES)-(?P<body>[A-Za-z0-9_-]+)$"
+)
+
+
+def extract_table_business_row(line: str) -> Optional[Tuple[str, str, str, str]]:
+    """从 Markdown 表格行提取业务条目 ``(business_id, kind, title, body)``。
+
+    支持首列或次列为 ``REQ-*`` / ``Function-*`` / ``Design-*`` / ``DES-*`` 的表格数据行。
+    """
+    stripped = str(line or "").strip()
+    if not stripped.startswith("|") or stripped.count("|") < 2:
+        return None
+    cells = [c.strip() for c in stripped.strip("|").split("|")]
+    if not cells or all(not c or set(c) <= {"-", ":", " "} for c in cells):
+        return None
+    for idx in range(min(2, len(cells))):
+        cell = cells[idx].strip()
+        m = TABLE_BUSINESS_ID_RE.match(cell)
+        if m:
+            prefix = m.group("prefix")
+            kind = "design" if prefix in ("Design", "DES") else "requirement"
+            other_cells = [c for j, c in enumerate(cells) if j != idx and c]
+            title = other_cells[0] if other_cells else cell
+            body = " | ".join(c for c in cells if c)
+            return cell, kind, title, body
+    return None
+
 
 @dataclass(frozen=True)
 class ItemRef:
@@ -348,6 +377,10 @@ def plan_legacy_migration(
             if DOC_ITEM_RE.search(line):
                 continue
             legacy = _leading_number(line)
+            if not legacy:
+                table_row = extract_table_business_row(line)
+                if table_row is not None:
+                    legacy = table_row[0]
             if not legacy:
                 continue
             key = "{0}@{1}".format(heading_no, legacy)
