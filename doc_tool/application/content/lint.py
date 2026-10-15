@@ -7,7 +7,7 @@
 - 表格结构：与构建内核共用 ``doc_tool.domain.markdown_structure`` 契约，在合并前
   就报出会让构建失败的元数据问题，以及不阻断但改变排版的列数/分隔行问题。
 
-术语清单存储于项目 ``.state/terms.json``（``TermStore``），可在结果面板
+术语清单存储于项目 ``quality/terms.json``，兼容旧 ``.state/terms.json``，可在结果面板
 增删，变更后立即生效并重跑相关检查。
 """
 
@@ -56,14 +56,40 @@ class LintIssue:
             self.rule_id = self.rule
 
 
+@dataclass
+class LintRunReport:
+    """一次检查的事实：内容发现与检查是否真正执行分开表达。"""
+    issues: List[LintIssue]
+    configuration: dict = field(default_factory=dict)
+    rules: List[dict] = field(default_factory=list)
+    cache_hit: bool = False
+
+    @property
+    def configuration_failed(self):
+        return not self.configuration.get("valid", True) or any(
+            issue.rule_id == "rule_configuration" and issue.severity == "error" for issue in self.issues
+        )
+
+    def to_dict(self):
+        executed = sum(x["status"] == "executed" for x in self.rules)
+        enabled = sum(bool(x["enabled"]) for x in self.rules)
+        complete = bool(executed) and not self.configuration_failed and all(
+            not x["enabled"] or x["status"] in ("executed", "not-applicable") for x in self.rules
+        )
+        return {"configuration": dict(self.configuration), "rules": [dict(x) for x in self.rules],
+                "enabledCount": enabled, "executedCount": executed,
+                "disabledCount": sum(x["status"] == "disabled" for x in self.rules),
+                "complete": complete, "cacheHit": self.cache_hit}
+
+
 #: 进程内“检查结果复用”缓存（V4.2 42-B）。
 #:
 #: 键包含正文状态（每章路径 + 行数 + 内容摘要）、规则参数、解析器版本与范围，
 #: 依赖摘要变化必然换键——因此不会拿旧结果冒充新正文。容量超限整体丢弃。
-_LINT_RESULT_CACHE: "Dict[tuple, List[LintIssue]]" = {}
+_LINT_RESULT_CACHE: "Dict[tuple, tuple]" = {}
 _LINT_RESULT_CACHE_MAX = 64
 #: 解析器版本参与键：解析逻辑变化必须使旧结果失效。
-LINT_PARSER_VERSION = "lint-v1"
+LINT_PARSER_VERSION = "lint-v2-quality-contracts"
 
 #: 规则依赖分类（V4.2 42-B 2.3）。
 #:
@@ -83,6 +109,9 @@ RULE_DEPENDENCIES = {
     "term_case": "cross-chapter",
     "required_section": "cross-chapter",
     "numbering_uniqueness": "cross-chapter",
+    "module_sections": "local",
+    "table_schema": "local",
+    "rule_configuration": "cross-chapter",
 }
 
 
@@ -150,6 +179,11 @@ class ContentLinter:
         self._rules_config = rules_config
         self._use_result_cache = bool(use_result_cache)
 
+    @property
+    def last_report(self):
+        """最近一次真实检查的执行事实；不把关闭/无效项装成通过。"""
+        return getattr(self, "_last_report", None)
+
     def _rules(self):
         if self._rules_config is not None:
             return self._rules_config.rule_map()
@@ -157,38 +191,56 @@ class ContentLinter:
         doc_type = next(iter(self._index.document_types), "general")
         return {rule.rule_id: rule for rule in default_rules(doc_type)}
 
-    def _rules_signature(self) -> tuple:
-        """规则参数签名：启用状态与严重级别进入依赖键（规则变化必然换键）。"""
-        signature = []
-        for rule_id, rule in sorted(self._rules().items()):
-            signature.append((
-                str(rule_id), bool(getattr(rule, "enabled", True)),
-                str(getattr(rule, "severity", "")),
-                str(getattr(rule, "params", "") or ""),
-            ))
-        return tuple(signature)
+    def _configuration(self):
+        from doc_tool.application.content.quality_rules import (
+            RuleConfigDiagnostic, RulesLoadResult, validate_rule_payload,
+        )
+        try:
+            if self._rules_config is not None and hasattr(self._rules_config, "load_result"):
+                return self._rules_config.load_result()
+            rules = list(self._rules().values())
+            diagnostics = validate_rule_payload([rule.to_dict() for rule in rules])
+            return RulesLoadResult(rules, "builtin" if self._rules_config is None else "custom", "", "", diagnostics)
+        except Exception as exc:  # 配置/索引错误必须成为失败事实，不可转成“零问题”。
+            return RulesLoadResult([], "unavailable", "", "unavailable", [
+                RuleConfigDiagnostic("config_read", "质量规则无法读取：{0}".format(exc)),
+            ])
+
+    def _rules_signature(self, rules=None, configuration=None) -> tuple:
+        config = configuration if configuration is not None else self._configuration()
+        items = rules if rules is not None else {rule.rule_id: rule for rule in config.rules}
+        signature = tuple(
+            (str(rid), bool(rule.enabled), str(rule.severity), json.dumps(rule.params, sort_keys=True, ensure_ascii=False, default=str))
+            for rid, rule in sorted(items.items())
+        )
+        # 同样的默认回退规则不代表配置有效；来源/原始摘要/诊断也参与缓存键。
+        return signature, json.dumps(config.to_dict(), sort_keys=True, ensure_ascii=False)
 
     def check_all(self, terms: List[str]) -> List[LintIssue]:
-        """运行全部检查，返回按文件与行排序的结果。
+        """保留旧列表接口；check_report 同时提供来源和执行清单。"""
+        return self.check_report(terms).issues
 
-        V4.2 42-B：同一进程内对“同一正文状态 + 同一规则参数 + 同一范围”复用上次
-        结果——依赖摘要变化即换键，因此不会用旧结果冒充新正文；容量不足或未命中
-        时完整重算，结果与无缓存完全一致。
-        """
+    def check_report(self, terms: List[str], *, term_warnings=()):
+        from doc_tool.application.content.quality_rules import RuleConfigDiagnostic
+        from doc_tool.domain.errors import CancelledError
+        self._last_report = None
+        config = self._configuration()
+        if term_warnings and any(rule.rule_id == "term_case" and rule.enabled for rule in config.rules):
+            config.diagnostics.extend(RuleConfigDiagnostic("terms_config", str(message), rule_id="term_case") for message in term_warnings)
+        rules = {rule.rule_id: rule for rule in config.rules}
         cache_key = None
         if self._use_result_cache:
-            try:
-                cache_key = (
-                    index_dependency_digest(self._index),
-                    self._rules_signature(),
-                    tuple(sorted(str(item) for item in (terms or ()))),
-                )
-                cached = _LINT_RESULT_CACHE.get(cache_key)
-                if cached is not None:
-                    return list(cached)
-            except Exception:  # noqa: BLE001 - 键构造失败时直接完整重算
-                cache_key = None
-        issues = []
+            cache_key = (index_dependency_digest(self._index), self._rules_signature(rules, config), tuple(sorted(str(x) for x in (terms or ()))))
+            cached = _LINT_RESULT_CACHE.get(cache_key)
+            if cached is not None:
+                issues, executions = cached
+                report = LintRunReport(list(issues), config.to_dict(), [dict(x) for x in executions], True)
+                self._last_report = report
+                return report
+        issues = [LintIssue("rule_configuration", "", diagnostic.line_no,
+                    "规则配置 {0}：{1}".format(config.path or config.source, diagnostic.message),
+                    "rule_configuration", diagnostic.severity) for diagnostic in config.diagnostics]
+        invalid_ids = {x.rule_id for x in config.diagnostics if x.severity == "error" and x.rule_id}
         dispatch = {
             "duplicate_title": lambda rule: self.check_duplicate_titles(rule.severity),
             "todo_residual": lambda rule: self.check_todo(rule.severity),
@@ -201,16 +253,76 @@ class ContentLinter:
             "markdown_structure": self.check_markdown_structure,
             "mermaid_syntax": self.check_mermaid_syntax,
             "heading_format": lambda rule: self.check_heading_format(rule.severity),
+            "module_sections": self.check_document_contract,
+            "table_schema": self.check_document_contract,
         }
-        for rule in self._rules().values():
-            if rule.enabled and rule.rule_id in dispatch:
-                issues.extend(dispatch[rule.rule_id](rule))
+        executions = []
+        for rule in rules.values():
+            item = {"ruleId": rule.rule_id, "enabled": rule.enabled, "status": "not-run", "reason": "", "findingCount": 0}
+            if not rule.enabled:
+                item.update(status="disabled", reason="配置中明确关闭，未执行")
+            elif rule.rule_id in invalid_ids:
+                item.update(status="invalid", reason="配置无效，未执行")
+            elif rule.rule_id not in dispatch:
+                item.update(status="unknown", reason="当前版本不支持，未执行")
+            else:
+                reason = self._not_applicable(rule, terms)
+                if reason:
+                    item.update(status="not-applicable", reason=reason)
+                else:
+                    try:
+                        found = dispatch[rule.rule_id](rule)
+                        issues.extend(found)
+                        item.update(status="executed", findingCount=len(found))
+                    except CancelledError:
+                        raise
+                    except Exception as exc:
+                        item.update(status="failed", reason="执行失败：{0}".format(exc))
+                        issues.append(LintIssue("rule_configuration", "", 0,
+                            "规则「{0}」执行未完成：{1}".format(rule.rule_id, exc), "rule_configuration", "error"))
+            executions.append(item)
+        # 解析前已被拒绝的启用项也必须列出，不能因未进入 rule_map 而失踪。
+        for diagnostic in config.diagnostics:
+            if diagnostic.severity == "error" and diagnostic.rule_id and diagnostic.rule_id not in rules:
+                if not any(x["ruleId"] == diagnostic.rule_id for x in executions):
+                    executions.append({"ruleId": diagnostic.rule_id, "enabled": True, "status": "invalid", "reason": diagnostic.message, "findingCount": 0})
         from doc_tool.domain.content_index import path_natural_sort_key
         issues.sort(key=lambda i: (path_natural_sort_key(i.rel_path), i.line_no))
+        report = LintRunReport(issues, config.to_dict(), executions)
+        self._last_report = report
         if cache_key is not None:
             if len(_LINT_RESULT_CACHE) >= _LINT_RESULT_CACHE_MAX:
                 _LINT_RESULT_CACHE.clear()
-            _LINT_RESULT_CACHE[cache_key] = list(issues)
+            _LINT_RESULT_CACHE[cache_key] = (list(issues), [dict(x) for x in executions])
+        return report
+
+    def _not_applicable(self, rule, terms):
+        if not self._index.lines:
+            return "本次检查范围没有正文"
+        if rule.rule_id == "term_case" and not terms:
+            return "未配置术语清单"
+        if rule.rule_id == "required_section" and not rule.params.get("titles"):
+            return "未配置必备标题"
+        if rule.rule_id == "field_completeness" and not rule.params.get("fields"):
+            return "未配置字段要求"
+        if rule.rule_id == "sensitive_info" and not rule.params.get("patterns"):
+            return "未配置匹配模式"
+        if rule.rule_id in ("module_sections", "table_schema"):
+            from doc_tool.application.content.document_contracts import matches_paths
+            if not any(matches_paths(path, rule.params) for path in self._index.lines):
+                return "本次范围没有匹配选择器的模块文件，未证明该规范通过"
+        return ""
+
+    def check_document_contract(self, rule):
+        from doc_tool.application.content.document_contracts import (
+            check_module_sections, check_table_schema, matches_paths,
+        )
+        checker = check_module_sections if rule.rule_id == "module_sections" else check_table_schema
+        issues = []
+        for path, lines in self._index.lines.items():
+            if matches_paths(path, rule.params):
+                for finding in checker("\n".join(lines), rule.params):
+                    issues.append(LintIssue(rule.rule_id, path, finding.line_no, finding.message, rule.rule_id, rule.severity))
         return issues
 
     def check_duplicate_titles(self, severity: str = "warning") -> List[LintIssue]:
@@ -574,26 +686,41 @@ class ContentLinter:
 
 
 class TermStore:
-    """术语清单持久化（项目 .state/terms.json）。"""
+    """术语清单：项目 quality/ 优先，旧 .state/ 只读兼容。"""
 
-    def __init__(self, state_dir: Path) -> None:
-        self._file: Path = Path(state_dir) / TERMS_FILE_NAME
+    def __init__(self, state_dir: Path, *, writable: bool = True) -> None:
+        state = Path(state_dir)
+        self._project_root = state.parent if state.name == ".state" else None
+        self.writable = writable
+        self.warnings: List[str] = []
+        if self._project_root is not None:
+            from doc_tool.application.quality_location import QUALITY_DIR, QUALITY_TERMS_NAME
+            self._file = self._project_root / QUALITY_DIR / QUALITY_TERMS_NAME
+        else:
+            self._file = state / TERMS_FILE_NAME
 
     @property
     def file(self) -> Path:
         return self._file
 
     def load(self) -> List[str]:
-        """读取术语清单；缺失或损坏返回空。"""
+        """只读取，不迁移；损坏的术语配置给出诊断。"""
+        self.warnings = []
+        if self._project_root is not None:
+            from doc_tool.application.quality_location import load_terms_with_fallback
+            terms, warnings = load_terms_with_fallback(self._project_root)
+            self.warnings = ["术语配置：" + value for value in warnings]
+            return terms
         if not self._file.exists():
             return []
         try:
-            data = json.loads(self._file.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return [str(item).strip() for item in data if str(item).strip()]
-            terms = data.get("terms", []) if isinstance(data, dict) else []
-            return [str(item).strip() for item in terms if str(item).strip()]
-        except (json.JSONDecodeError, OSError):
+            data = json.loads(self._file.read_text(encoding="utf-8-sig"))
+            items = data if isinstance(data, list) else data.get("terms", []) if isinstance(data, dict) else None
+            if not isinstance(items, list):
+                raise ValueError("terms 应为列表")
+            return [str(item).strip() for item in items if str(item).strip()]
+        except (ValueError, OSError, UnicodeError) as exc:
+            self.warnings = ["术语配置不可用，未执行术语检查：{0}".format(exc)]
             return []
 
     def save(self, terms: List[str]) -> Optional[str]:
@@ -604,6 +731,10 @@ class TermStore:
             错误文本而不是抛异常——面板据此提示「术语未持久化」，避免术语
             「看似已添加」实际重启后消失、且检查结果表因槽异常中断。
         """
+        if not self.writable:
+            return "只读项目不可保存术语清单"
+        if self._file.exists() and not self._file.is_file():
+            return "术语保存目标不是文件，未写入配置"
         cleaned: List[str] = []
         seen = set()
         for term in terms:
@@ -611,14 +742,60 @@ class TermStore:
             if value and value not in seen:
                 seen.add(value)
                 cleaned.append(value)
-        import os
+        # 添加一个词不能丢掉团队共享文件的说明及既有词条的 canonical/备注元数据。
+        source = self._file
+        if self._project_root is not None:
+            from doc_tool.application.quality_location import resolve_quality_location, QUALITY_TERMS_NAME
+            source = resolve_quality_location(self._project_root, QUALITY_TERMS_NAME, legacy_name=TERMS_FILE_NAME).path
+        previous = None
+        try:
+            previous = json.loads(source.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeError, ValueError):
+            pass
+        items = previous.get("terms", []) if isinstance(previous, dict) else previous if isinstance(previous, list) else []
+        by_name = {}
+        for item in items if isinstance(items, list) else []:
+            name = str(item.get("canonical", "")).strip() if isinstance(item, dict) else str(item).strip()
+            by_name.setdefault(name, item)
+        preserved = [by_name.get(value, value) for value in cleaned]
+        payload = dict(previous) if isinstance(previous, dict) else None
+        if payload is not None:
+            payload["terms"] = preserved
+        else:
+            payload = preserved
+        return self._write_payload(payload)
 
+    def save_entries(self, entries) -> Optional[str]:
+        """设置页保存完整术语资源，与词库面板的字符串增删视图区分。"""
+        if not self.writable:
+            return "只读项目不可保存术语清单"
+        from doc_tool.application.quality_location import parse_terms_payload, load_terms_resource
+        _terms, warnings = parse_terms_payload(entries)
+        if not isinstance(entries, list) or warnings:
+            return "术语配置无效：{0}".format("；".join(warnings) or "条目应为列表")
+        if self._project_root is not None:
+            previous = load_terms_resource(self._project_root)["data"]
+        else:
+            try:
+                previous = json.loads(self._file.read_text(encoding="utf-8-sig"))
+            except (OSError, UnicodeError, ValueError):
+                previous = None
+        payload = dict(previous) if isinstance(previous, dict) else {}
+        payload["terms"] = list(entries)
+        return self._write_payload(payload)
+
+    def _write_payload(self, payload) -> Optional[str]:
+        if not self.writable:
+            return "只读项目不可保存术语清单"
+        if self._file.exists() and not self._file.is_file():
+            return "术语保存目标不是文件，未写入配置"
+        import os
         tmp = None
         try:
             self._file.parent.mkdir(parents=True, exist_ok=True)
             tmp = self._file.with_suffix(".json.tmp")
             tmp.write_text(
-                json.dumps(cleaned, ensure_ascii=False, indent=2),
+                json.dumps(payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
             try:
@@ -627,7 +804,7 @@ class TermStore:
                 import shutil
 
                 shutil.move(str(tmp), str(self._file))
-        except OSError as exc:
+        except (OSError, TypeError, ValueError) as exc:
             if tmp is not None:
                 try:
                     tmp.unlink()
@@ -746,7 +923,8 @@ def apply_all_quick_fixes(content: str, issues: List[LintIssue]) -> Tuple[str, i
 RULE_CATEGORY_GROUPS: dict[str, list[str]] = {
     "格式规范": ["heading_format", "markdown_structure", "mermaid_syntax"],
     "内容质量": ["todo_residual", "term_case", "duplicate_title"],
-    "结构完整": ["required_section", "field_completeness", "interface_table_structure"],
+    "结构完整": ["required_section", "field_completeness", "interface_table_structure", "module_sections", "table_schema"],
+    "规则配置": ["rule_configuration"],
     "合规与安全": ["sensitive_info", "numbering_uniqueness"],
 }
 
@@ -766,6 +944,9 @@ RULE_LABELS: dict[str, str] = {
     "interface_table_structure": "接口表结构",
     "numbering_uniqueness": "编号唯一性",
     "sensitive_info": "敏感信息",
+    "module_sections": "模块章节契约",
+    "table_schema": "需求表型契约",
+    "rule_configuration": "规则配置与执行",
 }
 
 SEVERITY_LABELS: dict[str, str] = {

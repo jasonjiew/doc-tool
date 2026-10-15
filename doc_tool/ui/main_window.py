@@ -2762,23 +2762,26 @@ class MainWindow(QMainWindow):
             except Exception as exc:  # noqa: BLE001
                 tree_errors.append(str(exc))
 
-            # 术语与质量规则检查
+            # 与 CLI / 构建同源，异常和未执行不能冒充质量检查通过。
             err_issues = []
             warn_issues = []
+            quality_run = None
+            quality_failure = ""
             try:
                 from doc_tool.application.content.index import ContentIndexService
                 from doc_tool.application.content.lint import ContentLinter, TermStore
                 from doc_tool.application.content.quality_rules import QualityRulesConfig
-
                 state_dir = paths.state_dir
                 content_root = paths.resolve(manifest.relative_content_root())
                 index = ContentIndexService(content_root).build()
                 q_config = QualityRulesConfig(state_dir, manifest.documentType, writable=False)
-                issues = ContentLinter(index, q_config).check_all(TermStore(state_dir).load())
-                err_issues = [iss for iss in issues if iss.severity == "error"]
-                warn_issues = [iss for iss in issues if iss.severity == "warning"]
-            except Exception:
-                pass
+                store = TermStore(state_dir, writable=False)
+                terms = store.load()
+                quality_run = ContentLinter(index, q_config).check_report(terms, term_warnings=store.warnings)
+                err_issues = [iss for iss in quality_run.issues if iss.severity == "error"]
+                warn_issues = [iss for iss in quality_run.issues if iss.severity == "warning"]
+            except Exception as exc:
+                quality_failure = "质量检查未完成：{0}".format(exc)
 
             report_lines = [
                 "# {0} 源码与结构检查报告".format(manifest.documentName or manifest.documentType),
@@ -2794,8 +2797,13 @@ class MainWindow(QMainWindow):
                 for err in tree_errors:
                     report_lines.append("- [FAIL] 目录结构/资源引用错误: {0}".format(err))
 
-            if not err_issues:
-                report_lines.append("- [PASS] 质量规则检查通过（{0} 个提示）".format(len(warn_issues)))
+            if quality_failure:
+                report_lines.append("- [FAIL] " + quality_failure)
+            elif quality_run is not None and not quality_run.to_dict()["executedCount"] and not err_issues:
+                report_lines.append("- [NOT-RUN] 本次范围未实际执行适用质量规则，不代表规范已通过")
+            elif not err_issues:
+                count = quality_run.to_dict()["executedCount"] if quality_run is not None else 0
+                report_lines.append("- [PASS] 当前启用规则未发现错误（执行 {0} 条，提醒 {1} 项）".format(count, len(warn_issues)))
             else:
                 for iss in err_issues[:10]:
                     rel = getattr(iss, "rel_path", getattr(iss, "file", ""))
@@ -2807,10 +2815,11 @@ class MainWindow(QMainWindow):
             report_lines.append("- 质量错误: {0}".format(len(err_issues)))
             report_lines.append("- 质量警告: {0}".format(len(warn_issues)))
 
-            passes = (1 if not tree_errors else 0) + (1 if not err_issues else 0)
-            fails = (len(tree_errors) if tree_errors else 0) + len(err_issues)
+            passes = (1 if not tree_errors else 0) + (1 if not err_issues and not quality_failure and quality_run is not None and quality_run.to_dict()["executedCount"] else 0)
+            fails = (len(tree_errors) if tree_errors else 0) + len(err_issues) + (1 if quality_failure else 0)
             report_lines.extend(["", "## 总结", "", "- PASS: {0}".format(passes), "- FAIL: {0}".format(fails)])
-            report_lines.append("- 结论: **{0}**".format("通过" if fails == 0 else "失败"))
+            conclusion = "失败" if fails else "通过" if quality_run is not None and quality_run.to_dict()["executedCount"] else "质量检查未执行"
+            report_lines.append("- 结论: **{0}**".format(conclusion))
 
             report_path = paths.logs_dir / "{0}-validation.md".format(manifest.documentType)
             paths.logs_dir.mkdir(parents=True, exist_ok=True)

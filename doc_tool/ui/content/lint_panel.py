@@ -554,8 +554,9 @@ class LintPanel(QWidget):
         return scope_paths, overrides, note
 
     def run_check(self) -> None:
-        terms = self._current_terms()
-        persist_error = self._terms.save(terms)
+        # 检查只读配置，只有用户明确新增/删除术语时才保存。
+        terms = self._terms.load()
+        self._render_terms(terms)
         try:
             scope_paths, overrides, note = self._resolve_scope()
         except Exception as exc:  # noqa: BLE001 - 缓冲不可读时不使用旧磁盘代替
@@ -578,14 +579,20 @@ class LintPanel(QWidget):
             if scoped is not None:
                 linter = scoped
                 scoped_used = True
-        issues = linter.check_all(terms)
+        if isinstance(linter, ContentLinter):
+            quality_run = linter.check_report(terms, term_warnings=getattr(self._terms, "warnings", []))
+            issues = quality_run.issues
+        else:
+            issues = linter.check_all(terms)
+            quality_run = getattr(linter, "last_report", None)
+        self._quality_report = quality_run.to_dict() if quality_run is not None else {}
         if overrides and not scoped_used:
             # 无法按活缓冲建立作用域检查时，绝不拿旧磁盘正文冒充当前结果：
             # 有未保存正文的章节本次不报告（状态行明确说明）。
             issues = [issue for issue in issues if issue.rel_path not in overrides]
         if scope_paths is not None:
             allowed = set(scope_paths)
-            issues = [issue for issue in issues if issue.rel_path in allowed]
+            issues = [issue for issue in issues if issue.rel_path in allowed or issue.rule_id == "rule_configuration"]
         self._issues = list(issues)
         self._page_size = ISSUE_PAGE_SIZE
         if self._on_issues is not None:
@@ -596,32 +603,51 @@ class LintPanel(QWidget):
             self._scope_label.setText(
                 "范围：{0}{1}".format(note, "（含未保存正文）" if overrides else "")
             )
-        if persist_error:
-            # 术语未持久化必须提示：否则用户以为已保存、重启后消失。
-            self._status_label.setText(
-                self._status_label.text() + "；术语保存失败：{0}".format(persist_error)
-            )
+        if self._quality_report:
+            data = self._quality_report
+            source = data.get("configuration", {}).get("source", "unknown")
+            self._status_label.setText(self._status_label.text() + "；规则来源 {0}，已执行 {1}，关闭 {2}".format(
+                source, data["executedCount"], data["disabledCount"]))
+            if not data["configuration"].get("valid", False):
+                self._status_label.setText(self._status_label.text() + "；配置异常，检查未完成")
 
     def add_term(self) -> None:
+        if not self._writable:
+            return
         value = self._term_entry.text().strip()
         if not value:
             return
-        terms = self._current_terms()
+        terms = self._terms.load()
+        if getattr(self._terms, "warnings", []):
+            self._status_label.setText("术语配置不可用，请先在项目设置中修正；未覆盖原配置。")
+            return
         if value not in terms:
             terms.append(value)
+        error = self._terms.save(terms)
+        if error:
+            self._status_label.setText("术语未保存：{0}".format(error))
+            return
         self._term_entry.clear()
         self._render_terms(terms)
-        self.run_check()  # run_check 内部保存术语并透出持久化失败
+        self.run_check()
 
     def remove_term(self) -> None:
+        if not self._writable:
+            return
         row = self._term_list.currentRow()
         if row < 0:
             return
-        terms = self._current_terms()
-        if 0 <= row < len(terms):
-            terms.pop(row)
-            self._render_terms(terms)
-            self.run_check()  # run_check 内部保存术语并透出持久化失败
+        selected = self._term_list.item(row).text()
+        terms = self._terms.load()
+        if getattr(self._terms, "warnings", []):
+            self._status_label.setText("术语配置不可用，请先在项目设置中修正；未覆盖原配置。")
+            return
+        # 以选中的词而不是陈旧行号删除，避免覆盖同事新增的词条。
+        error = self._terms.save([term for term in terms if term != selected])
+        if error:
+            self._status_label.setText("术语未保存：{0}".format(error))
+            return
+        self.run_check()
 
     # --- 内部 ---
 

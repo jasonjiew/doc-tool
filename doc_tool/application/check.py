@@ -70,6 +70,7 @@ class CheckReport:
     artifacts: List[CheckArtifact] = field(default_factory=list)
     exit_code: int = EXIT_OK
     message: str = ""
+    quality: dict = field(default_factory=dict)
 
     @property
     def error_count(self) -> int:
@@ -106,6 +107,7 @@ class CheckReport:
             "stages": [stage.to_dict() for stage in self.stages],
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
             "exitCode": self.exit_code,
+            "quality": dict(self.quality),
         }
 
 
@@ -130,6 +132,7 @@ def build_report(
     stages: Optional[List[CheckStage]] = None,
     artifacts: Optional[List[CheckArtifact]] = None,
     message: str = "",
+    quality: Optional[dict] = None,
 ) -> CheckReport:
     """把问题列表汇总成统一报告（退出码在此处决定）。"""
     status, code = _status_for(issues, fail_on)
@@ -143,6 +146,7 @@ def build_report(
         artifacts=list(artifacts or []),
         exit_code=code,
         message=message,
+        quality=dict(quality or {}),
     )
 
 
@@ -178,18 +182,27 @@ def run_check(
     artifacts: List[CheckArtifact] = []
     issues: List[IssueRecord] = []
 
-    lint_issues = _collect_lint_issues(manifest, paths)
+    lint_issues, quality = _collect_lint_report(manifest, paths)
     issues.extend(lint_issues)
-    stages.append(
-        CheckStage(
-            "lint",
-            "succeeded" if not lint_issues else "warning",
-            "内容检查 {0} 项".format(len(lint_issues)),
-        )
+    configuration_failed = not quality.get("configuration", {}).get("valid", True) or any(
+        item.issue_type == "rule_configuration" and item.severity == SEVERITY_ERROR for item in lint_issues
     )
+    no_execution = "executedCount" in quality and quality["executedCount"] == 0
+    if no_execution and not configuration_failed:
+        issues.append(IssueRecord("lint", "quality_not_run", manifest.documentType,
+            SEVERITY_ERROR if strict else SEVERITY_WARNING, "", None, None,
+            "当前范围没有实际执行的质量规则（关闭或不适用）；不能认定规范检查通过。"))
+    lint_status = "failed" if any(item.severity == SEVERITY_ERROR for item in issues) else (
+        "skipped" if no_execution else "warning" if lint_issues else "succeeded")
+    stages.append(CheckStage("lint", lint_status,
+        "执行 {0} 条，关闭 {1} 条；规则来源 {2}".format(
+            quality.get("executedCount", "未知"), quality.get("disabledCount", "未知"),
+            quality.get("configuration", {}).get("source", "未知"))))
 
     if not build:
         stages.append(CheckStage("build", "skipped", "未请求构建（--build）"))
+    elif configuration_failed:
+        stages.append(CheckStage("build", "skipped", "规则配置/执行未完成，未启动构建；原产物保持"))
     else:
         import contextlib
         import sys as _sys
@@ -202,6 +215,10 @@ def run_check(
             pipeline = run_pipeline(manifest, paths, skip_word_refresh=True)
         for event in pipeline.events:
             stages.append(CheckStage(event.stage, event.status, event.detail or ""))
+        if not pipeline.success:
+            detail = pipeline.last_stage.detail if pipeline.last_stage else "构建未完成"
+            issues.append(IssueRecord("pipeline", "build_failed", manifest.documentType,
+                SEVERITY_ERROR, "", None, pipeline.error_code or "E2001", detail or "构建未完成"))
         if pipeline.pending_output_path:
             artifacts.append(
                 CheckArtifact(pipeline.pending_output_path, "待刷新")
@@ -241,23 +258,28 @@ def run_check(
         stages=stages,
         artifacts=artifacts,
         message="" if not issues else "共 {0} 项发现".format(len(issues)),
+        quality=quality,
     )
 
 
-def _collect_lint_issues(manifest, paths) -> List[IssueRecord]:
-    """收集内容检查结果（与 GUI/CLI lint 同一服务）。"""
+def _collect_lint_report(manifest, paths):
+    """同一快照同时返回内容发现与执行事实，避免二次读取配置造成错配。"""
     from doc_tool.application.content.index import ContentIndexService
     from doc_tool.application.content.lint import ContentLinter, TermStore
     from doc_tool.application.content.quality_rules import QualityRulesConfig
     from doc_tool.application.issues import issues_from_lint
-
     content_root = paths.resolve(manifest.relative_content_root())
     index = ContentIndexService(content_root).build()
-    rules_config = QualityRulesConfig(
-        paths.state_dir, manifest.documentType, writable=False
-    )
-    raw = ContentLinter(index, rules_config).check_all(TermStore(paths.state_dir).load())
-    return issues_from_lint(raw, manifest.documentType)
+    config = QualityRulesConfig(paths.state_dir, manifest.documentType, writable=False)
+    store = TermStore(paths.state_dir, writable=False)
+    terms = store.load()
+    run = ContentLinter(index, config).check_report(terms, term_warnings=store.warnings)
+    return issues_from_lint(run.issues, manifest.documentType), run.to_dict()
+
+
+def _collect_lint_issues(manifest, paths) -> List[IssueRecord]:
+    """保留旧私有辅助接口；主流程使用同源执行报告。"""
+    return _collect_lint_report(manifest, paths)[0]
 
 
 def serialize_check_text(report: CheckReport) -> str:
@@ -273,6 +295,11 @@ def serialize_check_text(report: CheckReport) -> str:
             "，严格模式" if report.strict else "",
         ),
     ]
+    if report.quality:
+        facts = report.quality
+        lines.append("规则：来源 {0}，启用 {1}，实际执行 {2}，关闭 {3}；执行完整={4}".format(
+            facts.get("configuration", {}).get("source", "未知"), facts.get("enabledCount", "未知"),
+            facts.get("executedCount", "未知"), facts.get("disabledCount", "未知"), facts.get("complete", False)))
     if report.issues:
         lines.append("")
         lines.append("问题：")

@@ -117,13 +117,19 @@ def load_settings(project_root: Union[str, Path]) -> SettingsModel:
         FieldSpec(key, key, value)
         for key, value in sorted((manifest.variables or {}).items())
     ]
-    terms = _read_json(_quality_file(root, QUALITY_TERMS_NAME, "terms")) or {}
-    model.sections[术语] = [
-        FieldSpec("terms", "术语表", terms.get("terms", []), kind="list")
-    ]
-    rules = _read_json(_quality_file(root, QUALITY_RULES_NAME, "rules")) or {}
+    from doc_tool.application.content.quality_rules import QualityRulesConfig
+    from doc_tool.application.quality_location import load_terms_resource
+    term_resource = load_terms_resource(root)
+    model.warnings.extend(term_resource["warnings"])
+    # 设置/规范包使用原资源，词库检查器才使用规范化的字符串视图。
+    model.sections[术语] = [FieldSpec("terms", "术语表", term_resource["entries"], kind="list")]
+    loaded = QualityRulesConfig(root / ".state", manifest.documentType, writable=False).load_result()
+    # 保留可解析的原始行供用户修正，不能把失效项悄悄从设置页删除。
+    visible_rules = loaded.raw_rules if loaded.raw_rules is not None else [r.to_dict() for r in loaded.rules]
+    model.warnings.extend(x.message for x in loaded.diagnostics)
     model.sections[规则] = [
-        FieldSpec("rules", "检查规则", rules.get("rules", []), kind="list")
+        FieldSpec("rules", "检查规则", visible_rules, kind="list",
+                  hint="实际来源：{0}；保存到项目 quality/rules.json，旧配置不删除".format(loaded.source))
     ]
     model.sections[门禁] = [
         FieldSpec("qualitySource", "检查策略来源", manifest.qualitySource, kind="choice", options=["", "pack", "project", "builtin"]),
@@ -173,11 +179,20 @@ def save_settings(
         if key == "bodyStyle" and not str(value).strip():
             errors["bodyStyle"] = "正文样式不能为空"
     terms = payload.get("terms")
-    if terms is not None and not _is_string_list(terms):
-        errors["terms"] = "术语表应为字符串列表"
+    if terms is not None:
+        from doc_tool.application.quality_location import parse_terms_payload
+        if not isinstance(terms, list):
+            errors["terms"] = "术语表应为字符串或 canonical 对象组成的列表"
+        else:
+            _canonical, term_errors = parse_terms_payload(terms)
+            if term_errors:
+                errors["terms"] = "；".join(term_errors)
     rules = payload.get("rules")
-    if rules is not None and not isinstance(rules, list):
-        errors["rules"] = "规则表应为列表"
+    if rules is not None:
+        from doc_tool.application.content.quality_rules import validate_rule_payload
+        rule_errors = [item.message for item in validate_rule_payload(rules) if item.severity == "error"]
+        if rule_errors:
+            errors["rules"] = "；".join(rule_errors)
     variables = payload.get("variables")
     if variables is not None and not isinstance(variables, dict):
         errors["variables"] = "变量应为「名称 -> 值」映射"
@@ -205,24 +220,35 @@ def save_settings(
             manifest.headingStyles[level] = str(payload[key])
     if isinstance(variables, dict):
         manifest.variables = {str(k): str(v) for k, v in variables.items()}
-    try:
-        manifest.save(root)
-    except Exception as exc:  # noqa: BLE001 - 清单校验失败必须作为字段错误返回
-        outcome.errors["__manifest__"] = str(exc)
-        outcome.message = "清单校验失败，未保存：{0}".format(exc)
-        return outcome
-    outcome.written.append(str(root / "project.yml"))
-
-    quality = root / QUALITY_DIR
-    quality.mkdir(parents=True, exist_ok=True)
+    manifest_keys = {"documentVersion", "qualitySource", "documentName", "documentNo", "documentKind", "bodyStyle", "variables"}
+    if any(key in manifest_keys or key.startswith("heading") for key in payload):
+        try:
+            manifest.save(root)
+        except Exception as exc:  # 清单校验失败必须作为字段错误返回。
+            outcome.errors["__manifest__"] = str(exc)
+            outcome.message = "清单校验失败，未保存：{0}".format(exc)
+            return outcome
+        outcome.written.append(str(root / "project.yml"))
+    # 规则/术语单独保存不触碰清单；复用实际检查器的验证与共享落盘入口。
     if terms is not None:
-        target = quality / QUALITY_TERMS_NAME
-        target.write_text(json.dumps({"terms": list(terms)}, ensure_ascii=False, indent=2), encoding="utf-8")
-        outcome.written.append(str(target))
+        from doc_tool.application.content.lint import TermStore
+        store = TermStore(root / ".state")
+        error = store.save_entries(terms)
+        if error:
+            outcome.errors["terms"] = error
+            outcome.message = "术语保存失败；此前已写入 {0} 项。".format(len(outcome.written))
+            return outcome
+        outcome.written.append(str(store.file))
     if rules is not None:
-        target = quality / QUALITY_RULES_NAME
-        target.write_text(json.dumps({"rules": list(rules)}, ensure_ascii=False, indent=2), encoding="utf-8")
-        outcome.written.append(str(target))
+        from doc_tool.application.content.quality_rules import QualityRulesConfig
+        store = QualityRulesConfig(root / ".state", manifest.documentType)
+        try:
+            store.save_payload(rules)
+        except (ValueError, OSError) as exc:
+            outcome.errors["rules"] = str(exc)
+            outcome.message = "规则保存失败；此前已写入 {0} 项。".format(len(outcome.written))
+            return outcome
+        outcome.written.append(str(store.file))
     outcome.ok = True
     outcome.message = "已保存 {0} 个文件。".format(len(outcome.written))
     return outcome

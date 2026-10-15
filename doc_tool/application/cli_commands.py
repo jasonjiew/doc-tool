@@ -298,12 +298,14 @@ def lint_command(projects: Iterable[str]) -> CommandResult:
         content_root = paths.resolve(manifest.relative_content_root())
         index = ContentIndexService(content_root).build()
         config = QualityRulesConfig(paths.state_dir, manifest.documentType, writable=False)
-        raw = ContentLinter(index, config).check_all(TermStore(paths.state_dir).load())
-        issues = issues_from_lint(raw, manifest.documentType)
+        store = TermStore(paths.state_dir, writable=False)
+        terms = store.load()
+        run = ContentLinter(index, config).check_report(terms, term_warnings=store.warnings)
+        issues = issues_from_lint(run.issues, manifest.documentType)
         return ProjectCommandResult(
             str(root), not issues, "" if not issues else "E2002",
             "" if not issues else "请修正 lint 发现后重试。",
-            data={"documentType": manifest.documentType, "issueCount": len(issues)},
+            data={"documentType": manifest.documentType, "issueCount": len(issues), "quality": run.to_dict()},
             issues=issues,
         )
 

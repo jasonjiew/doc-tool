@@ -11,6 +11,7 @@
 - **代码仓库**：<https://github.com/wangjie0721666-web/doc-tool>
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md) / [docs/COLLEAGUE_AI_CLI_GUIDE.md](docs/COLLEAGUE_AI_CLI_GUIDE.md)
+- **主流程质量检查**：[团队共享规则、模块/需求表规范与执行状态](docs/mainflow-quality.md)（新规则按配置启用，旧项目不自动迁移）
 - **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)
 
 ---

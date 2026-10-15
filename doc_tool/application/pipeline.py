@@ -88,8 +88,8 @@ PIPELINE_STAGE_LABELS = {
 def _run_prebuild_lint(manifest, paths):
     """构建前 Lint：与 GUI 问题面板、CLI ``lint`` 共用同一服务与规则。
 
-    只读内容与规则配置；默认策略下结果只作为提醒透出，
-    不会阻断出稿（严格交付的门禁由 ``STAGE_AUDIT`` 与策略决定）。
+    只读内容与规则配置；返回内容发现及执行事实。内容提醒保持既有门禁策略，
+    但配置或规则执行失效必须阻断本次出稿，不能用默认回退冒充检查通过。
     """
     from doc_tool.application.content.index import ContentIndexService
     from doc_tool.application.content.lint import ContentLinter, TermStore
@@ -100,8 +100,9 @@ def _run_prebuild_lint(manifest, paths):
     rules_config = QualityRulesConfig(
         paths.state_dir, manifest.documentType, writable=False
     )
-    terms = TermStore(paths.state_dir).load()
-    return ContentLinter(index, rules_config).check_all(terms)
+    store = TermStore(paths.state_dir, writable=False)
+    terms = store.load()
+    return ContentLinter(index, rules_config).check_report(terms, term_warnings=store.warnings)
 
 
 def collect_chapter_markdown_paths(content_root) -> "List[str]":
@@ -933,30 +934,46 @@ def _run_pipeline_inner(
         prepared_sources = []
         _record_stage(STAGE_PREPARE, "warning")
 
-    # --- 阶段 0.5：构建前 Lint（与 CLI ``lint`` 同一套规则） ---
+    # 配置/执行失败不能被“零发现”或提示模式掩盖；普通内容提醒保持原策略。
     _check_cancel()
+    from doc_tool.application.content.lint import LintRunReport
+    quality = None
+    lint_failure = ""
     try:
-        issues = _run_prebuild_lint(manifest, paths)
-    except Exception as exc:  # noqa: BLE001 - Lint 不能阻断构建本身
-        log.warn(STAGE_LINT, "prebuild_lint_failed", {"message": str(exc)})
+        raw = _run_prebuild_lint(manifest, paths)
+        if isinstance(raw, LintRunReport):
+            quality = raw.to_dict()
+            issues = raw.issues
+            if raw.configuration_failed:
+                lint_failure = "规则配置或执行未完成，不能继续出稿"
+        else:
+            issues = list(raw)  # 兼容现有私有钩子的列表返回。
+        if any(item.rule_id == "rule_configuration" and item.severity == "error" for item in issues):
+            lint_failure = "规则配置或执行未完成，不能继续出稿"
+    except CancelledError:
+        raise
+    except Exception as exc:
         issues = []
-    lint_severities = {issue.severity for issue in issues}
-    if issues:
-        result.events.append(StageEvent(
-            STAGE_LINT,
-            "succeeded",
-            detail="构建前检查发现 {0} 项（默认带提醒继续）".format(len(issues)),
-            metrics={"issueCount": len(issues)},
-        ))
-        for issue in issues[:50]:
-            detail = "{0}:{1} {2}".format(issue.rel_path, issue.line_no, issue.message)
-            _emit(STAGE_LINT, "warning", detail)
-            log.warn(STAGE_LINT, issue.rule_id or issue.rule, {"message": detail})
-        _record_stage(STAGE_LINT, "succeeded")
-    else:
-        _record_stage(STAGE_LINT, "succeeded")
-    if lint_severities:
-        log.info(STAGE_LINT, "severities", {"severities": sorted(lint_severities)})
+        lint_failure = "质量检查无法完成：{0}".format(exc)
+    metrics = {"issueCount": len(issues)}
+    if quality is not None:
+        metrics["quality"] = quality
+    for issue in issues[:50]:
+        detail = "{0}:{1} {2}".format(issue.rel_path, issue.line_no, issue.message)
+        _emit(STAGE_LINT, "warning", detail)
+        log.warn(STAGE_LINT, issue.rule_id or issue.rule, {"message": detail})
+    if lint_failure:
+        result.error_code = ValidationError.code
+        result.events.append(StageEvent(STAGE_LINT, "failed", detail=lint_failure, error_code=result.error_code, metrics=metrics))
+        _record_stage(STAGE_LINT, "failed")
+        _cleanup_temp()
+        # 不替换任何既有输出；默认规则回退只用于诊断列表，不作为出稿放行依据。
+        return result
+    no_execution = quality is not None and not quality["executedCount"]
+    status = "skipped" if no_execution else "succeeded"
+    detail = "未实际执行适用规则，不代表规范通过" if no_execution else "质量检查执行完成，内容提醒按现有策略处理"
+    result.events.append(StageEvent(STAGE_LINT, status, detail=detail, metrics=metrics))
+    _record_stage(STAGE_LINT, status)
 
     # --- 阶段 1：构建到临时文件 ---
     _check_cancel()

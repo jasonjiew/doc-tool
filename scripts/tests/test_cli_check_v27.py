@@ -77,7 +77,7 @@ class CheckCommandTests(unittest.TestCase):
         from doc_tool.application.issues import IssueRecord
 
         def _issues(*_args, **_kwargs):
-            return [
+            return ([
                 IssueRecord(
                     source="lint",
                     issue_type="todo_residual",
@@ -88,9 +88,9 @@ class CheckCommandTests(unittest.TestCase):
                     error_code=None,
                     message="待办残留",
                 )
-            ]
+            ], {})
 
-        with mock.patch.object(check_module, "_collect_lint_issues", _issues):
+        with mock.patch.object(check_module, "_collect_lint_report", _issues):
             code_error, out_error, _err = _run(
                 ["check", "--project", self.project, "--output", "json"]
             )

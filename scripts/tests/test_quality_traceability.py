@@ -171,11 +171,15 @@ class QualityRulesTests(unittest.TestCase):
             root.mkdir(parents=True)
             (root / "1.1 概述.md").write_text("# 范围\n", encoding="utf-8")
             config = QualityRulesConfig(Path(tmp) / ".state", "requirement")
-            config.save([
-                QualityRule("field_completeness", True, "warning", {"fields": {"编号": {"regex": "RQ-\\d+", "count": "oops"}}}),
-            ])
+            bad = QualityRule("field_completeness", True, "warning", {"fields": {"编号": {"regex": "RQ-\\d+", "count": "oops"}}})
+            with self.assertRaises(ValueError):
+                config.save([bad])
+            # 模拟已有/外部写入的坏配置：检查不可崩溃，也不可假装字段规则执行成功。
+            config.file.parent.mkdir(parents=True, exist_ok=True)
+            config.file.write_text(json.dumps({"rules": [bad.to_dict()]}), encoding="utf-8")
             issues = ContentLinter(ContentIndexService(root).build(), config).check_all([])
-            self.assertTrue(any(issue.rule_id == "field_completeness" for issue in issues))
+            self.assertTrue(any(issue.rule_id == "rule_configuration" and issue.severity == "error" for issue in issues))
+            self.assertFalse(any(issue.rule_id == "field_completeness" for issue in issues))
 
     def test_heading_format_rule(self):
         with tempfile.TemporaryDirectory() as tmp:

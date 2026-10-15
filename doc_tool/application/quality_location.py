@@ -100,7 +100,7 @@ def safe_read_json(path: Path) -> Tuple[object, Optional[str]]:
     import json
 
     try:
-        return json.loads(path.read_text(encoding="utf-8")), None
+        return json.loads(path.read_text(encoding="utf-8-sig")), None
     except FileNotFoundError:
         return None, "文件不存在"
     except (OSError, UnicodeError) as exc:
@@ -109,21 +109,9 @@ def safe_read_json(path: Path) -> Tuple[object, Optional[str]]:
         return None, "格式损坏：{0}".format(exc)
 
 
-def load_terms_with_fallback(project_root: Union[str, Path]) -> Tuple[List[str], List[str]]:
-    """读取术语表：损坏或非法项跳过并返回可读说明。
-
-    支持两种形状：``{"terms": [...]}\frank`` 与直接列表；不会因损坏而拖垓检查。
-    """
+def parse_terms_payload(data) -> Tuple[List[str], List[str]]:
+    """把资源条目投影为检查词表，不修改 canonical/aliases/备注原结构。"""
     warnings: List[str] = []
-    location = resolve_quality_location(
-        project_root, QUALITY_TERMS_NAME, legacy_name=LEGACY_TERMS_NAME
-    )
-    if not location.exists:
-        return [], warnings
-    data, error = safe_read_json(location.path)
-    if error is not None:
-        warnings.append("术语配置不可用（{0}），已回退空术语表继续。".format(error))
-        return [], warnings
     items = data
     if isinstance(data, dict):
         items = data.get("terms")
@@ -149,6 +137,27 @@ def load_terms_with_fallback(project_root: Union[str, Path]) -> Tuple[List[str],
     if skipped:
         warnings.append("术语配置中有 {0} 项无效已跳过。".format(skipped))
     return terms, warnings
+
+
+def load_terms_resource(project_root: Union[str, Path]) -> dict:
+    """同一次读取提供资源视图与检查视图，供设置/规范包及运行时共用。"""
+    location = resolve_quality_location(project_root, QUALITY_TERMS_NAME, legacy_name=LEGACY_TERMS_NAME)
+    result = {"data": None, "entries": [], "terms": [], "warnings": [], "source": location.source}
+    if not location.exists:
+        return result
+    data, error = safe_read_json(location.path)
+    if error is not None:
+        result["warnings"] = ["术语配置不可用（{0}），已回退空术语表继续。".format(error)]
+        return result
+    terms, warnings = parse_terms_payload(data)
+    entries = data.get("terms") if isinstance(data, dict) else data
+    result.update(data=data, entries=entries if isinstance(entries, list) else [], terms=terms, warnings=warnings)
+    return result
+
+
+def load_terms_with_fallback(project_root: Union[str, Path]) -> Tuple[List[str], List[str]]:
+    resource = load_terms_resource(project_root)
+    return resource["terms"], resource["warnings"]
 
 
 def quality_files_state(project_root: Union[str, Path]) -> dict:
