@@ -242,6 +242,8 @@ class SuggestionEngine:
         module_roots: Sequence[str] = (),
     ) -> None:
         self._index = index
+        self._index_service = None
+        self._buffer_bases = {}
         self._rules_config = rules_config
         self._terms: List[str] = [str(item).strip() for item in (terms or ()) if str(item).strip()]
         self._aliases: Dict[str, str] = {}
@@ -313,8 +315,9 @@ class SuggestionEngine:
 
         from doc_tool.application.content.impact import ReviewRecordStore
 
+        index_service = ContentIndexService(content_root)
         engine = cls(
-            index=ContentIndexService(content_root).build(),
+            index=index_service.build(),
             rules_config=QualityRulesConfig(state_dir, document_type),
             terms=terms,
             term_aliases=term_aliases,
@@ -326,6 +329,7 @@ class SuggestionEngine:
             change_items=change_items,
             module_roots=module_roots,
         )
+        engine._index_service = index_service
         engine._warnings.extend(warnings)
         loaded_terms, term_warnings = load_terms_with_fallback(root)
         for term in loaded_terms:
@@ -338,23 +342,37 @@ class SuggestionEngine:
     # --- 缓冲叠加 ---
 
     def apply_buffers(self, buffers: Optional[Mapping[str, str]]) -> None:
-        """把当前编辑缓冲叠加到索引，使建议基于作者正在看的内容。"""
-        if not buffers or self._index is None:
+        """Replace the live overlay; a closed/saved buffer must not linger as current text."""
+        if buffers is None or self._index is None:
             return
-        for rel_path, content in buffers.items():
-            rel = display_path(str(rel_path))
-            if not rel:
-                continue
-            lines = text_lines(content or "")
+        normalized = {display_path(str(k)): str(v) for k, v in buffers.items() if display_path(str(k))}
+        for rel in set(self._buffer_bases) - set(normalized):
+            entry, lines, headings = self._buffer_bases.pop(rel)
+            if self._index_service is not None:
+                self._index_service.rebuild_file(self._index, rel)
+            elif entry is not None:
+                self._index.files[rel] = entry
+                self._index.lines[rel] = lines
+                self._index.headings[rel] = headings
+            else:
+                self._index.files.pop(rel, None)
+                self._index.lines.pop(rel, None)
+                self._index.headings.pop(rel, None)
+        for rel, content in normalized.items():
             existing = self._index.files.get(rel)
+            if rel not in self._buffer_bases:
+                self._buffer_bases[rel] = (
+                    existing, list(self._index.lines.get(rel, [])),
+                    list(self._index.headings.get(rel, [])),
+                )
+            lines = text_lines(content)
             document_type = existing.document_type if existing is not None else self._document_type
-            self._index.files[rel] = FileEntry(
-                rel_path=rel, document_type=document_type, line_count=len(lines)
-            )
+            self._index.files[rel] = FileEntry(rel_path=rel, document_type=document_type, line_count=len(lines))
             self._index.lines[rel] = lines
             self._index.headings[rel] = self._heading_entries(rel, lines)
             self._index.refresh(rel)
             self._index.document_types.add(document_type)
+        self._references_scanned = False
 
     @staticmethod
     def _heading_entries(rel_path: str, lines: Sequence[str]) -> List[HeadingEntry]:

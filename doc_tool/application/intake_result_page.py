@@ -29,6 +29,7 @@ from doc_tool.application.intake_contract import (
     DEFAULT_ACTIONABLE_LIMIT,
     HANDLING_ORIGINAL_ONLY,
     HANDLING_PLACEHOLDER,
+    HANDLING_SKIPPED, HANDLING_TEXT_FALLBACK, HANDLING_LABELS,
     PLACEHOLDER_PREFIX,
 )
 from doc_tool.domain.manifest import ProjectManifest
@@ -75,6 +76,7 @@ class IntakeResultPage:
     toFix: int = 0
     unavailableComparisons: List[str] = field(default_factory=list)
     hasRecord: bool = False
+    followUps: List[Dict[str, object]] = field(default_factory=list)
 
     @property
     def needsAttention(self) -> bool:
@@ -93,6 +95,7 @@ class IntakeResultPage:
             "toFix": self.toFix,
             "unavailableComparisons": list(self.unavailableComparisons),
             "hasRecord": self.hasRecord,
+            "followUps": [dict(item) for item in self.followUps],
         }
 
 
@@ -183,9 +186,40 @@ def build_result_page(project_root, *, limit: int = DEFAULT_ACTIONABLE_LIMIT) ->
             feature=feature,
             retainedPath=str(action.get("retainedPath") or record.retainedPath),
         ))
+    page.followUps = summarize_followups(page.details, retained_available=bool(
+        page.retainedPath and (project_root / page.retainedPath).is_file()))
     if not page.summary:
         page.summary = ["项目已生成，可直接编辑"]
     return page
+
+
+def summarize_followups(details, *, retained_available=False):
+    """Count every ledger finding by cause/handling, independently of the action/page limit."""
+    groups = {}
+    for item in details:
+        handling = str(item.get("handling") or "unknown")
+        feature = str(item.get("feature") or "unknown")
+        if handling == HANDLING_EDITABLE:
+            continue  # already editable; not an invented to-do
+        if handling == HANDLING_PLACEHOLDER and feature == "image":
+            reason, next_step, action = "缺失或不可导入的图片", "选中对应行，定位并选择替代图片", ACTION_REPLACE_IMAGE
+        elif handling == HANDLING_ORIGINAL_ONLY:
+            reason, next_step, action = "仅在原件中保留", "查看原件核对；此处不是可编辑保留", ACTION_VIEW_ORIGINAL
+        elif handling == HANDLING_SKIPPED:
+            reason, next_step, action = "该部分未执行导入", "核对跳过原因；未执行不等于已完整保留", ACTION_LOCATE
+        elif handling == HANDLING_TEXT_FALLBACK:
+            reason, next_step, action = "已降为参考文本", "核对原格式与语义；需要时对照原件", ACTION_LOCATE
+        else:
+            reason, next_step, action = "占位或其他处理缺口", "定位正文并核对完整处理说明", ACTION_LOCATE
+        if action == ACTION_VIEW_ORIGINAL and not retained_available:
+            next_step, action = "原件路径当前不可用；先核对记录与原文件位置", ACTION_LOCATE
+        key = (reason, handling)
+        if key not in groups:
+            groups[key] = {"reason": reason, "handling": handling,
+                           "handlingLabel": HANDLING_LABELS.get(handling, handling),
+                           "count": 0, "nextStep": next_step, "action": action}
+        groups[key]["count"] += 1
+    return sorted(groups.values(), key=lambda item: (-item["count"], item["handling"], item["reason"]))
 
 
 @dataclass
@@ -202,9 +236,9 @@ class ReplaceImageOutcome:
     def summary_line(self) -> str:
         if not self.ok:
             return "替换未完成：{0}".format(self.message or "未知原因")
-        return "已在 {0} 第 {1} 行替换为 {2}".format(
-            self.relPath, self.line or 0, self.imageRelPath
-        )
+        text = "已在 {0} 第 {1} 行替换为 {2}".format(
+            self.relPath, self.line or 0, self.imageRelPath)
+        return text + ("；" + self.message if self.message else "")
 
 
 def replace_placeholder_image(
@@ -226,6 +260,9 @@ def replace_placeholder_image(
         return outcome
     try:
         manifest = ProjectManifest.load(project_root)
+        if not manifest.is_writable():
+            outcome.message = "只读项目不能替换图片，正文与资源未改变"
+            return outcome
         paths = ProjectPaths(project_root)
         content_root = paths.resolve(manifest.relative_content_root())
     except Exception as exc:  # noqa: BLE001
@@ -244,7 +281,7 @@ def replace_placeholder_image(
     lines = target.read_text(encoding="utf-8").splitlines()
     index = _find_placeholder_line(lines, line)
     if index is None:
-        outcome.message = "未找到可替换的占位行"
+        outcome.message = "图片占位位置已变化或不唯一，请先重新定位；未替换其他位置"
         return outcome
 
     ext = source_image.suffix.lstrip(".").lower() or "png"
@@ -273,22 +310,25 @@ def replace_placeholder_image(
     outcome.ok = True
     outcome.imageRelPath = "images/" + image_name
     outcome.line = index + 1
-    outcome.updatedFindings = _mark_finding_resolved(project_root, rel_path, target)
+    try:
+        outcome.updatedFindings = _mark_finding_resolved(project_root, rel_path, target, line=index + 1)
+    except (OSError, ValueError) as exc:
+        outcome.message = "正文已替换；导入记录待更新（{0}），原未完成项仍保留".format(type(exc).__name__)
+    else:
+        if not outcome.updatedFindings:
+            outcome.message = "正文已替换；导入记录未能唯一对应，保留原未完成项供核对"
     return outcome
 
 
 def _find_placeholder_line(lines: Sequence[str], line: Optional[int]) -> Optional[int]:
+    def is_image(text):
+        return PLACEHOLDER_PREFIX in text and "图片" in text
     if line is not None:
         position = int(line) - 1
-        if 0 <= position < len(lines) and PLACEHOLDER_PREFIX in lines[position]:
-            return position
-    for position, text in enumerate(lines):
-        if PLACEHOLDER_PREFIX in text and "图片" in text:
-            return position
-    for position, text in enumerate(lines):
-        if PLACEHOLDER_PREFIX in text:
-            return position
-    return None
+        # A stale explicit anchor never falls through to another object.
+        return position if 0 <= position < len(lines) and is_image(lines[position]) else None
+    positions = [index for index, text in enumerate(lines) if is_image(text)]
+    return positions[0] if len(positions) == 1 else None
 
 
 def _rewrite_placeholder(
@@ -300,29 +340,44 @@ def _rewrite_placeholder(
     return rewritten
 
 
-def _mark_finding_resolved(project_root: Path, rel_path: str, target: Path) -> int:
-    """把该章节的图片占位事实改为“可编辑保留”，保持账本与界面数量一致。"""
+def _mark_finding_resolved(project_root: Path, rel_path: str, target: Path, *, line: Optional[int] = None) -> int:
+    """Resolve only one uniquely located image, never every gap in its chapter."""
     record = read_import_record(project_root)
     if record is None:
         return 0
-    changed = 0
-    chapter_title = Path(rel_path).parent.name
-    for item in record.findings:
-        if item.feature != "image" or item.handling != HANDLING_PLACEHOLDER:
-            continue
-        if item.target_chapter and _norm(item.target_chapter) not in _norm(chapter_title):
-            continue
-        item.handling = HANDLING_EDITABLE
-        item.editable = True
-        item.detail = (item.detail or "") + "；已由用户替换为项目内图片"
-        changed += 1
-    if changed:
-        write_import_record(project_root, record)
-    return changed
+    def path_key(value):
+        return Path(str(value).replace(chr(92), "/")).as_posix()
+    wanted = path_key(rel_path)
+    pending = [item for item in record.findings
+               if item.feature == "image" and item.handling == HANDLING_PLACEHOLDER]
+    exact = [item for item in pending if item.target_path
+             and path_key(item.target_path) == wanted and item.target_line == line]
+    if len(exact) == 1:
+        selected = exact[0]
+    elif exact:
+        return 0  # ambiguous records must not become an invented clean state
+    else:
+        # Older records sometimes only locate the chapter. Keep compatibility
+        # only when the remaining body and the candidate are both unambiguous.
+        if any(PLACEHOLDER_PREFIX in text and "图片" in text
+               for text in target.read_text(encoding="utf-8").splitlines()):
+            return 0
+        candidates = [item for item in pending if not item.target_line
+            and ((item.target_path and path_key(item.target_path) == wanted)
+                 or (not item.target_path and item.target_chapter
+                     and resolve_chapter_rel_path(project_root, item.target_chapter) == wanted))]
+        if len(candidates) != 1:
+            return 0
+        selected = candidates[0]
+    selected.handling = HANDLING_EDITABLE
+    selected.editable = True
+    selected.detail = (selected.detail or "") + "；已由用户替换为项目内图片"
+    write_import_record(project_root, record)
+    return 1
 
 
 __all__ = [
     "ACTION_LOCATE", "ACTION_VIEW_ORIGINAL", "ACTION_REPLACE_IMAGE",
     "ResultAction", "IntakeResultPage", "ReplaceImageOutcome",
-    "build_result_page", "resolve_chapter_rel_path", "replace_placeholder_image",
+    "build_result_page", "resolve_chapter_rel_path", "replace_placeholder_image", "summarize_followups",
 ]

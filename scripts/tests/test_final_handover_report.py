@@ -24,11 +24,22 @@ class FinalHandoverReportTests(unittest.TestCase):
 
         cls.junit = latest_junit()
         cls.expected = build_report(cls.junit)
-        REPORT.write_text(cls.expected, encoding="utf-8")
+        cls._repository_report_bytes = REPORT.read_bytes()
+        scratch = REPO_ROOT / "tmp"
+        scratch.mkdir(exist_ok=True)
+        cls._report_fixture = TemporaryDirectory(prefix="handover-report-fixture-", dir=scratch)
+        cls.addClassCleanup(cls._report_fixture.cleanup)
+        cls.generated_report = Path(cls._report_fixture.name) / "product-v3-final-report.md"
+        cls.generated_report.write_text(cls.expected, encoding="utf-8")
 
     def setUp(self):
-        self.assertTrue(REPORT.is_file(), "缺少最终交接报告")
-        self.text = REPORT.read_text(encoding="utf-8")
+        self.assertTrue(REPORT.is_file(), "缺少仓库中的最终交接报告/链接目标")
+        self.assertTrue(self.generated_report.is_file(), "缺少本次生成的隔离报告 fixture")
+        self.text = self.generated_report.read_text(encoding="utf-8")
+
+    def test_fixture_never_rewrites_repository_report(self):
+        self.assertEqual(REPORT.read_bytes(), self._repository_report_bytes,
+                         "默认测试不能刷新/改写仓库中的历史交接报告")
 
     @staticmethod
     def _without_timestamp(text: str) -> str:

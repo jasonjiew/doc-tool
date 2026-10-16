@@ -30,7 +30,7 @@ from doc_tool.application.content.unsaved import UnsavedChoice  # noqa: E402
 from doc_tool.ui.main_window import MainWindow  # noqa: E402
 
 #: 几何证据文件（与执行台账里的记录路径一致）。
-EVIDENCE_PATH = REPO_ROOT / "analysis" / "ui-polish-B-geometry.txt"
+EVIDENCE_PATH = Path(os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT", str(REPO_ROOT / "analysis"))) / "ui-polish-B-geometry.txt"
 
 #: 正文控件目标（逻辑像素）：1280×720 默认单栏。
 BODY_TARGET = (560, 320)

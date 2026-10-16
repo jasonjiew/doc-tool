@@ -174,6 +174,11 @@ DEFAULT_TESTS = [
     "test_smart_mainflow_features.py",
     "test_split_rules_and_policy.py",
     "test_review_20261015_regressions.py",
+    "test_mainflow_quality.py",
+    "test_mainflow_intelligence_safety.py",
+    "test_mainflow_intelligence.py",
+    "test_mainflow_intelligence_evidence.py",
+    "test_mainflow_intelligence_ai.py",
 ]
 
 

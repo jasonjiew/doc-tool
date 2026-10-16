@@ -88,4 +88,11 @@ def build_index_task(
     }
 
 
-__all__ = ["DEFAULT_BATCH_SIZE", "IndexStageEvent", "build_index_task"]
+def send_enhancement_task(gateway, preview, *, cancel_token=None, on_event=None):
+    if on_event is not None:
+        on_event(IndexStageEvent(stage="enhance", status="running", detail="发送已确认的单次增强请求"))
+    return gateway.enhance(preview.purpose, context_text=preview.text,
+                           prepared=preview, cancel_token=cancel_token)
+
+
+__all__ = ["DEFAULT_BATCH_SIZE", "IndexStageEvent", "build_index_task", "send_enhancement_task"]

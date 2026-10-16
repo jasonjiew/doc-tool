@@ -167,41 +167,34 @@ class ResultPageUiTests(unittest.TestCase):
         fixtures.cleanup(self.work)
 
     def test_action_buttons_call_real_services(self):
-        """结果窗口的替换动作复用既有资源修复服务（真实服务调用）。"""
-        clicked_actions = []
-
-        def _fake_replace(project_root, rel_path, source, line=None):
-            clicked_actions.append((rel_path, str(source)))
-
-            class _Outcome:
-                ok = True
-
-                def summary_line(self):
-                    return "已替换"
-
-            return _Outcome()
-
+        """已打开同项目的结果页回调调用真实修复服务，并读回实际账本。"""
+        from doc_tool.application.intake_result_page import replace_placeholder_image
+        from doc_tool.application.project_service import ProjectSummary
+        from doc_tool.domain.manifest import ProjectManifest
+        from doc_tool.domain.paths import ProjectPaths
+        self.window._project_summary = ProjectSummary(
+            manifest=ProjectManifest.load(self.project), paths=ProjectPaths(self.project),
+            project_root=self.project, is_writable=True, source_exists=True,
+            template_exists=True, content_exists=True, output_exists=True)
+        before = read_import_record(self.project).to_fix_count()
         with patch(
             "doc_tool.ui.main_window.QFileDialog.getOpenFileName",
-            return_value=(str(self.work / "a.png"), ""),
-        ), patch(
-            "doc_tool.application.intake_result_page.replace_placeholder_image", _fake_replace
-        ):
+            return_value=(str(self.work / "a.png"), "")), patch(
+            "doc_tool.application.intake_result_page.replace_placeholder_image",
+            wraps=replace_placeholder_image) as repair:
             self.window._show_intake_result_page(str(self.project))
             window = self.window._intake_result_window
-            self.assertIsNotNone(window, "结果窗口应已打开")
+            self.assertIsNotNone(window)
             self.assertFalse(window.isModal())
-            # 选中第一条占位事实（替换动作仅对占位项可用）
-            target_row = None
-            for row in range(window._table.rowCount()):
-                if window._rows_cache[row].get("handling") == "placeholder":
-                    target_row = row
-                    break
-            self.assertIsNotNone(target_row, "缺图项目应至少有一条占位事实")
+            target_row = next((row for row in range(window._table.rowCount())
+                if window._rows_cache[row].get("handling") == "placeholder"), None)
+            self.assertIsNotNone(target_row)
             window._table.selectRow(target_row)
             self.assertTrue(window._replace_btn.isEnabled())
             window._on_replace_image()
-        self.assertTrue(clicked_actions, "结果窗口动作应调用替换图片服务")
+        repair.assert_called_once()
+        self.assertEqual(read_import_record(self.project).to_fix_count(), before - 1)
+        self.assertEqual(window._page.toFix, before - 1)
 
     def test_details_view_shows_full_facts(self):
         """完整处理事实在同一个非模态窗口里可查（不再截断到 40 项）。"""

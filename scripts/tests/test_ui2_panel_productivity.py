@@ -244,7 +244,7 @@ class AdvancedPanelContextTests(unittest.TestCase):
         ):
             self.assertTrue(widget.isVisible())
         labels = [panel._tabs.tabText(i) for i in range(panel._tabs.count())]
-        self.assertEqual(labels, ["资料", "建议"])
+        self.assertEqual(labels, ["资料", "建议", "增强候选"])
         panel.close()
 
     def test_batch_form_partial_invalid_members_and_cancel_keeps_input(self):

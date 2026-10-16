@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from typing import Dict, List, Optional
+from doc_tool.application.intake_contract import HANDLING_LABELS
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -45,6 +46,7 @@ class IntakeResultWindow(QDialog):
         self._filtered: List[Dict[str, object]] = list(self._rows)
         self._page_index = 0
         self._kind_filter = ""
+        self._handling_filter = ""
 
         self.setWindowTitle("导入结果与待处理项")
         self.setModal(False)
@@ -56,7 +58,15 @@ class IntakeResultWindow(QDialog):
         header = QLabel("\n".join(page.summary or ["项目已生成，可直接编辑"]), self)
         header.setWordWrap(True)
         header.setObjectName("intakeSummary")
+        header.setTextFormat(Qt.TextFormat.PlainText)
+        self._summary_header = header
         layout.addWidget(header)
+        self._followups = QLabel(self)
+        self._followups.setObjectName("intakeFollowUps")
+        self._followups.setTextFormat(Qt.TextFormat.PlainText)
+        self._followups.setWordWrap(True)
+        self._refresh_followups()
+        layout.addWidget(self._followups)
 
         self._counts = QLabel("", self)
         self._counts.setObjectName("statusMuted")
@@ -74,6 +84,13 @@ class IntakeResultWindow(QDialog):
                 self._kind_combo.addItem(feature, feature)
         self._kind_combo.currentIndexChanged.connect(self._on_kind_changed)
         filters.addWidget(self._kind_combo)
+        self._handling_combo = QComboBox(self)
+        self._handling_combo.setObjectName("intakeHandlingFilter")
+        self._handling_combo.addItem("全部处理方式", "")
+        for handling, label in HANDLING_LABELS.items():
+            self._handling_combo.addItem(label, handling)
+        self._handling_combo.currentIndexChanged.connect(self._on_handling_changed)
+        filters.addWidget(self._handling_combo)
         layout.addLayout(filters)
 
         self._table = QTableWidget(0, 5, self)
@@ -125,12 +142,25 @@ class IntakeResultWindow(QDialog):
         self._page_index = 0
         self._apply_filter()
 
+    def _refresh_followups(self) -> None:
+        groups = getattr(self._page, "followUps", [])
+        self._followups.setText("\n".join("{0} {1} 项 · 下一步：{2}".format(
+            item["reason"], item["count"], item["nextStep"]) for item in groups))
+        self._followups.setVisible(bool(groups))
+
+    def _on_handling_changed(self, _index: int) -> None:
+        self._handling_filter = str(self._handling_combo.currentData() or "")
+        self._page_index = 0
+        self._apply_filter()
+
     def _apply_filter(self) -> None:
         needle = self._search.text().strip().lower()
         self._filtered = []
         for item in self._rows:
             feature = str(item.get("feature") or "")
             if self._kind_filter and feature != self._kind_filter:
+                continue
+            if self._handling_filter and str(item.get("handling") or "") != self._handling_filter:
                 continue
             if needle:
                 haystack = " ".join(
@@ -242,6 +272,8 @@ class IntakeResultWindow(QDialog):
             return
         self._page = page
         self._rows = list(page.details or [])
+        self._summary_header.setText("\n".join(page.summary or ["项目已生成，可直接编辑"]))
+        self._refresh_followups()
         self._apply_filter()
 
     def selected_row_dict(self) -> Optional[Dict[str, object]]:

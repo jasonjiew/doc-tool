@@ -86,7 +86,8 @@ from doc_tool.ui.operation_loading_overlay import run_async_operation
 from doc_tool.ui.content.unsaved_prompt import confirm_unsaved_dialog
 
 
-def _index_service_for(content_root, *, state_dir: Optional[Path] = None) -> ContentIndexService:
+def _index_service_for(content_root, *, state_dir: Optional[Path] = None,
+                       override_texts: Optional[Dict[str, str]] = None) -> ContentIndexService:
     """构造内容索引服务（V3.6 36-B）：默认启用项目级派生缓存。
 
     缓存只加速“读盘后解析”，任何失败（不可写、损坏、关闭）都会回退到直接读取
@@ -101,9 +102,10 @@ def _index_service_for(content_root, *, state_dir: Optional[Path] = None) -> Con
             cache_path = Path(project_root) / ".state" / "cache" / _incremental.CACHE_NAME
         cache = _incremental.ChapterCache(cache_path, enabled=cache_path is not None)
         fingerprint = _incremental.config_fingerprint(project_root) if project_root is not None else ""
-        return ContentIndexService(content_root, cache=cache, config_fingerprint=fingerprint)
+        return ContentIndexService(content_root, cache=cache, config_fingerprint=fingerprint,
+                                   override_texts=override_texts)
     except Exception:  # noqa: BLE001 - 缓存不可用时退回无缓存索引，功能不受影响
-        return ContentIndexService(content_root)
+        return ContentIndexService(content_root, override_texts=override_texts)
 
 
 def build_content_context(
@@ -793,11 +795,14 @@ class ContentWorkspace(QWidget):
         if panel is not None:
             panel._on_export_draft()
 
-    def run_lint(self) -> None:
-        self._select_panel("检查")
+    def run_lint(self) -> bool:
+        self._select_panel("格式检查")
         panel = getattr(self, "_lint_panel", None)
-        if panel is not None:
-            panel.run_check()
+        if panel is None:
+            if self._on_status is not None:
+                self._on_status("内容索引尚未就绪，本次检查未执行；稍后可按 F5 重试。")
+            return False
+        return bool(panel.run_check())
 
     def _on_lint_issues(self, issues) -> None:
         document_type = ""
@@ -815,10 +820,15 @@ class ContentWorkspace(QWidget):
         if panel is not None:
             panel.set_baseline_issues(previous)
             panel.set_check_context(
-                scope_text="当前内容索引的全部正文",
-                checked_at=time.strftime("%Y-%m-%d %H:%M:%S"),
-                staleness="fresh",
+                scope_text=(getattr(getattr(self, "_lint_panel", None), "_scope_note", "未知范围") +
+                            ("（含未保存正文）" if getattr(getattr(self, "_lint_panel", None), "_text_overrides", {}) else "（已保存正文）")),
+                checked_at=getattr(getattr(self, "_lint_panel", None), "_checked_at", ""),
+                staleness=("fresh" if getattr(self, "_lint_panel", None) is not None and
+                           self._lint_panel.quality_facts().state in ("clean", "issues") else "unknown"),
             )
+        changed = getattr(self, "on_quality_changed", None)
+        if callable(changed):
+            changed()
 
     def refresh_issues(
         self,
@@ -1515,10 +1525,9 @@ class ContentWorkspace(QWidget):
         复用同一份索引服务（含派生缓存），只对命中缓冲的章节改用内存文本，
         因此「当前章/所选章」检查看到的是真实当前内容，且不写盘、不改脏状态。
         """
-        service = _index_service_for(self._content_root, state_dir=self._state_dir)
-        index = service.build(
-            save_cache=False, override_texts=dict(overrides or {})
-        )
+        service = _index_service_for(self._content_root, state_dir=self._state_dir,
+                                     override_texts=dict(overrides or {}))
+        index = service.build(save_cache=False)
         if scope_paths is not None:
             allowed = set(scope_paths)
             for mapping in (index.files, index.lines, index.headings, index.references):

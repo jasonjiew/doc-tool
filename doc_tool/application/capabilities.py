@@ -39,6 +39,10 @@ def get_capabilities_report() -> Dict[str, Any]:
             "supported": list(SUPPORTED_PROJECT_SCHEMA_VERSIONS),
         },
         "commands": [
+            {"name": "mainflow-advice", "description": "派生离线下一步建议，仅查询已保存正文；不表示业务批准",
+             "readOnly": True, "options": ["--project", "--output", "--no-check"],
+             "exitCodes": {"0": "只读查询完成（不等于质量通过）", "2": "项目或查询不可用"},
+             "requiresWord": False, "requiresModel": False, "sourceMode": "saved"},
             {
                 "name": "capabilities",
                 "description": "显示工具版本、固化构建来源、支持命令与环境契约",

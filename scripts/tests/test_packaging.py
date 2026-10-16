@@ -34,6 +34,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 class SigningConfigurationTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt", "PowerShell signing configuration")
+    @unittest.skipUnless(
+        os.environ.get("DOC_TOOL_TEST_NATIVE_SIGNING") == "1",
+        "本机签名脚本集成需显式 DOC_TOOL_TEST_NATIVE_SIGNING=1；不覆写执行策略",
+    )
     def test_signing_skips_missing_config_and_rejects_repo_private_key(self):
         import subprocess
 
@@ -43,7 +47,7 @@ class SigningConfigurationTests(unittest.TestCase):
             env.pop("CODE_SIGNING_PFX", None)
             env.pop("CODE_SIGNING_PASSWORD", None)
             env["CODE_SIGNING_DIR"] = external
-            command = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+            command = ["powershell", "-NoProfile", "-File", script,
                        "-Target", str(Path(external) / "unused.exe")]
             skipped = subprocess.run(command, env=env, capture_output=True, timeout=15)
             self.assertEqual(skipped.returncode, 0)

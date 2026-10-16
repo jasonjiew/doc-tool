@@ -109,14 +109,14 @@ class ExportRoundView:
     def pending_formats(self) -> List[RoundFormatView]:
         return [
             item for item in self.formats
-            if item.status in ("pending-refresh", "pending-convert")
+            if item.status in ("pending-refresh", "pending-convert", "pending-registration")
         ]
 
     @property
     def has_retryable(self) -> bool:
         """是否还有可补的格式（失败或待刷新/待转换）。"""
         return any(
-            item.status in ("failed", "pending-convert", "pending-refresh")
+            item.status in ("failed", "pending-convert", "pending-refresh", "pending-registration")
             for item in self.formats
         )
 

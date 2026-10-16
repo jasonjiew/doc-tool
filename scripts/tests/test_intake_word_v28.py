@@ -77,13 +77,50 @@ class PreviewTests(unittest.TestCase):
 
 class IntakeTests(unittest.TestCase):
     def setUp(self):
+        from core_fixtures import standard_docx
         self.tmp = Path(tempfile.mkdtemp(prefix="v28-intake-run-"))
         self.source = self.tmp / "source.docx"
-        shutil.copy2(TEMPLATE, self.source)
+        # A style template is not an authored source document. Exercise real headings.
+        standard_docx(self.source)
         self.project = self.tmp / "project"
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_preflight_style_to_level_mapping_reaches_the_existing_importer(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        preview = IntakePreview(heading_style_map={"Heading1": "1", "CustomTitle": "2", "OtherTitle": "2"})
+        failure = SimpleNamespace(success=False)
+        with patch("doc_tool.application.intake_word.preview_intake", return_value=preview):
+            with patch("doc_tool.application.import_project.import_first_time", return_value=failure) as importer:
+                result, returned = intake_word_project(self.source, self.project)
+        self.assertIs(result, failure)
+        self.assertIs(returned, preview)
+        self.assertEqual(importer.call_args.args[0].heading_style_map,
+                         {"Heading1": 1, "CustomTitle": 2, "OtherTitle": 2})
+
+    def test_no_heading_mapping_keeps_importer_auto_detection(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        with patch("doc_tool.application.intake_word.preview_intake", return_value=IntakePreview()):
+            with patch("doc_tool.application.import_project.import_first_time", return_value=SimpleNamespace(success=False)) as importer:
+                intake_word_project(self.source, self.project)
+        self.assertIsNone(importer.call_args.args[0].heading_style_map)
+
+    def test_valid_authored_source_also_imports_without_a_pack(self):
+        result, preview = intake_word_project(self.source, self.project, document_type="general")
+        self.assertTrue(result.success, (result.error_code, getattr(result, "error_message", "")))
+        self.assertTrue(preview.ok)
+        manifest = ProjectManifest.load(self.project)
+        self.assertFalse(manifest.standardPack)
+        self.assertTrue(any((self.project / "content").rglob("*.md")))
+
+    def test_preview_keeps_style_identity_in_its_json_contract(self):
+        preview = preview_intake(self.source, PACK)
+        self.assertIn("Heading1", preview.heading_style_map)
+        self.assertEqual(preview.heading_style_map["Heading1"], "1")
+        self.assertEqual(preview.to_dict()["headingStyleMap"], preview.heading_style_map)
 
     def test_invalid_pack_aborts_without_creating_project(self):
         bad = self.tmp / "bad-pack"
@@ -103,8 +140,7 @@ class IntakeTests(unittest.TestCase):
             document_name="接管样例",
         )
         self.assertIsNotNone(result)
-        if not getattr(result, "success", False):
-            self.skipTest("本机导入前置条件不足：{0}".format(getattr(result, "error_code", "")))
+        self.assertTrue(result.success, (result.error_code, getattr(result, "error_message", "")))
         manifest = ProjectManifest.load(self.project)
         self.assertEqual(manifest.standardPack.get("id"), "generic-requirement")
         self.assertTrue(manifest.standardPack.get("hash"))

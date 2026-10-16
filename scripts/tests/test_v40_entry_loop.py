@@ -56,6 +56,9 @@ class RealWordFormalTests(_ExportFixture):
 
     def setUp(self):
         super().setUp()
+        import os
+        if os.environ.get("V40_REAL_WORD") != "1":
+            self.skipTest("真实 Word 为显式实机项：设置 V40_REAL_WORD=1 后执行")
         from doc_tool.application.word_check import check_word_available
 
         probe = check_word_available(dispatch_timeout_seconds=15)

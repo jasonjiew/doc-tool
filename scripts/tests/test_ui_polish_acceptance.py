@@ -32,9 +32,9 @@ from doc_tool.application.content.unsaved import UnsavedChoice  # noqa: E402
 from doc_tool.application.effective_snapshot import discover_chapters  # noqa: E402
 from doc_tool.ui.main_window import MainWindow  # noqa: E402
 
-EVIDENCE_ROOT = REPO_ROOT / "analysis" / "ui-polish-acceptance"
-GEOMETRY_FILE = REPO_ROOT / "analysis" / "ui-polish-5.2-geometry.txt"
-CLOSED_LOOP_FILE = REPO_ROOT / "analysis" / "ui-polish-5.1-closed-loop.txt"
+EVIDENCE_ROOT = Path(os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT", str(REPO_ROOT / "analysis"))) / "ui-polish-acceptance"
+GEOMETRY_FILE = Path(os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT", str(REPO_ROOT / "analysis"))) / "ui-polish-5.2-geometry.txt"
+CLOSED_LOOP_FILE = Path(os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT", str(REPO_ROOT / "analysis"))) / "ui-polish-5.1-closed-loop.txt"
 
 
 def _scale_tag() -> str:

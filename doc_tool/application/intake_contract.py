@@ -101,6 +101,7 @@ def normalize_formats(values: Iterable[str]) -> List[str]:
 # --- 格式结果状态 -----------------------------------------------------------
 
 STATUS_READY = "ready"                        #: 已生成可打开产物
+STATUS_PENDING_REGISTRATION = "pending-registration"  #: 可读且已刷新，正式登记待完成
 STATUS_PENDING_REFRESH = "pending-refresh"    #: 可读稿已有，字段/页码待刷新
 STATUS_PENDING_CONVERT = "pending-convert"    #: 待转换（如缺 Word 的 PDF）
 STATUS_FAILED = "failed"
@@ -108,7 +109,7 @@ STATUS_CANCELLED = "cancelled"
 STATUS_SKIPPED = "skipped"
 
 #: 视为“有可用产物”的状态：可打开、可交付。
-USABLE_STATUSES = (STATUS_READY, STATUS_PENDING_REFRESH, STATUS_PENDING_CONVERT)
+USABLE_STATUSES = (STATUS_READY, STATUS_PENDING_REFRESH, STATUS_PENDING_CONVERT, STATUS_PENDING_REGISTRATION)
 
 
 # --- 通用工具 ---------------------------------------------------------------
@@ -800,6 +801,7 @@ class FormatResult:
 FORMAT_STATUS_LABELS = {
     STATUS_READY: "已生成",
     STATUS_PENDING_REFRESH: "待刷新",
+    STATUS_PENDING_REGISTRATION: "待登记",
     STATUS_PENDING_CONVERT: "待转换",
     STATUS_FAILED: "失败",
     STATUS_CANCELLED: "已取消",

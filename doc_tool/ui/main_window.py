@@ -387,6 +387,7 @@ class MainWindow(QMainWindow):
         from doc_tool.ui.project_loading_overlay import ProjectLoadingOverlay
 
         self._loading_overlay = ProjectLoadingOverlay(self, dark=self._dark)
+        self._init_mainflow_advice()
 
     def _build_nav_bar(self) -> QWidget:
         """路径导航条（UI2-C 3.1/3.4）：后退/前进 + 真实章节路径 + 定位当前章。
@@ -564,10 +565,16 @@ class MainWindow(QMainWindow):
 
         # 操作
         ops_menu = menubar.addMenu("操作")
-        self._validate_action = QAction("项目检查", self)
+        self._validate_action = QAction("检查当前正文", self)
         self._validate_action.setShortcut(QKeySequence("F5"))
         self._validate_action.triggered.connect(self._on_validate)
         ops_menu.addAction(self._validate_action)
+        next_step = QAction("下一步建议（离线）", self)
+        next_step.triggered.connect(self._on_mainflow_panel)
+        ops_menu.addAction(next_step)
+        self._validate_output_action = QAction("验证已有 Word 成品（已保存来源）", self)
+        self._validate_output_action.triggered.connect(self._on_validate_output)
+        ops_menu.addAction(self._validate_output_action)
         ops_menu.addSeparator()
         self._diag_action = QAction("快速构建（无 Word）", self)
         self._diag_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
@@ -1202,25 +1209,46 @@ class MainWindow(QMainWindow):
         self._show_status_message("原件不存在：{0}（可继续编辑正文，或从来源重新导入）".format(retained))
 
     def _replace_intake_image(self, page, item, window=None) -> bool:
-        """用项目外图片替换占位（复用资产入库与写入服务），成功返回 True。"""
+        """Repair only this saved target; never overwrite a dirty/readonly/old project."""
         from doc_tool.application.intake_result_page import replace_placeholder_image
-
+        rel_path = str(item.get("target_path") or "").replace(chr(92), "/")
+        def allowed():
+            summary = self._project_summary
+            if summary is None or not summary.is_writable:
+                self._show_status_message("只读或未打开项目，不能替换图片。")
+                return False
+            if Path(summary.project_root).resolve() != Path(str(page.projectRoot or "")).resolve():
+                self._show_status_message("结果页不属于当前项目，未替换图片。")
+                return False
+            try:
+                buffers = self._collect_assist_buffer_texts()
+            except Exception as exc:
+                self._show_status_message("当前编辑内容不可读取，未替换图片：{0}".format(exc))
+                return False
+            if rel_path in buffers:
+                self._show_status_message("目标章有未保存编辑；先保存或核对该章再替换，不自动保存或覆盖正文。")
+                return False
+            return True
+        if not allowed():
+            return False
         chosen, _selected = QFileDialog.getOpenFileName(
             self, "选择替代图片", "",
-            "图片 (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;所有文件 (*)",
-        )
-        if not chosen:
+            "图片 (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;所有文件 (*)")
+        if not chosen or not allowed():
             return False
         outcome = replace_placeholder_image(
-            str(page.projectRoot or ""), str(item.get("target_path") or ""), chosen,
-            line=item.get("target_line") if isinstance(item.get("target_line"), int) else None,
-        )
-        self._show_status_message(outcome.summary_line())
-        if outcome.ok and getattr(self, "_content_workspace", None) is not None:
+            str(page.projectRoot or ""), rel_path, chosen,
+            line=item.get("target_line") if isinstance(item.get("target_line"), int) else None)
+        workspace = getattr(self, "_content_workspace", None)
+        if outcome.ok and workspace is not None:
             try:
-                self._content_workspace._rebuild_index()
-            except Exception:  # noqa: BLE001 - 索引刷新失败不影响已替换的正文
-                pass
+                tabs = getattr(workspace, "tabs_host", None)
+                if tabs is not None:
+                    tabs.reload_file(rel_path)  # target was checked clean, not all open chapters
+                workspace._rebuild_index()
+            except Exception:
+                outcome.message += "；图片正文已保留，界面刷新未完成，请重新定位"
+        self._show_status_message(outcome.summary_line())
         return bool(outcome.ok)
 
     def _show_intake_details(self, page) -> None:
@@ -1230,7 +1258,7 @@ class MainWindow(QMainWindow):
     def _run_intake_action(self, project_root: str, action) -> None:
         """执行结果页动作：复用既有资源修复、章节定位与原件查看服务。"""
         from doc_tool.application.intake_result_page import (
-            ACTION_REPLACE_IMAGE, ACTION_VIEW_ORIGINAL, replace_placeholder_image,
+            ACTION_REPLACE_IMAGE, ACTION_VIEW_ORIGINAL,
         )
 
         if action.kind == ACTION_VIEW_ORIGINAL:
@@ -1241,21 +1269,9 @@ class MainWindow(QMainWindow):
                 self._show_status_message("原件不存在：{0}".format(target))
             return
         if action.kind == ACTION_REPLACE_IMAGE:
-            chosen, _selected = QFileDialog.getOpenFileName(
-                self, "选择替代图片", "",
-                "图片 (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;所有文件 (*)",
-            )
-            if not chosen:
-                return
-            outcome = replace_placeholder_image(
-                project_root, action.relPath, chosen, line=action.line,
-            )
-            self._show_status_message(outcome.summary_line())
-            if outcome.ok and getattr(self, "_content_workspace", None) is not None:
-                try:
-                    self._content_workspace._rebuild_index()
-                except Exception:  # noqa: BLE001 - 索引刷新失败不影响已替换的正文
-                    pass
+            from doc_tool.application.intake_result_page import IntakeResultPage
+            self._replace_intake_image(IntakeResultPage(projectRoot=project_root),
+                {"target_path": action.relPath, "target_line": action.line})
             return
         rel_path = action.relPath
         if rel_path and self._open_chapter_in_workspace(
@@ -2096,8 +2112,176 @@ class MainWindow(QMainWindow):
             result_available=bool(self._result_state.is_terminal),
         )
         self._apply_workbench_state(state)
+        self._refresh_mainflow_advice()
 
     # --- 最近项目 ---
+
+    def _init_mainflow_advice(self) -> None:
+        from PySide6.QtWidgets import QToolButton, QMenu
+        self._mainflow_primary_request = None
+        button = QToolButton(self)
+        button.setObjectName("mainflowNextButton")
+        button.setMaximumWidth(250)
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        menu = QMenu(button)
+        button.setMenu(menu)
+        menu.aboutToShow.connect(self._refresh_mainflow_advice)
+        button.clicked.connect(self._on_mainflow_primary)
+        self._mainflow_next_button = button
+        self._mainflow_next_menu = menu
+        self.statusBar().addPermanentWidget(button)
+        button.hide()
+
+    def _mainflow_facts(self):
+        from doc_tool.application.mainflow_advice import MainflowFacts, QualityFacts, FormatFact
+        summary = self._project_summary
+        if summary is None:
+            return MainflowFacts(project_loaded=False)
+        workspace = getattr(self, "_content_workspace", None)
+        panel = getattr(workspace, "_lint_panel", None)
+        quality = panel.quality_facts() if panel is not None else QualityFacts()
+        buffers = self._collect_assist_buffer_texts()
+        root = str(summary.project_root)
+        view = self._export_rounds.latest(root)
+        formats = tuple(FormatFact(item.format, item.status, item.usable,
+                                   item.can_open, item.formal) for item in (view.formats if view else []))
+        from doc_tool.application.import_record import read_import_record
+        record = read_import_record(summary.project_root)
+        source_changed = None
+        # Existing reimport diagnosis is readonly; unknown remains unknown on failure.
+        try:
+            from doc_tool.application.content.reimport import ReimportService
+            source_changed = ReimportService(summary.manifest, summary.paths).source_changed()
+        except Exception:
+            pass
+        return MainflowFacts(running=bool(self.runner.is_running), read_only=not summary.is_writable,
+            source_mode="current-buffer" if buffers else "saved", unsaved_chapters=len(buffers),
+            quality=quality, import_attention=record.to_fix_count() if record else 0,
+            source_changed=source_changed, formats=formats, round_id=view.round_id if view else "",
+            round_source_mode=view.source_mode if view else "unknown",
+            round_scope_text=view.scope_text if view else "未知范围")
+
+    def _refresh_mainflow_advice(self):
+        button = getattr(self, "_mainflow_next_button", None)
+        if button is None:
+            return None
+        from doc_tool.application.mainflow_advice import derive_advice
+        try:
+            project_root = str(Path(self._project_summary.project_root).resolve()) if self._project_summary else ""
+            report = derive_advice(self._mainflow_facts())
+        except Exception as exc:
+            button.setText("下一步：状态待刷新")
+            button.setToolTip("当前事实暂不可读取，未推断检查通过：{0}".format(exc))
+            button.setVisible(self._project_summary is not None)
+            button.setEnabled(False)
+            self._mainflow_primary_request = None
+            self._mainflow_next_menu.clear()
+            panel = getattr(getattr(self, "_content_workspace", None), "_mainflow_advice_panel", None)
+            if panel is not None:
+                panel.set_report(None)
+            return None
+        primary = report.primary
+        self._mainflow_primary_request = (primary.action, project_root, primary.round_id) if primary else None
+        button.setEnabled(primary is not None)
+        button.setVisible(self._project_summary is not None)
+        button.setText("下一步：" + (primary.label if primary else "继续编辑"))
+        button.setToolTip((primary.reason if primary else "") + "\n来源：{0}；检查范围：{1}".format(
+            report.facts.source_mode, report.facts.quality.scope_text))
+        menu = self._mainflow_next_menu
+        menu.clear()
+        for step in report.steps:
+            action = menu.addAction(step.label)
+            action.setToolTip(step.reason)
+            action.triggered.connect(
+                lambda _checked=False, key=step.action, root=project_root, round_id=step.round_id:
+                    self._on_mainflow_action(key, root, round_id)
+            )
+        menu.addSeparator()
+        menu.addAction("查看建议依据…", self._on_mainflow_panel)
+        panel = getattr(getattr(self, "_content_workspace", None), "_mainflow_advice_panel", None)
+        if panel is not None:
+            panel.set_report(report, project_root)
+        return report
+
+    def _on_mainflow_primary(self) -> None:
+        # Execute the displayed intent, not a different primary chosen at click time.
+        request = getattr(self, "_mainflow_primary_request", None)
+        if request is not None:
+            self._on_mainflow_action(*request)
+
+    def _on_mainflow_issues(self) -> None:
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is not None:
+            workspace._select_panel("格式检查")
+            self._show_panels_dock()
+
+    def _on_mainflow_panel(self) -> None:
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is None:
+            self._show_status_message("先打开项目，再查看离线下一步建议。")
+            return
+        from doc_tool.ui.mainflow_advice_panel import MainflowAdvicePanel
+        panel = getattr(workspace, "_mainflow_advice_panel", None)
+        if panel is None:
+            panel = MainflowAdvicePanel(workspace.panels_host)
+            panel.action_requested.connect(self._on_mainflow_action)
+            workspace._mainflow_advice_panel = panel
+            workspace._panels.addTab(panel, "下一步")
+        self._refresh_mainflow_advice()
+        workspace._select_panel("下一步")
+        self._show_panels_dock()
+
+    def _on_mainflow_action(self, action_id: str, expected_project_root: str = "",
+                            expected_round_id: str = "") -> bool:
+        from doc_tool.application.mainflow_advice import ALLOWED_ACTIONS, derive_advice
+        if action_id not in ALLOWED_ACTIONS:
+            self._show_status_message("不支持的建议动作，未执行。")
+            return False
+        try:
+            summary = self._project_summary
+            if summary is not None:
+                if not expected_project_root or Path(expected_project_root).resolve() != Path(summary.project_root).resolve():
+                    self._show_status_message("建议所属项目已变化或缺少项目标识，未执行；请重新查看建议。")
+                    self._refresh_mainflow_advice()
+                    return False
+            elif expected_project_root or action_id != "open-project":
+                self._show_status_message("原项目已关闭，未执行旧建议。")
+                return False
+            report = derive_advice(self._mainflow_facts())  # never execute a stale menu snapshot
+        except Exception as exc:
+            self._show_status_message("状态不可读取，未执行建议动作：{0}".format(exc))
+            return False
+        if action_id not in {step.action for step in report.steps}:
+            self._refresh_mainflow_advice()
+            self._show_status_message("状态已变化，建议已刷新；本次未启动旧动作。")
+            return False
+        if action_id in ("retry-round", "show-results") and (
+            not expected_round_id or expected_round_id != report.facts.round_id
+        ):
+            self._show_status_message("建议所属轮次已变化或缺少轮次标识，未执行；请重新查看成果。")
+            self._refresh_mainflow_advice()
+            return False
+        handlers = {
+            "check-current": self._on_validate,
+            "show-issues": self._on_mainflow_issues,
+            "rule-settings": self._on_project_settings,
+            "import-result": self.reopen_intake_result,
+            "show-results": self._on_show_results,
+            "new-export": self._on_export_settings,
+            "revision-preview": self._on_reimport_source,
+            "show-progress": lambda: self._task_dock_widget.show(),
+            "open-project": self._on_open_project,
+        }
+        if action_id == "retry-round":
+            view = self._export_rounds.latest(str(self._project_summary.project_root))
+            if view is None or view.round_id != expected_round_id:
+                self._show_status_message("原轮已变化，未补错轮；请重新查看成果。")
+                return False
+            self._on_retry_export_round(view)
+        else:
+            handlers[action_id]()
+        self._refresh_mainflow_advice()
+        return True
 
     def _refresh_recent_projects(self) -> None:
         from doc_tool.application.project_service import load_recent_projects
@@ -2186,6 +2370,7 @@ class MainWindow(QMainWindow):
                 from doc_tool.application.content.reimport import ReimportService
                 if ReimportService(summary.manifest, summary.paths).source_changed():
                     self._status_label.setText("检测到源 Word 已变化，可从工具菜单重新导入")
+                self._refresh_mainflow_advice()
             except (OSError, AttributeError):
                 pass
         QTimer.singleShot(150, _check_source_reimport)
@@ -2300,6 +2485,8 @@ class MainWindow(QMainWindow):
             on_stage=lambda s: self._loading_overlay.show_stage(s) if hasattr(self, "_loading_overlay") else None,
             unsaved_resolver=self._unsaved_resolver,
         )
+
+        self._content_workspace.on_quality_changed = self._refresh_mainflow_advice
 
         # 左侧章节树 Dock
         self._tree_dock = QDockWidget("章节树", self)
@@ -2541,7 +2728,7 @@ class MainWindow(QMainWindow):
             return
         self._show_panels_dock()
         # index 1..5：1=搜索,2=替换,3=重命名,4=检查,5=改动
-        names = ["搜索", "替换", "重命名/重编号", "检查", "改动"]
+        names = ["搜索", "替换", "重命名/重编号", "格式检查", "改动"]
         if 1 <= index <= len(names):
             target = names[index - 1]
             for i in range(panels.count()):
@@ -2837,6 +3024,26 @@ class MainWindow(QMainWindow):
         self._append_log("ℹ 提示：本地尚未生成 Word 产物，已自动执行【Markdown 源码与结构检查】。")
 
     def _on_validate(self) -> None:
+        """F5 checks what the author is editing, never an implicitly selected old DOCX."""
+        if not self._project_summary or self.runner.is_running:
+            return
+        workspace = getattr(self, "_content_workspace", None)
+        run_lint = getattr(workspace, "run_lint", None)
+        if callable(run_lint):
+            attempted = run_lint()
+            self._show_status_message(
+                "当前正文检查尚未完成，详见格式检查面板（未保存内容不会自动落盘）"
+                if attempted is False else
+                "当前正文检查结果已更新；实际范围、来源和执行事实见格式检查面板"
+            )
+            refresh = getattr(self, "_refresh_mainflow_advice", None)
+            if callable(refresh):
+                refresh()
+            return
+        # No editor workspace exists: this is explicitly a saved-source check.
+        self._run_source_content_check(self._project_summary)
+
+    def _on_validate_output(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
         summary = self._project_summary
@@ -3976,11 +4183,12 @@ class MainWindow(QMainWindow):
         from doc_tool.ui.assist_panel import AssistPanel
 
         try:
-            assistant = build_assistant(str(self._project_summary.project_root))
+            assistant = build_assistant(str(self._project_summary.project_root), read_only=not self._project_summary.is_writable)
+            assistant.buffer_provider = self._collect_assist_buffer_texts
         except Exception as exc:  # noqa: BLE001 - 辅助不可用不阻止编辑
             self._show_error("写作辅助不可用", str(exc))
             return
-        buffers = self._collect_buffer_texts()
+        buffers = self._collect_assist_buffer_texts()
         if buffers:
             try:
                 assistant.set_buffers(buffers)
@@ -4000,7 +4208,11 @@ class MainWindow(QMainWindow):
         )
         panel.insert_requested.connect(self._on_assist_insert_requested)
         panel.summary_candidate.connect(self._on_assist_summary_candidate)
-        panel.buffers_changed.connect(self._on_assist_buffers_changed)
+        panel.buffers_changed.connect(
+            lambda texts: self._on_assist_buffers_changed(
+                texts, expected_texts=panel.expected_buffer_texts,
+            )
+        )
         panel.status_message.connect(lambda message: self._show_status_message(message))
         self._assist_scope_roots = []
         dock = QDockWidget("资料搜索与建议", self)
@@ -4033,8 +4245,10 @@ class MainWindow(QMainWindow):
             assistant = build_assistant(
                 str(self._project_summary.project_root),
                 module_roots=self._assist_scope_roots,
+                read_only=not self._project_summary.is_writable,
             )
-            buffers = self._collect_buffer_texts()
+            assistant.buffer_provider = self._collect_assist_buffer_texts
+            buffers = self._collect_assist_buffer_texts()
             if buffers:
                 assistant.set_buffers(buffers)
             panel.set_assistant(assistant)
@@ -4084,6 +4298,10 @@ class MainWindow(QMainWindow):
         """把引用/正文插入当前编辑器光标处；一次操作进入撤销栈。"""
         if not text:
             return
+        summary = getattr(self, "_project_summary", None)
+        if summary is not None and not getattr(summary, "is_writable", True):
+            self._show_status_message("只读项目可查看/复制候选，不写正文或修订记录。")
+            return
         workspace = getattr(self, "_content_workspace", None)
         editor = workspace.current_editor() if workspace is not None else None
         target = getattr(editor, "_editor", None)
@@ -4091,7 +4309,9 @@ class MainWindow(QMainWindow):
             self._show_status_message("没有打开的章节：请先打开要插入的章节")
             return
         cursor = target.textCursor()
+        cursor.beginEditBlock()
         cursor.insertText(text)
+        cursor.endEditBlock()
         target.setTextCursor(cursor)
         target.setFocus()
         self._show_status_message(
@@ -4115,9 +4335,13 @@ class MainWindow(QMainWindow):
             value = value[len(document_type) + 1:]
         return value
 
-    def _on_assist_buffers_changed(self, texts) -> None:
+    def _on_assist_buffers_changed(self, texts, *, expected_texts=None) -> None:
         """采纳/撤销后把缓冲写回编辑器：整篇替换记为**一个撤销步**，并标脏保存路径不变。"""
         if not isinstance(texts, dict) or not texts:
+            return
+        summary = getattr(self, "_project_summary", None)
+        if summary is not None and not getattr(summary, "is_writable", True):
+            self._show_status_message("只读项目不写入助手采纳结果。")
             return
         from PySide6.QtGui import QTextCursor
 
@@ -4157,7 +4381,13 @@ class MainWindow(QMainWindow):
             target = getattr(editor, "_editor", None) or editor
             if target is None or not hasattr(target, "textCursor"):
                 continue
-            if target.toPlainText() == str(raw_text):
+            current_text = target.toPlainText()
+            if expected_texts is not None and (
+                raw_path not in expected_texts or current_text != expected_texts[raw_path]
+            ):
+                self._show_status_message("章节在预览后已变化，保留当前编辑并跳过：{0}".format(rel_path))
+                continue
+            if current_text == str(raw_text):
                 continue
             cursor = target.textCursor()
             cursor.beginEditBlock()
@@ -4205,6 +4435,10 @@ class MainWindow(QMainWindow):
         """修订摘要候选只填既有修订记录，不新建发布状态。"""
         if not text:
             return
+        summary = getattr(self, "_project_summary", None)
+        if summary is not None and not getattr(summary, "is_writable", True):
+            self._show_status_message("只读项目可查看/复制候选，不写正文或修订记录。")
+            return
         workspace = getattr(self, "_content_workspace", None)
         tabs = getattr(workspace, "tabs_host", None)
         filled = False
@@ -4242,6 +4476,27 @@ class MainWindow(QMainWindow):
             self._show_status_message("修订记录未打开：摘要候选已复制到剪贴板，可粘贴后核对")
 
     # --- CORE-F：统一出稿入口与结果直接动作 ---
+
+    def _collect_assist_buffer_texts(self) -> Dict[str, str]:
+        """Assistant indexes use workspace-relative paths, not the export path aliases.
+
+        Unlike optional export metadata collection, unreadable dirty text is an error:
+        a cross-panel edit must never fall back to an older snapshot silently.
+        """
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None)
+        if tabs is None:
+            return {}
+        result = {}
+        for rel in tabs.open_rel_paths():
+            editor = tabs.editor_for(rel)
+            if editor is None or not editor.is_dirty():
+                continue
+            text = editor.plain_text()
+            if not isinstance(text, str):
+                raise RuntimeError("无法读取当前章节：{0}".format(rel))
+            result[str(rel).replace(chr(92), "/")] = text
+        return result
 
     def _collect_buffer_texts(self) -> Dict[str, str]:
         """收集编辑器缓冲（未保存修改），供“当前内容”出稿使用。
@@ -4580,7 +4835,7 @@ class MainWindow(QMainWindow):
             return
         pending = [
             item.format for item in view.formats
-            if item.status in ("failed", "pending-convert", "pending-refresh")
+            if item.status in ("failed", "pending-convert", "pending-refresh", "pending-registration")
         ]
         if not pending:
             self._show_status_message("本轮没有需要补的格式")

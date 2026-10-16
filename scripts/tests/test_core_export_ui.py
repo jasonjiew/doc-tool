@@ -283,3 +283,7 @@ class ChangeDirectoryActionTests(unittest.TestCase):
             "已保存来源不应注入编辑器缓冲内容",
         )
         self.assertEqual(captured["source_mode"], SOURCE_MODE_SAVED)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

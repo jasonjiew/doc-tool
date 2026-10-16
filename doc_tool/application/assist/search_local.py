@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import json
+import heapq
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -301,6 +303,8 @@ class SearchHit:
     stale: bool = False
     unsaved: bool = False
     origin: str = "saved"
+    rank_score: int = 0
+    rank_reasons: Tuple[str, ...] = ()
 
     @property
     def location_label(self) -> str:
@@ -332,6 +336,8 @@ class SearchHit:
             "stale": self.stale,
             "unsaved": self.unsaved,
             "location": self.location_label,
+            "rankScore": self.rank_score, "rankReasons": list(self.rank_reasons),
+            "freshness": "stale" if self.stale else "current-buffer" if self.unsaved else "saved-snapshot",
         }
 
 
@@ -694,36 +700,52 @@ class LocalEvidenceSearch:
         # 去重，避免同一处内容被报两次（V3.3 1.4）。
         seen_hits: set = set()
         deduped = 0
-        for document in self._sorted_documents():
-            if document.origin == "buffer" and not include_buffers:
-                continue
-            if allowed and document.document_type not in allowed:
-                continue
-            if self._cancelled(cancel_token):
-                cancelled = True
-                break
-            for line_no, line in enumerate(document.lines, start=1):
-                reason, matched = self._match_line(line, pattern, term_list, regex=regex)
-                if reason is None:
+        def candidates():
+            nonlocal cancelled, total, deduped
+            for document in self._sorted_documents():
+                if document.origin == "buffer" and not include_buffers:
                     continue
-                identity = (
-                    str(self._document_file_path(document) or document.rel_path),
-                    line_no,
-                    document.content_hash,
-                )
-                if identity in seen_hits:
-                    deduped += 1
+                if allowed and document.document_type not in allowed:
                     continue
-                seen_hits.add(identity)
-                total += 1
-                files.add(document.key)
-                if len(hits) < outcome.limit:
-                    hits.append(SearchHit(
+                if self._cancelled(cancel_token):
+                    cancelled = True
+                    break
+                # Freeze physical location once per document. Re-statting the
+                # source root per matching line made high-hit scopes needlessly slow.
+                document_path = str(self._document_file_path(document) or "")
+                in_fence = False
+                fence_char, fence_size = "", 0
+                for line_no, line in enumerate(document.lines, start=1):
+                    if (line_no - 1) % 128 == 0 and self._cancelled(cancel_token):
+                        cancelled = True
+                        break
+                    fence = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+                    if fence:
+                        marker = fence.group(1)
+                        if not in_fence:
+                            in_fence, fence_char, fence_size = True, marker[0], len(marker)
+                        elif marker[0] == fence_char and len(marker) >= fence_size:
+                            in_fence = False
+                    reason, matched = self._match_line(line, pattern, term_list, regex=regex)
+                    if reason is None:
+                        continue
+                    identity = (
+                        document_path or document.rel_path,
+                        line_no,
+                        document.content_hash,
+                    )
+                    if identity in seen_hits:
+                        deduped += 1
+                        continue
+                    seen_hits.add(identity)
+                    total += 1
+                    files.add(document.key)
+                    hit = SearchHit(
                         source_id=document.source_id,
                         source_kind=document.source_kind,
                         source_label=document.source_label,
                         rel_path=document.rel_path,
-                        file_path=str(self._document_file_path(document) or ""),
+                        file_path=document_path,
                         line_no=line_no,
                         text=line,
                         match_reason=reason,
@@ -734,8 +756,13 @@ class LocalEvidenceSearch:
                         stale=document.stale,
                         unsaved=document.unsaved,
                         origin=document.origin,
-                    ))
+                    )
+                    self._rank_hit(hit, text, regex=regex, heading=not in_fence)
+                    yield hit
+        hits = heapq.nsmallest(outcome.limit, candidates(), key=self._ranking_key)
         outcome.hits = hits
+        if hits:
+            outcome.notes.append("已按来源新鲜度、标题/标识符与文本相关性排序；同分顺序稳定。")
         outcome.total = total
         outcome.deduped = deduped
         if deduped:
@@ -749,7 +776,7 @@ class LocalEvidenceSearch:
         outcome.cancelled = cancelled or status.cancelled
         if outcome.truncated:
             outcome.notes.append(
-                "命中超过上限，已截断显示前 {0} 条（可缩小范围或提高上限）。".format(outcome.limit)
+                "命中超过上限，已截断显示相关性最高的 {0} 条（可缩小范围或提高上限）。".format(outcome.limit)
             )
         if outcome.stale_count:
             outcome.notes.append(
@@ -764,6 +791,43 @@ class LocalEvidenceSearch:
         return outcome
 
     # --- 引用/复制 ---
+
+    @staticmethod
+    def _rank_hit(hit: SearchHit, query: str, *, regex=False, heading=True) -> None:
+        """Deterministic lexical signals, not semantic approval or a new search engine."""
+        score, reasons = 1, [hit.match_label]
+        stripped = hit.text.strip()
+        query_text = query.casefold().strip()
+        title = re.match(r"^#{1,6}\s+(.+?)\s*#*\s*$", stripped) if heading else None
+        if title is not None:
+            score += 50
+            reasons.append("标题命中")
+            if query_text and not regex and title.group(1).casefold() == query_text:
+                score += 35
+                reasons.append("标题精确匹配")
+        elif query_text and not regex and stripped.casefold() == query_text:
+            score += 40
+            reasons.append("整行精确匹配")
+        if query_text and not regex and query_text in Path(hit.rel_path).stem.casefold():
+            score += 15
+            reasons.append("文件名匹配")
+        if not regex and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*-[A-Za-z0-9_-]+", query or ""):
+            if re.search(r"(?<![A-Za-z0-9_-])" + re.escape(query) + r"(?![A-Za-z0-9_-])", hit.text, re.I):
+                score += 100
+                reasons.append("完整标识符匹配")
+        if hit.match_reason == MATCH_REASON_TERM:
+            score += 10
+        if hit.unsaved:
+            score += 5
+            reasons.append("当前未保存缓冲")
+        if hit.stale:
+            reasons.append("来源已变化，须核对")
+        hit.rank_score, hit.rank_reasons = score, tuple(reasons)
+
+    @staticmethod
+    def _ranking_key(hit: SearchHit):
+        return (bool(hit.stale), -hit.rank_score, hit.source_label.casefold(),
+                path_natural_sort_key(hit.rel_path), hit.line_no, hit.source_id)
 
     def citation_text(self, hit: SearchHit) -> str:
         """带来源引用的普通文字（不产生任意文件 INCLUDE）。"""

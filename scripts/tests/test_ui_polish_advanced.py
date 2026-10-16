@@ -322,10 +322,12 @@ class AssistPanelFirstUseTests(unittest.TestCase):
     def test_tabs_exist_and_switch(self):
         panel = self._panel()
         titles = [panel._tabs.tabText(i) for i in range(panel._tabs.count())]
-        self.assertEqual(titles, ["资料", "建议"])
+        self.assertEqual(titles, ["资料", "建议", "增强候选"])
         self.assertEqual(panel.current_page(), "materials")
         panel.show_page("suggestions")
         self.assertEqual(panel.current_page(), "suggestions")
+        panel.show_page("enhanced")
+        self.assertEqual(panel.current_page(), "enhanced")
         panel.deleteLater()
 
     def test_actions_preserved_across_pages(self):

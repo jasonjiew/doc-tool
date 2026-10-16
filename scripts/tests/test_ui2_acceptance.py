@@ -37,7 +37,7 @@ from doc_tool.ui.export_rounds import ExportRoundView, RoundFormatView  # noqa: 
 from doc_tool.ui.export_settings_dialog import build_export_request  # noqa: E402
 from doc_tool.ui.main_window import MainWindow  # noqa: E402
 
-EVIDENCE_DIR = REPO_ROOT / "analysis" / "ui2-acceptance-20261002"
+EVIDENCE_DIR = Path(os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT", str(REPO_ROOT / "analysis"))) / "ui2-acceptance-20261002"
 GEOMETRY_FILE = EVIDENCE_DIR / "ui2-geometry.json"
 LOOP_FILE = EVIDENCE_DIR / "ui2-closed-loop.json"
 

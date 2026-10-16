@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")
 
+    advice_p = sub.add_parser("mainflow-advice", help="只读查询离线主流程下一步（仅已保存正文）")
+    advice_p.add_argument("--project", required=True)
+    advice_p.add_argument("--output", choices=("human", "json"), default="human")
+    advice_p.add_argument("--no-check", action="store_true", help="不运行只读规则，保留检查状态为未知")
+
     # --- 研发流程接入与免安装薄入口 ---
     cap_p = sub.add_parser("capabilities", help="显示工具版本、固化构建来源与命令契约")
     cap_p.add_argument("--format", choices=("json", "human"), default="json")
@@ -1710,6 +1715,29 @@ def _write_report_file_if_needed(path_str: str, text: str) -> None:
         p.write_text(text, encoding="utf-8")
 
 
+def _mainflow_advice_command(args) -> int:
+    from doc_tool.application.mainflow_advice import saved_project_advice
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            report = saved_project_advice(args.project, check=not args.no_check)
+        payload = report.to_dict()
+        code = 0
+    except Exception as exc:
+        payload = {"schemaVersion": 1, "command": "mainflow-advice", "readOnly": True,
+                   "sourceMode": "saved", "status": "unavailable", "error": str(exc), "actions": []}
+        code = 2
+    if args.output == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif code:
+        print("建议查询未完成：" + payload["error"])
+    else:
+        print("离线建议 · 来源：已保存正文（不读取 GUI 未保存缓冲）")
+        print("检查状态：" + payload["quality"]["state"])
+        for step in payload["actions"]:
+            print("- {0}：{1}".format(step["label"], step["reason"]))
+    return code
+
+
 def _capabilities_command(args) -> int:
     from doc_tool.application.capabilities import get_capabilities_report
     payload = get_capabilities_report()
@@ -1996,6 +2024,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "mainflow-advice":
+        return _mainflow_advice_command(args)
     if args.command == "capabilities":
         return _capabilities_command(args)
     if args.command == "baseline-check":

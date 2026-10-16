@@ -39,6 +39,7 @@ from doc_tool.application.intake_contract import (
     STATUS_FAILED,
     STATUS_PENDING_CONVERT,
     STATUS_PENDING_REFRESH,
+    STATUS_PENDING_REGISTRATION,
     STATUS_READY,
     STATUS_SKIPPED,
     ExportRequest,
@@ -112,7 +113,7 @@ class ExportReport:
         """严格模式下的未达标格式：失败、待转换与未正式刷新。"""
         return [
             item.format for item in self.results
-            if item.status in (STATUS_FAILED, STATUS_PENDING_CONVERT, STATUS_PENDING_REFRESH)
+            if item.status in (STATUS_FAILED, STATUS_PENDING_CONVERT, STATUS_PENDING_REFRESH, STATUS_PENDING_REGISTRATION)
         ]
 
     def all_failed(self) -> bool:
@@ -412,7 +413,9 @@ def _run_docx(
                 schema_version=int(getattr(manifest, "schemaVersion", 0) or 0),
                 stages=None, compute_hash=True,
             )
-        except Exception as exc:  # noqa: BLE001 - 登记失败保留可读成果与真实待办
+        except Exception as exc:  # noqa: BLE001 - 文件/刷新与正式登记是不同事实
+            formal = False
+            status = STATUS_PENDING_REGISTRATION
             warnings.append("正式状态登记未完成（成果可打开）：{0}".format(exc))
     # 阶段事实与清理结论进入提醒：结果页/成果页据此说明“卡在哪一步”。
     if refresh:
@@ -430,7 +433,8 @@ def _run_docx(
         format=FORMAT_DOCX, status=status, path=str(target),
         sha256=sha256_file(target), backend="kernel", formal=formal,
         warnings=warnings,
-        message="" if formal else "目录/页码待刷新",
+        message=("正式状态登记待完成（可读稿已刷新）" if status == STATUS_PENDING_REGISTRATION
+                 else "" if formal else "目录/页码待刷新"),
     ), str(target)
 
 

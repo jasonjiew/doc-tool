@@ -12,6 +12,7 @@
 - **发布下载**：<https://github.com/wangjie0721666-web/doc-tool/releases>
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md) / [docs/COLLEAGUE_AI_CLI_GUIDE.md](docs/COLLEAGUE_AI_CLI_GUIDE.md)
 - **主流程质量检查**：[团队共享规则、模块/需求表规范与执行状态](docs/mainflow-quality.md)（新规则按配置启用，旧项目不自动迁移）
+- **离线主流程智能化（本轮源码）**：[下一步建议、当前正文 F5、可选 AI 预览与采纳](docs/mainflow-intelligence.md) / [调研执行计划](docs/mainflow-intelligence-plan-20261016.md) / [执行验证交接](docs/mainflow-intelligence-execution-20261016.md)（源码实现、实机试点与已发布包分开记录）
 - **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)
 
 ---
@@ -150,7 +151,7 @@ $env:DOC_TOOL_CLI = 'D:/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe'
 2. **章节编辑**：在左侧章节树中点击对应 `.md` 进行编写，利用 `Ctrl+Alt+T` 美化表格，利用 `Ctrl+P` 秒级切换章节；
 3. **维护修订表**：出稿前在 `content/<类型>/_revision_record.md` 底部增加一行说明，**末行版本号即最终出稿的文档版本号**；
 4. **一键出稿**：
-   - **校验项目（F5）**：检查结构完整性、失效引用与格式门禁（无需安装 Word）；
+   - **检查当前正文（F5）**：使用工作台当前缓冲与实际所选范围检查，不隐式保存全部、不拿旧 DOCX 冒充当前结果（无需 Word）；已有 Word 成品验证另在操作菜单；
    - **诊断构建（Ctrl+Shift+B）**：无 Word 环境下快速生成非正式试看 DOCX；
    - **正式合并**：调用本机 Word 自动刷新目录域与页码，在 `output/` 目录下生成正式受控交付物。
 
@@ -167,9 +168,21 @@ python -m pip install -r requirements.txt -r requirements-build.txt
 # 2. 启动桌面主应用
 python -m doc_tool.app
 
-# 3. 运行全量自动化测试套件（35+ 测试套件）
+# 3. 运行已注册自动化测试脚本（文件数/内部用例数与跳过应分别记录）
 python scripts\tests\run_tests.py
 ```
+
+若本地已有修改中的 UI 分析/截图，先为子进程指定本轮独立证据目录，再运行回归，
+例如 Bash：
+
+```bash
+export DOC_TOOL_TEST_ARTIFACT_ROOT='D:/work/doc-tool/analysis/my-independent-run'
+python -B scripts/tests/run_tests.py --junit analysis/my-independent-run.xml
+```
+
+真实 Word 正式化用例与本机签名脚本集成默认单列，不计入离线功能验收；显式开关、合成规模量测和
+原生桌面/企业试点边界见[主流程智能化说明](docs/mainflow-intelligence.md)。本轮没有新增依赖，
+没有自动启用 provider、安装、提交或发布。
 
 ### 一键安装包构建（Windows）
 

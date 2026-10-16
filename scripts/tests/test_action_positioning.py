@@ -81,8 +81,8 @@ class TestActionPositioningAndLogic(unittest.TestCase):
         self.assertEqual(MainWindow._task_label("diag_build"), "快速构建")
         self.assertEqual(MainWindow._task_label("merge"), "正式出稿")
 
-    def test_on_validate_with_fallback_existing_docx(self):
-        """当当前版本产物不存在，但 output 目录下有历史产物时，自适应选用已有产物而不报错。"""
+    def test_validate_output_with_fallback_existing_docx(self):
+        """显式已有成品验证保留历史回退；F5 当前正文不再走这条路径。"""
         window = MainWindow()
         manifest = ProjectManifest(
             documentNo="DOC-001",
@@ -112,7 +112,7 @@ class TestActionPositioningAndLogic(unittest.TestCase):
         started_specs = []
         window._start_task = lambda spec: started_specs.append(spec)
         with patch.object(window, "_show_error") as mock_err:
-            window._on_validate()
+            window._on_validate_output()
             # 不应当弹“Word 产物不存在”错误框
             mock_err.assert_not_called()
 

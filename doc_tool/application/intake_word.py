@@ -145,7 +145,7 @@ def _fill_preflight(preview: IntakePreview, docx_path: Union[str, Path]) -> None
         preview.differences.append(IntakeDifference("\u9884\u68c0\u672a\u901a\u8fc7", str(exc)))
         return
     preview.heading_style_map = {
-        str(level): str(style_id) for level, style_id in (result.heading_style_map or {}).items()
+        str(style_id): str(level) for style_id, level in (result.heading_style_map or {}).items()
     }
     if not preview.heading_style_map:
         preview.differences.append(
@@ -199,7 +199,7 @@ def intake_word_project(
         document_version=document_version,
         require_exact_roundtrip=require_exact_roundtrip,
         heading_style_map=(
-            {int(level): style for level, style in preview.heading_style_map.items()}
+            {style_id: int(level) for style_id, level in preview.heading_style_map.items()}
             if preview.heading_style_map
             else None
         ),

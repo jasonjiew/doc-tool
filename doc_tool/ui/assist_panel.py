@@ -44,6 +44,7 @@ class AssistPanel(QWidget):
         *,
         project_root=None,
         on_scope_changed=None,
+        confirm_enhancement=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -51,6 +52,11 @@ class AssistPanel(QWidget):
         self._on_scope_changed = on_scope_changed
         self._extra_module_roots: List[str] = []
         self._assistant = assistant
+        self._confirm_enhancement = confirm_enhancement
+        self._enhance_runner = None
+        self._enhancement_result = None
+        self._enhancement_preview = None
+        self._enhancement_cancelled = False
         self._project_root = project_root
         self._index_runner = None
         self._index_result = None
@@ -58,6 +64,7 @@ class AssistPanel(QWidget):
         self._suggestion_set: Optional[SuggestionSet] = None
         self._suggestions: List[Suggestion] = []
         self._last_adoption: Optional[AdoptionOutcome] = None
+        self.expected_buffer_texts = {}
         self._build_ui()
         if assistant is not None:
             self.set_assistant(assistant)
@@ -253,6 +260,22 @@ class AssistPanel(QWidget):
         self._adopt_row = adopt_row
         suggestions_layout.addWidget(adopt_row)
         self._tabs.addTab(suggestions, "建议")
+        enhanced_page = QWidget(self)
+        enhanced_layout = QVBoxLayout(enhanced_page)
+        self._enhancement_candidates = QListWidget(enhanced_page)
+        self._enhancement_candidates.setObjectName("enhancementCandidates")
+        self._enhancement_candidates.currentRowChanged.connect(self._show_enhancement_candidate)
+        enhanced_layout.addWidget(self._enhancement_candidates, 1)
+        candidate_actions = FlowRow(stack_below=380, parent=enhanced_page)
+        self._adopt_enhancement_button = QPushButton("采用所选候选")
+        self._adopt_enhancement_button.setEnabled(False)
+        self._adopt_enhancement_button.clicked.connect(self.adopt_enhancement_selected)
+        copy_candidate = QPushButton("复制所选候选")
+        copy_candidate.clicked.connect(self.copy_enhancement_selected)
+        candidate_actions.add(self._adopt_enhancement_button)
+        candidate_actions.add(copy_candidate)
+        enhanced_layout.addWidget(candidate_actions)
+        self._tabs.addTab(enhanced_page, "增强候选")
         layout.addWidget(self._tabs, 3)
 
         self._diff_view = QPlainTextEdit()
@@ -260,17 +283,23 @@ class AssistPanel(QWidget):
         self._diff_view.setPlaceholderText("选择一条结果/建议查看 before-after 差异")
         layout.addWidget(self._diff_view, 2)
 
-        enhance_row = QHBoxLayout()
+        enhance_row = FlowRow(stack_below=480, parent=self)
         self._provider_label = QLabel("可选增强：未启用（本地候选可用）")
         self._provider_label.setWordWrap(True)
         self._enhance_summary_button = QPushButton("增强摘要")
         self._enhance_summary_button.clicked.connect(lambda: self.enhance(PURPOSE_REVISION_SUMMARY))
         self._enhance_term_button = QPushButton("增强术语")
         self._enhance_term_button.clicked.connect(lambda: self.enhance(PURPOSE_TERM))
-        enhance_row.addWidget(self._provider_label, 1)
-        enhance_row.addWidget(self._enhance_summary_button)
-        enhance_row.addWidget(self._enhance_term_button)
-        layout.addLayout(enhance_row)
+        enhance_row.add(self._provider_label)
+        enhance_row.add(self._enhance_summary_button)
+        enhance_row.add(self._enhance_term_button)
+        self._cancel_enhancement_button = QPushButton("取消增强")
+        self._cancel_enhancement_button.setEnabled(False)
+        self._cancel_enhancement_button.clicked.connect(self.cancel_enhancement)
+        enhance_row.add(self._cancel_enhancement_button)
+        self._enhance_row = enhance_row
+        self._candidate_actions = candidate_actions
+        layout.addWidget(enhance_row)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -279,17 +308,19 @@ class AssistPanel(QWidget):
             getattr(self, "_search_row", None),
             getattr(self, "_scope_actions", None),
             getattr(self, "_adopt_row", None),
+            getattr(self, "_enhance_row", None),
+            getattr(self, "_candidate_actions", None),
         ):
             if row is not None:
                 row.apply_width(width)
 
     def current_page(self) -> str:
-        """当前切页标识：``materials``（资料）或 ``suggestions``（建议）。"""
-        return "suggestions" if self._tabs.currentIndex() == 1 else "materials"
+        """当前切页标识：``materials`` / ``suggestions`` / ``enhanced``。"""
+        return ("materials", "suggestions", "enhanced")[min(self._tabs.currentIndex(), 2)]
 
     def show_page(self, page: str) -> None:
-        """切换资料/建议页；共用下方的出处/差异详情不随页面重置。"""
-        self._tabs.setCurrentIndex(1 if str(page) == "suggestions" else 0)
+        """切换资料/建议/增强候选页；共用的出处/差异详情不随页面重置。"""
+        self._tabs.setCurrentIndex({"suggestions": 1, "enhanced": 2}.get(str(page), 0))
 
     def add_scope_manually(self) -> None:
         """无资料范围时的真实设置动作：选择一个已有模块库作为资料范围。"""
@@ -314,6 +345,11 @@ class AssistPanel(QWidget):
         return self.load_suggestions()
 
     def set_assistant(self, assistant) -> None:
+        self.cancel_enhancement()
+        self._enhancement_preview = None
+        self._enhancement_result = None
+        self._enhancement_candidates.clear()
+        self._adopt_enhancement_button.setEnabled(False)
         self._assistant = assistant
         self.refresh_scope()
         self.refresh_provider_label()
@@ -357,7 +393,11 @@ class AssistPanel(QWidget):
             self.set_status("尚未装配项目上下文，无法搜索。")
             return None
         text = query if query is not None else self._query.text()
-        outcome = self._assistant.search_evidence(text)
+        try:
+            outcome = self._assistant.search_evidence(text)
+        except Exception as exc:
+            self.set_status("检索未执行，当前内容不可读取：{0}".format(exc))
+            return None
         self.show_search_outcome(outcome)
         # 无缓存/索引陈旧时顺手在后台建索引：本次结果照常返回，编辑不被阻塞。
         from doc_tool.application.assist.models import CACHE_DISABLED, CACHE_FRESH
@@ -392,6 +432,8 @@ class AssistPanel(QWidget):
         )
         item = QListWidgetItem(text)
         item.setData(Qt.UserRole, hit)
+        item.setToolTip("{0}\n相关性 {1}：{2}".format(
+            hit.match_label, hit.rank_score, "；".join(hit.rank_reasons)))
         return item
 
     def selected_hit(self) -> Optional[SearchHit]:
@@ -417,7 +459,11 @@ class AssistPanel(QWidget):
     def load_suggestions(self, kinds: Optional[Sequence[str]] = None) -> Optional[SuggestionSet]:
         if self._assistant is None:
             return None
-        result = self._assistant.suggest(kinds=kinds)
+        try:
+            result = self._assistant.suggest(kinds=kinds)
+        except Exception as exc:
+            self.set_status("建议未刷新，当前内容不可读取：{0}".format(exc))
+            return None
         self.set_suggestions(result)
         return result
 
@@ -498,13 +544,18 @@ class AssistPanel(QWidget):
         if not ids:
             self.set_status("请先勾选要采纳的建议。")
             return None
-        outcome = self._assistant.adopt(ids)
+        try:
+            outcome = self._assistant.adopt(ids, suggestions=self._suggestions)
+        except Exception as exc:  # current buffers are unavailable: do not apply stale content
+            self.set_status("采纳未执行，当前内容读取失败：{0}".format(exc))
+            return None
         self._last_adoption = outcome
         for suggestion_id in outcome.summary_candidates:
             self.summary_candidate.emit(outcome.summary_candidates[suggestion_id])
         if outcome.buffer_updates:
             # 采纳结果同步给宿主编辑器（应用内可达；服务层仍只写缓冲）
-            self.buffers_changed.emit(dict(self._assistant.current_texts()))
+            self.expected_buffer_texts = dict(outcome.transaction.before_texts) if outcome.transaction else {}
+            self.buffers_changed.emit(dict(outcome.buffer_updates))
         self.set_status("；".join(outcome.summary_lines()))
         return outcome
 
@@ -521,26 +572,164 @@ class AssistPanel(QWidget):
         if self._assistant is None or self._last_adoption is None:
             self.set_status("没有可撤销的采纳记录。")
             return False
-        done, _restored, detail = self._assistant.undo(self._last_adoption)
+        try:
+            done, restored, detail = self._assistant.undo(self._last_adoption)
+        except Exception as exc:
+            self.set_status("撤销未执行，当前内容读取失败：{0}".format(exc))
+            return False
         if done:
             # 撤销同样回写到编辑器（宿主侧同样是一个撤销步）
-            self.buffers_changed.emit(dict(self._assistant.current_texts()))
+            self.expected_buffer_texts = dict(self._last_adoption.buffer_updates)
+            self.buffers_changed.emit(dict(restored))
         self.set_status(detail)
         return done
 
     # --- 增强 ---
 
-    def enhance(self, purpose: str = PURPOSE_REVISION_SUMMARY) -> Optional[EnhancementResult]:
+    def enhance(self, purpose: str = PURPOSE_REVISION_SUMMARY, *, background=True) -> Optional[EnhancementResult]:
         if self._assistant is None:
             return None
-        result = self._assistant.enhance(purpose)
-        self.set_status("；".join(result.summary_lines()))
-        for item in result.enhanced:
-            if purpose == PURPOSE_REVISION_SUMMARY:
-                self.summary_candidate.emit(item.text)
-        return result
+        if self._enhance_runner is not None and self._enhance_runner.is_running:
+            self.set_status("已有增强请求正在处理，本次未重复发送。")
+            return None
+        try:
+            preview = self._assistant.preview_enhance(purpose)
+        except Exception as exc:
+            self.set_status("无法读取当前内容，未生成或发送增强请求：{0}".format(exc))
+            return None
+        self._enhancement_preview = preview
+        self._enhancement_cancelled = False
+        self._enhancement_result = None
+        self._enhancement_candidates.clear()
+        self._adopt_enhancement_button.setEnabled(False)
+        if not preview.can_send:
+            result = self._assistant.send_enhancement_preview(preview, confirmed=True)
+            self._show_enhancement_result(result)
+            return result
+        if self._confirm_enhancement is None:
+            from doc_tool.ui.enhancement_preview import EnhancementPreviewDialog
+            confirmed = EnhancementPreviewDialog.confirm(preview, self)
+        else:
+            confirmed = bool(self._confirm_enhancement(preview))
+        if not confirmed:
+            result = self._assistant.send_enhancement_preview(preview, confirmed=False)
+            self._show_enhancement_result(result)
+            return result
+        if not background:
+            result = self._assistant.send_enhancement_preview(preview, confirmed=True)
+            self._show_enhancement_result(result)
+            return result
+        from doc_tool.application.assist.worker import send_enhancement_task
+        from doc_tool.ui.task_bridge import TaskRunner, TaskSpec
+        from PySide6.QtCore import QTimer
+        if self._enhance_runner is None:
+            self._enhance_runner = TaskRunner()
+            self._enhance_timer = QTimer(self)
+            self._enhance_timer.setInterval(100)
+            self._enhance_timer.timeout.connect(self._poll_enhancement)
+        self._enhancement_gateway = self._assistant.gateway
+        self._enhancement_start_call_count = self._enhancement_gateway.provider_call_count
+        started = self._enhance_runner.start(TaskSpec(name="assist-enhance", target=send_enhancement_task,
+            args=(self._assistant.gateway, preview),
+            timeout_seconds=preview.config_snapshot().timeout_seconds + 5), on_done=self._on_enhancement_done)
+        if started:
+            self._enhance_summary_button.setEnabled(False)
+            self._enhance_term_button.setEnabled(False)
+            self._cancel_enhancement_button.setEnabled(True)
+            self._enhance_timer.start()
+            self.set_status("正在后台处理已确认的单次请求；可继续编辑，结果只进入候选列表。")
+        return None
 
     # --- 差异预览/状态 ---
+
+    def _poll_enhancement(self):
+        if self._enhance_runner is not None:
+            self._enhance_runner.poll()
+            if not self._enhance_runner.is_running:
+                self._enhance_timer.stop()
+                self._enhance_summary_button.setEnabled(True)
+                self._enhance_term_button.setEnabled(True)
+                self._cancel_enhancement_button.setEnabled(False)
+
+    def cancel_enhancement(self):
+        self._enhancement_cancelled = True
+        if self._enhance_runner is not None and self._enhance_runner.is_running:
+            self._enhance_runner.cancel()
+            self.set_status("已请求取消；已发出的调用可能等待原超时，迟到响应不会应用。")
+
+    def _on_enhancement_done(self, result):
+        if self._enhancement_cancelled or not isinstance(result, EnhancementResult):
+            from doc_tool.application.assist.models import ENHANCE_CANCELLED
+            preview = self._enhancement_preview
+            if preview is not None:
+                result = EnhancementResult(purpose=preview.purpose, status=ENHANCE_CANCELLED,
+                    target_description=preview.target_description, scope_label=preview.scope_label,
+                    local_candidates=list(preview.local_candidates),
+                    notes=["请求未完成或已取消；保留本地候选，未应用迟到响应。"])
+            else:
+                return
+        self._show_enhancement_result(result)
+
+    def _show_enhancement_result(self, result):
+        self._enhancement_result = result
+        self._enhancement_candidates.clear()
+        self._diff_view.setPlainText("本次未自动修改正文、术语库或修订记录。")
+        values = []
+        if not result.used_local_candidates:
+            values.extend((item.text, item.source, tuple(item.evidence_ids)) for item in result.enhanced)
+        else:
+            values.extend((text, "local-candidate", ()) for text in result.local_candidates)
+        for text, source, evidence_ids in values:
+            label = {"local-evidence": "声明引用本地证据，仍需核对", "wording-candidate": "无本地出处，仅作措辞候选",
+                     "local-candidate": "本地确定性候选"}.get(source, "措辞候选")
+            item = QListWidgetItem("{0}｜{1}".format(label, text[:90]))
+            item.setData(Qt.UserRole, {"text": text, "source": source, "evidenceIds": evidence_ids})
+            self._enhancement_candidates.addItem(item)
+        self.show_page("enhanced")
+        self._adopt_enhancement_button.setText("填入所选修订摘要候选" if result.purpose == PURPOSE_REVISION_SUMMARY
+                                              else "插入所选术语措辞（可撤销）")
+        self._adopt_enhancement_button.setEnabled(bool(values) and not bool(getattr(self._assistant, "read_only", False)))
+        if values:
+            self._enhancement_candidates.setCurrentRow(0)
+        self.set_status("；".join(result.summary_lines()) + "；仅展示候选，未自动改正文/术语库/修订记录。")
+
+    def _selected_enhancement(self):
+        item = self._enhancement_candidates.currentItem()
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _show_enhancement_candidate(self, _row=0):
+        item = self._selected_enhancement()
+        if item is not None and hasattr(self, "_diff_view"):
+            self._diff_view.setPlainText("只读候选预览；未自动替换原文。\n来源标记：{0}\n本地证据 ID：{1}\n\n{2}".format(
+                item["source"], "、".join(item["evidenceIds"]) or "无（仅措辞参考）", item["text"]))
+
+    def adopt_enhancement_selected(self):
+        item = self._selected_enhancement()
+        if item is None or self._enhancement_result is None:
+            return False
+        if self._assistant is None or self._assistant.read_only:
+            self.set_status("只读项目可查看/复制候选，不写正文或修订。")
+            return False
+        if self._enhancement_result.purpose == PURPOSE_REVISION_SUMMARY:
+            self.summary_candidate.emit(item["text"])
+            self.set_status("已将一条所选候选交给既有修订编辑入口；未自动保存或改变发布状态。")
+        else:
+            self.insert_requested.emit(item["text"], INSERT_MODE_COPY_TEXT)
+            self.set_status("已插入所选术语措辞（编辑器可一次撤销）；未写入术语库或保存原文。")
+        return True
+
+    def copy_enhancement_selected(self):
+        item = self._selected_enhancement()
+        if item is None:
+            return False
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(item["text"])
+        self.set_status("已复制所选候选，项目文件未改动。")
+        return True
+
+    def closeEvent(self, event):
+        self.cancel_enhancement()
+        super().closeEvent(event)
 
     def _update_diff_preview(self) -> None:
         suggestion = self._current_suggestion()

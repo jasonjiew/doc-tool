@@ -17,13 +17,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import socket
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, List, Mapping, Optional, Sequence
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
 
 from doc_tool.application.assist.models import (
     DEFAULT_MAX_REQUEST_CHARS, ENHANCE_BAD_RESPONSE, ENHANCE_CANCELLED,
@@ -169,6 +170,67 @@ def validate_provider_response(
     return ProviderResponse(purpose=purpose, suggestions=suggestions, skipped=skipped)
 
 
+def safe_endpoint_description(endpoint: str) -> str:
+    from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+    if not endpoint:
+        return "（未配置端点）"
+    try:
+        parsed = urlsplit(endpoint)
+        host = parsed.hostname or ""
+        if parsed.scheme not in ("http", "https") or not host:
+            return "（端点配置不可用）"
+        if ":" in host:
+            host = "[" + host + "]"
+        if parsed.port:
+            host += ":" + str(parsed.port)
+        query = urlencode([(key, "<隐去>") for key, _ in parse_qsl(parsed.query, keep_blank_values=True)])
+        return urlunsplit((parsed.scheme, host, parsed.path, query, ""))
+    except (TypeError, ValueError):
+        return "（端点配置不可用）"
+
+
+def provider_payload(purpose, context, *, model=None):
+    payload = {"purpose": purpose, "context": dict(context or {})}
+    if model is not None:
+        payload["model"] = model
+    return payload
+
+
+def redact_provider_diagnostic(error, config) -> str:
+    """Mask known configured secrets in untrusted transport error strings.
+
+    Only the configured credential environment name is consulted, not all env.
+    """
+    from urllib.parse import urlsplit, parse_qsl, unquote, quote, quote_plus
+    message = str(error)
+    secrets = set()
+    if config.credential_env:
+        value = os.environ.get(config.credential_env, "")
+        if value:
+            secrets.add(value)
+    try:
+        parsed = urlsplit(config.endpoint or "")
+        secrets.update(value for value in (parsed.username, parsed.password) if value)
+        secrets.update(value for _key, value in parse_qsl(parsed.query) if value)
+    except ValueError:
+        pass
+    for arg in config.args or ():
+        value = str(arg)
+        if "=" in value:
+            value = value.partition("=")[2]
+        elif value.startswith("-"):
+            continue
+        if value:
+            secrets.add(value)
+    variants = set()
+    for value in secrets:
+        variants.update((value, unquote(value), quote(value, safe=""), quote_plus(value),
+                         json.dumps(value, ensure_ascii=False)[1:-1], repr(value)[1:-1]))
+    for value in sorted((value for value in variants if value), key=len, reverse=True):
+        message = message.replace(value, "[redacted]")
+    return message[:600]
+
+
 @dataclass
 class ProviderConfig:
     """provider 用户级配置（不含凭据本身）。"""
@@ -210,11 +272,10 @@ class ProviderConfig:
             return "未启用（本地候选）"
         if self.provider == PROVIDER_LOCAL_COMMAND:
             command = self.command or "（未配置命令）"
-            tail = " ".join(self.args)
-            return "本地命令：{0}{1}".format(command, (" " + tail) if tail else "")
+            return "本地命令：{0}（参数 {1} 项）".format(command, len(self.args))
         if self.provider == PROVIDER_HTTP:
             return "HTTP：{0}{1}".format(
-                self.endpoint or "（未配置端点）",
+                safe_endpoint_description(self.endpoint),
                 "（模型 {0}）".format(self.model) if self.model else "",
             )
         return "未启用（本地候选）"
@@ -368,7 +429,7 @@ class LocalCommandProvider(WritingProvider):
             raise ProviderCommandMissing("未配置本地模型命令。")
         argv = [command] + [str(item) for item in (self._config.args or ())]
         payload = json.dumps(
-            {"purpose": purpose, "context": dict(context or {})}, ensure_ascii=False
+            provider_payload(purpose, context), ensure_ascii=False
         )
         try:
             output = self._runner(argv, payload, float(self._config.timeout_seconds or 8.0))
@@ -397,9 +458,10 @@ class LocalCommandProvider(WritingProvider):
             check=False,
         )
         if completed.returncode != 0:
-            stderr = (completed.stderr or b"").decode("utf-8", errors="replace")[:200]
+            # Commands may echo inherited credentials or argv on stderr. Keep
+            # the actionable exit code, never publish raw process stderr.
             raise ProviderError(
-                "本地模型命令退出码 {0}：{1}".format(completed.returncode, stderr)
+                "本地模型命令退出码 {0}（标准错误不展示，以免泄露凭据/参数）".format(completed.returncode)
             )
         return (completed.stdout or b"").decode("utf-8", errors="replace")
 
@@ -448,11 +510,7 @@ class HttpProvider(WritingProvider):
         if credential:
             value = "{0} {1}".format(self._config.auth_scheme or "Bearer", credential).strip()
             headers[self._config.auth_header or "Authorization"] = value
-        payload = {
-            "purpose": purpose,
-            "model": self._config.model,
-            "context": dict(context or {}),
-        }
+        payload = provider_payload(purpose, context, model=self._config.model)
         try:
             body = self._transport(endpoint, payload, headers, float(self._config.timeout_seconds or 8.0))
         except (ProviderTimeout, ProviderNetworkError, ProviderError):
@@ -479,11 +537,25 @@ class HttpProvider(WritingProvider):
             headers=dict(headers),
             method="POST",
         )
+        class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, response_headers, newurl):
+                # Consent covers the previewed destination only. Even a same-host
+                # redirect needs an explicit endpoint change and a new preview.
+                return None
+
+        opener = urllib.request.build_opener(_RejectRedirects())
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with opener.open(request, timeout=timeout) as response:
                 return response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as exc:
-            raise ProviderError("HTTP 状态 {0}".format(exc.code), code="E3317") from exc
+            code = exc.code
+            exc.close()
+            if 300 <= code < 400:
+                raise ProviderError(
+                    "HTTP 重定向（{0}）未跟随；请核对最终端点后重新预览。".format(code),
+                    code="E3317",
+                ) from exc
+            raise ProviderError("HTTP 状态 {0}".format(code), code="E3317") from exc
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)
             if isinstance(reason, (TimeoutError, socket.timeout)):
@@ -583,6 +655,47 @@ class ProviderRequestLogEntry:
             "attempts": self.attempts,
             "at": self.at,
         }
+
+
+@dataclass(frozen=True)
+class EnhancementPreview:
+    """Frozen, in-memory request. Private config/text are never included in logs."""
+    purpose: str
+    text: str = field(repr=False)
+    scope_label: str
+    requested_chars: int
+    max_chars: int
+    truncated: bool
+    evidence_ids: Tuple[str, ...]
+    local_candidates: Tuple[str, ...] = field(repr=False)
+    target_description: str
+    provider_kind: str
+    model: str
+    config_digest: str
+    _config_json: str = field(repr=False)
+
+    def provider_context(self):
+        return {"purpose": self.purpose, "scope": self.scope_label, "text": self.text,
+                "truncated": self.truncated, "maxChars": self.max_chars,
+                "evidenceIds": list(self.evidence_ids)}
+
+    def wire_payload(self):
+        return provider_payload(self.purpose, self.provider_context(),
+                                model=self.model if self.provider_kind == PROVIDER_HTTP else None)
+
+    def config_snapshot(self):
+        return ProviderConfig.from_dict(json.loads(self._config_json))
+
+    @property
+    def can_send(self):
+        return self.config_snapshot().is_enabled and bool(self.text or self.local_candidates)
+
+    def to_dict(self):
+        return {"purpose": self.purpose, "target": self.target_description,
+                "scope": self.scope_label, "requestedChars": self.requested_chars,
+                "actualChars": len(self.text), "truncated": self.truncated,
+                "maxChars": self.max_chars, "canSend": self.can_send,
+                "payload": self.wire_payload(), "localCandidates": list(self.local_candidates)}
 
 
 @dataclass
@@ -702,6 +815,27 @@ class ProviderGateway:
     def set_provider(self, provider: Optional[WritingProvider]) -> None:
         self._provider = provider
 
+    def prepare(self, purpose: str, *, context_text: str, local_candidates=(),
+                evidence_ids=(), scope_label="", max_chars=None) -> EnhancementPreview:
+        """Build only: no provider resolution, requests, logs or file writes."""
+        config_json = self._configuration_json()
+        config = ProviderConfig.from_dict(json.loads(config_json))
+        purpose = purpose if purpose in PURPOSES else PURPOSE_REVISION_SUMMARY
+        limit = int(max_chars or config.max_chars or DEFAULT_MAX_REQUEST_CHARS)
+        text, truncated, requested = truncate_context(context_text or "", limit)
+        return EnhancementPreview(purpose=purpose, text=text, scope_label=scope_label,
+            requested_chars=requested, max_chars=limit, truncated=truncated,
+            evidence_ids=tuple(str(x) for x in (evidence_ids or ())),
+            local_candidates=tuple(str(x) for x in (local_candidates or ()) if str(x).strip()),
+            target_description=config.target_description(), provider_kind=config.provider,
+            model=config.model, config_digest=hashlib.sha256(config_json.encode()).hexdigest(),
+            _config_json=config_json)
+
+    def _configuration_json(self):
+        data = self._config.to_dict()
+        data.pop("credentialPresent", None)  # presence is checked at send time; value is never read here
+        return json.dumps(data, ensure_ascii=False, sort_keys=True)
+
     def enhance(
         self,
         purpose: str,
@@ -712,15 +846,20 @@ class ProviderGateway:
         scope_label: str = "",
         cancel_token=None,
         max_chars: Optional[int] = None,
+        prepared: Optional[EnhancementPreview] = None,
     ) -> EnhancementResult:
         """执行一次增强；任何失败都返回本地候选并集中说明。"""
-        purpose = purpose if purpose in PURPOSES else PURPOSE_REVISION_SUMMARY
-        limit = int(max_chars or self._config.max_chars or DEFAULT_MAX_REQUEST_CHARS)
-        text, truncated, original_chars = truncate_context(context_text or "", limit)
+        preview = prepared or self.prepare(purpose, context_text=context_text,
+            local_candidates=local_candidates, evidence_ids=evidence_ids,
+            scope_label=scope_label, max_chars=max_chars)
+        config = preview.config_snapshot()
+        purpose, text, limit = preview.purpose, preview.text, preview.max_chars
+        truncated, original_chars = preview.truncated, preview.requested_chars
+        local_candidates, evidence_ids, scope_label = preview.local_candidates, preview.evidence_ids, preview.scope_label
         result = EnhancementResult(
             purpose=purpose,
             status=ENHANCE_DISABLED,
-            target_description=self._config.target_description(),
+            target_description=preview.target_description,
             scope_label=scope_label,
             requested_chars=original_chars,
             actual_chars=len(text),
@@ -734,7 +873,12 @@ class ProviderGateway:
             result.notes.append(
                 "请求内容超过上限，已截断为前 {0} 字符（实际发送范围如上）。".format(limit)
             )
-        if not self._config.is_enabled:
+        if preview.config_digest != hashlib.sha256(self._configuration_json().encode()).hexdigest():
+            result.status = ENHANCE_CANCELLED
+            result.notes.append("目标或配置在预览后已变化，未发起请求；请重新预览。")
+            self._record(result)
+            return result
+        if not config.is_enabled:
             result.notes.append(
                 "provider 默认禁用：本次使用本地候选，未发起任何模型/网络请求。"
             )
@@ -745,31 +889,34 @@ class ProviderGateway:
             result.notes.append("增强请求已取消，未发起调用；本地候选保持不变。")
             self._record(result)
             return result
-        if self._config.provider == PROVIDER_HTTP and self._config.credential_env:
-            if not self._config.credential_present():
+        if config.provider == PROVIDER_HTTP and config.credential_env:
+            if not config.credential_present():
                 result.status = ENHANCE_NO_CREDENTIAL
                 result.notes.append(
                     "未在用户环境变量 {0} 找到凭据，未发起请求；凭据不会写入项目或日志。".format(
-                        self._config.credential_env
+                        config.credential_env
                     )
                 )
                 self._record(result)
                 return result
-        provider = self._resolve_provider()
+        if not text and not local_candidates:
+            result.status = ENHANCE_UNAVAILABLE
+            result.notes.append("没有本地变更事实或选定上下文，未请求模型；可先编辑或选择资料。")
+            self._record(result)
+            return result
+        provider = self._resolve_provider(config)
         if provider is None:
             result.status = ENHANCE_UNAVAILABLE
             result.notes.append("provider 未配置或类型不可用，本次未发起调用。")
             self._record(result)
             return result
 
-        context = {
-            "purpose": purpose,
-            "scope": scope_label,
-            "text": text,
-            "truncated": truncated,
-            "maxChars": limit,
-            "evidenceIds": [str(item) for item in (evidence_ids or ())],
-        }
+        context = preview.provider_context()
+        if self._is_cancelled(cancel_token):
+            result.status = ENHANCE_CANCELLED
+            result.notes.append("已在实际调用前取消，未发送请求。")
+            self._record(result)
+            return result
         self._call_count += 1
         result.attempts = 1
         try:
@@ -778,28 +925,33 @@ class ProviderGateway:
             else:
                 payload = provider.suggest_terms(context)
         except ProviderTimeout as exc:
-            self._fallback(result, ENHANCE_TIMEOUT, exc)
+            self._fallback(result, ENHANCE_TIMEOUT, exc, config=config)
         except ProviderNoCredential as exc:
-            self._fallback(result, ENHANCE_NO_CREDENTIAL, exc)
+            self._fallback(result, ENHANCE_NO_CREDENTIAL, exc, config=config)
         except ProviderNetworkError as exc:
-            self._fallback(result, ENHANCE_NETWORK, exc)
+            self._fallback(result, ENHANCE_NETWORK, exc, config=config)
         except ProviderCommandMissing as exc:
-            self._fallback(result, ENHANCE_COMMAND_MISSING, exc)
+            self._fallback(result, ENHANCE_COMMAND_MISSING, exc, config=config)
         except ProviderCancelled as exc:
-            self._fallback(result, ENHANCE_CANCELLED, exc)
+            self._fallback(result, ENHANCE_CANCELLED, exc, config=config)
         except ProviderBadResponse as exc:
-            self._fallback(result, ENHANCE_BAD_RESPONSE, exc)
+            self._fallback(result, ENHANCE_BAD_RESPONSE, exc, config=config)
         except ProviderError as exc:
-            self._fallback(result, ENHANCE_ERROR, exc)
+            self._fallback(result, ENHANCE_ERROR, exc, config=config)
         except Exception as exc:  # noqa: BLE001 - provider 故障不影响编辑
-            self._fallback(result, ENHANCE_ERROR, exc)
+            self._fallback(result, ENHANCE_ERROR, exc, config=config)
         else:
+            if self._is_cancelled(cancel_token):
+                result.status = ENHANCE_CANCELLED
+                result.notes.append("已请求取消；迟到响应已丢弃，正文与本地候选不变。")
+                self._record(result)
+                return result
             try:
                 response = validate_provider_response(
                     payload, purpose=purpose, known_evidence_ids=evidence_ids
                 )
             except ProviderBadResponse as exc:
-                self._fallback(result, ENHANCE_BAD_RESPONSE, exc)
+                self._fallback(result, ENHANCE_BAD_RESPONSE, exc, config=config)
             else:
                 enhanced = [item for item in response.suggestions if not item.instruction_like]
                 blocked = [item for item in response.suggestions if item.instruction_like]
@@ -828,21 +980,28 @@ class ProviderGateway:
 
     # --- 内部 ---
 
-    def _fallback(self, result: EnhancementResult, status: str, exc: BaseException) -> None:
+    def _fallback(self, result: EnhancementResult, status: str, exc: BaseException, *, config=None) -> None:
         result.status = status
         result.enhanced = []
         result.used_local_candidates = True
+        try:
+            diagnostic = redact_provider_diagnostic(exc, config or self.config)
+        except Exception:
+            diagnostic = "错误详情不可安全显示（{0}）".format(type(exc).__name__)
         result.notes.append(
             "{0}：{1}；已回退本地候选，正文与项目状态未改动（不自动重试）。".format(
-                ENHANCE_STATUS_LABELS.get(status, status), exc
+                ENHANCE_STATUS_LABELS.get(status, status), diagnostic
             )
         )
 
-    def _resolve_provider(self) -> Optional[WritingProvider]:
+    def _resolve_provider(self, config=None) -> Optional[WritingProvider]:
         if self._provider is not None:
             return self._provider
-        self._provider = self._provider_factory(self._config)
-        return self._provider
+        # Snapshot-bound built-in adapters cannot silently switch target after confirmation.
+        provider = self._provider_factory(config or self._config)
+        if config is None:
+            self._provider = provider
+        return provider
 
     @staticmethod
     def _is_cancelled(cancel_token) -> bool:

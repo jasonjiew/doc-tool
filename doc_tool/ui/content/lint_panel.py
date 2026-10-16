@@ -120,6 +120,11 @@ class LintPanel(QWidget):
         self._writer = writer
         self._on_applied = on_applied
         self._issues: List[LintIssue] = []
+        self._quality_report = {}
+        self._checked_at = ""
+        self._checked_source_mode = "unknown"
+        self._checked_texts = {}
+        self._check_unavailable = []
         # MAIN-D 4.1/4.2：范围（当前章/所选章/整份）、活缓冲内容、
         # 确定性修复的差异确认与撤销。
         self._scope_provider = scope_provider
@@ -408,7 +413,11 @@ class LintPanel(QWidget):
             )
 
         if total_cnt == 0:
-            self._status_label.setText("✓ 检查通过，未发现问题")
+            state = self.quality_facts().state
+            messages = {"unknown": "尚无已执行的检查结果", "not-run": "未执行任何规则，不能认定检查通过",
+                        "configuration-error": "配置异常，检查未完成", "incomplete": "检查未完整执行，不能认定通过",
+                        "stale": "旧结果已过期，请重检当前内容"}
+            self._status_label.setText(messages.get(state, "✓ 当前已检查范围未发现问题"))
         elif paged:
             self._status_label.setText(
                 "已显示前 {0} / 共 {1} 项（其中 {2} 项支持 ⚡ 一键修复）——可继续显示更多".format(
@@ -553,63 +562,123 @@ class LintPanel(QWidget):
                     overrides[rel_path] = text
         return scope_paths, overrides, note
 
-    def run_check(self) -> None:
-        # 检查只读配置，只有用户明确新增/删除术语时才保存。
-        terms = self._terms.load()
-        self._render_terms(terms)
-        try:
-            scope_paths, overrides, note = self._resolve_scope()
-        except Exception as exc:  # noqa: BLE001 - 缓冲不可读时不使用旧磁盘代替
-            self._issues = []
-            self._render_results()
-            self._status_label.setText("检查失败：无法读取章节范围或编辑缓冲：{0}".format(exc))
-            return
-        self._scope_paths = scope_paths
-        self._text_overrides = overrides
-        self._scope_note = note
-        linter = self._linter
-        scoped_used = False
-        if self._scoped_linter_provider is not None and (
-            scope_paths is not None or overrides
-        ):
+    def quality_facts(self):
+        """Derived view of this report and current buffers/configuration; never runs rules."""
+        from doc_tool.application.mainflow_advice import QualityFacts
+        stale = bool(set(self._stale_paths) & set(self._checked_texts))
+        unavailable = list(self._check_unavailable)
+        index = getattr(self._linter, "_index", None)
+        lines_by_path = getattr(index, "lines", {}) or {}
+        if self._checked_texts:
+            for rel, checked_lines in self._checked_texts.items():
+                try:
+                    live = self._live_text_provider(rel) if self._live_text_provider is not None else None
+                    current = tuple(str(live).splitlines()) if live is not None else tuple(lines_by_path.get(rel, ()))
+                    if current != checked_lines:
+                        stale = True
+                except Exception as exc:
+                    unavailable.append("无法核对当前缓冲：{0}".format(exc))
+            if self._scope_paths is None and set(lines_by_path) != set(self._checked_texts):
+                stale = True
+        current_configuration = {}
+        config = getattr(self._linter, "_rules_config", None)
+        if self._quality_report and config is not None and hasattr(config, "load_result"):
             try:
-                scoped = self._scoped_linter_provider(scope_paths, overrides)
-            except Exception:  # noqa: BLE001 - 作用域索引不可用退回原索引
-                scoped = None
-            if scoped is not None:
-                linter = scoped
-                scoped_used = True
-        if isinstance(linter, ContentLinter):
-            quality_run = linter.check_report(terms, term_warnings=getattr(self._terms, "warnings", []))
-            issues = quality_run.issues
-        else:
-            issues = linter.check_all(terms)
-            quality_run = getattr(linter, "last_report", None)
-        self._quality_report = quality_run.to_dict() if quality_run is not None else {}
-        if overrides and not scoped_used:
-            # 无法按活缓冲建立作用域检查时，绝不拿旧磁盘正文冒充当前结果：
-            # 有未保存正文的章节本次不报告（状态行明确说明）。
-            issues = [issue for issue in issues if issue.rel_path not in overrides]
-        if scope_paths is not None:
-            allowed = set(scope_paths)
-            issues = [issue for issue in issues if issue.rel_path in allowed or issue.rule_id == "rule_configuration"]
-        self._issues = list(issues)
+                current_configuration = config.load_result().to_dict()
+                original = self._quality_report.get("configuration") or {}
+                if original.get("fingerprint") != current_configuration.get("fingerprint"):
+                    stale = True
+            except Exception as exc:
+                unavailable.append("无法核对当前规则配置：{0}".format(exc))
+        kind = self._scope_combo.currentData() if hasattr(self, "_scope_combo") else "document"
+        # Use the checked scope, not a combobox changed after the check.
+        kind = getattr(self, "_checked_scope_kind", kind)
+        return QualityFacts(report=dict(self._quality_report), issue_count=len(self._issues),
+                            stale=stale, scope_text=self._scope_note, scope_kind=kind,
+                            source_mode=self._checked_source_mode,
+                            checked_at=self._checked_at, unavailable=tuple(unavailable),
+                            current_configuration=current_configuration)
+
+    def run_check(self) -> bool:
+        """Check current scope; false means not executed, never an implicit clean pass."""
+        import time
+        self._quality_report = {}
+        self._check_unavailable = []
+        self._checked_at = time.strftime("%Y-%m-%d %H:%M:%S")
+        self._checked_texts = {}
+        self._scope_paths = None
+        self._scope_note = "未知范围"
+        self._checked_source_mode = "unknown"
+        self._text_overrides = {}
+        try:
+            terms = self._terms.load()
+            self._render_terms(terms)
+            scope_paths, overrides, note = self._resolve_scope()
+            self._scope_paths, self._text_overrides, self._scope_note = scope_paths, overrides, note
+            self._checked_source_mode = "current-buffer" if overrides else "saved"
+            self._checked_scope_kind = self._scope_combo.currentData() if hasattr(self, "_scope_combo") else "document"
+            if scope_paths == []:
+                self._quality_report = {"complete": False, "executedCount": 0,
+                                        "configuration": {"valid": True, "source": "not-run"}}
+                self._issues = []
+                self._render_results()
+                if self._on_issues is not None:
+                    self._on_issues([])
+                self._scope_label.setText("范围：{0}（未选择章节，未执行）".format(note))
+                return False
+            linter = self._linter
+            scoped_used = False
+            if self._scoped_linter_provider is not None:
+                try:
+                    scoped = self._scoped_linter_provider(scope_paths, overrides)
+                except Exception as exc:
+                    scoped = None
+                    self._check_unavailable.append("当前作用域索引不可用：{0}".format(exc))
+                if scoped is not None:
+                    linter, scoped_used = scoped, True
+                elif not self._check_unavailable:
+                    self._check_unavailable.append("当前作用域索引未就绪")
+            if isinstance(linter, ContentLinter):
+                quality_run = linter.check_report(terms, term_warnings=getattr(self._terms, "warnings", []))
+                issues = quality_run.issues
+            else:
+                issues = linter.check_all(terms)
+                quality_run = getattr(linter, "last_report", None)
+            self._quality_report = quality_run.to_dict() if quality_run is not None else {}
+            if overrides and not scoped_used:
+                issues = [issue for issue in issues if issue.rel_path not in overrides]
+                self._check_unavailable.append("{0} 个活缓冲章节未实际检查，不能以磁盘结果代替".format(len(overrides)))
+            if scope_paths is not None:
+                allowed = set(scope_paths)
+                issues = [issue for issue in issues if issue.rel_path in allowed or issue.rule_id == "rule_configuration"]
+            self._issues = list(issues)
+            checked_index = getattr(linter, "_index", None)
+            self._checked_texts = {rel: tuple(lines) for rel, lines in
+                                   (getattr(checked_index, "lines", {}) or {}).items()
+                                   if scope_paths is None or rel in scope_paths}
+            if not self._check_unavailable:
+                checked = set(self._checked_texts)
+                self._stale_paths = [rel for rel in self._stale_paths if rel not in checked]
+        except Exception as exc:
+            self._issues = []
+            self._check_unavailable.append("无法读取范围/当前缓冲或执行检查：{0}".format(exc))
         self._page_size = ISSUE_PAGE_SIZE
-        if self._on_issues is not None:
-            self._on_issues(issues)
         self._refresh_category_combo()
         self._render_results()
         if hasattr(self, "_scope_label"):
-            self._scope_label.setText(
-                "范围：{0}{1}".format(note, "（含未保存正文）" if overrides else "")
-            )
+            self._scope_label.setText("范围：{0}{1} · 来源：{2}".format(
+                self._scope_note, "（含未保存正文）" if self._text_overrides else "",
+                "当前编辑缓冲 + 已保存正文" if self._text_overrides else "已保存正文"))
         if self._quality_report:
             data = self._quality_report
-            source = data.get("configuration", {}).get("source", "unknown")
             self._status_label.setText(self._status_label.text() + "；规则来源 {0}，已执行 {1}，关闭 {2}".format(
-                source, data["executedCount"], data["disabledCount"]))
-            if not data["configuration"].get("valid", False):
-                self._status_label.setText(self._status_label.text() + "；配置异常，检查未完成")
+                (data.get("configuration") or {}).get("source", "unknown"),
+                data.get("executedCount", "未知"), data.get("disabledCount", "未知")))
+        if self._check_unavailable:
+            self._status_label.setText(self._status_label.text() + "；" + "；".join(self._check_unavailable))
+        if self._on_issues is not None:
+            self._on_issues(list(self._issues))
+        return bool(self._quality_report) and not self._check_unavailable
 
     def add_term(self) -> None:
         if not self._writable:

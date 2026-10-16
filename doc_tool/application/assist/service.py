@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from doc_tool.application.assist.adoption import AdoptionOutcome, AdoptionSession
 from doc_tool.application.assist.models import (
@@ -23,7 +23,7 @@ from doc_tool.application.assist.models import (
     display_path,
 )
 from doc_tool.application.assist.provider import (
-    EnhancementResult, ProviderConfig, ProviderConfigStore, ProviderGateway, WritingProvider,
+    EnhancementPreview, EnhancementResult, ProviderConfig, ProviderConfigStore, ProviderGateway, WritingProvider,
 )
 from doc_tool.application.assist.search_local import (
     BufferDocument, EvidenceSource, LocalEvidenceSearch, SearchHit, SearchOutcome,
@@ -43,6 +43,7 @@ class AuthoringAssistant:
     buffers: Dict[str, str] = field(default_factory=dict)
     project_source_id: str = ""
     notes: List[str] = field(default_factory=list)
+    buffer_provider: Optional[Callable[[], Mapping[str, str]]] = field(default=None, repr=False)
 
     # --- 构造 ---
 
@@ -64,6 +65,11 @@ class AuthoringAssistant:
     ) -> "AuthoringAssistant":
         """按项目（可选模块库）装配辅助能力；缺配置时全部本地可用。"""
         root = Path(project_root)
+        try:
+            from doc_tool.domain.manifest import ProjectManifest
+            read_only = bool(read_only or not ProjectManifest.load(root).is_writable())
+        except Exception:
+            pass  # plain readable folders retain the caller's explicit policy
         project_source = EvidenceSource.from_project(root, read_only=read_only)
         sources: List[EvidenceSource] = [project_source]
         for module_root in module_roots or ():
@@ -108,8 +114,16 @@ class AuthoringAssistant:
             for rel_path, text in sorted(self.buffers.items())
         ]
         self.search_service.set_buffers(documents)
-        if self.suggestion_engine is not None and self.buffers:
+        if self.suggestion_engine is not None:
             self.suggestion_engine.apply_buffers(self.buffers)
+
+    def sync_live_buffers(self) -> None:
+        """Read the host's current overlay; a read failure never silently uses stale text."""
+        if self.buffer_provider is not None:
+            latest = self.buffer_provider()
+            if latest is None:
+                raise RuntimeError("无法读取当前编辑缓冲，未应用旧建议。")
+            self.set_buffers(latest)
 
     # --- 检索 ---
 
@@ -124,6 +138,7 @@ class AuthoringAssistant:
         cancel_token=None,
         **kwargs,
     ) -> SearchOutcome:
+        self.sync_live_buffers()
         return self.search_service.search(
             query,
             terms=terms,
@@ -152,6 +167,7 @@ class AuthoringAssistant:
         change_items: Optional[Sequence] = None,
         status_map: Optional[Mapping[str, str]] = None,
     ) -> SuggestionSet:
+        self.sync_live_buffers()
         if self.suggestion_engine is None:
             return SuggestionSet(coverage_notes=["未装配项目索引：本地建议不可用。"])
         return self.suggestion_engine.collect(
@@ -203,9 +219,17 @@ class AuthoringAssistant:
         include_ignored: bool = False,
     ) -> AdoptionOutcome:
         """采纳所选建议到编辑缓冲；返回可撤销事务与摘要候选。"""
+        self.sync_live_buffers()
         if suggestions is None:
             collected = self.suggest(status_map=status_map)
             suggestions = collected.suggestions
+        engine = self.suggestion_engine
+        index_service = getattr(engine, "_index_service", None)
+        targets = {s.target_rel_path for s in suggestions if s.suggestion_id in selected_ids}
+        if index_service is not None and refresh:
+            for rel in targets - set(self.buffers):
+                if rel:
+                    index_service.rebuild_file(engine.index, rel)
         if refresh and self.suggestion_engine is not None:
             self.suggestion_engine.refresh(
                 suggestions,
@@ -214,6 +238,12 @@ class AuthoringAssistant:
                 buffers=self.buffers or None,
             )
         working = dict(texts) if texts is not None else self.current_texts()
+        if texts is None and index_service is not None and refresh:
+            # Index lines omit the terminal newline; the editor comparison needs exact text.
+            for rel in targets - set(self.buffers):
+                path = index_service._resolve(rel) if rel else None
+                if path is not None and path.is_file():
+                    working[rel] = path.read_text(encoding="utf-8")
         outcome = self.adoption_session.adopt(
             suggestions, selected_ids, working, include_ignored=include_ignored
         )
@@ -223,7 +253,20 @@ class AuthoringAssistant:
         return outcome
 
     def undo(self, outcome: AdoptionOutcome) -> Tuple[bool, Dict[str, str], str]:
-        """一次撤销采纳；恢复的缓冲会同步回门面状态。"""
+        """Undo only the still-current adopted text, never later author edits."""
+        if outcome is None or outcome.transaction is None or outcome.transaction.undone:
+            return self.adoption_session.undo(outcome)
+        self.sync_live_buffers()
+        current = self.current_texts()
+        expected = outcome.buffer_updates
+        index_service = getattr(self.suggestion_engine, "_index_service", None)
+        if index_service is not None:
+            for rel in set(expected) - set(self.buffers):
+                path = index_service._resolve(rel)
+                if path is not None and path.is_file():
+                    current[rel] = path.read_text(encoding="utf-8")
+        if any(current.get(rel) != text for rel, text in expected.items()):
+            return False, {}, "采纳后正文已变化，未撤销也未覆盖新内容；可使用编辑器原生撤销。"
         done, restored, detail = self.adoption_session.undo(outcome)
         if done and restored:
             self.set_buffers({**self.buffers, **restored})
@@ -241,9 +284,11 @@ class AuthoringAssistant:
         return self.adoption_session.export_text(suggestions, selected_ids)
 
     def current_texts(self) -> Dict[str, str]:
+        texts = {}
         if self.suggestion_engine is not None and self.suggestion_engine.index is not None:
-            return self.suggestion_engine.current_texts()
-        return dict(self.buffers)
+            texts.update(self.suggestion_engine.current_texts())
+        texts.update(self.buffers)  # preserve the exact current text, including terminal newlines
+        return texts
 
     # --- 保存（沿用既有写入路径） ---
 
@@ -259,33 +304,40 @@ class AuthoringAssistant:
 
     # --- 可选增强 ---
 
-    def enhance(
-        self,
-        purpose: str,
-        *,
-        context_text: str = "",
-        evidence_ids: Sequence[str] = (),
-        scope_label: str = "",
-        cancel_token=None,
-    ) -> EnhancementResult:
-        """显式调用可选 provider；未启用时只返回本地候选。"""
+    def preview_enhance(self, purpose: str, *, context_text: str = "", evidence_ids: Sequence[str] = (),
+                        scope_label: str = "") -> EnhancementPreview:
+        self.sync_live_buffers()
         local: List[str] = []
+        explicit_context = bool(context_text)
         if purpose == PURPOSE_REVISION_SUMMARY:
             local = self.revision_summary_texts()
             if not context_text:
                 context_text = "\n".join(local)
-        elif purpose == PURPOSE_TERM:
+            label = "本地变更摘要候选（不自动包含全文）"
+        else:
             local = self.term_candidate_texts()
             if not context_text:
                 context_text = "\n".join(self._term_context())
-        return self.gateway.enhance(
-            purpose,
-            context_text=context_text,
-            local_candidates=local,
-            evidence_ids=evidence_ids,
-            scope_label=scope_label,
-            cancel_token=cancel_token,
-        )
+            label = "项目正文前50个非标题行（当前缓冲优先）"
+        return self.gateway.prepare(purpose, context_text=context_text, local_candidates=local,
+            evidence_ids=evidence_ids, scope_label=scope_label or (
+                "调用方明确选定的文本" if explicit_context else label))
+
+    def send_enhancement_preview(self, preview: EnhancementPreview, *, confirmed=False,
+                                 cancel_token=None) -> EnhancementResult:
+        if not confirmed:
+            class Cancelled:
+                is_cancelled = True
+            cancel_token = Cancelled()
+        return self.gateway.enhance(preview.purpose, context_text=preview.text,
+                                   prepared=preview, cancel_token=cancel_token)
+
+    def enhance(self, purpose: str, *, context_text: str = "", evidence_ids: Sequence[str] = (),
+                scope_label: str = "", cancel_token=None) -> EnhancementResult:
+        """Explicit API invocation, retained for CLI compatibility; GUI previews first."""
+        preview = self.preview_enhance(purpose, context_text=context_text,
+                                       evidence_ids=evidence_ids, scope_label=scope_label)
+        return self.send_enhancement_preview(preview, confirmed=True, cancel_token=cancel_token)
 
     def _term_context(self) -> List[str]:
         """术语增强的默认上下文：术语库 + 当前范围的术语相关行。"""
