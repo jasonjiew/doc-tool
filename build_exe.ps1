@@ -199,7 +199,8 @@ if (-not $SkipTests) {
     } else {
         $Internal = "$RepoRoot\dist\DocTool\_internal"
         foreach ($Need in @('python313.dll', 'Qt6Core.dll', 'shiboken6.abi3.dll')) {
-            if (-not (Test-Path "$Internal\$Need")) {
+            $found = (Test-Path "$Internal\$Need") -or (Test-Path "$Internal\PySide6\$Need") -or (Test-Path "$Internal\shiboken6\$Need")
+            if (-not $found) {
                 throw "onedir 产物缺少 $Internal\$Need——请确认构建时 PYTHONPATH 挂载了 build\pyside-runtime。"
             }
         }

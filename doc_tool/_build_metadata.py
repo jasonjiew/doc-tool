@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """固化的构建元数据（打包时自动生成）。"""
 
-COMMIT = "83094d0a0eb3"
-BUILD_TIME = "2026-10-14T05:16:24Z"
+COMMIT = "2fa695b652a9"
+BUILD_TIME = "2026-10-27T23:37:17Z"
 BUILD_SOURCE = "devflow-portable-package"
