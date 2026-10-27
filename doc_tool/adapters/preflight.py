@@ -670,6 +670,26 @@ def validate_heading_mapping(path: Union[str, Path], heading_style_map: Dict[str
     return ""
 
 
+def _unwrap_block_sdts(body) -> None:
+    """展开 body 下非目录的内容控件（w:sdt），使其内部段落直接平铺为 body 的子节点。"""
+    from doc_tool.adapters.importer import _is_toc_element
+    changed = True
+    while changed:
+        changed = False
+        for sdt in list(body.findall(_qn("sdt"))):
+            if _is_toc_element(sdt):
+                continue
+            content = sdt.find(_qn("sdtContent"))
+            if content is not None:
+                idx = body.index(sdt)
+                for child in list(content):
+                    body.insert(idx, child)
+                    idx += 1
+                body.remove(sdt)
+                changed = True
+                break
+
+
 def _build_heading_tree(
     parts: Dict[str, bytes], heading_style_map: Dict[str, int]
 ) -> List[HeadingInfo]:
@@ -679,6 +699,7 @@ def _build_heading_tree(
     body = root.find(_qn("body"))
     if body is None:
         return []
+    _unwrap_block_sdts(body)
 
     headings: List[HeadingInfo] = []
     for index, elem in enumerate(body):

@@ -69,6 +69,14 @@ A = "{" + A_NS + "}"
 WP = "{" + WP_NS + "}"
 
 
+def _local_tag(el) -> str:
+    """安全获取 XML 节点本地名称，对 XML 注释及特殊节点不报错。"""
+    if el is None or not isinstance(getattr(el, "tag", None), str):
+        return ""
+    tag = el.tag
+    return tag.split("}")[-1] if "}" in tag else tag
+
+
 def _qn(tag: str) -> str:
     return W + tag
 
@@ -128,6 +136,75 @@ class TemplateMeta:
     heading_style_decisions: Dict[int, str] = field(default_factory=dict)
 
 
+def _is_toc_element(el) -> bool:
+    """判断元素是否属于目录容器或目录域（支持段落与 w:sdt 控件）。"""
+    for node in el.iter():
+        name = _local_tag(node)
+        if name == "docPartGallery":
+            val = (node.get("val") or node.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val") or "").lower()
+            if "table of contents" in val or "toc" in val:
+                return True
+        elif name == "fldSimple":
+            instr = (node.get("instr") or node.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}instr") or "").upper()
+            if "TOC" in instr:
+                return True
+        elif name == "instrText":
+            if "TOC" in (node.text or "").upper():
+                return True
+        elif name == "pStyle":
+            val = (node.get("val") or node.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val") or "").lower()
+            if "toc" in val:
+                return True
+    return False
+
+
+def _unwrap_block_sdts(body) -> None:
+    """展开 body 下非目录的内容控件（w:sdt），使其内部段落与表格直接平铺为 body 的子节点。"""
+    changed = True
+    while changed:
+        changed = False
+        for sdt in list(body.findall(_qn("sdt"))):
+            if _is_toc_element(sdt):
+                continue
+            content = sdt.find(_qn("sdtContent"))
+            if content is not None:
+                idx = body.index(sdt)
+                for child in list(content):
+                    body.insert(idx, child)
+                    idx += 1
+                body.remove(sdt)
+                changed = True
+                break
+
+
+def _find_pre_title_body_start(children: list, first_heading_idx: int) -> int:
+    """定位首个标题前属于引言正文的起始索引，跳过封面区表格、修订记录表、目录域及分节符。"""
+    last_structural_idx = -1
+    for idx in range(min(first_heading_idx, len(children))):
+        el = children[idx]
+        tag = _local_tag(el)
+        if tag == "tbl":
+            last_structural_idx = idx
+        elif _is_toc_element(el):
+            last_structural_idx = idx
+        elif tag == "p":
+            has_sect = any(_local_tag(child) == "sectPr" for child in el.iter())
+            if has_sect:
+                last_structural_idx = idx
+
+    start_idx = last_structural_idx + 1 if last_structural_idx >= 0 else 0
+    while start_idx < first_heading_idx:
+        el = children[start_idx]
+        if _local_tag(el) == "p":
+            txt = _para_text(el).strip()
+            if txt or _para_has_image(el) or _unsupported_features(el):
+                break
+        elif _local_tag(el) == "tbl":
+            break
+        start_idx += 1
+    return start_idx
+
+
 def generate_template(
     source_docx: Union[str, Path],
     target_template: Union[str, Path],
@@ -135,6 +212,7 @@ def generate_template(
     allow_missing_headings: bool = False,
     paragraph_levels: Optional[Dict[int, int]] = None,
     split_policy: Optional[SplitPolicy] = None,
+    retain_pre_title_body: bool = False,
 ) -> TemplateMeta:
     """从源 DOCX 生成项目模板（任务 4.1）。
 
@@ -169,8 +247,11 @@ def generate_template(
 
     root = parse_xml_safe(document_xml, "word/document.xml")
     body = root.find(_qn("body"))
+    if body is not None:
+        _unwrap_block_sdts(body)
     if body is None:
         raise ValueError("源文档 document.xml 缺少 w:body，无法生成模板。")
+    _unwrap_block_sdts(body)
 
     user_heading_map: Optional[Dict[str, int]] = None
     if heading_style_map is None:
@@ -238,10 +319,16 @@ def generate_template(
         else:
             raise ValueError("源文档未找到第一个 Heading 1，无法确定正文起点。")
 
-    # 删除正文元素（保留 sectPr）
+    cut_idx = start_idx
+    if retain_pre_title_body and start_idx is not None and start_idx > 0 and _has_meaningful_content(children[:start_idx]):
+        pre_body_start = _find_pre_title_body_start(children, start_idx)
+        if pre_body_start < start_idx:
+            cut_idx = pre_body_start
+
+    # 删除正文元素（从 cut_idx 开始，保留 sectPr）
     removed = 0
-    for el in children[start_idx:]:
-        if etree.QName(el).localname == "sectPr":
+    for el in children[cut_idx:]:
+        if _local_tag(el) == "sectPr":
             continue
         body.remove(el)
         removed += 1
@@ -321,7 +408,7 @@ def _find_first_heading1(
     paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> Optional[int]:
     for i, el in enumerate(children):
-        if etree.QName(el).localname != 'p':
+        if _local_tag(el) != 'p':
             continue
         lvl = (paragraph_levels or {}).get(i) if paragraph_levels else None
         if lvl is None:
@@ -338,7 +425,7 @@ def _find_first_heading(
     paragraph_levels: Optional[Dict[int, int]] = None,
 ) -> Optional[int]:
     for i, el in enumerate(children):
-        if etree.QName(el).localname != 'p':
+        if _local_tag(el) != 'p':
             continue
         lvl = (paragraph_levels or {}).get(i) if paragraph_levels else None
         if lvl is None:
@@ -351,7 +438,7 @@ def _find_first_heading(
 
 def _find_first_content(children: List) -> int:
     for i, el in enumerate(children):
-        local = etree.QName(el).localname
+        local = _local_tag(el)
         if local == "tbl":
             return i
         if local == "p":
@@ -477,8 +564,10 @@ def extract_content(
     pre_title_chapter: Optional[str] = None
     if retain_pre_title_body and start_idx is not None and start_idx > 0:
         if _has_meaningful_content(children[:start_idx]):
-            pre_title_chapter = pre_title_title
-            start_idx = 0
+            pre_body_start = _find_pre_title_body_start(children, start_idx)
+            if pre_body_start < start_idx:
+                pre_title_chapter = pre_title_title
+                start_idx = pre_body_start
 
     img_map: List[Dict] = []
     tbl_map: List[Dict] = []
@@ -494,7 +583,7 @@ def extract_content(
     for element_index, el in enumerate(children):
         if element_index < start_idx:
             continue
-        tag = etree.QName(el).localname
+        tag = _local_tag(el)
         if tag == "sectPr":
             continue
         if tag == "p":
@@ -671,7 +760,7 @@ def _para_text_raw(p) -> str:
     """
     parts: List[str] = []
     for node in p.iter():
-        tag = etree.QName(node).localname
+        tag = _local_tag(node)
         if tag == "t":
             parts.append(node.text or "")
         elif tag == "tab":
@@ -730,7 +819,7 @@ def _has_meaningful_content(children) -> bool:
     ``start_idx`` 选择时被整段跳过，既没有事实记录也没有正文占位（复核发现）。
     """
     for el in children or ():
-        tag = etree.QName(el).localname
+        tag = _local_tag(el)
         if tag == "p":
             if _para_text(el).strip() or _para_has_image(el) or _unsupported_features(el):
                 return True

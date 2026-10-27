@@ -101,9 +101,9 @@ class LocalHistoryTests(unittest.TestCase):
         index = self.store._folder(self.rel) / "index.json"
         index.write_text("broken", encoding="utf-8")
         self.assertEqual(self.entries()[0].snapshot_id, result.history_id)
-        self.assertEqual(index.read_text(), "broken")
+        self.assertEqual(index.read_text(encoding="utf-8"), "broken")
         self.store.rebuild_index(self.rel)
-        self.assertEqual(json.loads(index.read_text())["schemaVersion"], 1)
+        self.assertEqual(json.loads(index.read_text(encoding="utf-8"))["schemaVersion"], 1)
 
     def test_count_quota_and_newest_are_preserved(self):
         for n in range(25):

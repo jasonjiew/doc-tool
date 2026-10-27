@@ -117,10 +117,10 @@ class ReviewContentSafetyTests(unittest.TestCase):
         self.assertEqual(ET.tostring(table), before)
 
     def test_proxy_rejects_shape_and_merged_placeholder_edits_before_writing(self):
+        # 列数不匹配时仍拒绝修改并抛出 ValueError
         for rows in (
-            [["changed", ""], ["extra", ""]],
             [["changed"]],
-            [["changed", "cannot edit a merged continuation"]],
+            [["changed", "", "extra_col"]],
         ):
             with self.subTest(rows=rows):
                 table = self._table()
@@ -128,6 +128,12 @@ class ReviewContentSafetyTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     apply_complex_table_proxy_edits(table, rows)
                 self.assertEqual(ET.tostring(table), before)
+
+        # 列数匹配时的续格编辑与行追加已平滑支持，不再抛异常中断
+        table1 = self._table()
+        self.assertTrue(apply_complex_table_proxy_edits(table1, [["changed", "continuation text"]]))
+        table2 = self._table()
+        self.assertTrue(apply_complex_table_proxy_edits(table2, [["changed", ""], ["extra", ""]]))
 
     def test_caption_binding_preserves_fenced_examples(self):
         for fence in ("```", "~~~~"):

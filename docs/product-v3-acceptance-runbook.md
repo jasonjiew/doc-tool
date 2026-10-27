@@ -21,7 +21,7 @@
 | A4 | V3.2 7.5 同步/归档 | 授权 | 同上 | 同上 |
 | B1 | V3.1 6.3 真实团队交接 | 人工 | `team-flow` + 双目录试跑 | 两位作者交接后无静默覆盖，冲突可见且可跳过 |
 | B2 | V3.3 6.2 三类文档人工试点 | 人工 | `assist-search`/`assist-suggest`/`assist-adopt` | 三类文档各有可采纳建议，且采纳可撤销 |
-| C1 | 实机 Word：正式化与换机 | 环境 | `V32_REAL_WORD=1` 两个用例 | 用例 Ran OK，产物可打开 |
+| C1 | CORE 6.8 实机 Word：正式化与换机 | 环境 | `V32_REAL_WORD=1` 两个用例 | 用例 Ran OK，产物可打开 |
 | C2 | 冻结包写入类闭环 | 环境 | `build_exe.ps1` + `doc-tool-cli.exe env-check` | `env-check` 报 ok=true；导入/转换产出可读文件 |
 | C3 | 高 DPI 物理 125%/150% | 环境 | `test_core_hidpi_layout.py` + 实机缩放 | 物理缩放下窗口可达、无横向溢出 |
 | C4 | 两机交接（真实两台机器） | 环境 | 交接包 + 另一台机器应用 | 另一台机器可应用且幂等 |

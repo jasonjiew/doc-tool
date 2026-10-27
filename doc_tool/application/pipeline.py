@@ -472,7 +472,11 @@ def _sync_revision_version(
     result.events.append(StageEvent(STAGE_REVISION, "started"))
     log.info(STAGE_REVISION, "started")
     original = str(revision_sync.get("original_version") or "")
-    if version == original:
+    if revision_sync.get("export_override"):
+        manifest.documentVersion = version
+        revision_sync["applied"] = version != original
+        detail = "使用本次导出指定的版本号：{0}".format(version)
+    elif version == original:
         detail = "文档版本号已与 _revision_record.md 末行一致：{0}".format(version)
     else:
         manifest.documentVersion = version
@@ -548,6 +552,8 @@ def run_pipeline(
     output_override: Optional[str] = None,
     auto_revision: bool = False,
     revision_author: str = "系统",
+    document_version_override: Optional[str] = None,
+    document_properties: Optional[Dict[str, str]] = None,
 ) -> PipelineResult:
     """执行构建→前校验→Word 刷新→后校验管线，返回结构化结果。
 
@@ -665,6 +671,11 @@ def run_pipeline(
             auto_revision=auto_revision,
             revision_author=revision_author,
         )
+        if document_version_override is not None:
+            if revision_sync is None:
+                revision_sync = {"original_version": manifest.documentVersion, "applied": False}
+            revision_sync["new_version"] = document_version_override
+            revision_sync["export_override"] = True
         result = _run_pipeline_inner(
             manifest, paths, skip_word_refresh, baseline, cancel_token,
             result, log, build_with_project, refresh_with_project,
@@ -673,6 +684,8 @@ def run_pipeline(
             chapter_scope=chapter_scope,
             variant_id=variant_id,
             output_override=output_override,
+            fixed_document_version=document_version_override is not None,
+            document_properties=document_properties,
         )
         if not result.success:
             _rollback_revision_sync(revision_sync, manifest, log)
@@ -796,6 +809,8 @@ def _run_pipeline_inner(
     chapter_scope: Optional[List[str]] = None,
     variant_id: Optional[str] = None,
     output_override: Optional[str] = None,
+    fixed_document_version: bool = False,
+    document_properties: Optional[Dict[str, str]] = None,
 ) -> PipelineResult:
     """管线内部执行（锁已获取），分离以便 finally 释放锁。
 
@@ -1095,16 +1110,32 @@ def _run_pipeline_inner(
     result.events.append(StageEvent(STAGE_BUILD, "started"))
     log.info(STAGE_BUILD, "started")
     try:
+        build_policy = merge_policy
+        if not skip_word_refresh:
+            # Word will regenerate the TOC. A synthetic TOC containing PAGEREFs
+            # to chapter bookmarks makes Word discard those bookmarks on update.
+            from dataclasses import replace
+            from doc_tool.domain.merge_policy import resolve_merge_policy
+
+            raw_policy = merge_policy if merge_policy is not None else getattr(manifest, "mergePolicy", None)
+            build_policy = replace(
+                resolve_merge_policy({"mergePolicy": raw_policy, "chapterScope": effective_scope}),
+                synthesize_static_fields=False,
+            )
         # 先删除可能残留的临时文件，避免上次失败遗留
         _cleanup_temp()
         expression_warnings: List[str] = []
+        build_options = {"fixed_document_version": True} if fixed_document_version else {}
+        if document_properties:
+            build_options["export_properties"] = document_properties
         built_path = build_with_project(
             manifest, paths, output_override=str(temp_output),
             on_warning=expression_warnings.append,
             prepared=prepared_sources or None,
-            merge_policy=merge_policy,
+            merge_policy=build_policy,
             chapter_scope=effective_scope or None,
             chapter_order=effective_order,
+            **build_options,
         )
         if Path(built_path).resolve() != temp_output.resolve() or not temp_output.is_file():
             raise BuildError(
@@ -1168,6 +1199,7 @@ def _run_pipeline_inner(
             output_override=str(temp_output),
             baseline=effective_baseline,
             require_refreshed=False,
+            report_override=str(paths.logs_dir / "{0}-validation-pre.md".format(manifest.documentType)),
             asset_overrides=asset_overrides,
             prepared_texts=prepared_texts,
             merge_policy=merge_policy,
@@ -1389,6 +1421,14 @@ def _run_pipeline_inner(
             log.error(STAGE_VALIDATE_POST, exception=exc)
             result.error_code = err.code
             _record_stage(STAGE_VALIDATE_POST, "failed")
+            preserved = _preserve_pending_output()
+            if preserved:
+                result.events.append(StageEvent(
+                    STAGE_VALIDATE_POST, "warning",
+                    detail="已保留可打开的待确认副本：{0}".format(preserved),
+                ))
+                result.pending_output_path = preserved
+                result.output_path = str(preserved)
             _cleanup_temp()
             write_state(
                 str(formal_output),
@@ -1405,6 +1445,14 @@ def _run_pipeline_inner(
 
     # --- 阶段 5：原子发布（临界区，不可取消） ---
     if not post_ok:
+        preserved = _preserve_pending_output()
+        if preserved:
+            result.events.append(StageEvent(
+                STAGE_VALIDATE_POST, "warning",
+                detail="已保留可打开的待确认副本：{0}".format(preserved),
+            ))
+            result.pending_output_path = preserved
+            result.output_path = str(preserved)
         _cleanup_temp()
         write_state(
             str(formal_output),

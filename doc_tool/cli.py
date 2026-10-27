@@ -40,7 +40,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog=CLI_NAME,
-        description=PRODUCT_DESCRIPTION,
+        description=(
+            f"{PRODUCT_DESCRIPTION}\n\n"
+            "核心主航道三步闭环：\n"
+            "  1. 拆解文档：doc-tool decompose (或 import) --docx <源.docx> --name <项目名> [--retain-pre-title]\n"
+            "  2. 检查项目：doc-tool check --project <项目目录> (查看属性: doc-tool export --project <项目目录> --inspect-properties)\n"
+            "  3. 还原导出：doc-tool export (或 project-export) --project <项目目录> [--document-no ...] [--document-name ...] [--document-version ...] [-D KEY=VALUE]"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="store_true", help="显示应用版本与构建信息")
     sub = parser.add_subparsers(dest="command")
@@ -112,6 +119,15 @@ def build_parser() -> argparse.ArgumentParser:
     build_p = sub.add_parser("build", help="构建并校验文档（项目上下文）")
     build_p.add_argument("--skip-word-refresh", action="store_true")
     build_p.add_argument("--project", required=True, help="项目目录")
+    build_p.add_argument("--output-file", default=None, help="覆盖输出文件路径")
+    build_p.add_argument("--document-no", default=None, help="覆盖文件编号")
+    build_p.add_argument("--document-name", default=None, help="覆盖文件名称")
+    build_p.add_argument("--document-version", default=None, help="覆盖版本号")
+    build_p.add_argument("--property", "-D", dest="properties", action="append", default=[], help="覆盖属性 KEY=VALUE")
+    build_p.add_argument("--chapters", default=None, help="指定构建的章节列表（逗号分隔）")
+    build_p.add_argument("--variant", default="", help="产品变体 ID")
+    build_p.add_argument("--output", choices=["human", "json"], default="human", help="输出格式")
+    build_p.add_argument("--json", action="store_true", help="等价 --output json")
     # 修订记录没有命令行参数：内容与版本号都由 content/<类型>/_revision_record.md
     # 一处维护，构建按该文件为准（末行版本号 → documentVersion，数据行整表覆盖
     # Word 修订记录表）。CI/脚本要写修订记录就直接改那个文件。
@@ -121,7 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--docx", required=True)
     _add_output(preflight)
 
-    import_p = sub.add_parser("import", help="首次导入项目")
+    import_p = sub.add_parser("import", aliases=["decompose"], help="首次导入/拆解项目 (别名: decompose)")
     import_p.add_argument("--docx", required=True)
     import_p.add_argument("--name", required=True)
     import_p.add_argument("--target-dir", default=".")
@@ -133,6 +149,27 @@ def build_parser() -> argparse.ArgumentParser:
     import_p.add_argument("--document-no", default="")
     import_p.add_argument("--document-name", default="")
     import_p.add_argument("--document-version", default="")
+    import_p.add_argument(
+        "--retain-pre-title", action="store_true",
+        help="将首个一级标题前的引言正文保留为独立 Markdown 章节（如 01-前言.md）",
+    )
+    import_p.add_argument(
+        "--pre-title-title", default="前言",
+        help="搭配 --retain-pre-title 使用的前置章节标题（默认：前言）",
+    )
+    import_p.add_argument(
+        "--ignore-roundtrip-block", action="store_true",
+        help="忽略往返差异门禁 BLOCK 项（允许结构性变更导入）",
+    )
+    import_p.add_argument(
+        "--allow-missing-headings", action="store_true", default=True,
+        help="当源文档缺少标准 Heading 1 时允许按大纲/启发式规则自动识别标题层级（默认开启）",
+    )
+    import_p.add_argument(
+        "--split-level", type=int, choices=(1, 2, 3, 4), default=0,
+        help="指定章节文件拆分的最大标题层级（1~4，0 表示沿用默认拆分策略）",
+    )
+    import_p.add_argument("--json", action="store_true", help="等价 --output json")
     # CORE R5：命名导入映射预设（应用 / 保存）
     import_p.add_argument("--preset", default="", help="应用的命名导入映射预设（未命中项回退自动识别）")
     import_p.add_argument("--save-preset", dest="save_preset", default="",
@@ -243,7 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output(renumber_p)
 
     pexport_p = sub.add_parser(
-        "project-export",
+        "project-export", aliases=["export", "restore"],
         help="项目统一出稿：Word/PDF/离线HTML/源码包，同一轮内容，支持仅补失败格式",
     )
     pexport_p.add_argument("--project", required=True, help="项目目录（含 project.yml）")
@@ -303,6 +340,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--retry-formats", default="",
         help="与 --retry-of 搭配：只补这些格式（逗号分隔）；缺省补全部失败/待转换格式",
     )
+    pexport_p.add_argument("--document-no", default=None, help="本次导出覆盖的文件编号（缺省沿用项目或模板）")
+    pexport_p.add_argument("--document-name", default=None, help="本次导出覆盖的文件名称（缺省沿用项目或模板）")
+    pexport_p.add_argument("--document-version", default=None, help="本次导出覆盖的版本号（缺省取 _revision_record.md 末行或清单）")
+    pexport_p.add_argument(
+        "--property", "-D", dest="properties", action="append", default=[],
+        help="覆盖 Word 文档属性（格式 KEY=VALUE，如 custom:项目=二期 或 项目=二期 或 core:subject=主题，可重复指定）",
+    )
+    pexport_p.add_argument("--variant", default="", help="产品变体 ID（缺省主版本）")
+    pexport_p.add_argument(
+        "--inspect-properties", action="store_true",
+        help="仅列出该项目模板可编辑的文档字段与自定义属性（支持 --output human|json），不执行导出",
+    )
+    pexport_p.add_argument("--json", action="store_true", help="等价 --output json")
     pexport_p.add_argument(
         "--output", choices=["human", "json"], default="human",
         help="输出形式：human 摘要 / json 单一机器报告",
@@ -747,7 +797,7 @@ def _convert_command(args) -> int:
         on_progress=_progress,
         template_path=template_path,
     )
-    if getattr(args, "output", "human") == "json":
+    if getattr(args, "output", "human") == "json" or getattr(args, "json", False):
         import json
 
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
@@ -916,6 +966,78 @@ def _project_export_command(args) -> int:
     if not (project / "project.yml").is_file():
         print("项目目录缺少 project.yml：{0}".format(project), file=sys.stderr)
         return 2
+
+    # --inspect-properties 处理
+    if getattr(args, "inspect_properties", False):
+        from doc_tool.domain.manifest import ProjectManifest
+        from doc_tool.domain.paths import ProjectPaths
+        from doc_tool.application.export.document_properties import (
+            read_template_reserved_properties,
+            inspect_document_properties,
+        )
+        from doc_tool.application.content.revision_record import document_version_from_record
+
+        manifest = ProjectManifest.load(project)
+        paths = ProjectPaths(project)
+        reserved_props = read_template_reserved_properties(paths.template_docx) if paths.template_docx.is_file() else {}
+        props = inspect_document_properties(paths.template_docx) if paths.template_docx.is_file() else {}
+        rev_md = paths.resolve(manifest.relative_content_root()) / "_revision_record.md"
+        rev_ver = document_version_from_record(rev_md) if rev_md.is_file() else None
+
+        info = {
+            "documentNo": manifest.documentNo or reserved_props.get("文档编号") or reserved_props.get("文件编号") or "",
+            "documentName": manifest.documentName or reserved_props.get("文件名称") or reserved_props.get("文档名称") or "",
+            "documentVersion": rev_ver or manifest.documentVersion or "",
+            "documentType": manifest.documentType,
+            "properties": props,
+        }
+        if getattr(args, "output", "human") == "json" or getattr(args, "json", False):
+            print(json.dumps(info, ensure_ascii=False, indent=2))
+        else:
+            print("文件编号: {0}".format(info["documentNo"]))
+            print("文件名称: {0}".format(info["documentName"]))
+            print("版本号: {0}".format(info["documentVersion"]))
+            print("文档类型: {0}".format(info["documentType"]))
+            print("可编辑属性:")
+            for k, v in props.items():
+                print("  - {0} ({1}): {2}".format(k, v.get("label", ""), v.get("value", "")))
+        return 0
+
+    # 解析 --property 参数
+    doc_props = {}
+    from doc_tool.domain.manifest import ProjectManifest
+    from doc_tool.domain.paths import ProjectPaths
+    from doc_tool.application.export.document_properties import inspect_document_properties
+
+    _m = ProjectManifest.load(project)
+    _p = ProjectPaths(project)
+    available_props = inspect_document_properties(_p.template_docx) if _p.template_docx.is_file() else {}
+
+    for item in (getattr(args, "properties", []) or []):
+        if "=" in item:
+            key, val = item.split("=", 1)
+            key = key.strip()
+            val = val.strip()
+            if not key.startswith("custom:") and not key.startswith("core:"):
+                if ("custom:" + key) in available_props:
+                    key = "custom:" + key
+                elif ("core:" + key) in available_props:
+                    key = "core:" + key
+                else:
+                    # 尝试按 label 匹配
+                    matched_key = None
+                    for ak, av in available_props.items():
+                        if av.get("label") == key:
+                            matched_key = ak
+                            break
+                    if matched_key:
+                        key = matched_key
+                    else:
+                        key = "custom:" + key
+            doc_props[key] = val
+        else:
+            print("属性参数格式非法（必须为 KEY=VALUE，如 custom:项目=二期 或 项目=二期）: {0}".format(item), file=sys.stderr)
+            return 2
     source_mode = getattr(args, "source_mode", "saved")
     if source_mode == SOURCE_MODE_CURRENT_BUFFER:
         print(
@@ -973,6 +1095,11 @@ def _project_export_command(args) -> int:
             refresh=not bool(getattr(args, "no_refresh", False)),
             strict=bool(getattr(args, "strict", False)),
             include_original=bool(getattr(args, "include_original", False)),
+            variant_id=str(getattr(args, "variant", "") or ""),
+            document_no=getattr(args, "document_no", None),
+            document_name=getattr(args, "document_name", None),
+            document_version=getattr(args, "document_version", None),
+            document_properties=doc_props,
         )
         # 内核/管线会把过程输出打印到 stdout；机器报告必须保持纯净。
         with contextlib.redirect_stdout(sys.stderr):
@@ -1658,12 +1785,58 @@ def _legacy(args, parser: argparse.ArgumentParser) -> Optional[int]:
     ensure_kernel_importable()
     from doc_tool.application.pipeline import run_pipeline
     from doc_tool.domain.manifest import ProjectManifest
-    manifest = ProjectManifest.load(args.project)
-    result = run_pipeline(
-        manifest,
-        manifest.resolve_paths(args.project),
-        skip_word_refresh=args.skip_word_refresh,
-    )
+    try:
+        manifest = ProjectManifest.load(args.project)
+        paths = manifest.resolve_paths(args.project)
+    except Exception as exc:
+        print("无法加载项目清单 ({0}): {1}".format(args.project, exc), file=sys.stderr)
+        return 2
+    build_props = {}
+    for item in (getattr(args, "properties", []) or []):
+        if "=" in item:
+            k, v = item.split("=", 1)
+            build_props[k.strip()] = v.strip()
+        else:
+            print("属性参数格式非法（必须为 KEY=VALUE）: {0}".format(item), file=sys.stderr)
+            return 2
+
+    effective_chapters = [c.strip() for c in args.chapters.split(",") if c.strip()] if getattr(args, "chapters", None) else None
+    is_json = getattr(args, "output", "human") == "json" or getattr(args, "json", False)
+
+    extra_pipeline_kwargs = {}
+    if getattr(args, "output_file", None):
+        extra_pipeline_kwargs["output_override"] = args.output_file
+    if getattr(args, "document_version", None):
+        extra_pipeline_kwargs["document_version_override"] = args.document_version
+    if build_props:
+        extra_pipeline_kwargs["document_properties"] = build_props
+    if effective_chapters:
+        extra_pipeline_kwargs["chapter_scope"] = effective_chapters
+
+    if is_json:
+        with contextlib.redirect_stdout(sys.stderr):
+            result = run_pipeline(
+                manifest,
+                paths,
+                skip_word_refresh=args.skip_word_refresh,
+                **extra_pipeline_kwargs,
+            )
+        json_report = {
+            "success": result.success,
+            "outputPath": result.output_path or result.pending_output_path or "",
+            "errorCode": result.error_code or "",
+            "stages": [{"stage": e.stage, "status": e.status, "detail": e.detail, "errorCode": e.error_code} for e in result.events],
+            "warnings": [e.detail for e in result.events if e.status == "warning"],
+        }
+        print(json.dumps(json_report, ensure_ascii=False, indent=2))
+        return 0 if result.success else 1
+    else:
+        result = run_pipeline(
+            manifest,
+            paths,
+            skip_word_refresh=args.skip_word_refresh,
+            **extra_pipeline_kwargs,
+        )
     for event in result.events:
         line = "[{0}] {1}".format(event.status.upper(), event.stage)
         if event.detail:
@@ -2052,7 +2225,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return _intake_presets_command(args)
     if args.command == "team-flow":
         return _team_flow_command(args)
-    if args.command == "project-export":
+    if args.command in ("project-export", "export", "restore"):
         # 统一出稿自带机器报告与退出码约定，不走质量命令的序列化通道。
         return _project_export_command(args)
     if args.command == "convert":
@@ -2086,7 +2259,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     with contextlib.redirect_stdout(sys.stderr):
         if args.command == "preflight":
             result = preflight_command(args.docx)
-        elif args.command == "import":
+        elif args.command in ("import", "decompose"):
             result = import_command(args)
         elif args.command == "validate":
             result = validate_command(args.project)
@@ -2112,7 +2285,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         output = serialize_sarif(result)
     elif getattr(args, "format", None) == "junit":
         output = serialize_junit(result)
-    elif getattr(args, "output", "human") == "json":
+    elif getattr(args, "output", "human") == "json" or getattr(args, "json", False):
         output = serialize_json(result)
     else:
         output = serialize_human(result)

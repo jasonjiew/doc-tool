@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import re
 from typing import Dict, List, Optional, Sequence, Set, Tuple
@@ -402,7 +403,7 @@ TABLE_PROXY_END = "<!-- TABLE_PROXY_END -->"
 
 def _cell_visible_text(tc: ET.Element) -> str:
     paragraphs: List[str] = []
-    for p in tc.findall(_qn("p")):
+    for p in tc.iter(_qn("p")):
         parts: List[str] = []
         for child in p.iter():
             tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
@@ -500,23 +501,33 @@ def format_complex_table_proxy_lines(tbl_elem: ET.Element) -> List[str]:
     return out
 
 
-def _update_tc_text_preserving_style(tc: ET.Element, new_text: str) -> None:
-    """将 ``new_text``（含可选 ``<br>``）写入 ``<w:tc>``，保留首个段落及首个 run 的样式属性。"""
+def _sub_element(parent, tag: str, attrib=None, **extra):
+    attrs = dict(attrib or {})
+    attrs.update(extra)
+    if hasattr(parent, "makeelement"):
+        el = parent.makeelement(tag, attrs)
+        parent.append(el)
+        return el
+    return ET.SubElement(parent, tag, attrs)
+
+
+def _update_tc_text_preserving_style(tc, new_text: str) -> None:
+    """将 new_text（含可选 <br>）写入 <w:tc>，保留首个段落及首个 run 的样式属性（兼容 lxml 与 xml.etree）。"""
     paragraphs = tc.findall(_qn("p"))
     lines = re.split(r"<br\s*/?>|\n", new_text, flags=re.I)
     if not paragraphs:
-        p = ET.SubElement(tc, _qn("p"))
-        r = ET.SubElement(p, _qn("r"))
-        t = ET.SubElement(r, _qn("t"))
+        p = _sub_element(tc, _qn("p"))
+        r = _sub_element(p, _qn("r"))
+        t = _sub_element(r, _qn("t"))
         t.text = lines[0] if lines else ""
         return
 
     first_p = paragraphs[0]
-    first_rPr: Optional[ET.Element] = None
+    first_rPr = None
     for r in first_p.findall(_qn("r")):
         rPr = r.find(_qn("rPr"))
         if rPr is not None:
-            first_rPr = ET.fromstring(ET.tostring(rPr, encoding="utf-8"))
+            first_rPr = copy.deepcopy(rPr)
             break
 
     keep_children = []
@@ -528,13 +539,13 @@ def _update_tc_text_preserving_style(tc: ET.Element, new_text: str) -> None:
     for child in keep_children:
         first_p.append(child)
 
-    r_new = ET.SubElement(first_p, _qn("r"))
+    r_new = _sub_element(first_p, _qn("r"))
     if first_rPr is not None:
         r_new.append(first_rPr)
     for idx, part in enumerate(lines):
         if idx > 0:
-            ET.SubElement(r_new, _qn("br"))
-        t_el = ET.SubElement(r_new, _qn("t"))
+            _sub_element(r_new, _qn("br"))
+        t_el = _sub_element(r_new, _qn("t"))
         if part.startswith(" ") or part.endswith(" "):
             t_el.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
         t_el.text = part
@@ -549,32 +560,103 @@ def apply_complex_table_proxy_edits(
 ) -> bool:
     """Apply text edits only; unedited cells retain their original XML.
 
-    Shape changes and merged continuation edits cannot be represented losslessly
-    by the proxy, so validate the whole grid before mutating any cell.
+    支持合并续格自动归并到主单元格，支持数据行动态增删（列数一致时），
+    若列数不一致抛出 ValueError 触发降级渲染。
     """
     if not proxy_rows:
         return False
+
+    def normalized(value):
+        return re.sub(r"<br\s*/?>", "\n", str(value or ""), flags=re.I).replace("\r\n", "\n").strip()
+
     orig_rows, tc_matrix = extract_complex_table_proxy_rows(tbl_elem)
+    structural_change = False
+
+    # 动态增删数据行（当列数完全一致时）
+    if orig_rows and all(len(r) == len(orig_rows[0]) for r in proxy_rows):
+        if len(proxy_rows) > len(orig_rows):
+            structural_change = True
+            trs = tbl_elem.findall(_qn("tr"))
+            if trs:
+                last_tr = trs[-1]
+                for new_row in proxy_rows[len(orig_rows):]:
+                    new_tr = copy.deepcopy(last_tr)
+                    for tc in new_tr.findall(_qn("tc")):
+                        tcPr = tc.find(_qn("tcPr"))
+                        if tcPr is not None:
+                            vMerge = tcPr.find(_qn("vMerge"))
+                            if vMerge is not None:
+                                tcPr.remove(vMerge)
+                    tcs = new_tr.findall(_qn("tc"))
+                    c_idx = 0
+                    for tc in tcs:
+                        span = _cell_grid_span(tc)
+                        val = new_row[c_idx] if c_idx < len(new_row) else ""
+                        _update_tc_text_preserving_style(tc, normalized(val))
+                        c_idx += span
+                    tbl_elem.append(new_tr)
+                orig_rows, tc_matrix = extract_complex_table_proxy_rows(tbl_elem)
+        elif len(proxy_rows) < len(orig_rows):
+            structural_change = True
+            trs = tbl_elem.findall(_qn("tr"))
+            excess = len(orig_rows) - len(proxy_rows)
+            for tr in trs[-excess:]:
+                tbl_elem.remove(tr)
+            orig_rows, tc_matrix = extract_complex_table_proxy_rows(tbl_elem)
+
     if len(proxy_rows) != len(orig_rows) or any(
         len(new) != len(old) for old, new in zip(orig_rows, proxy_rows)
     ):
         raise ValueError("Complex-table proxy dimensions differ from the original XML")
 
-    def normalized(value):
-        return re.sub(r"<br\s*/?>", "\n", str(value or ""), flags=re.I).replace("\r\n", "\n").strip()
+    # 构建每个逻辑单元格的主单元格引用映射（用于合并续格编辑归并）
+    master_map: List[List[Optional[ET.Element]]] = []
+    for r in range(len(orig_rows)):
+        m_row: List[Optional[ET.Element]] = []
+        for c in range(len(orig_rows[r])):
+            cell = tc_matrix[r][c]
+            if cell is not None:
+                m_row.append(cell)
+            else:
+                found_m = None
+                # 先向左找水平合并主单元格
+                for lc in range(c - 1, -1, -1):
+                    if tc_matrix[r][lc] is not None:
+                        found_m = tc_matrix[r][lc]
+                        break
+                # 若无向左主单元格，向上找垂直合并主单元格
+                if found_m is None:
+                    for ur in range(r - 1, -1, -1):
+                        if tc_matrix[ur][c] is not None:
+                            found_m = tc_matrix[ur][c]
+                            break
+                m_row.append(found_m)
+        master_map.append(m_row)
 
     edits = []
+    merge_indicators = {"⟦合并⟧", "←", "↑", "^", "合并", "<-"}
     for row_index, (original, edited) in enumerate(zip(orig_rows, proxy_rows)):
         for column_index, (old, new) in enumerate(zip(original, edited)):
-            if normalized(old) == normalized(new):
+            norm_old = normalized(old)
+            norm_new = normalized(new)
+            if norm_old == norm_new:
+                continue
+            if norm_new in merge_indicators:
                 continue
             cell = tc_matrix[row_index][column_index]
-            if cell is None:
-                raise ValueError("Merged continuation cells cannot be edited through the table proxy")
-            edits.append((cell, normalized(new)))
+            if cell is not None:
+                edits.append((cell, norm_new))
+            else:
+                m_cell = master_map[row_index][column_index]
+                if m_cell is not None and norm_new:
+                    cur_text = _cell_visible_text(m_cell).strip()
+                    if not cur_text:
+                        edits.append((m_cell, norm_new))
+                    elif norm_new not in cur_text:
+                        edits.append((m_cell, cur_text + " " + norm_new))
     for cell, text in edits:
         _update_tc_text_preserving_style(cell, text)
-    return bool(edits)
+    return bool(edits or structural_change)
 
 
 # ---------------------------------------------------------------------------

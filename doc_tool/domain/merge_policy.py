@@ -262,11 +262,22 @@ SCOPED_MERGE_POLICY = MergePolicy(
     synthesize_static_fields=True,
 )
 
+DEFAULT_MERGE_POLICY = MergePolicy(
+    profile=MERGE_PROFILE_TOLERANT,
+    renumber_mode=RENUMBER_PRESERVE,
+    auto_shift_inline_headings=True,
+    heading_number_mode=HEADING_NUM_AUTO,
+    top_level_format=TOP_FORMAT_CHAPTER,
+    respect_chapter_order=True,
+    chapter_scope=(),
+    synthesize_static_fields=True,
+)
+
 
 def resolve_merge_policy(config: Optional[Dict[str, Any]] = None) -> MergePolicy:
     """从内核 config 字典解析生效的 ``MergePolicy``。"""
     if not config or not isinstance(config, dict):
-        return STRICT_MERGE_POLICY
+        return DEFAULT_MERGE_POLICY
     raw = config.get("mergePolicy") or config.get("merge_policy")
     if isinstance(raw, MergePolicy):
         policy = raw
@@ -275,7 +286,7 @@ def resolve_merge_policy(config: Optional[Dict[str, Any]] = None) -> MergePolicy
     elif isinstance(raw, str):
         policy = MergePolicy.from_profile(raw)
     else:
-        policy = STRICT_MERGE_POLICY
+        policy = DEFAULT_MERGE_POLICY
     extra_scope = config.get("chapterScope") or config.get("chapter_scope")
     if extra_scope:
         policy = policy.with_scope(extra_scope)

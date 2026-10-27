@@ -290,6 +290,7 @@ class TreeContractTests(unittest.TestCase):
     def test_numbering_gap_fails_with_exact_suggestion(self):
         with tempfile.TemporaryDirectory() as root:
             config = self.make_config(root)
+            config["mergePolicy"] = "strict"
             chapter = os.path.join(config["paths"]["content_root"], "第1章 A")
             os.makedirs(chapter)
             with open(os.path.join(chapter, "1.1 B.md"), "w", encoding="utf-8") as handle:
@@ -308,6 +309,40 @@ class TreeContractTests(unittest.TestCase):
                 handle.write("![缺图](missing.png)")
             with self.assertRaisesRegex(AutomationError, "图片不存在"):
                 validate_content_tree(config)
+
+    def test_scan_entries_ignores_os_temp_and_hidden_files(self):
+        with tempfile.TemporaryDirectory() as root:
+            config = self.make_config(root)
+            chapter = os.path.join(config["paths"]["content_root"], "第1章 示例")
+            os.makedirs(chapter)
+            with open(os.path.join(chapter, "1.1 正文.md"), "w", encoding="utf-8") as f:
+                f.write("内容")
+            # Create OS temporary / system files
+            for junk in [".DS_Store", "Thumbs.db", "desktop.ini", "~$temp.docx", ".git"]:
+                p = os.path.join(chapter, junk)
+                if junk.startswith(".git"):
+                    os.makedirs(p, exist_ok=True)
+                else:
+                    with open(p, "wb") as f:
+                        f.write(b"junk")
+            # Should not raise AutomationError
+            entries = validate_content_tree(config)
+            self.assertEqual(len(entries), 2)
+            self.assertEqual(entries[1].title, "正文")
+
+    def test_default_merge_policy_allows_numbering_gaps(self):
+        with tempfile.TemporaryDirectory() as root:
+            config = self.make_config(root)
+            chapter = os.path.join(config["paths"]["content_root"], "第1章 示例")
+            os.makedirs(chapter)
+            with open(os.path.join(chapter, "1.1 A.md"), "w", encoding="utf-8") as f:
+                f.write("内容 A")
+            with open(os.path.join(chapter, "1.3 C.md"), "w", encoding="utf-8") as f:
+                f.write("内容 C")
+            # Default policy should preserve numbering and succeed without raising AutomationError
+            entries = validate_content_tree(config)
+            self.assertEqual(len(entries), 3)
+            self.assertEqual([e.number for e in entries], [(1,), (1, 1), (1, 3)])
 
 
 

@@ -123,3 +123,7 @@ tools/_patch*.json
 
 # DeepSeek Harness 本地临时目录
 .dsh-tmp/
+
+# Codex temporary directory
+.codex-tmp/
+继续执行.md

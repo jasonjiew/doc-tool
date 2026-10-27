@@ -347,6 +347,7 @@ def import_first_time(
             allow_missing_headings=allow_missing_effective,
             paragraph_levels=effective_paragraph_levels or None,
             split_policy=active_split_policy,
+            retain_pre_title_body=retain_pre_title,
         )
         _record(result, STAGE_GENERATE_TEMPLATE, "succeeded", metrics={
             "headingStyles": len(template_meta.heading_styles),

@@ -251,14 +251,12 @@ def audit_docx(
     template_shape = _template_shape(template_path) if template_path else None
     # 模板元素只能出现在生成内容之前：一旦命中第一个偏离模板形状的元素，
     # 之后的同类元素一律当作作者内容。
-    template_limit = _template_prefix_length(body, template_shape)
+    template_elements = _template_prefix_elements(body, template_shape)
     empty_run = 0
     empty_start = 0
     for index, element in enumerate(body):
         location = "body[{0}]".format(index)
-        is_template_element = (
-            template_shape is not None and index < template_limit
-        )
+        is_template_element = element in template_elements
         if element.tag == _W + "tbl":
             if is_code_container(element):
                 # 代码容器：内文是代码示例（可能含“Error! 未定义书签”这种
@@ -275,6 +273,10 @@ def audit_docx(
             continue
         text = visible_text(element)
         _audit_field_errors(element, active_policy, report, location)
+        if is_template_element:
+            # 模板自带元素不计入正文占位或异常空段
+            empty_run = 0
+            continue
         if _PLACEHOLDER_RE.search(text):
             report.findings.append(
                 AuditFinding(
@@ -519,27 +521,39 @@ def _excerpt(text: str, limit: int = 60) -> str:
 def twips_to_emu(twips: int) -> int:
     """twips -> EMU（与内核 ``usable_page_width_emu`` 同一换算）。"""
     return int(twips) * _EMU_PER_TWIP
-def _template_prefix_length(body, template_shape) -> int:
-    """返回产物中仍属于模板前缀的元素个数。
+def _template_prefix_elements(body, template_shape) -> set:
+    """返回产物中属于模板前缀的元素集合。
 
     模板元素在产物中保持原顺序；遇到第一个既不符合模板形状、
     也不是空段作者内容的元素时停止。这样后面的作者新表就不会被
     误判为模板原表。
     """
     if template_shape is None:
-        return 0
+        return set()
+    ignored_tags = {
+        _W + "bookmarkStart",
+        _W + "bookmarkEnd",
+        _W + "commentRangeStart",
+        _W + "commentRangeEnd",
+    }
+    filtered_body = [el for el in body if el.tag not in ignored_tags]
     length = 0
-    for index, element in enumerate(body):
-        if template_shape.matches(body, index):
+    for index, element in enumerate(filtered_body):
+        if template_shape.matches(filtered_body, index):
             length = index + 1
             continue
         if element.tag == _W + "p" and not visible_text(element):
-            # 模板自带的""空段""（无文本）可能因为模板形状
+            # 模板自带的空段（无文本）可能因为模板形状
             # 在建构后发生微小变化而未命中，不应因此提前截断前缀。
             length = index + 1
             continue
         break
-    return length
+    return set(filtered_body[:length])
+
+
+def _template_prefix_length(body, template_shape) -> int:
+    """向后兼容的模板前缀长度计算。"""
+    return len(_template_prefix_elements(body, template_shape))
 
 
 class _TemplateShape:
@@ -602,4 +616,11 @@ def _template_shape(template_path):
     body = document.find(_W + "body")
     if body is None:
         return None
-    return _TemplateShape([_element_signature(element) for element in body])
+    ignored_tags = {
+        _W + "bookmarkStart",
+        _W + "bookmarkEnd",
+        _W + "commentRangeStart",
+        _W + "commentRangeEnd",
+    }
+    body_elements = [el for el in body if el.tag not in ignored_tags]
+    return _TemplateShape([_element_signature(element) for element in body_elements])

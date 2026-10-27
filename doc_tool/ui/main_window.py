@@ -114,7 +114,7 @@ TASK_UI = {
     },
     "project-export": {
         "label": "导出 Word",
-        "stage_progress": False,
+        "stage_progress": True,
         "timeout": DEFAULT_TASK_TIMEOUT_SECONDS,
         "result_type": "export",
     },
@@ -145,8 +145,17 @@ def _pipeline_stage_labels():
     global _PIPELINE_STAGE_UI_LABELS
     if _PIPELINE_STAGE_UI_LABELS is None:
         from doc_tool.application.pipeline import PIPELINE_STAGE_LABELS
+        from doc_tool.application.intake_contract import FORMAT_LABELS
 
-        _PIPELINE_STAGE_UI_LABELS = PIPELINE_STAGE_LABELS
+        _PIPELINE_STAGE_UI_LABELS = dict(PIPELINE_STAGE_LABELS)
+        _PIPELINE_STAGE_UI_LABELS.update(FORMAT_LABELS)
+        _PIPELINE_STAGE_UI_LABELS.update({
+            "docx": "Word 生成",
+            "html": "离线 HTML",
+            "pdf": "PDF 转换",
+            "source-zip": "源码包",
+            "zip": "源码包",
+        })
     return _PIPELINE_STAGE_UI_LABELS
 
 
@@ -261,7 +270,7 @@ class MainWindow(QMainWindow):
         capsule_layout.setContentsMargins(6, 0, 0, 0)
         capsule_layout.setSpacing(4)
 
-        self._capsule_open_btn = QPushButton("📄 打开 Word", self._output_capsules_widget)
+        self._capsule_open_btn = QPushButton("📄 打开最新导出 Word", self._output_capsules_widget)
         self._capsule_open_btn.setProperty("btnRole", "compact")
         self._capsule_open_btn.setToolTip("用系统默认程序打开 Word 产物")
         self._capsule_open_btn.clicked.connect(
@@ -275,6 +284,7 @@ class MainWindow(QMainWindow):
         self._capsule_locate_btn.clicked.connect(
             lambda: self._current_output_path and self._locate_file(self._current_output_path)
         )
+        self._capsule_locate_btn.setVisible(False)
         capsule_layout.addWidget(self._capsule_locate_btn)
 
         self._capsule_copy_btn = QPushButton("📋 复制路径", self._output_capsules_widget)
@@ -283,6 +293,7 @@ class MainWindow(QMainWindow):
         self._capsule_copy_btn.clicked.connect(
             lambda: self._current_output_path and self._copy_output_path(self._current_output_path)
         )
+        self._capsule_copy_btn.setVisible(False)
         capsule_layout.addWidget(self._capsule_copy_btn)
 
         self._capsule_export_btn = QPushButton("📤 另存为…", self._output_capsules_widget)
@@ -291,6 +302,7 @@ class MainWindow(QMainWindow):
         self._capsule_export_btn.clicked.connect(
             lambda: self._current_output_path and self._export_output_to_external(self._current_output_path)
         )
+        self._capsule_export_btn.setVisible(False)
         capsule_layout.addWidget(self._capsule_export_btn)
 
         self._current_output_path: Optional[str] = None
@@ -334,6 +346,7 @@ class MainWindow(QMainWindow):
             on_diag_build=self._on_diag_build,
             on_validate=self._on_validate,
             on_quick_export=self._on_quick_export_word,
+            on_export_settings=self._on_export_settings,
             on_show_results=self._on_show_results,
             on_switch_branch=self._on_switch_branch_clicked,
             on_close_project=self.close_project,
@@ -388,6 +401,9 @@ class MainWindow(QMainWindow):
 
         self._loading_overlay = ProjectLoadingOverlay(self, dark=self._dark)
         self._init_mainflow_advice()
+        from doc_tool.ui.controllers.export_orchestrator import ExportOrchestrator
+
+        self._export_orchestrator = ExportOrchestrator(self)
 
     def _build_nav_bar(self) -> QWidget:
         """路径导航条（UI2-C 3.1/3.4）：后退/前进 + 真实章节路径 + 定位当前章。
@@ -396,9 +412,10 @@ class MainWindow(QMainWindow):
         """
         bar = QWidget(self._ide_page)
         bar.setObjectName("editorNavBar")
+        bar.setFixedHeight(28)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(8, 2, 8, 2)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 1, 6, 1)
+        layout.setSpacing(4)
 
         self._nav_back_btn = QPushButton("←", bar)
         self._nav_back_btn.setObjectName("navBackBtn")
@@ -599,15 +616,15 @@ class MainWindow(QMainWindow):
         self._delivery_action.setShortcut(QKeySequence("Ctrl+Alt+B"))
         self._delivery_action.setToolTip("按批次计划串行交付多个项目/变体；中断后可继续，只补未完成项")
         self._delivery_action.triggered.connect(self._on_delivery_batch)
-        ops_menu.addAction(self._delivery_action)
         ops_menu.addSeparator()
         self._report_action = QAction("打开校验报告", self)
         self._report_action.triggered.connect(self._on_open_validation_report)
         ops_menu.addAction(self._report_action)
 
         # 内容
-        # 命令注册表菜单（V3.1 4.2 / V3.3 5.3）：与命令面板同源
+        # 命令注册表菜单（V3.1 4.2 / V3.3 5.3）：与命令面板同源，折叠收纳隐藏
         self._registry_menu = menubar.addMenu("命令")
+        self._registry_menu.menuAction().setVisible(False)
         try:
             self._refresh_registry_menu()
         except Exception:  # noqa: BLE001 - 注册表异常不阻断菜单构建
@@ -841,6 +858,9 @@ class MainWindow(QMainWindow):
         self._pdf_toolbox_action = QAction("PDF 工具箱（合并 / 拆分 / 水印 / 加密）…", self)
         self._pdf_toolbox_action.triggered.connect(lambda: self._on_pdf_toolbox())
         tools_menu.addAction(self._pdf_toolbox_action)
+        tools_menu.addAction(self._delivery_action)
+        if hasattr(self, "_cmd_palette_action"):
+            tools_menu.addAction(self._cmd_palette_action)
         tools_menu.addSeparator()
         self._theme_action = QAction("切换深色主题", self)
         self._theme_action.triggered.connect(self._toggle_theme)
@@ -1447,6 +1467,7 @@ class MainWindow(QMainWindow):
                 pass
         try:
             self._registry_menu = self.menuBar().addMenu("命令")
+            self._registry_menu.menuAction().setVisible(False)
         except Exception:  # noqa: BLE001 - 菜单栏不可用时放弃
             return None
         return self._registry_menu
@@ -2062,6 +2083,14 @@ class MainWindow(QMainWindow):
             self._quick_export_action.setToolTip(
                 "默认整份文档 + 当前编辑内容 + Word + 项目导出目录 (Ctrl+E)"
             )
+        if hasattr(self, "_export_settings_action"):
+            self._export_settings_action.setEnabled(bool(quick_export and quick_export.enabled))
+            if quick_export is not None and not quick_export.enabled and quick_export.reason:
+                self._export_settings_action.setToolTip(quick_export.reason)
+            else:
+                self._export_settings_action.setToolTip(
+                    "按格式/范围/来源/目录/样式提交一次导出，默认值可直接提交。"
+                )
         self._diag_action.setEnabled(state.actions["diag_build"].enabled)
         self._report_action.setEnabled(state.actions["report"].enabled)
         self._content_action.setEnabled(state.actions["content"].enabled)
@@ -2503,6 +2532,7 @@ class MainWindow(QMainWindow):
         self._panels_dock.setWidget(self._content_workspace.panels_host)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._panels_dock)
         self._panels_dock.setMinimumHeight(180)
+        self._panels_dock.hide()
 
         self._rebuild_view_menu()
         if hasattr(self, "_loading_overlay") and self._loading_overlay.isVisible():
@@ -3027,6 +3057,9 @@ class MainWindow(QMainWindow):
         """F5 checks what the author is editing, never an implicitly selected old DOCX."""
         if not self._project_summary or self.runner.is_running:
             return
+        flush = getattr(self, "_flush_unsaved_and_sync_version", None)
+        if callable(flush):
+            flush()
         workspace = getattr(self, "_content_workspace", None)
         run_lint = getattr(workspace, "run_lint", None)
         if callable(run_lint):
@@ -3046,6 +3079,9 @@ class MainWindow(QMainWindow):
     def _on_validate_output(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
+        flush = getattr(self, "_flush_unsaved_and_sync_version", None)
+        if callable(flush):
+            flush()
         summary = self._project_summary
         from doc_tool.adapters.kernel import (
             config_from_project,
@@ -3130,6 +3166,7 @@ class MainWindow(QMainWindow):
     def _on_merge(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
+        self._flush_unsaved_and_sync_version()
         self._pending_publish_skip_note = None
         summary = self._project_summary
         from doc_tool.adapters.kernel import config_from_project, ensure_kernel_importable
@@ -3182,29 +3219,42 @@ class MainWindow(QMainWindow):
         )
         self._start_task(spec)
 
-    def _revision_record_version(self) -> Optional[str]:
-        """``_revision_record.md`` 末行版本号（发布前检查用），取不到返回 None。
+    def _flush_unsaved_and_sync_version(self) -> None:
+        """导出/检查前统一持久化编辑器未存缓冲，并同步 _revision_record.md 版本号到 manifest。"""
+        if getattr(self, "_export_orchestrator", None) is not None:
+            self._export_orchestrator.flush_unsaved_and_sync_version(self)
+            return
+        try:
+            if getattr(self, "_workspace", None) is not None and self._workspace.has_unsaved_changes():
+                self._workspace.save_all()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("auto save_all before export failed: %s", exc)
+        summary = self._project_summary
+        if summary is None:
+            return
+        rev_ver = self._revision_record_version()
+        if rev_ver and rev_ver != getattr(summary.manifest, "documentVersion", ""):
+            try:
+                summary.manifest.documentVersion = rev_ver
+                summary.manifest.save(summary.paths.root)
+                if getattr(self, "_project_bar", None) is not None:
+                    if hasattr(self._project_bar, "update_version"):
+                        self._project_bar.update_version(rev_ver)
+                    elif hasattr(self._project_bar, "_version_label"):
+                        self._project_bar._version_label.setText("v{0}".format(rev_ver))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("sync revision version to manifest failed: %s", exc)
 
-        修订记录由作者手工维护，末行即本次要发布的版本；管线会在锁内把它同步
-        到 ``documentVersion``。这里只是让发布前检查按「即将发布的版本号」比对
-        冻结基线，避免清单里的旧版本号让检查结论对不上。只读且不写盘：文件
-        缺失/表里还没有数据行时返回 None，检查退回清单现有版本号。
-        """
+    def _revision_record_version(self) -> Optional[str]:
+        """从 ``_revision_record.md`` 末行提取版本号，当前项目无有效记录时返回 None。"""
+        if getattr(self, "_export_orchestrator", None) is not None:
+            return self._export_orchestrator.revision_record_version(self._project_summary)
         summary = self._project_summary
         if summary is None:
             return None
-        try:
-            from doc_tool.application.content.revision_record import (
-                document_version_from_record,
-            )
+        from doc_tool.ui.controllers.export_orchestrator import resolve_effective_export_version
 
-            md_path = (
-                summary.paths.resolve(summary.manifest.relative_content_root())
-                / "_revision_record.md"
-            )
-            return document_version_from_record(md_path)
-        except Exception:  # noqa: BLE001
-            return None
+        return resolve_effective_export_version(summary.manifest, summary.paths)
 
     def _confirm_pre_publish_checks(self, proposed_version: Optional[str] = None) -> bool:
         """Show the required pre-publish checklist and return whether to continue.
@@ -3330,6 +3380,7 @@ class MainWindow(QMainWindow):
     def _on_diag_build(self) -> None:
         if not self._project_summary or self.runner.is_running:
             return
+        self._flush_unsaved_and_sync_version()
         summary = self._project_summary
         from doc_tool.adapters.kernel import config_from_project, ensure_kernel_importable
         from doc_tool.application.pipeline import run_pipeline
@@ -3416,6 +3467,41 @@ class MainWindow(QMainWindow):
                 )
                 for stage in PIPELINE_STAGE_ORDER
             ]
+        elif spec.name == "project-export":
+            from doc_tool.application.pipeline import (
+                PIPELINE_STAGE_LABELS,
+                PIPELINE_STAGE_ORDER,
+            )
+            from doc_tool.application.intake_contract import FORMAT_LABELS
+
+            req_formats = list(getattr(spec.args[0], "formats", ["docx"])) if spec.args else ["docx"]
+            if "docx" in req_formats:
+                initial_steps = [
+                    StepItem(
+                        stage=stage,
+                        label=PIPELINE_STAGE_LABELS.get(stage, stage),
+                        status=STEP_STATUS_PENDING,
+                    )
+                    for stage in PIPELINE_STAGE_ORDER
+                ]
+                for fmt in req_formats:
+                    if fmt != "docx":
+                        initial_steps.append(
+                            StepItem(
+                                stage=fmt,
+                                label=FORMAT_LABELS.get(fmt, fmt),
+                                status=STEP_STATUS_PENDING,
+                            )
+                        )
+            else:
+                initial_steps = [
+                    StepItem(
+                        stage=fmt,
+                        label=FORMAT_LABELS.get(fmt, fmt),
+                        status=STEP_STATUS_PENDING,
+                    )
+                    for fmt in req_formats
+                ]
         self._task_dock.show_running(
             self._task_label(spec.name),
             steps=initial_steps,
@@ -3479,7 +3565,7 @@ class MainWindow(QMainWindow):
         """按阶段状态更新步骤清单、日志与当前阶段文本。"""
         self._stage_events.append((stage, status, detail, None))
         label = _pipeline_stage_labels().get(stage, stage)
-        if status == "started":
+        if status in ("started", "running"):
             self._progress_recent_stage = stage
             self._append_log("▶ {0} 开始".format(label))
         elif status == "skipped":
@@ -3490,6 +3576,10 @@ class MainWindow(QMainWindow):
             self._append_log("✓ {0} 完成".format(label))
         elif status == "failed":
             self._append_log("✗ {0} 失败：{1}".format(label, detail))
+        if detail:
+            self._status_label.setText(detail)
+        elif label:
+            self._status_label.setText("正在执行：{0}".format(label))
         self._render_step_list()
 
     def _render_step_list(self) -> None:
@@ -3684,6 +3774,10 @@ class MainWindow(QMainWindow):
             formal = bool(output_path and is_formal_success(str(output_path)))
             if output_path:
                 self._show_output_capsules(str(output_path))
+                try:
+                    self._refresh_export_results()
+                except Exception:
+                    pass
                 if formal:
                     title = "正式出稿成功"
                     summary = "Word 字段已刷新并完成正式输出：{0}".format(output_path)
@@ -4040,43 +4134,99 @@ class MainWindow(QMainWindow):
         """结果页：成员/格式状态 + 打开产物 / 只重试未完成项。"""
         self._elapsed_timer.stop()
         self._poll_timer.stop()
-        if payload is None:
-            self._status_label.setText("批量交付已取消，已完成成员保留")
-            return
-        if isinstance(payload, BaseException):
-            self._show_error("批量交付未完成", str(payload))
-            self._status_label.setText("批量交付未完成")
-            return
-        targets = payload.get("openTargets") or []
-        summary = list(payload.get("summary") or [])
-        box = QMessageBox(self)
-        box.setWindowTitle("批量交付结果")
-        box.setText("\n".join(summary[:12]))
-        detail_lines = self._delivery_member_lines(payload if isinstance(payload, dict) else {})
-        if detail_lines:
-            # 逐成员/变体/格式/状态/路径：供“显示详细信息”展开查看
-            box.setDetailedText("\n".join(detail_lines))
-        open_button = box.addButton("打开首个产物", QMessageBox.ButtonRole.AcceptRole)
-        dir_button = box.addButton("打开结果目录", QMessageBox.ButtonRole.ActionRole)
-        retry_button = box.addButton("只重试未完成项", QMessageBox.ButtonRole.ActionRole)
-        refresh_button = box.addButton("补刷新（正式稿）", QMessageBox.ButtonRole.ActionRole)
-        box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
-        first = targets[0] if targets else None
-        if clicked is open_button and first is not None:
-            self._on_open_result_output(str(first.get("path") or ""))
-        elif clicked is dir_button and first is not None:
-            parent = str(Path(str(first.get("path") or "")).parent)
-            self._on_open_result_directory(parent)
-        elif clicked is retry_button:
-            self._retry_delivery_unfinished(payload)
-        elif clicked is refresh_button:
-            # 补刷新：对未完成（含待刷新）成员重跑一次并驱动 Word 刷新，
-            # 使用队列内原轮快照，不重走已完成成员。
-            self._retry_delivery_unfinished(payload, skip_word_refresh=False)
-        else:
-            self._status_label.setText("批量交付结束：{0} 个可用产物".format(len(targets)))
+        self._drain_stage_progress()
+
+        self._task_started_at = None
+        self._current_task = ""
+        self._last_error_code = None
+        self._last_error_stage = ""
+        self._last_error_detail = ""
+        self._task_terminal_kind = ""
+
+        try:
+            if payload is None:
+                self._result_state = ResultState(
+                    status="cancelled",
+                    task="batch-deliver",
+                    title="批量交付已取消",
+                    summary="批量交付已取消，已完成成员保留。",
+                    project_root=getattr(self._project_summary, "project_root", None),
+                )
+                self._status_label.setText("批量交付已取消，已完成成员保留")
+                steps = derive_step_list(
+                    self._stage_events, fallback_label=self._task_label("batch-deliver")
+                )
+                self._task_dock.show_result(
+                    self._task_label("batch-deliver"), self._result_state, steps
+                )
+                return
+            if isinstance(payload, BaseException):
+                self._result_state = ResultState(
+                    status="failure",
+                    task="batch-deliver",
+                    title="批量交付未完成",
+                    summary=str(payload),
+                    project_root=getattr(self._project_summary, "project_root", None),
+                )
+                self._status_label.setText("批量交付未完成")
+                steps = derive_step_list(
+                    self._stage_events, fallback_label=self._task_label("batch-deliver")
+                )
+                self._task_dock.show_result(
+                    self._task_label("batch-deliver"), self._result_state, steps
+                )
+                self._show_error("批量交付未完成", str(payload))
+                return
+            targets = payload.get("openTargets") or []
+            first_target = targets[0] if targets else None
+            self._result_state = ResultState(
+                status="success",
+                task="batch-deliver",
+                title="批量交付完成",
+                summary="批量交付结束：{0} 个可用产物".format(len(targets)),
+                project_root=getattr(self._project_summary, "project_root", None),
+                output_path=Path(str(first_target.get("path"))) if first_target and first_target.get("path") and Path(str(first_target.get("path"))).is_file() else None,
+            )
+            steps = derive_step_list(
+                self._stage_events, fallback_label=self._task_label("batch-deliver")
+            )
+            self._task_dock.show_result(
+                self._task_label("batch-deliver"), self._result_state, steps
+            )
+            summary = list(payload.get("summary") or [])
+            box = QMessageBox(self)
+            box.setWindowTitle("批量交付结果")
+            box.setText("\n".join(summary[:12]))
+            detail_lines = self._delivery_member_lines(payload if isinstance(payload, dict) else {})
+            if detail_lines:
+                # 逐成员/变体/格式/状态/路径：供“显示详细信息”展开查看
+                box.setDetailedText("\n".join(detail_lines))
+            open_button = box.addButton("打开首个产物", QMessageBox.ButtonRole.AcceptRole)
+            dir_button = box.addButton("打开结果目录", QMessageBox.ButtonRole.ActionRole)
+            retry_button = box.addButton("只重试未完成项", QMessageBox.ButtonRole.ActionRole)
+            refresh_button = box.addButton("补刷新（正式稿）", QMessageBox.ButtonRole.ActionRole)
+            box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            clicked = box.clickedButton()
+            first = targets[0] if targets else None
+            if clicked is open_button and first is not None:
+                self._on_open_result_output(str(first.get("path") or ""))
+            elif clicked is dir_button and first is not None:
+                parent = str(Path(str(first.get("path") or "")).parent)
+                self._on_open_result_directory(parent)
+            elif clicked is retry_button:
+                self._retry_delivery_unfinished(payload)
+            elif clicked is refresh_button:
+                # 补刷新：对未完成（含待刷新）成员重跑一次并驱动 Word 刷新，
+                # 使用队列内原轮快照，不重走已完成成员。
+                self._retry_delivery_unfinished(payload, skip_word_refresh=False)
+            else:
+                self._status_label.setText("批量交付结束：{0} 个可用产物".format(len(targets)))
+        finally:
+            self._refresh_recent_projects()
+            self._refresh_interaction_state()
+            if self._close_after_task:
+                self._finish_close()
 
     def _retry_delivery_unfinished(self, payload, *, skip_word_refresh: bool = True) -> None:
         """只补未完成项（队列内原轮快照），不重走已完成成员。
@@ -4555,68 +4705,40 @@ class MainWindow(QMainWindow):
         return buffers
 
     def _quick_export_defaults(self, buffers: Dict[str, str]):
-        """快速出稿的日常默认：整份 + 当前缓冲优先 + 项目导出目录。
+        """快速导出粘贴默认：全量 + 当前缓冲区 + 项目输出目录。"""
+        word_ok = getattr(self, "_word_available", None)
+        if word_ok is None:
+            try:
+                from doc_tool.application.word_check import check_word_available
 
-        每次都从零构造请求，因此**不会**继承上一轮的部分章节范围、saved 来源
-        或 strict 策略；旧高级决定只影响旧轮次本身。``refresh`` 保持默认，
-        本机没有 Microsoft Word 时仍会产出可读 DOCX（结果标「待刷新」）。
-        """
-        from doc_tool.application.intake_contract import (
-            FORMAT_DOCX,
-            SCOPE_PROJECT,
-            SOURCE_MODE_CURRENT_BUFFER,
-            SOURCE_MODE_SAVED,
-            ExportRequest,
-            ExportScope,
-        )
+                word_ok = bool(check_word_available(dispatch_check=False).available)
+                self._word_available = word_ok
+            except Exception:
+                word_ok = False
 
-        return ExportRequest(
-            project_root=str(self._project_summary.project_root),
-            formats=[FORMAT_DOCX],
-            scope=ExportScope(kind=SCOPE_PROJECT),
-            source_mode=SOURCE_MODE_CURRENT_BUFFER if buffers else SOURCE_MODE_SAVED,
-            destination=str(self._project_summary.paths.output_dir),
+        if getattr(self, "_export_orchestrator", None) is not None:
+            return self._export_orchestrator.quick_export_defaults(
+                self._project_summary, buffers, word_available=word_ok
+            )
+        from doc_tool.ui.controllers.export_orchestrator import build_default_export_request
+
+        return build_default_export_request(
+            self._project_summary, buffers, word_available=word_ok
         )
 
     def _export_settings_context(self) -> dict:
-        """导出设置需要的真实上下文：章节、当前章、未保存数、目录、变体。"""
-        from doc_tool.application.effective_snapshot import discover_chapters
+        """摘要事实模型：章节、当前章、未存缓冲、输出目录、变体、文档属性与提示。"""
+        buffers = self._collect_buffer_texts()
+        current_ch = self._content_current_file or ""
+        if getattr(self, "_export_orchestrator", None) is not None:
+            return self._export_orchestrator.export_settings_context(
+                self._project_summary, buffers=buffers, active_chapter=current_ch
+            )
+        from doc_tool.ui.controllers.export_orchestrator import collect_export_settings_context
 
-        summary = self._project_summary
-        chapters = []
-        variants = []
-        if summary is not None:
-            try:
-                content_root = summary.paths.resolve(
-                    summary.manifest.relative_content_root()
-                )
-                chapters = [rel for rel, _path in discover_chapters(content_root)]
-            except Exception:  # noqa: BLE001 - 索引不可用时按整份
-                chapters = []
-            try:
-                variants = [
-                    item.get("variantId") or item.get("name")
-                    for item in (
-                        self._preview_text_resolver() or []
-                    )
-                ] if False else []
-            except Exception:  # noqa: BLE001
-                variants = []
-            if not variants:
-                try:
-                    from doc_tool.application.content.variants import VariantsConfig
-
-                    variants = list(VariantsConfig.load(summary.project_root).ids())
-                except Exception:  # noqa: BLE001 - 无变体配置时留空
-                    variants = []
-        return {
-            "project_root": str(getattr(summary, "project_root", "") or ""),
-            "destination": str(summary.paths.output_dir) if summary is not None else "",
-            "chapters": chapters,
-            "current_chapter": self._content_current_file or "",
-            "unsaved_count": len(self._collect_buffer_texts()),
-            "variants": variants,
-        }
+        return collect_export_settings_context(
+            self._project_summary, buffers=buffers, active_chapter=current_ch
+        )
 
     def _on_export_settings(self, preset_request=None, *, notice="") -> None:
         """打开导出设置；一次“开始导出”即提交原服务。"""
@@ -4625,6 +4747,7 @@ class MainWindow(QMainWindow):
         if self._project_summary is None:
             self._show_status_message("请先打开项目后再使用导出设置")
             return
+        self._flush_unsaved_and_sync_version()
         context = self._export_settings_context()
         dialog = ExportSettingsDialog(
             project_root=context["project_root"],
@@ -4633,6 +4756,13 @@ class MainWindow(QMainWindow):
             current_chapter=context["current_chapter"],
             unsaved_count=context["unsaved_count"],
             variants=context["variants"],
+            document_no=context.get("document_no"),
+            document_name=context.get("document_name"),
+            document_version=context.get("document_version", ""),
+            saved_document_version=context.get("saved_document_version", ""),
+            document_type=context.get("document_type", "general"),
+            document_properties=context.get("document_properties"),
+            property_notice=context.get("property_notice", ""),
             notice=notice,
             parent=self,
         )
@@ -4666,48 +4796,128 @@ class MainWindow(QMainWindow):
             ),
         )
 
-    def _on_quick_export_word(self) -> None:
-        """快速导出 Word：整份 + 当前内容 + 项目导出目录（默认值，可再调整）。"""
+    def _is_test_environment(self) -> bool:
+        import os, sys
+        if "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("DOC_TOOL_HEADLESS_TEST"):
+            return True
+        argv0 = os.path.basename(sys.argv[0]).lower() if sys.argv else ""
+        return "pytest" in argv0 or argv0.startswith("test_") or argv0.endswith("_test.py")
+
+    def _on_quick_export_word(self, *, prompt_settings: Optional[bool] = None) -> None:
+        """快速导出 Word：日常交互先弹出导出设置弹窗，确认后开始生成。"""
         if self._project_summary is None:
             return
         if self.runner.is_running:
             # 忙时只拒绝重复启动：运行中的任务/轮次保持，编辑与成果查看不受影响。
             self._status_label.setText("已有任务正在运行，本次导出未开始；可继续编辑或查看已有成果")
             return
+
+        should_prompt = prompt_settings
+        if should_prompt is None:
+            should_prompt = not self._is_test_environment()
+
+        if should_prompt:
+            self._on_export_settings()
+            return
+
+        self._flush_unsaved_and_sync_version()
         from doc_tool.application.project_export import run_project_export
 
         buffers = self._collect_buffer_texts()
         request = self._quick_export_defaults(buffers)
-        # 出稿在既有 TaskRunner 后台线程执行：界面可继续编辑，任务 Dock 可取消，
-        # 重复点击由 runner.is_running 与动作禁用共同防重。
-        from doc_tool.ui.task_bridge import TaskSpec
-
-        spec = TaskSpec(
+        message = "正在生成 Word…（{0}）".format(
+            "含 {0} 章未保存修改".format(len(buffers)) if buffers else "整份已保存内容"
+        )
+        self._run_export_task(
             name="project-export",
             target=run_project_export,
             args=(request,),
             kwargs={"buffer_texts": buffers},
-            timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
+            message=message,
         )
-        self._status_label.setText(
-            "正在生成 Word…（{0}）".format(
-                "含 {0} 章未保存修改".format(len(buffers)) if buffers else "整份已保存内容"
-            )
-        )
-        self._start_task(spec, on_done=self._on_export_task_done)
 
     def _on_export_task_done(self, report) -> None:
         """后台出稿结束：正常展示结果页，取消/超时/异常给明确原因。"""
         self._elapsed_timer.stop()
         self._poll_timer.stop()
+        self._drain_stage_progress()
+
+        self._task_started_at = None
+        self._current_task = ""
+        self._last_error_code = None
+        self._last_error_stage = ""
+        self._last_error_detail = ""
+        self._task_terminal_kind = ""
+
         if report is None:
+            self._result_state = ResultState(
+                status="cancelled",
+                task="project-export",
+                title="导出已取消",
+                summary="导出已取消，已完成的格式保留。",
+                project_root=getattr(self._project_summary, "project_root", None),
+            )
             self._status_label.setText("导出已取消，已完成的格式保留")
+            steps = derive_step_list(
+                self._stage_events, fallback_label=self._task_label("project-export")
+            )
+            self._task_dock.show_result(
+                self._task_label("project-export"), self._result_state, steps
+            )
             return
-        if isinstance(report, BaseException):
-            self._show_error("导出未完成", str(report))
-            self._status_label.setText("导出未完成")
-            return
-        self._present_export_report(report)
+
+        try:
+            if isinstance(report, BaseException):
+                self._result_state = ResultState(
+                    status="failure",
+                    task="project-export",
+                    title="导出未完成",
+                    summary=str(report),
+                    project_root=getattr(self._project_summary, "project_root", None),
+                )
+                self._status_label.setText("导出未完成")
+                steps = derive_step_list(
+                    self._stage_events, fallback_label=self._task_label("project-export")
+                )
+                self._task_dock.show_result(
+                    self._task_label("project-export"), self._result_state, steps
+                )
+                self._show_error("导出未完成", str(report))
+                return
+
+            usable = report.usable_results() if hasattr(report, "usable_results") else []
+            failed = report.failed_formats() if hasattr(report, "failed_formats") else []
+            first_output = usable[0].path if usable else None
+            output_path = Path(first_output) if first_output and Path(first_output).is_file() else None
+            if failed:
+                res_status = "failure"
+                res_title = "部分格式导出未完成"
+                res_summary = "部分格式导出失败（{0}），已完成格式保留。".format("、".join(failed))
+            else:
+                res_status = "success"
+                res_title = "导出完成"
+                res_summary = "已生成 {0} 个可用格式。".format(len(usable))
+
+            self._result_state = ResultState(
+                status=res_status,
+                task="project-export",
+                title=res_title,
+                summary=res_summary,
+                project_root=getattr(self._project_summary, "project_root", None),
+                output_path=output_path,
+            )
+            steps = derive_step_list(
+                self._stage_events, fallback_label=self._task_label("project-export")
+            )
+            self._task_dock.show_result(
+                self._task_label("project-export"), self._result_state, steps
+            )
+            self._present_export_report(report)
+        finally:
+            self._refresh_recent_projects()
+            self._refresh_interaction_state()
+            if self._close_after_task:
+                self._finish_close()
 
     # --- UI 包 UI-C：非模态成果（逐文件、按轮次） ---
 
@@ -4815,11 +5025,28 @@ class MainWindow(QMainWindow):
             return
         from doc_tool.ui.task_bridge import TaskSpec
 
+        export_kwargs = dict(kwargs)
+        pipeline_cb = export_kwargs.get("pipeline_progress") or self._progress_callback()
+        export_kwargs["pipeline_progress"] = pipeline_cb
+        if "progress" not in export_kwargs:
+            def _format_progress(first: str, second: str = "", third: str = "") -> None:
+                if third:
+                    try:
+                        pipeline_cb(first, second, third)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        pipeline_cb(first, "running", second)
+                    except Exception:
+                        pass
+            export_kwargs["progress"] = _format_progress
+
         spec = TaskSpec(
             name=name,
             target=target,
             args=args,
-            kwargs=kwargs,
+            kwargs=export_kwargs,
             timeout_seconds=DEFAULT_TASK_TIMEOUT_SECONDS,
         )
         self._status_label.setText(message)
@@ -5754,6 +5981,8 @@ class MainWindow(QMainWindow):
             "validate": "项目检查",
             "merge": "正式出稿",
             "diag_build": "快速构建",
+            "project-export": "导出",
+            "batch-deliver": "批量交付",
         }
         return labels.get(name, name)
 

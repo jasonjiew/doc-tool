@@ -96,6 +96,8 @@ class EffectiveSnapshot:
     captureIndex: Dict[str, str] = field(default_factory=dict)
     #: 父章节正文的磁盘摘要；不改变可勾选章节列表，但参与资源/缓存/更新检测。
     indexDiskHashes: Dict[str, str] = field(default_factory=dict)
+    #: None 表示旧快照未记录；空串表示捕获时修订记录不存在。
+    revisionDiskHash: Optional[str] = None
     readonlyProject: bool = False
     externalDestination: str = ""
     sourceUpdated: bool = False
@@ -397,6 +399,21 @@ def capture_snapshot(
         if progress is not None:
             progress(rel_path)
 
+    # 修订记录决定封面和最终版本，也必须随同一轮正文捕获。
+    revision_path = content_root / "_revision_record.md"
+    snapshot.revisionDiskHash = ""
+    if revision_path.is_file() or (effective_mode == SOURCE_MODE_CURRENT_BUFFER and "_revision_record.md" in buffers):
+        disk_text = revision_path.read_text(encoding="utf-8") if revision_path.is_file() else ""
+        snapshot.revisionDiskHash = sha256_text(disk_text) if revision_path.is_file() else ""
+        from_buffer = effective_mode == SOURCE_MODE_CURRENT_BUFFER and "_revision_record.md" in buffers
+        text = buffers["_revision_record.md"] if from_buffer else disk_text
+        snapshot.indexDiskHashes["_revision_record.md"] = sha256_text(disk_text)
+        if from_buffer and text != disk_text:
+            snapshot.unsavedChapters.append("_revision_record.md")
+        captured_texts["_revision_record.md"] = text
+        snapshot.captureIndex["_revision_record.md"] = sha256_text(text)
+        texts.append(text)
+
     # _index.md 是实际出稿正文：在捕获阶段固定其文本及资源，不在物化时再读源。
     if snapshot.scope.kind == SCOPE_PROJECT and not snapshot.variantApplied:
         index_paths = set(content_root.rglob("_index.md"))
@@ -439,7 +456,7 @@ def capture_snapshot(
     )
     for missing in snapshot.missingResources:
         snapshot.warnings.append("资源缺失：{0}（正文保留占位）".format(missing))
-    snapshot.templateHash = _file_hash(paths.template_docx)
+    snapshot.templateHash = _file_hash(paths.resolve(manifest.relative_template_docx()))
     snapshot.configHash = _config_hash(manifest, snapshot)
     effective_work_root = work_root
     if effective_work_root is None and not manifest.is_writable():
@@ -510,6 +527,9 @@ def _config_hash(manifest: ProjectManifest, snapshot: EffectiveSnapshot) -> str:
         "sourceMode": snapshot.sourceMode,
         "parseVersion": SNAPSHOT_PARSE_VERSION,
         "documentType": manifest.documentType,
+        "documentNo": manifest.documentNo,
+        "documentName": manifest.documentName,
+        "documentVersion": manifest.documentVersion,
     }
     return sha256_text(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
@@ -542,7 +562,9 @@ def _materialize(
     root = root.resolve()
     project_root = paths.root.resolve()
     protected = [content_root.resolve(), paths.resolve(manifest.relative_asset_root()).resolve(),
-                 paths.template_dir.resolve(), paths.original_dir.resolve()]
+                 paths.template_dir.resolve(), paths.original_dir.resolve(),
+                 paths.resolve(manifest.relative_template_docx()).resolve(),
+                 paths.resolve(manifest.relative_source_docx()).resolve()]
     if root == project_root or root in project_root.parents or any(
         root == source or source in root.parents or root in source.parents for source in protected
     ):
@@ -594,12 +616,14 @@ def _materialize(
         except OSError:
             continue
 
-    if paths.template_docx.is_file():
-        shutil.copy2(str(paths.template_docx), str(root / "template" / "template.docx"))
+    template_docx = paths.resolve(manifest.relative_template_docx())
+    source_docx = paths.resolve(manifest.relative_source_docx())
+    if template_docx.is_file():
+        shutil.copy2(str(template_docx), str(root / "template" / "template.docx"))
     try:
-        if paths.source_docx.is_file():
+        if source_docx.is_file():
             (root / "original").mkdir(parents=True, exist_ok=True)
-            os.link(str(paths.source_docx), str(root / "original" / "source.docx"))
+            os.link(str(source_docx), str(root / "original" / "source.docx"))
     except OSError:
         pass
 
@@ -694,6 +718,13 @@ def mark_source_updated(snapshot: EffectiveSnapshot) -> bool:
     except Exception:  # noqa: BLE001 - 源不可读时按未变化处理
         return False
     updated = False
+    if snapshot.revisionDiskHash is not None:
+        revision = Path(content_root) / "_revision_record.md"
+        try:
+            current_revision = sha256_text(revision.read_text(encoding="utf-8")) if revision.is_file() else ""
+        except (OSError, UnicodeError):
+            current_revision = ""
+        updated = current_revision != snapshot.revisionDiskHash
     for chapter in snapshot.chapters:
         path = Path(content_root) / chapter.rel_path
         try:

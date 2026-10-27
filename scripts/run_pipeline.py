@@ -46,7 +46,10 @@ def run_step(label: str, arguments: Sequence[str]) -> bool:
 
 
 def pipeline(document: str, skip_word_refresh: bool) -> bool:
-    if not run_step("{0}: 构建 DOCX".format(document), ("scripts/build_docx.py", document)):
+    build_args = ("scripts/build_docx.py", document)
+    if not skip_word_refresh:
+        build_args += ("--defer-static-toc",)
+    if not run_step("{0}: 构建 DOCX".format(document), build_args):
         return False
     if not run_step("{0}: 刷新前严格校验".format(document), ("scripts/validate_docx.py", document)):
         return False

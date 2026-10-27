@@ -293,6 +293,25 @@ class RoundRegenerationTests(_ProjectCase):
     def test_selected_chapter_regeneration_creates_actual_scoped_html(self):
         self._new_round(SCOPE_CHAPTERS)
 
+    def test_new_round_uses_current_fields_even_if_original_was_overridden(self):
+        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
+
+        first = self._export()
+        view = self.window._record_export_round(first)
+        request, _ = self.window._new_round_request(view, force_source=SOURCE_MODE_CURRENT_BUFFER)
+        self.assertIsNone(request.document_version)
+        self.assertIsNone(request.document_name)
+        self.assertEqual(request.document_properties, {})
+
+        explicit = run_project_export(ExportRequest(
+            project_root=str(self.project), formats=[FORMAT_HTML], source_mode=SOURCE_MODE_SAVED,
+            destination=str(self.work / "explicit"), document_name="指定名称", document_version="4.2",
+        ), skip_word_refresh=True)
+        view = self.window._record_export_round(explicit)
+        request, _ = self.window._new_round_request(view, force_source=SOURCE_MODE_CURRENT_BUFFER)
+        self.assertIsNone(request.document_name)
+        self.assertIsNone(request.document_version)
+
     def test_current_chapter_regeneration_keeps_original_chapter_after_navigation(self):
         self._new_round(SCOPE_CURRENT_CHAPTER)
 

@@ -261,26 +261,99 @@ def derive_step_list(
     )
     involved = [stage for stage in ordered if any(ev[0] == stage for ev in events)]
     if not involved:
-        # Heartbeat-only task: a single in-progress step, no fake percentage.
+        # Check if events contain format stages (e.g. html, pdf, source-zip)
+        from doc_tool.application.intake_contract import FORMAT_LABELS
+
+        format_stages = [
+            ev[0] for ev in events
+            if ev[0] in FORMAT_LABELS or ev[0] in ("docx", "html", "pdf", "source-zip", "zip")
+        ]
+        unique_formats = list(dict.fromkeys(format_stages))
+        if unique_formats:
+            format_steps: Dict[str, StepItem] = {
+                fmt: StepItem(
+                    stage=fmt,
+                    label=FORMAT_LABELS.get(fmt, fmt),
+                    status=STEP_STATUS_PENDING,
+                )
+                for fmt in unique_formats
+            }
+            for ev in events:
+                stage = ev[0]
+                if stage not in format_steps:
+                    continue
+                status = ev[1] if len(ev) > 1 else ""
+                detail = ev[2] if len(ev) > 2 else ""
+                error_code = ev[3] if len(ev) > 3 else None
+                current = format_steps[stage]
+                if status in ("started", "running"):
+                    format_steps[stage] = StepItem(
+                        stage=stage, label=current.label, status=STEP_STATUS_RUNNING, detail=detail
+                    )
+                elif status == "succeeded":
+                    format_steps[stage] = StepItem(
+                        stage=stage, label=current.label, status=STEP_STATUS_SUCCESS, detail=detail
+                    )
+                elif status == "skipped":
+                    format_steps[stage] = StepItem(
+                        stage=stage, label=current.label, status=STEP_STATUS_SKIPPED, detail=detail
+                    )
+                elif status == "failed":
+                    format_steps[stage] = StepItem(
+                        stage=stage, label=current.label, status=STEP_STATUS_FAILED, detail=detail, error_code=error_code
+                    )
+                elif status == "cancelled":
+                    format_steps[stage] = StepItem(
+                        stage=stage, label=current.label, status=STEP_STATUS_CANCELLED, detail=detail
+                    )
+            return [format_steps[f] for f in unique_formats]
+
+        # Heartbeat-only task: single step reflecting the latest event status
+        last_status = events[-1][1] if len(events[-1]) > 1 else ""
+        step_status = STEP_STATUS_RUNNING
+        if last_status == "succeeded":
+            step_status = STEP_STATUS_SUCCESS
+        elif last_status == "failed":
+            step_status = STEP_STATUS_FAILED
+        elif last_status == "cancelled":
+            step_status = STEP_STATUS_CANCELLED
+        elif last_status == "skipped":
+            step_status = STEP_STATUS_SKIPPED
         return [
             StepItem(
                 stage="",
                 label=fallback_label or "处理中",
-                status=STEP_STATUS_RUNNING,
+                status=step_status,
+                detail=events[-1][2] if len(events[-1]) > 2 else "",
             )
         ]
 
     has_revision = any(ev[0] == "revision" for ev in events)
     effective_order = [s for s in ordered if s != "revision" or has_revision]
 
-    steps: Dict[str, StepItem] = {
-        stage: StepItem(
+    from doc_tool.application.intake_contract import FORMAT_LABELS
+
+    extra_format_stages = [
+        ev[0] for ev in events
+        if (ev[0] in FORMAT_LABELS or ev[0] in ("html", "pdf", "source-zip", "zip"))
+        and ev[0] not in effective_order and ev[0] != "docx"
+    ]
+    unique_extra_formats = list(dict.fromkeys(extra_format_stages))
+    combined_order = list(effective_order) + unique_extra_formats
+
+    steps: Dict[str, StepItem] = {}
+    for stage in effective_order:
+        steps[stage] = StepItem(
             stage=stage,
             label=PIPELINE_STAGE_LABELS.get(stage, stage),
             status=STEP_STATUS_PENDING,
         )
-        for stage in effective_order
-    }
+    for fmt in unique_extra_formats:
+        steps[fmt] = StepItem(
+            stage=fmt,
+            label=FORMAT_LABELS.get(fmt, fmt),
+            status=STEP_STATUS_PENDING,
+        )
     for ev in events:
         stage = ev[0]
         if stage not in steps:
@@ -289,9 +362,9 @@ def derive_step_list(
         detail = ev[2] if len(ev) > 2 else ""
         error_code = ev[3] if len(ev) > 3 else None
         current = steps[stage]
-        if status == "started":
+        if status in ("started", "running"):
             steps[stage] = StepItem(
-                stage=stage, label=current.label, status=STEP_STATUS_RUNNING
+                stage=stage, label=current.label, status=STEP_STATUS_RUNNING, detail=detail
             )
         elif status == "succeeded":
             steps[stage] = StepItem(
@@ -314,7 +387,7 @@ def derive_step_list(
                 detail=detail,
             )
 
-    return [steps[stage] for stage in effective_order]
+    return [steps[stage] for stage in combined_order]
 
 
 def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:

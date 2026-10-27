@@ -282,17 +282,88 @@ def _output_stem(manifest, request: ExportRequest, snapshot: EffectiveSnapshot) 
         from doc_tool.application.intake_contract import sanitize_name_part
 
         cleaned = sanitize_name_part(request.output_name)
+        if cleaned.lower().endswith(".docx"):
+            cleaned = cleaned[:-5].strip()
         if cleaned:
             return cleaned
-    try:
-        from doc_tool.domain.paths import build_output_filename
+    from doc_tool.domain.paths import build_output_filename
 
+    try:
         return Path(build_output_filename(
-            manifest.document_no, manifest.document_name,
-            manifest.document_version, manifest.documentType,
+            manifest.documentNo, manifest.documentName,
+            manifest.documentVersion, manifest.documentType,
         )).stem
     except Exception:  # noqa: BLE001 - 清单非法时退回文档名
         return manifest.documentName or "导出文档"
+
+
+def _prepare_snapshot_document(snapshot: EffectiveSnapshot, request: ExportRequest):
+    """固定本轮文档字段，所有修改只写入快照。"""
+    from doc_tool.application.pipeline import _prepare_revision_sync
+    from doc_tool.application.export.document_properties import apply_document_properties
+    from doc_tool.application.effective_snapshot import _config_hash, snapshot_cache_key
+    from doc_tool.domain.manifest import ProjectManifest
+    from doc_tool.domain.paths import ProjectPaths
+
+    root = Path(snapshot.workDir)
+    paths = ProjectPaths(root)
+    manifest = ProjectManifest.load(root)
+    reserved_props = {}
+    if paths.template_docx.is_file():
+        try:
+            from doc_tool.application.export.document_properties import read_template_reserved_properties
+            reserved_props = read_template_reserved_properties(paths.template_docx)
+        except Exception:
+            reserved_props = {}
+    effective_no = (
+        request.document_no
+        if request.document_no is not None
+        else (manifest.documentNo or reserved_props.get("文档编号") or reserved_props.get("文件编号") or "")
+    )
+    effective_name = (
+        request.document_name
+        if request.document_name is not None
+        else (manifest.documentName or reserved_props.get("文件名称") or reserved_props.get("文档名称") or "")
+    )
+    revision = _prepare_revision_sync(manifest, paths)
+    rev_version = None
+    md_path = paths.resolve(manifest.relative_content_root()) / "_revision_record.md"
+    if md_path.is_file():
+        try:
+            from doc_tool.application.content.revision_record import (
+                document_version_from_record,
+            )
+
+            rev_version = document_version_from_record(md_path)
+        except Exception:
+            rev_version = None
+    version = (
+        request.document_version
+        if (request.document_version is not None and request.document_version != "")
+        else rev_version or (revision or {}).get("new_version") or manifest.documentVersion
+    )
+    manifest = replace(
+        manifest,
+        documentNo=effective_no,
+        documentName=effective_name,
+        documentVersion=version,
+    )
+    if paths.template_docx.is_file():
+        apply_document_properties(paths.template_docx, request.document_properties)
+    manifest.save(root)
+    if any(value is not None for value in (request.document_no, request.document_name, request.document_version)) or request.document_properties:
+        (root / ".export-document-fields.json").write_text(
+            json.dumps({
+                "documentNoOverride": request.document_no,
+                "documentNameOverride": request.document_name,
+                "documentVersionOverride": manifest.documentVersion if request.document_version is not None else None,
+                "documentProperties": request.document_properties,
+            }, ensure_ascii=False), encoding="utf-8"
+        )
+    snapshot.templateHash = sha256_file(paths.template_docx) if paths.template_docx.is_file() else ""
+    snapshot.configHash = _config_hash(manifest, snapshot)
+    snapshot.cacheKey = snapshot_cache_key(snapshot)
+    return manifest
 
 
 def _export_commit_id() -> str:
@@ -305,6 +376,21 @@ def _export_commit_id() -> str:
         return ""
 
 
+def _emit_progress(progress, stage: str, status: str, detail: str = "") -> None:
+    """统一进度中继：兼容 (stage, status, detail) 与两参 (stage, detail) 回调。"""
+    if progress is None:
+        return
+    try:
+        progress(stage, status, detail)
+    except TypeError:
+        try:
+            progress(stage, detail or status)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def _run_docx(
     snapshot: EffectiveSnapshot,
     request: ExportRequest,
@@ -314,6 +400,7 @@ def _run_docx(
     refresh: bool,
     cancel_token: Optional[CancellationToken],
     progress,
+    pipeline_progress: Optional[Callable[[str, str, str], None]] = None,
     word_available: Optional[bool] = None,
     word_facts: Optional[Dict[str, object]] = None,
 ) -> Tuple[FormatResult, str]:
@@ -330,17 +417,25 @@ def _run_docx(
     resolved_word = (_word_available() if word_available is None else bool(word_available)) if refresh else False
     use_refresh = bool(refresh) and resolved_word
     if progress is not None:
-        progress("docx", "开始生成 Word")
+        try:
+            progress("docx", "开始生成 Word")
+        except Exception:
+            pass
     # V4.0 40-D：把这一轮 Word 刷新的真实阶段/清理事实带回去（缺项表示未知）。
     word_report = WordOperationReport(
         operation="word-refresh", source="", target=str(destination / stem),
     )
     if word_facts is not None:
         word_facts["report"] = word_report
+    field_file = work / ".export-document-fields.json"
+    fields = json.loads(field_file.read_text(encoding="utf-8")) if field_file.is_file() else {}
+
     result = run_pipeline(
         manifest, paths, skip_word_refresh=not use_refresh,
         word_available=resolved_word if use_refresh else None,
-        cancel_token=cancel_token, progress=None,
+        cancel_token=cancel_token, progress=pipeline_progress,
+        document_version_override=fields.get("documentVersionOverride"),
+        document_properties=fields.get("documentProperties"),
     )
     _collected_word_report(result, word_report)
     source_output = None
@@ -353,6 +448,12 @@ def _run_docx(
     elif result.output_path and Path(result.output_path).is_file():
         source_output = Path(result.output_path)
         pending = not is_formal_docx(source_output)
+    elif getattr(paths, "output_docx", None) and paths.output_docx.is_file():
+        source_output = paths.output_docx
+        pending = True
+    elif getattr(paths, "diagnostic_docx", None) and paths.diagnostic_docx.is_file():
+        source_output = paths.diagnostic_docx
+        pending = True
     if source_output is None:
         detail = result.last_stage.detail if result.last_stage else "构建未产出可用文件"
         return FormatResult(
@@ -372,6 +473,8 @@ def _run_docx(
     warnings: List[str] = []
     if pending or not formal:
         warnings.append("Word 字段/页码待刷新（可读稿已可打开）")
+        if not use_refresh or not result.success:
+            warnings.append("已生成可用 Word 文档（本机 Word 刷新未完成或校验告警，打开后可按 Ctrl+A → F9 更新目录页码）")
     if snapshot.unsavedChapters:
         warnings.append("本轮包含未保存编辑 {0} 章".format(len(snapshot.unsavedChapters)))
 
@@ -524,7 +627,10 @@ def _run_html(
     content_root = work / "content"
     assets_root = work / "assets"
     if progress is not None:
-        progress("html", "开始生成离线 HTML")
+        try:
+            progress("html", "开始生成离线 HTML")
+        except Exception:
+            pass
     try:
         result = export_readonly_html(
             content_root, assets_root, destination / "html", "",
@@ -567,7 +673,10 @@ def _run_pdf(
             message="本机没有可用的 Microsoft Word，PDF 待转换（Word/HTML 已可用）",
         )
     if progress is not None:
-        progress("pdf", "开始由本轮 Word 转换 PDF")
+        try:
+            progress("pdf", "开始由本轮 Word 转换 PDF")
+        except Exception:
+            pass
     from doc_tool.application.convert import convert_paths
 
     batch = convert_paths(
@@ -599,7 +708,14 @@ def _run_source_zip(
     request: ExportRequest,
     destination: Path,
     stem: str,
+    *,
+    progress=None,
 ) -> FormatResult:
+    if progress is not None:
+        try:
+            progress("zip", "开始生成源码包")
+        except Exception:
+            pass
     try:
         from doc_tool.application.source_package import build_source_package
     except Exception as exc:  # noqa: BLE001 - 未实现时明确未执行
@@ -635,6 +751,7 @@ def run_project_export(
     buffer_texts: Optional[Dict[str, str]] = None,
     cancel_token: Optional[CancellationToken] = None,
     progress: Optional[Callable[[str, str], None]] = None,
+    pipeline_progress: Optional[Callable[[str, str, str], None]] = None,
     skip_word_refresh: bool = False,
     prior: Optional[ExportReport] = None,
     only_formats: Optional[Sequence[str]] = None,
@@ -683,6 +800,9 @@ def run_project_export(
             if note not in report.warnings:
                 report.warnings.append(note)
     else:
+        formats_preview = normalize_formats(only_formats if only_formats is not None else request.formats)
+        if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
+            _emit_progress(pipeline_progress, "prepare", "started", "正在准备导出内容快照…")
         manifest = ProjectManifest.load(project_root)
         snapshot = capture_snapshot(
             project_root,
@@ -693,6 +813,9 @@ def run_project_export(
             cancel_token=cancel_token,
             variant_id=str(getattr(request, "variant_id", "") or ""),
         )
+        manifest = _prepare_snapshot_document(snapshot, request)
+        if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
+            _emit_progress(pipeline_progress, "prepare", "succeeded", "导出内容快照已就绪")
         report = ExportReport(
             captureId=snapshot.captureId,
             variantId=str(getattr(snapshot, "variantId", "") or ""),
@@ -716,6 +839,8 @@ def run_project_export(
         report.warnings.append(fallback_note)
 
     formats = normalize_formats(only_formats if only_formats is not None else request.formats)
+    if prior is None and FORMAT_SOURCE_ZIP in formats and request.document_version is not None:
+        report.warnings.append("源码包保留原修订记录；重新构建时版本仍以修订记录为准。")
     # 旧 DOCX 必须与该轮登记的 hash 相符；文件存在不等于仍是原轮输入。
     docx_path = _verified_docx_path(prior) if prior is not None and origin_known else ""
     # V4.0 40-D：本轮 Word 阶段事实（由 _run_docx 填充，缺项表示本轮未刷新/未知）。
@@ -741,22 +866,47 @@ def run_project_export(
                     snapshot, request, destination, report.outputName,
                     refresh=bool(request.refresh) and not skip_word_refresh,
                     cancel_token=cancel_token, progress=progress,
+                    pipeline_progress=pipeline_progress,
                     word_available=word_available,
                     word_facts=word_facts,
                 )
                 docx_path = new_docx_path or docx_path
             elif fmt == FORMAT_HTML:
+                if pipeline_progress is not None:
+                    _emit_progress(pipeline_progress, "html", "started", "正在生成离线 HTML…")
                 result = _run_html(snapshot, destination, cancel_token=cancel_token, progress=progress)
+                if pipeline_progress is not None:
+                    _emit_progress(
+                        pipeline_progress, "html",
+                        "succeeded" if result.usable else "failed",
+                        result.message or "离线 HTML 已生成",
+                    )
             elif fmt == FORMAT_PDF:
                 if prior is not None and not docx_path:
                     result = _unavailable_original_result(fmt, previous)
                 else:
+                    if pipeline_progress is not None:
+                        _emit_progress(pipeline_progress, "pdf", "started", "正在由 Word 转换 PDF…")
                     result = _run_pdf(
                         docx_path, destination, report.outputName,
                         cancel_token=cancel_token, progress=progress,
                     )
+                    if pipeline_progress is not None:
+                        _emit_progress(
+                            pipeline_progress, "pdf",
+                            "succeeded" if result.usable else "failed",
+                            result.message or "PDF 转换完成",
+                        )
             elif fmt == FORMAT_SOURCE_ZIP:
-                result = _run_source_zip(snapshot, request, destination, report.outputName)
+                if pipeline_progress is not None:
+                    _emit_progress(pipeline_progress, "source-zip", "started", "正在生成源码包…")
+                result = _run_source_zip(snapshot, request, destination, report.outputName, progress=progress)
+                if pipeline_progress is not None:
+                    _emit_progress(
+                        pipeline_progress, "source-zip",
+                        "succeeded" if result.usable else "failed",
+                        result.message or "源码包生成完成",
+                    )
             else:
                 result = FormatResult(
                     format=fmt, status=STATUS_SKIPPED, message="未知格式：{0}".format(fmt),
@@ -884,6 +1034,7 @@ def retry_export_formats(
     buffer_texts: Optional[Dict[str, str]] = None,
     cancel_token: Optional[CancellationToken] = None,
     progress: Optional[Callable[[str, str], None]] = None,
+    pipeline_progress: Optional[Callable[[str, str, str], None]] = None,
     skip_word_refresh: bool = False,
 ) -> ExportReport:
     """仅补失败/待转换格式：使用原轮快照与 DOCX，不混入当前新正文。"""
@@ -896,7 +1047,8 @@ def retry_export_formats(
         raise ValueError("补格式需要原轮项目位置：请从结果页或索引文件恢复报告。")
     return run_project_export(
         effective, buffer_texts=buffer_texts, cancel_token=cancel_token,
-        progress=progress, skip_word_refresh=skip_word_refresh,
+        progress=progress, pipeline_progress=pipeline_progress,
+        skip_word_refresh=skip_word_refresh,
         prior=report, only_formats=list(formats),
     )
 

@@ -12,30 +12,30 @@
         640
       ],
       "actual": [
-        368,
+        356,
         640
       ],
-      "minimumWidthHint": 368,
+      "minimumWidthHint": 356,
       "stacked": true,
       "buttons": [
         {
           "text": "补这次成果（原轮）",
-          "width": 360,
+          "width": 348,
           "hint": 128
         },
         {
           "text": "按当前修改重新生成",
-          "width": 360,
+          "width": 348,
           "hint": 128
         },
         {
           "text": "更改设置…",
-          "width": 360,
+          "width": 348,
           "hint": 80
         },
         {
           "text": "换目录并重新导出…",
-          "width": 360,
+          "width": 348,
           "hint": 128
         }
       ],
@@ -51,7 +51,7 @@
         420,
         640
       ],
-      "minimumWidthHint": 368,
+      "minimumWidthHint": 356,
       "stacked": false,
       "buttons": [
         {
@@ -91,7 +91,7 @@
         700,
         640
       ],
-      "minimumWidthHint": 368,
+      "minimumWidthHint": 356,
       "stacked": false,
       "buttons": [
         {
@@ -136,20 +136,21 @@
         369
       ],
       "navBarRect": [
-        238,
-        24
+        258,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
+        "validate",
         "diag_build",
         "merge",
         "branch",
@@ -178,20 +179,21 @@
         369
       ],
       "navBarRect": [
-        238,
-        24
+        258,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
+        "validate",
         "diag_build",
         "merge",
         "branch",
@@ -216,27 +218,28 @@
       "logicalDpi": 96.0,
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
-        925,
+        926,
         449
       ],
       "navBarRect": [
-        393,
-        24
+        414,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
+        "diag_build",
+        "merge",
         "branch",
-        "toggle_summary",
-        "close"
+        "toggle_summary"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -257,27 +260,28 @@
       "logicalDpi": 96.0,
       "fontFamily": "Microsoft YaHei UI",
       "editorRect": [
-        925,
+        926,
         449
       ],
       "navBarRect": [
-        393,
-        24
+        414,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
+        "diag_build",
+        "merge",
         "branch",
-        "toggle_summary",
-        "close"
+        "toggle_summary"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -302,14 +306,14 @@
         809
       ],
       "navBarRect": [
-        1032,
-        24
+        1052,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27
@@ -339,14 +343,14 @@
         809
       ],
       "navBarRect": [
-        1032,
-        24
+        1052,
+        26
       ],
       "quickExport": [
-        125,
+        151,
         27
       ],
-      "quickExportSizeHint": 125,
+      "quickExportSizeHint": 151,
       "results": [
         52,
         27

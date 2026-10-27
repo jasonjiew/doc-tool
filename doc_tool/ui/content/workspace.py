@@ -326,6 +326,7 @@ class ContentWorkspace(QWidget):
 
         self.panels_host = QWidget(self)
         self._panels = QTabWidget(self.panels_host)
+        self._panels.setStyleSheet("QTabBar::tab { height: 24px; padding: 2px 8px; font-size: 11px; }")
         panels_layout = QVBoxLayout(self.panels_host)
         panels_layout.setContentsMargins(0, 0, 0, 0)
         panels_layout.addWidget(self._panels)

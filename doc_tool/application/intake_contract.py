@@ -732,11 +732,20 @@ class ExportRequest:
     capture_id: str = ""
     #: V3.2 4.2：产品变体（空=项目当前内容）；出稿按变体的有效章节/变量/模块版本展开。
     variant_id: str = ""
+    #: None 表示沿用项目/修订记录；显式值只影响当前导出快照。
+    document_no: Optional[str] = None
+    document_name: Optional[str] = None
+    document_version: Optional[str] = None
+    document_properties: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.formats = normalize_formats(self.formats) or [FORMAT_DOCX]
         if self.source_mode not in SOURCE_MODES:
             self.source_mode = SOURCE_MODE_SAVED
+        if self.document_properties is None:
+            self.document_properties = {}
+        else:
+            self.document_properties = dict(self.document_properties)
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -758,6 +767,10 @@ class ExportRequest:
             source_mode=str(data.get("source_mode") or SOURCE_MODE_SAVED),
             destination=str(data.get("destination") or ""),
             output_name=str(data.get("output_name") or ""),
+            document_no=str(data["document_no"]) if data.get("document_no") is not None else None,
+            document_name=str(data["document_name"]) if data.get("document_name") is not None else None,
+            document_version=str(data["document_version"]) if data.get("document_version") is not None else None,
+            document_properties={str(k): str(v) for k, v in (data.get("document_properties") or {}).items()},
             layout_profile=str(data.get("layout_profile") or "template"),
             layout=dict(data.get("layout") or {}),
             refresh=bool(data.get("refresh", True)),

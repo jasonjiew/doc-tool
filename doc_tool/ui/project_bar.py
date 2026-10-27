@@ -41,6 +41,7 @@ class ProjectBar(QWidget):
         on_diag_build: Optional[Callable[[], None]] = None,
         on_validate: Optional[Callable[[], None]] = None,
         on_quick_export: Optional[Callable[[], None]] = None,
+        on_export_settings: Optional[Callable[[], None]] = None,
         on_show_results: Optional[Callable[[], None]] = None,
         on_switch_branch: Optional[Callable[[], None]] = None,
         on_close_project: Optional[Callable[[], None]] = None,
@@ -51,6 +52,7 @@ class ProjectBar(QWidget):
         self._on_diag_build = on_diag_build
         self._on_validate = on_validate
         self._on_quick_export = on_quick_export
+        self._on_export_settings = on_export_settings
         self._on_show_results = on_show_results
         self._on_switch_branch = on_switch_branch
         self._on_close_project = on_close_project
@@ -109,7 +111,7 @@ class ProjectBar(QWidget):
 
         # 高频入口：日常「导出 Word」优先可见可点（与菜单 Ctrl+E 同一 handler）；
         # 项目检查 / 快速构建 / 正式出稿作为次级动作保留完整流水线语义。
-        self._quick_export_btn = QPushButton("导出 Word", self)
+        self._quick_export_btn = QPushButton("导出正式 Word", self)
         self._quick_export_btn.setObjectName("barQuickExportBtn")
         self._quick_export_btn.setProperty("btnRole", "primary")
         # 主要动作不参与溢出：按完整样式（QSS 生效后）的最小尺寸保留，不裁切文字。
@@ -118,10 +120,19 @@ class ProjectBar(QWidget):
         )
         self._quick_export_btn.setShortcut("Ctrl+E")
         self._quick_export_btn.setToolTip(
-            "快速导出整份 Word（当前编辑内容优先，无需本机 Word） (Ctrl+E)"
+            "一键保存修改、同步版本并导出 Word 文档 (Ctrl+E)"
         )
         self._quick_export_btn.clicked.connect(self._handle_quick_export)
         main.addWidget(self._quick_export_btn)
+
+        self._export_settings_btn = QPushButton("导出设置…", self)
+        self._export_settings_btn.setObjectName("barExportSettingsBtn")
+        self._export_settings_btn.setProperty("btnRole", "secondary")
+        self._export_settings_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self._export_settings_btn.setToolTip("弹窗配置文档属性（文档部件 → 域 → 文档属性）、格式与范围")
+        self._export_settings_btn.clicked.connect(lambda: self._on_export_settings() if self._on_export_settings else None)
+        self._export_settings_btn.setVisible(True)
+        main.addWidget(self._export_settings_btn)
 
         # 「成果」：非模态逐文件结果入口（关闭后仍能从这里找回最近轮次）。
         self._results_btn = QPushButton("成果", self)
@@ -134,7 +145,7 @@ class ProjectBar(QWidget):
         self._results_btn.clicked.connect(self._handle_show_results)
         main.addWidget(self._results_btn)
 
-        self._validate_btn = QPushButton("项目检查", self)
+        self._validate_btn = QPushButton("检查 (F5)", self)
         self._validate_btn.setProperty("btnRole", "secondary")
         self._validate_btn.setToolTip("检查文档结构、引用与格式；若已生成 Word 则一并校验一致性 (F5)")
         self._validate_btn.clicked.connect(self._handle_validate)
@@ -142,13 +153,13 @@ class ProjectBar(QWidget):
 
         self._diag_btn = QPushButton("快速构建", self)
         self._diag_btn.setProperty("btnRole", "secondary")
-        self._diag_btn.setToolTip("快速生成 DOCX 预览（无需本机 Word，跳过目录域刷新） (Ctrl+Shift+B)")
+        self._diag_btn.setToolTip("【开发诊断】快速生成 DOCX 预览（跳过 Word 目录与域刷新） (Ctrl+Shift+B)")
         self._diag_btn.clicked.connect(self._handle_diag_build)
         main.addWidget(self._diag_btn)
 
         self._merge_btn = QPushButton("正式出稿", self)
         self._merge_btn.setProperty("btnRole", "secondary")
-        self._merge_btn.setToolTip("完整生成、刷新目录域与页码并正式归档（需本机 Microsoft Word）")
+        self._merge_btn.setToolTip("【开发诊断】直接进行完整构建与 Word 刷新（跳过导出设置弹窗）")
         self._merge_btn.clicked.connect(self._handle_merge)
         main.addWidget(self._merge_btn)
 
@@ -275,11 +286,12 @@ class ProjectBar(QWidget):
         self._quick_export_btn.setMinimumWidth(
             max(0, self._quick_export_btn.sizeHint().width())
         )
-        for widget in (self._quick_export_btn, self._results_btn, self._more_btn):
+        self._export_settings_btn.setMinimumWidth(max(0, self._export_settings_btn.sizeHint().width()))
+        for widget in (self._quick_export_btn, self._export_settings_btn, self._results_btn, self._more_btn):
             reserved += max(0, widget.sizeHint().width()) + 10
         self._overflow.set_primary_width(reserved)
         # 主要动作不得被压缩：布局后被挤压时继续溢出次级动作。
-        self._overflow.protect(self._quick_export_btn, self._results_btn)
+        self._overflow.protect(self._quick_export_btn, self._export_settings_btn, self._results_btn)
         return self._overflow.refresh(max(0, total))
 
     def showEvent(self, event) -> None:  # noqa: N802
@@ -362,6 +374,7 @@ class ProjectBar(QWidget):
             actions.get("quick_export", None),
             self._quick_export_tooltip(),
         )
+        self._set_enabled(self._export_settings_btn, actions.get("quick_export", None), "设置导出范围、文件名和本次文档属性")
         # 「成果」始终可点：没有轮次时给出明确空态说明，而不是禁用成死按钮。
         self._results_btn.setEnabled(True)
         self._results_btn.setToolTip(
@@ -437,6 +450,11 @@ class ProjectBar(QWidget):
         """由主窗口在渲染前注入未保存修改章节数（0 表示无未保存修改）。"""
         self._pending_edit_count = max(0, int(count or 0))
 
+    def update_version(self, version: str) -> None:
+        """更新顶栏显示的版本号。"""
+        if getattr(self, "_version_label", None) is not None:
+            self._version_label.setText("v{0}".format(version) if version else "")
+
     def set_round_count(self, count: int) -> None:
         """由主窗口注入本项目已有出稿轮次数（用于「成果」入口提示）。"""
         self._round_count = max(0, int(count or 0))
@@ -496,6 +514,7 @@ class ProjectBar(QWidget):
         self._diag_btn.setEnabled(False)
         self._validate_btn.setEnabled(False)
         self._quick_export_btn.setEnabled(False)
+        self._export_settings_btn.setEnabled(False)
         self._results_btn.setEnabled(False)
         for action in (
             getattr(self, "_validate_action", None),

@@ -39,6 +39,9 @@ class MarkdownHighlighter(QSyntaxHighlighter):
     _QUOTE_RE = QRegularExpression(r"^>\s?")
     _FENCE_RE = QRegularExpression(r"^```")
     _EMPTY_PAR_RE = QRegularExpression(r"<EMPTY_PAR\s*/?>")
+    _LAYOUT_COMMENT_RE = QRegularExpression(
+        r"<!--\s*(P:|TBL:|TABLE:|COMPLEX_TABLE_PROXY:).*?-->"
+    )
 
     def __init__(self, document) -> None:
         super().__init__(document)
@@ -92,7 +95,13 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         if comment_start != -1:
             comment_end = text.find("-->", comment_start + 4)
             if comment_end != -1:
-                self.setFormat(comment_start, comment_end + 3 - comment_start, self._comment_fmt())
+                sub = text[comment_start : comment_end + 3]
+                is_layout = any(
+                    k in sub
+                    for k in ("<!-- P:", "<!-- TBL:", "<!-- TABLE:", "<!-- COMPLEX_TABLE_PROXY:")
+                )
+                fmt = self._layout_comment_fmt() if is_layout else self._comment_fmt()
+                self.setFormat(comment_start, comment_end + 3 - comment_start, fmt)
             else:
                 self.setFormat(comment_start, len(text) - comment_start, self._comment_fmt())
                 self.setCurrentBlockState(self.STATE_IN_COMMENT)
@@ -132,6 +141,13 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         fmt = QTextCharFormat()
         fmt.setFontItalic(True)
         fmt.setForeground(QColor("#94a3b8"))
+        return fmt
+
+    def _layout_comment_fmt(self) -> QTextCharFormat:
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(True)
+        fmt.setForeground(QColor("#94a3b8"))
+        fmt.setFontPointSize(9.0)
         return fmt
 
     def _heading_fmt(self) -> QTextCharFormat:

@@ -16,6 +16,9 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import posixpath
 import re
@@ -40,6 +43,7 @@ from docx_common import (
     format_location,
     iter_chapter_entries,
     load_config,
+    cleanup_element_bookmarks,
     neutralize_dangling_hyperlinks,
     neutralize_hyperlink_fields,
     parse_image_reference,
@@ -1811,16 +1815,14 @@ def update_custom_properties(items: Dict[str, bytes], config: Dict) -> None:
 
     # 若 _revision_record.md 存在，尝试自动读取末行最新版本号作为真实版本
     rev_path = config.get("paths", {}).get("revision_record")
-    if rev_path and os.path.isfile(rev_path):
+    if not config.get("fixedDocumentVersion") and rev_path and os.path.isfile(rev_path):
         try:
-            rev_rows = _parse_revision_markdown(rev_path)
-            if rev_rows and rev_rows[-1] and rev_rows[-1][0]:
-                latest_ver = str(rev_rows[-1][0]).strip()
-                if latest_ver.upper().startswith("V"):
-                    latest_ver = latest_ver[1:].strip()
-                if latest_ver:
-                    doc_ver = latest_ver
-                    config["documentVersion"] = latest_ver
+            from doc_tool.application.content.revision_record import document_version_from_record
+
+            latest_ver = document_version_from_record(rev_path)
+            if latest_ver:
+                doc_ver = latest_ver
+                config["documentVersion"] = latest_ver
         except Exception:
             pass
 
@@ -1859,7 +1861,6 @@ def update_custom_properties(items: Dict[str, bytes], config: Dict) -> None:
             continue
         if name in prop_by_name:
             p = prop_by_name[name]
-            # 关键：清除原有的全部子节点（如 <vt:r8>、<vt:i4> 等），统一设为 Unicode 字符串 <vt:lpwstr>
             for child in list(p):
                 p.remove(child)
             lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
@@ -1872,6 +1873,24 @@ def update_custom_properties(items: Dict[str, bytes], config: Dict) -> None:
             next_pid += 1
             lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
             lpwstr.text = value
+
+    # 同义属性名同步更新（若模板 custom.xml 中已存在这些属性名）
+    synonym_pairs = [
+        ("文档编号", ("文件编号",)),
+        ("版本", ("版本号", "文档版本")),
+        ("文件名称", ("文档名称",)),
+    ]
+    for std_name, syn_names in synonym_pairs:
+        val = custom_props.get(std_name)
+        if not val:
+            continue
+        for syn in syn_names:
+            if syn in prop_by_name:
+                p = prop_by_name[syn]
+                for child in list(p):
+                    p.remove(child)
+                lpwstr = etree.SubElement(p, "{{{0}}}lpwstr".format(VT_NS))
+                lpwstr.text = val
 
     items["docProps/custom.xml"] = etree.tostring(
         root, xml_declaration=True, encoding="UTF-8", standalone=True
@@ -1940,20 +1959,45 @@ def update_custom_properties(items: Dict[str, bytes], config: Dict) -> None:
             pass
 
 
-def update_cover(root, config: Dict) -> None:
-    expected = {
-        "文件编号": ("text", str(config["documentNo"])),
-        "版本号": ("text", str(config["documentVersion"])),
-        "页数": ("field", "NUMPAGES \\* MERGEFORMAT"),
-    }
+def update_cover(root, config: Dict, *, strict: bool = False) -> None:
+    doc_no = str(config.get("documentNo", "")).strip()
+    doc_ver = str(config.get("documentVersion", "")).strip()
+    doc_name = str(config.get("documentName", "")).strip()
+
+    expected = {}
+    if doc_no:
+        expected["文件编号"] = ("text", doc_no)
+        expected["文档编号"] = ("text", doc_no)
+    if doc_ver:
+        expected["版本号"] = ("text", doc_ver)
+        expected["版本"] = ("text", doc_ver)
+        expected["文档版本"] = ("text", doc_ver)
+    expected["页数"] = ("field", "NUMPAGES \\* MERGEFORMAT")
+    expected["总页数"] = ("field", "NUMPAGES \\* MERGEFORMAT")
+    if doc_name:
+        expected["文档名称"] = ("text", doc_name)
+        expected["文件名称"] = ("text", doc_name)
+
+    rev_tbl = None
+    body = root.find(qn("body"))
+    if body is not None:
+        rev_tbl = _find_revision_record_table(body)
+
     found = set()
     cover_tables = []
     for table in root.iter(qn("tbl")):
+        if rev_tbl is not None and table == rev_tbl:
+            continue
         labels = {_cell_text(cell).rstrip("：:").strip() for cell in table.iter(qn("tc"))}
-        if set(expected).issubset(labels):
+        if {"修订摘要", "修订说明", "修改内容", "变更说明", "修订人", "修改人"} & labels:
+            continue
+        matched = labels.intersection(set(expected))
+        if matched and ({"文件编号", "文档编号"} & matched or {"版本号", "版本"} & matched or {"页数", "总页数"} & matched):
             cover_tables.append(table)
-    if len(cover_tables) != 1:
+
+    if strict and len(cover_tables) != 1:
         raise AutomationError("模板封面字段表数量异常，预期 1，实际 {0}".format(len(cover_tables)))
+
     for table in cover_tables:
         for row in table.findall(qn("tr")):
             cells = row.findall(qn("tc"))
@@ -1967,9 +2011,27 @@ def update_cover(root, config: Dict) -> None:
                 else:
                     _replace_cell_text(cells[index + 1], value)
                 found.add(label)
-    missing = sorted(set(expected) - found)
-    if missing:
-        raise AutomationError("模板封面缺少字段: {0}".format(", ".join(missing)))
+
+    if strict:
+        must_have = {"文件编号", "版本号", "页数"}
+        missing = sorted(must_have - found)
+        if missing:
+            raise AutomationError("模板封面缺少字段: {0}".format(", ".join(missing)))
+
+    # 同步更新封面段落中的 w:fldSimple 域缓存文本
+    for fld in root.iter(qn("fldSimple")):
+        inst = (fld.get(qn("instr")) or "").upper()
+        if "DOCPROPERTY" in inst:
+            for t in fld.iter(qn("t")):
+                if "版本" in inst or "VERSION" in inst:
+                    if doc_ver:
+                        t.text = doc_ver
+                elif "文件编号" in inst or "文档编号" in inst or "DOCNO" in inst:
+                    if doc_no:
+                        t.text = doc_no
+                elif "文件名称" in inst or "文档名称" in inst:
+                    if doc_name:
+                        t.text = doc_name
 
     # 同步更新封面段落中的 DOCPROPERTY 域缓存文本
     doc_no = str(config.get("documentNo", ""))
@@ -2012,16 +2074,34 @@ def update_headers(items, config):
     doc_ver = str(config.get("documentVersion", ""))
     doc_name = str(config.get("documentName", ""))
     doc_no_pattern = re.compile(r"^[a-zA-Z0-9_-]+-\d+-\d+-\d+$")
-    ver_pattern = re.compile(r"^\d+\.\d+(\.\d+)?$")
+    ver_pattern = re.compile(r"^[vV]?\d+\.\d+(\.\d+)?$")
     header_names = sorted(
         name for name in items
-        if name.startswith("word/header") and name.endswith(".xml")
+        if (name.startswith("word/header") or name.startswith("word/footer")) and name.endswith(".xml")
     )
     if not header_names:
         return
     for hdr_name in header_names:
         hdr_root = _parse_xml_safe(items[hdr_name], hdr_name)
         modified = False
+
+        # 0. 扫描更新 w:fldSimple 域缓存值
+        for fld in hdr_root.iter(qn("fldSimple")):
+            inst = (fld.get(qn("instr")) or "").upper()
+            if "DOCPROPERTY" in inst:
+                for t in fld.iter(qn("t")):
+                    if "版本" in inst or "VERSION" in inst:
+                        if doc_ver and t.text != doc_ver:
+                            t.text = doc_ver
+                            modified = True
+                    elif "文件编号" in inst or "文档编号" in inst or "DOCNO" in inst:
+                        if doc_no and t.text != doc_no:
+                            t.text = doc_no
+                            modified = True
+                    elif "文件名称" in inst or "文档名称" in inst or "TITLE" in inst:
+                        if doc_name and t.text != doc_name:
+                            t.text = doc_name
+                            modified = True
 
         # 1. 扫描更新 DOCPROPERTY 域缓存值
         flat_runs = [(run, run.getparent()) for run in hdr_root.iter(qn("r"))]
@@ -2439,6 +2519,15 @@ def _clone_revision_row(prototype, values, expressions=None, summary_col_idx=Non
                 for name in list(node.attrib):
                     if name.rpartition("}")[2] in ("paraId", "textId"):
                         del node.attrib[name]
+            # 清除模板行中残留的 bookmarkStart 与 bookmarkEnd，防止克隆行导致书签重复
+            for bm in list(row.iter(qn("bookmarkStart"))):
+                parent = bm.getparent()
+                if parent is not None:
+                    parent.remove(bm)
+            for bm in list(row.iter(qn("bookmarkEnd"))):
+                parent = bm.getparent()
+                if parent is not None:
+                    parent.remove(bm)
             for idx, (cell, text) in enumerate(zip(cells, values)):
                 tc_pr = cell.find(qn("tcPr"))
                 if tc_pr is not None:
@@ -2672,7 +2761,22 @@ def _render_image_block(
         with Image.open(image_path) as image:
             image.verify()
     except Exception as exc:
-        raise AutomationError("图片损坏或无法读取 {0}: {1}".format(image_path, exc))
+        logger.warning("图片损坏或无法读取 %s: %s，已降级渲染为占位段落", image_path, exc)
+        p = make_paragraph(
+            None,
+            "【图片缺失或损坏: {0}】".format(block.alt or block.relative_path),
+        )
+        r = p.find(qn("r"))
+        if r is not None:
+            rpr = r.find(qn("rPr"))
+            if rpr is None:
+                rpr = etree.Element(qn("rPr"))
+                r.insert(0, rpr)
+            color = etree.SubElement(rpr, qn("color"))
+            color.set(qn("val"), "C00000")
+            etree.SubElement(rpr, qn("i"))
+        insert_element(insert_before, p)
+        return 1, 0
     extension = os.path.splitext(image_path)[1].lower().lstrip(".")
     rid, media_part, reused = image_manager.add_or_reuse(data, extension)
     if not reused:
@@ -2700,6 +2804,8 @@ def _render_table_block(
     block, insert_before, config, registry=None, available_width: Optional[int] = None
 ) -> int:
     """普通表格：复用元数据与集团内核参数，按所在节版心限宽。"""
+    if not block.rows:
+        return 0
     meta = block.meta or (None, None, "dxa", None, None, {})
     style_id, col_widths, width_type, table_width, row_height, extra = meta
     table = make_table_from_md(
@@ -2745,6 +2851,7 @@ def _render_complex_table_block(
         raise AutomationError("复杂表格 XML 无法解析 {0}: {1}".format(table_path, exc))
     if table_element.tag != qn("tbl"):
         raise AutomationError("复杂表格 XML 根节点不是 w:tbl: {0}".format(table_path))
+    cleanup_element_bookmarks(table_element)
     relationship_map = {
         relationship.get("Id"): relationship for relationship in relationships
     }
@@ -2763,7 +2870,16 @@ def _render_complex_table_block(
     if getattr(block, "proxy_rows", None):
         from doc_tool.domain.smart_features import apply_complex_table_proxy_edits
 
-        apply_complex_table_proxy_edits(table_element, block.proxy_rows)
+        try:
+            apply_complex_table_proxy_edits(table_element, block.proxy_rows)
+        except ValueError as exc:
+            import logging
+            logging.getLogger(__name__).warning("复杂表格代理应用编辑失败（%s），降级为普通 Word 表格", exc)
+            table_element = make_table_from_md(
+                block.proxy_rows,
+                None, None, "dxa", None, None,
+                _table_extra_from_meta({}),
+            )
     insert_element(insert_before, table_element)
     inserted = 1
     entry = registry.get(block.ident) if (registry is not None and getattr(block, "ident", "")) else None
@@ -3036,6 +3152,8 @@ def build(
     output_override: Optional[str] = None,
     config: Optional[Dict] = None,
     prepared=None,
+    *,
+    defer_static_toc: bool = False,
 ) -> str:
     """Build a DOCX from a template + chapter tree + Markdown assets.
 
@@ -3048,6 +3166,12 @@ def build(
         if doc_type is None:
             raise AutomationError("必须提供 doc_type 或 config 参数")
         config = load_config(doc_type)
+    if defer_static_toc:
+        from dataclasses import replace
+        from doc_tool.domain.merge_policy import resolve_merge_policy
+
+        config = dict(config)
+        config["mergePolicy"] = replace(resolve_merge_policy(config), synthesize_static_fields=False)
     doc_type = config["documentType"]
     validate_content_tree(config)
     template_path = config["paths"]["template"]
@@ -3072,9 +3196,8 @@ def build(
     # 需求/详细设计预设启用封面字段同步；通用大文档不得
     # 假设存在“文件编号/版本号/页数”表格，原封面随模板保留。
     update_custom_properties(items, config)
-    if doc_type in ("requirement", "design"):
-        update_cover(document_root, config)
-        update_headers(items, config)
+    update_cover(document_root, config, strict=False)
+    update_headers(items, config)
 
     relationship_root = _parse_xml_safe(items["word/_rels/document.xml.rels"], "word/_rels/document.xml.rels")
     image_manager = ImageManager(items, relationship_root)
@@ -3285,6 +3408,7 @@ def build(
 
     # 模板修订/导航表与复杂表格资源中可能内嵌 HYPERLINK 域与悬空超链接，
     # 指向模板书签；重建文档不生成这些书签，统一解除为静态文本。
+    cleanup_element_bookmarks(document_root, deduplicate=True, strip_internal=True)
     hyperlink_fields = neutralize_hyperlink_fields(document_root)
     dangling_hyperlinks = neutralize_dangling_hyperlinks(document_root)
     total_hyperlinks = hyperlink_fields + dangling_hyperlinks
@@ -3349,13 +3473,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     choices = tuple(available) + ("all",)
     parser.add_argument("document", choices=choices, nargs="?", default="all")
     parser.add_argument("--output", help="仅单文档时覆盖输出路径（用于隔离测试）")
+    parser.add_argument("--defer-static-toc", action="store_true", help="由后续 Word 刷新生成目录，不预先合成目录缓存")
     args = parser.parse_args(argv)
     if args.document == "all" and args.output:
         parser.error("--output 仅可用于单文档")
     targets = tuple(available) if args.document == "all" else (args.document,)
     try:
         for target in targets:
-            build(target, args.output)
+            build(target, args.output, defer_static_toc=args.defer_static_toc)
         return 0
     except (AutomationError, OSError, zipfile.BadZipFile, etree.LxmlError) as exc:
         print("[FAIL] {0}".format(exc), file=sys.stderr)

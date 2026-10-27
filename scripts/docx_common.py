@@ -8,6 +8,8 @@ separate so that the validator can inspect generated OOXML independently.
 
 from __future__ import annotations
 
+from doc_tool.domain.blocks import parse_blocks, parse_blocks_file
+
 import os
 import re
 import sys
@@ -339,15 +341,23 @@ def scan_entries(
         matches_chapter_scope,
     )
 
-    active_policy = policy if policy is not None else STRICT_MERGE_POLICY
+    from doc_tool.domain.merge_policy import DEFAULT_MERGE_POLICY
+    active_policy = policy if policy is not None else DEFAULT_MERGE_POLICY
     renumber_mode = active_policy.effective_renumber_mode()
     allow_extended = active_policy.allow_extended_titles()
     allow_unnumbered = active_policy.allow_unnumbered_titles()
 
     raw_items: List[Tuple[Optional[Tuple[int, ...]], str, str, str, str]] = []
     invalid: List[str] = []
+    _IGNORED_OS_FILES = {".ds_store", "thumbs.db", "desktop.ini"}
     for name in os.listdir(directory):
-        if name.startswith(".") or name.startswith("_"):
+        lower_name = name.lower()
+        if (
+            name.startswith(".")
+            or name.startswith("~")
+            or name.startswith("_")
+            or lower_name in _IGNORED_OS_FILES
+        ):
             continue
         if name.endswith(".bak") or name.endswith(".tmp"):
             # 工具备份/临时文件（编辑器写前 .md.bak、原子写 .tmp），非内容，跳过。
@@ -968,6 +978,92 @@ def neutralize_dangling_hyperlinks(
 
                 parent.remove(hl)
                 removed += 1
+    return removed
+
+
+INTERNAL_BOOKMARK_PREFIXES = ("OLE_LINK", "_Toc", "_Hlt", "_GoBack")
+
+
+def is_internal_bookmark_name(name: Optional[str]) -> bool:
+    """判定是否为 Word 内部临时或系统书签（OLE_LINK*, _Toc*, _Hlt*, _GoBack* 等）。"""
+    if not name:
+        return False
+    lower = name.lower()
+    return any(lower.startswith(prefix.lower()) for prefix in INTERNAL_BOOKMARK_PREFIXES)
+
+
+def cleanup_element_bookmarks(
+    element, deduplicate: bool = True, strip_internal: bool = True
+) -> int:
+    """清理/去重元素内无用与重复的 Word 书签（如 OLE_LINK*, _Toc*, _Hlt* 及重复书签）。
+
+    1. 若 strip_internal 为 True，清除所有匹配 Word 内部临时书签的前缀；
+    2. 若 deduplicate 为 True，对同名书签（不区分大小写）进行去重保留首个；
+    3. 清除重复的 bookmarkStart id，保证 bookmarkStart id 唯一；
+    4. 清除所有无匹配 bookmarkStart 的悬空 bookmarkEnd 以及无匹配 bookmarkEnd 的悬空 bookmarkStart。
+    返回被移除的 bookmarkStart 数量。
+    """
+    qn = _wqn
+    removed = 0
+    seen_names = set()
+    seen_start_ids = set()
+    ids_to_remove = set()
+
+    for start_node in list(element.iter(qn("bookmarkStart"))):
+        name = start_node.get(qn("name")) or ""
+        name_key = name.casefold() if name else ""
+        bm_id = start_node.get(qn("id"))
+        should_remove = False
+
+        if strip_internal and is_internal_bookmark_name(name):
+            should_remove = True
+        elif deduplicate and name_key:
+            if name_key in seen_names:
+                should_remove = True
+            else:
+                seen_names.add(name_key)
+
+        if bm_id is not None:
+            if bm_id in seen_start_ids:
+                should_remove = True
+            else:
+                seen_start_ids.add(bm_id)
+
+        if should_remove:
+            parent = start_node.getparent()
+            if parent is not None:
+                parent.remove(start_node)
+            if bm_id is not None:
+                ids_to_remove.add(bm_id)
+            removed += 1
+        else:
+            if name_key:
+                seen_names.add(name_key)
+
+    remaining_start_ids = {
+        node.get(qn("id"))
+        for node in element.iter(qn("bookmarkStart"))
+        if node.get(qn("id")) is not None
+    }
+    seen_end_ids = set()
+    for end_node in list(element.iter(qn("bookmarkEnd"))):
+        bm_id = end_node.get(qn("id"))
+        if bm_id is None or bm_id not in remaining_start_ids or bm_id in seen_end_ids:
+            parent = end_node.getparent()
+            if parent is not None:
+                parent.remove(end_node)
+        else:
+            seen_end_ids.add(bm_id)
+
+    # 检查并清理没有对应 bookmarkEnd 的孤立 bookmarkStart，保证严格 1:1 成对
+    for start_node in list(element.iter(qn("bookmarkStart"))):
+        bm_id = start_node.get(qn("id"))
+        if bm_id not in seen_end_ids:
+            parent = start_node.getparent()
+            if parent is not None:
+                parent.remove(start_node)
+            removed += 1
+
     return removed
 
 

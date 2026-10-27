@@ -156,14 +156,42 @@ def import_command(args) -> CommandResult:
         resolved, preset_info, preset_warnings = resolve_for_source(preset_name, Path(args.docx))
         if resolved is not None and resolved.mapping:
             heading_map = dict(resolved.mapping)
+    reserved = {}
+    if not args.document_no or not args.document_version or not args.document_name:
+        try:
+            from doc_tool.application.export.document_properties import read_template_reserved_properties
+
+            reserved = read_template_reserved_properties(Path(args.docx))
+        except Exception:
+            reserved = {}
+
+    doc_no = args.document_no or reserved.get("文档编号") or reserved.get("文件编号") or ""
+    doc_ver = args.document_version or reserved.get("版本") or reserved.get("版本号") or reserved.get("文档版本") or ""
+    doc_name = args.document_name or reserved.get("文档名称") or reserved.get("文件名称") or args.name
+
+    split_policy = None
+    split_level = getattr(args, "split_level", 0)
+    if split_level and 1 <= split_level <= 4:
+        from doc_tool.domain.split_rules import SplitPolicy
+
+        split_policy = SplitPolicy(max_split_depth=split_level)
+
     request = ImportRequest(
         source_docx=Path(args.docx),
         target_project_root=target,
         document_type=args.document_type,
-        document_no=args.document_no,
-        document_name=args.document_name or args.name,
-        document_version=args.document_version,
+        document_no=doc_no,
+        document_name=doc_name,
+        document_version=doc_ver,
         heading_style_map=heading_map,
+        decide_pre_title_body=bool(getattr(args, "retain_pre_title", False)),
+        pre_title_chapter_title=str(getattr(args, "pre_title_title", "前言") or "前言"),
+        allow_missing_headings=bool(getattr(args, "allow_missing_headings", True)),
+        ignore_roundtrip_block=bool(
+            getattr(args, "ignore_roundtrip_block", False)
+            or getattr(args, "retain_pre_title", False)
+        ),
+        split_policy=split_policy,
     )
     result = import_first_time(request)
     saved_preset = ""

@@ -213,9 +213,14 @@ def _revision_table_rows(md_path: Path) -> Optional[List[List[str]]]:
     （只含表头的列表）——后者说明作者还没写过任何一条修订记录。
     """
     try:
-        lines = Path(md_path).read_text(encoding="utf-8").splitlines()
+        text = Path(md_path).read_text(encoding="utf-8")
     except OSError:
         return None
+    return _revision_table_rows_from_text(text)
+
+
+def _revision_table_rows_from_text(text: str) -> Optional[List[List[str]]]:
+    lines = text.splitlines()
     table_lines: List[str] = []
     in_table = False
     for line in lines:
@@ -246,7 +251,10 @@ def last_revision_version(md_path: Path) -> Optional[str]:
     从最后一行向前查找，自动跳过尾部的审批/签名/备注等非版本行。
     支持非首列版本号（如首列为“序号”列）。
     """
-    rows = _revision_table_rows(md_path)
+    return _last_revision_version_from_rows(_revision_table_rows(md_path))
+
+
+def _last_revision_version_from_rows(rows) -> Optional[str]:
     if rows is None or len(rows) < 2:
         return None
     header = rows[0]
@@ -277,6 +285,12 @@ def last_revision_version(md_path: Path) -> Optional[str]:
             continue
         return candidate
     return None
+
+
+def document_version_from_text(text: str) -> Optional[str]:
+    """从当前编辑缓冲提取与构建时相同的修订版本。"""
+    version = _last_revision_version_from_rows(_revision_table_rows_from_text(text))
+    return normalize_revision_version(version) if version else None
 
 
 def document_version_from_record(md_path: Path) -> Optional[str]:

@@ -459,6 +459,7 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
     index = 0
     total = len(lines)
     pending_format: Optional[str] = None
+    pending_format_blanks: int = 0
     landscape_depth = 0
     landscape_open_line = 0
     seen_idents: Dict[str, int] = {}
@@ -494,10 +495,13 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
         return cursor
 
     def _consume_complex_proxy(start: int) -> Tuple[List[List[str]], int]:
-        """若紧随复杂表格标记之后存在 ``<!-- TABLE_PROXY_BEGIN -->``，消费代理管道表。"""
-        if start >= total or lines[start].strip() != TABLE_PROXY_BEGIN:
+        """若紧随复杂表格标记之后存在 ``<!-- TABLE_PROXY_BEGIN -->``（允许中间存在 1~2 个空行），消费代理管道表。"""
+        cursor = start
+        while cursor < total and not lines[cursor].strip() and (cursor - start <= 2):
+            cursor += 1
+        if cursor >= total or lines[cursor].strip() != TABLE_PROXY_BEGIN:
             return [], start
-        cursor = start + 1
+        cursor = cursor + 1
         proxy_lines: List[str] = []
         while cursor < total:
             cur_s = lines[cursor].strip()
@@ -521,6 +525,7 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
 
         # --- 显式横向节 ---
         if _SECTION_START_RE.match(stripped):
+            pending_format = None
             if landscape_depth > 0:
                 _warn(
                     line_no,
@@ -582,6 +587,8 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
 
         # --- 围栏代码块（含 mermaid） ---
         fence = _FENCE_OPEN_RE.match(raw)
+        if fence:
+            pending_format = None
         if fence:
             mark = fence.group("mark")
             info = fence.group("info").strip()
@@ -645,6 +652,7 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
 
         # --- 表格元数据 ---
         if stripped.startswith("<!-- TBL:"):
+            pending_format = None
             meta = parse_table_meta(stripped)
             if meta is None:
                 document.blocks.append(
@@ -652,8 +660,13 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
                 )
                 index += 1
                 continue
-            cursor = index + 1
-            if cursor < total and lines[cursor].strip().startswith("|"):
+            tbl_start = _skip_blanks(index + 1)
+            if (
+                tbl_start < total
+                and lines[tbl_start].strip().startswith("|")
+                and (tbl_start - (index + 1) <= 2)
+            ):
+                cursor = tbl_start
                 block_lines: List[str] = []
                 while cursor < total and lines[cursor].strip().startswith("|"):
                     block_lines.append(lines[cursor])
@@ -680,10 +693,12 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
             nxt_index = _skip_blanks(index + 1)
             nxt = lines[nxt_index].strip() if nxt_index < total else ""
             meta_before_tbl = parse_table_meta(nxt) if nxt.startswith("<!-- TBL:") else None
+            meta_tbl_start = _skip_blanks(nxt_index + 1) if meta_before_tbl is not None else nxt_index + 1
             has_meta_tbl = (
                 meta_before_tbl is not None
-                and nxt_index + 1 < total
-                and lines[nxt_index + 1].strip().startswith("|")
+                and meta_tbl_start < total
+                and lines[meta_tbl_start].strip().startswith("|")
+                and (meta_tbl_start - (nxt_index + 1) <= 2)
             )
             if nxt.startswith("|") or _COMPLEX_TABLE_RE.match(nxt) or has_meta_tbl:
                 ident = _register_ident(caption[2], line_no, "表格题注")
@@ -707,7 +722,7 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
                 meta_line_val = None
                 if has_meta_tbl:
                     meta_line_val = cursor + 1
-                    cursor += 1
+                    cursor = meta_tbl_start
                 block_lines = []
                 while cursor < total and lines[cursor].strip().startswith("|"):
                     block_lines.append(lines[cursor])
@@ -729,6 +744,7 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
 
         # --- 表格 ---
         if stripped.startswith("|"):
+            pending_format = None
             cursor = index
             block_lines = []
             while cursor < total and lines[cursor].strip().startswith("|"):
@@ -779,6 +795,8 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
         # --- 标题 ---
         heading = _HEADING_RE.match(stripped)
         if heading:
+            pending_format = None
+        if heading:
             document.blocks.append(
                 Heading(
                     location=_location(path, line_no, line_no),
@@ -791,6 +809,8 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
 
         # --- 列表 ---
         list_info = _parse_list(raw)
+        if list_info is not None:
+            pending_format = None
         if list_info is not None:
             kind, level, start, item_text = list_info
             document.blocks.append(
@@ -809,11 +829,13 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
         paragraph_format = _PARAGRAPH_FORMAT_RE.match(stripped)
         if paragraph_format:
             pending_format = paragraph_format.group(1)
+            pending_format_blanks = 0
             index += 1
             continue
 
         if stripped == "<EMPTY_PAR/>":
             document.blocks.append(EmptyParagraph(location=_location(path, line_no, line_no)))
+            pending_format = None
             index += 1
             continue
 
@@ -828,6 +850,11 @@ def parse_blocks(text: str, path: str = "") -> ParsedDocument:
             pending_format = None
             index += 1
             continue
+
+        if pending_format is not None:
+            pending_format_blanks += 1
+            if pending_format_blanks > 2:
+                pending_format = None
 
         index += 1
 

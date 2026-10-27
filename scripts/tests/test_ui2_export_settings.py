@@ -123,6 +123,60 @@ class ExportSettingsDialogTests(unittest.TestCase):
         defaults.update(kwargs)
         return ExportSettingsDialog(**defaults)
 
+    def test_export_settings_is_accessible_from_project_bar(self):
+        from doc_tool.ui.project_bar import ProjectBar
+
+        calls = []
+        bar = ProjectBar(on_export_settings=lambda: calls.append(True))
+        bar._export_settings_btn.click()
+        self.assertEqual(calls, [True])
+
+    def test_document_fields_echo_preview_and_one_round_request(self):
+        dialog = self._dialog(
+            document_no="KF-001", document_name="需求说明书", document_version="3.9",
+            saved_document_version="3.8", document_type="requirement",
+            document_properties={"custom:项目": {"label": "项目", "value": "旧项目", "type": "lpwstr", "editable": True}},
+        )
+        self.assertIn("KF-001 需求说明书(3.9).docx", dialog._summary.text())
+        self.assertIn("KF-001 需求说明书(3.9).docx", dialog._filename_preview.text())
+        self.assertEqual(dialog._property_entries["custom:项目"].text(), "旧项目")
+        saved = dialog._source_combo.findData(SOURCE_MODE_SAVED)
+        dialog._source_combo.setCurrentIndex(saved)
+        self.assertEqual(dialog._document_version.text(), "3.8")
+        dialog._document_name.setText("本次说明书")
+        dialog._document_version.setText("4.2")
+        dialog._document_version.textEdited.emit("4.2")
+        dialog._property_entries["custom:项目"].setText("本次项目")
+        request = dialog.request()
+        self.assertEqual((request.document_no, request.document_name, request.document_version), (None, "本次说明书", "4.2"))
+        self.assertEqual(request.document_properties, {"custom:项目": "本次项目"})
+        self.assertIn("KF-001 本次说明书(4.2).docx", dialog._summary.text())
+        roundtrip = ExportRequest.from_dict(request.to_dict())
+        restored = self._dialog(document_no="KF-001", document_name="需求说明书", document_version="3.9",
+                                document_type="requirement", document_properties={"custom:项目": {"label": "项目", "value": "旧项目", "type": "lpwstr", "editable": True}})
+        restored.apply_request(roundtrip)
+        self.assertEqual(restored._document_version.text(), "4.2")
+        self.assertEqual(restored._property_entries["custom:项目"].text(), "本次项目")
+
+    def test_other_properties_auto_expand_when_restoring_hidden_property(self):
+        dialog = self._dialog(
+            document_no="KF-001", document_name="需求说明书", document_version="3.9",
+            document_type="requirement",
+            document_properties={
+                "custom:项目": {"label": "项目", "value": "默认项目", "type": "lpwstr", "editable": True},
+                "core:description": {"label": "备注", "value": "", "type": "text", "editable": True},
+            },
+        )
+        self.assertTrue(hasattr(dialog, "_other_properties_toggle"))
+        self.assertFalse(dialog._other_properties_toggle.isChecked())
+        request = ExportRequest(
+            project_root=dialog._project_root,
+            document_properties={"core:description": "重要备注信息"},
+        )
+        dialog.apply_request(request)
+        self.assertTrue(dialog._other_properties_toggle.isChecked())
+        self.assertEqual(dialog._property_entries["core:description"].text(), "重要备注信息")
+
     def test_basic_defaults_submit_in_one_action(self):
         dialog = self._dialog()
         request = dialog.request()
@@ -168,7 +222,9 @@ class ExportSettingsDialogTests(unittest.TestCase):
     def test_advanced_is_collapsed_by_default_and_maps_layout(self):
         dialog = self._dialog()
         self.assertFalse(dialog._advanced_box.isChecked(), "高级区默认折叠")
+        self.assertTrue(dialog._advanced_content.isHidden())
         dialog._advanced_box.setChecked(True)
+        self.assertFalse(dialog._advanced_content.isHidden())
         dialog._layout_combo.setCurrentIndex(
             dialog._layout_combo.findData(MODE_BODY_ADAPTIVE)
         )
@@ -198,6 +254,7 @@ class ExportSettingsDialogTests(unittest.TestCase):
         self.assertEqual(request.source_mode, SOURCE_MODE_SAVED)
         self.assertEqual(request.destination, "X:/elsewhere")
         self.assertEqual(request.layout_profile, MODE_BODY_ADAPTIVE)
+        self.assertTrue(dialog._advanced_box.isChecked(), "带入高级选项时应展开供查看")
         self.assertIn("已不可用", dialog._chapter_hint.text())
         self.assertFalse(request.strict, "带入旧轮不得静默打开严格模式")
         dialog.deleteLater()

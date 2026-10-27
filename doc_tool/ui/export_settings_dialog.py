@@ -23,13 +23,17 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
+    QScrollArea,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -79,6 +83,10 @@ def build_export_request(
     source_mode: str,
     destination: str,
     output_name: str = "",
+    document_no: Optional[str] = None,
+    document_name: Optional[str] = None,
+    document_version: Optional[str] = None,
+    document_properties: Optional[dict] = None,
     layout_mode: str = MODE_TEMPLATE,
     image_width: str = "auto-width",
     table_width: str = TABLE_KEEP,
@@ -89,6 +97,7 @@ def build_export_request(
     variant_id: str = "",
     include_original: bool = False,
     strict: bool = False,
+    refresh: bool = True,
 ) -> ExportRequest:
     """纯适配：表单字段 → 既有 ``ExportRequest``（不做业务判断）。"""
     scope = ExportScope(
@@ -112,11 +121,16 @@ def build_export_request(
         source_mode=source_mode if source_mode in (SOURCE_MODE_CURRENT_BUFFER, SOURCE_MODE_SAVED) else SOURCE_MODE_CURRENT_BUFFER,
         destination=str(destination or ""),
         output_name=str(output_name or ""),
+        document_no=document_no,
+        document_name=document_name,
+        document_version=document_version,
+        document_properties=dict(document_properties or {}),
         layout_profile=profile.mode,
         layout=profile.to_dict() if hasattr(profile, "to_dict") else {},
         strict=bool(strict),
         include_original=bool(include_original),
         variant_id=str(variant_id or ""),
+        refresh=bool(refresh),
     )
 
 
@@ -144,6 +158,13 @@ class ExportSettingsDialog(QDialog):
         current_chapter: str = "",
         unsaved_count: int = 0,
         variants: Optional[Sequence[str]] = None,
+        document_no: Optional[str] = None,
+        document_name: Optional[str] = None,
+        document_version: str = "",
+        saved_document_version: str = "",
+        document_type: str = "general",
+        document_properties: Optional[dict] = None,
+        property_notice: str = "",
         notice: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
@@ -156,13 +177,90 @@ class ExportSettingsDialog(QDialog):
         self._unsaved_count = int(unsaved_count or 0)
         self._variants = list(variants or [])
         self._request: Optional[ExportRequest] = None
+        self._property_info = dict(document_properties or {})
+        self._property_entries = {}
+        self._has_document_fields = (document_name is not None) or bool(self._property_info)
+        self._initial_document_no = str(document_no or "").strip()
+        self._initial_document_name = str(document_name or "").strip()
+        self._document_type = document_type
+        self._current_document_version = str(document_version or "")
+        self._saved_document_version = str(saved_document_version or document_version or "")
+        self._version_edited = False
 
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        content = QWidget(scroll)
+        scroll.setWidget(content)
+        outer_layout.addWidget(scroll, 1)
+        layout = QVBoxLayout(content)
         self._recovery_notice = QLabel(str(notice), self)
         self._recovery_notice.setWordWrap(True)
         self._recovery_notice.setVisible(bool(notice))
         layout.addWidget(self._recovery_notice)
         layout.setSpacing(8)
+
+        # --- 文档属性设置（文档部件 → 选择域 → 文档属性） ---
+        if self._has_document_fields:
+            layout.addWidget(self._section_label("文档属性设置（文档部件 → 选择域 → 文档属性）"))
+            form = QFormLayout()
+            self._document_no = QLineEdit(str(document_no or ""), self)
+            self._document_name = QLineEdit(str(document_name or ""), self)
+            self._document_version = QLineEdit(self._current_document_version, self)
+            for label, entry in (("文件编号", self._document_no), ("文件名称", self._document_name), ("版本", self._document_version)):
+                form.addRow(label, entry)
+                entry.textChanged.connect(self._refresh_summary)
+            self._document_version.textEdited.connect(self._mark_version_edited)
+            layout.addLayout(form)
+            self._filename_preview = QLabel("", self)
+            self._filename_preview.setWordWrap(True)
+            layout.addWidget(self._filename_preview)
+            self._document_hint = QLabel("对应 Word【插入 → 文档部件 → 域 → 文档属性 (DOCPROPERTY)】，用于填充封面、页眉页脚与正文；仅作用于本次导出。", self)
+            self._document_hint.setWordWrap(True)
+            self._document_hint.setObjectName("statusMuted")
+            layout.addWidget(self._document_hint)
+            if property_notice:
+                property_warning = QLabel(str(property_notice), self)
+                property_warning.setWordWrap(True)
+                layout.addWidget(property_warning)
+            if self._property_info:
+                group = QGroupBox("Word 域代码与模板属性 (DOCPROPERTY)", self)
+                property_layout = QVBoxLayout(group)
+                property_form = QFormLayout()
+                property_layout.addLayout(property_form)
+                other_container = QWidget(group)
+                other_form = QFormLayout(other_container)
+                other_keys = []
+                for key, info in self._property_info.items():
+                    entry = QLineEdit(str(info.get("value") or ""), group)
+                    entry.setReadOnly(not info.get("editable", True))
+                    label = str(info.get("label") or key)
+                    if not info.get("editable", True):
+                        label += "（只读：{0}）".format(info.get("type") or "未知")
+                    elif info.get("type") not in (None, "text", "lpwstr", "lpstr", "bstr"):
+                        label += "（{0}）".format(info["type"])
+                    name = key.removeprefix("custom:")
+                    other = ((key.startswith("custom:") and (name.upper().startswith("KSO") or name.upper() == "ICV"))
+                             or (key.startswith("core:") and not info.get("value")))
+                    (other_form if other else property_form).addRow(label, entry)
+                    if other:
+                        other_keys.append(key)
+                    self._property_entries[key] = entry
+                if other_keys:
+                    self._other_keys = other_keys
+                    toggle = QToolButton(group)
+                    self._other_properties_toggle = toggle
+                    toggle.setText("其他模板属性")
+                    toggle.setCheckable(True)
+                    toggle.setArrowType(Qt.ArrowType.RightArrow)
+                    toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                    other_container.setVisible(False)
+                    toggle.toggled.connect(other_container.setVisible)
+                    toggle.toggled.connect(lambda checked: toggle.setArrowType(Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow))
+                    property_layout.addWidget(toggle)
+                    property_layout.addWidget(other_container)
+                layout.addWidget(group)
+
 
         # --- 导出什么 ---
         layout.addWidget(self._section_label("导出什么"))
@@ -176,6 +274,11 @@ class ExportSettingsDialog(QDialog):
             formats_row.addWidget(box)
         formats_row.addStretch(1)
         layout.addLayout(formats_row)
+        self._refresh_box = QCheckBox("启用 Word 字段刷新（更新 TOC 目录、NUMPAGES 页码与域代码）", self)
+        self._refresh_box.setChecked(True)
+        self._refresh_box.setToolTip("使用本机 Microsoft Word 刷新文档目录、页码及文档属性域；若当前机器未安装 Word 可取消勾选")
+        self._refresh_box.toggled.connect(self._refresh_summary)
+        layout.addWidget(self._refresh_box)
         self._format_hint = QLabel(
             "PDF 需要本机可用的转换环境；缺少时其它格式仍会生成并单独标注。",
             self,
@@ -219,7 +322,7 @@ class ExportSettingsDialog(QDialog):
         self._source_combo = QComboBox(self)
         self._source_combo.addItem("当前编辑内容（含未保存修改）", SOURCE_MODE_CURRENT_BUFFER)
         self._source_combo.addItem("已保存版本", SOURCE_MODE_SAVED)
-        self._source_combo.currentIndexChanged.connect(self._refresh_summary)
+        self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         layout.addWidget(self._source_combo)
         self._source_hint = QLabel("", self)
         self._source_hint.setObjectName("statusMuted")
@@ -244,6 +347,7 @@ class ExportSettingsDialog(QDialog):
         name_row.addWidget(QLabel("文件名（可选）：", self))
         self._name_entry = QLineEdit(self)
         self._name_entry.setPlaceholderText("留空＝按文档编号与版本自动命名")
+        self._name_entry.setToolTip("留空使用文件编号、文件名称和版本；遇到同名文件时自动使用新文件名。")
         self._name_entry.textChanged.connect(self._refresh_summary)
         name_row.addWidget(self._name_entry, 1)
         layout.addLayout(name_row)
@@ -252,7 +356,12 @@ class ExportSettingsDialog(QDialog):
         self._advanced_box = QGroupBox("高级设置（默认折叠）", self)
         self._advanced_box.setCheckable(True)
         self._advanced_box.setChecked(False)
-        advanced_layout = QVBoxLayout(self._advanced_box)
+        advanced_wrapper = QVBoxLayout(self._advanced_box)
+        self._advanced_content = QWidget(self._advanced_box)
+        advanced_layout = QVBoxLayout(self._advanced_content)
+        advanced_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_wrapper.addWidget(self._advanced_content)
+        self._advanced_content.setVisible(False)
         self._advanced_box.toggled.connect(self._on_advanced_toggled)
 
         layout_row = QHBoxLayout()
@@ -337,7 +446,8 @@ class ExportSettingsDialog(QDialog):
         )
         self._buttons.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
         self._buttons.accepted.connect(self._on_submit)
-        layout.addWidget(self._buttons)
+        outer_layout.addWidget(self._buttons)
+        self._buttons.rejected.connect(self.reject)
 
         self._on_scope_changed(0)
         self._refresh_summary()
@@ -371,9 +481,20 @@ class ExportSettingsDialog(QDialog):
         self._refresh_summary()
 
     def _on_advanced_toggled(self, checked: bool) -> None:
+        self._advanced_content.setVisible(checked)
         self._advanced_box.setTitle(
             "高级设置（{0}）".format("已展开" if checked else "默认折叠")
         )
+        self._refresh_summary()
+
+    def _mark_version_edited(self, _text: str) -> None:
+        self._version_edited = True
+
+    def _on_source_changed(self, *_args) -> None:
+        if self._has_document_fields and hasattr(self, "_document_version") and not self._version_edited:
+            self._document_version.setText(
+                self._saved_document_version if self.source_mode() == SOURCE_MODE_SAVED else self._current_document_version
+            )
         self._refresh_summary()
 
     # --- 状态 ---
@@ -411,6 +532,11 @@ class ExportSettingsDialog(QDialog):
             source_mode=self.source_mode(),
             destination=self._destination_entry.text().strip(),
             output_name=self._name_entry.text().strip(),
+            document_no=self._document_no.text().strip() if self._has_document_fields and self._document_no.text().strip() != self._initial_document_no else None,
+            document_name=self._document_name.text().strip() if self._has_document_fields and self._document_name.text().strip() != self._initial_document_name else None,
+            document_version=self._document_version.text().strip() if self._has_document_fields and self._version_edited else None,
+            document_properties={key: entry.text() for key, entry in self._property_entries.items()
+                                 if self._property_info[key].get("editable", True) and entry.text() != str(self._property_info[key].get("value") or "")},
             layout_mode=str(self._layout_combo.currentData() or MODE_TEMPLATE),
             image_width=str(self._image_combo.currentData() or "auto-width"),
             table_width=str(self._table_combo.currentData() or TABLE_KEEP),
@@ -421,6 +547,7 @@ class ExportSettingsDialog(QDialog):
             variant_id=str(self._variant_combo.currentData() or ""),
             include_original=self._include_original.isChecked(),
             strict=self._strict.isChecked(),
+            refresh=self._refresh_box.isChecked() if hasattr(self, "_refresh_box") else True,
         )
 
     def _refresh_summary(self, *_args) -> None:
@@ -428,6 +555,23 @@ class ExportSettingsDialog(QDialog):
         self._summary.setText(
             "本次将提交：{0}".format(describe_request(request, total_chapters=len(self._chapters)))
         )
+        if self._has_document_fields:
+            from doc_tool.domain.paths import build_output_filename
+            try:
+                filename = build_output_filename(self._document_no.text().strip(), self._document_name.text().strip(), self._document_version.text().strip(), self._document_type)
+                if request.output_name:
+                    from doc_tool.application.intake_contract import sanitize_name_part
+
+                    custom = sanitize_name_part(request.output_name)
+                    if custom.lower().endswith(".docx"):
+                        custom = custom[:-5].strip()
+                    if custom:
+                        filename = custom + ".docx"
+                self._filename_preview.setText("Word 文件名：" + filename)
+                self._summary.setText(self._summary.text() + "\nWord 文件名：" + filename)
+            except Exception as exc:
+                self._filename_preview.setText("文档信息需要完善：" + str(exc))
+                self._summary.setText(self._summary.text() + "\n文档信息需要完善：" + str(exc))
         if not self.formats():
             self._summary.setText(
                 self._summary.text() + "（未勾选格式：将按默认 Word 提交）"
@@ -459,6 +603,20 @@ class ExportSettingsDialog(QDialog):
                 )
 
     def _on_submit(self) -> None:
+        if self._has_document_fields:
+            from doc_tool.domain.paths import build_output_filename
+            from doc_tool.application.export.document_properties import validate_property_value
+            try:
+                build_output_filename(self._document_no.text().strip(), self._document_name.text().strip(), self._document_version.text().strip(), self._document_type)
+                for key, entry in self._property_entries.items():
+                    if self._property_info[key].get("editable", True) and entry.text() != str(self._property_info[key].get("value") or ""):
+                        validate_property_value(self._property_info[key], entry.text())
+            except ValueError as exc:
+                QMessageBox.warning(self, "文档信息无效", str(exc))
+                return
+            except Exception as exc:
+                QMessageBox.warning(self, "文档信息无效", str(exc))
+                return
         self._request = self.request()
         self.accept()
 
@@ -492,6 +650,26 @@ class ExportSettingsDialog(QDialog):
             self._destination_entry.setText(request.destination)
         if request.output_name:
             self._name_entry.setText(request.output_name)
+        if hasattr(request, "refresh") and hasattr(self, "_refresh_box"):
+            self._refresh_box.setChecked(bool(request.refresh))
+        if self._has_document_fields:
+            if request.document_no is not None:
+                self._document_no.setText(request.document_no)
+            if request.document_name is not None:
+                self._document_name.setText(request.document_name)
+            if request.document_version is not None:
+                self._document_version.setText(request.document_version)
+                self._version_edited = True
+            for key, value in (request.document_properties or {}).items():
+                if key in self._property_entries and self._property_info[key].get("editable", True):
+                    self._property_entries[key].setText(value)
+            if hasattr(self, "_other_properties_toggle") and self._other_properties_toggle is not None:
+                if any(k in (request.document_properties or {}) for k in getattr(self, "_other_keys", [])):
+                    self._other_properties_toggle.setChecked(True)
+            missing = [key for key in (request.document_properties or {}) if key not in self._property_entries or not self._property_info[key].get("editable", True)]
+            if missing:
+                self._recovery_notice.setText("原轮部分文档属性在当前模板中不可编辑：" + "、".join(missing))
+                self._recovery_notice.setVisible(True)
         index = self._layout_combo.findData(request.layout_profile)
         if index >= 0:
             self._layout_combo.setCurrentIndex(index)
@@ -516,6 +694,12 @@ class ExportSettingsDialog(QDialog):
             self._variant_combo.setCurrentIndex(index)
         self._include_original.setChecked(bool(request.include_original))
         self._strict.setChecked(bool(request.strict))
+        if (request.layout_profile != MODE_TEMPLATE or self._image_combo.currentData() != "auto-width"
+                or self._table_combo.currentData() != TABLE_KEEP or self._repeat_header.isChecked()
+                or not self._allow_split.isChecked() or self._page_break.isChecked()
+                or self._landscape_count.value() or self._variant_combo.currentData()
+                or self._include_original.isChecked() or self._strict.isChecked()):
+            self._advanced_box.setChecked(True)
         self._refresh_summary()
         # 刷新后再追加“原范围失效”提醒：_refresh_summary 会重写该提示。
         if request.scope.kind == SCOPE_CHAPTERS and request.scope.chapters:

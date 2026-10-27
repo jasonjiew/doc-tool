@@ -263,9 +263,11 @@ def config_from_project(
         "_config_path": str(paths.manifest_file),
         "refresh": {"timeoutSeconds": manifest.refreshTimeoutSeconds},
     }
-    from doc_tool.domain.merge_policy import resolve_merge_policy
+    from doc_tool.domain.merge_policy import DEFAULT_MERGE_POLICY, resolve_merge_policy
 
     raw_policy = merge_policy if merge_policy is not None else getattr(manifest, "mergePolicy", None)
+    if raw_policy is None:
+        raw_policy = DEFAULT_MERGE_POLICY
     effective_policy = resolve_merge_policy(
         {"mergePolicy": raw_policy, "chapterScope": chapter_scope}
     )
@@ -296,6 +298,8 @@ def build_with_project(
     merge_policy=None,
     chapter_scope: Optional[Sequence[str]] = None,
     chapter_order: Optional[Sequence[str]] = None,
+    fixed_document_version: bool = False,
+    export_properties: Optional[Dict[str, str]] = None,
 ) -> str:
     """以项目上下文调用 ``build_docx.build``，返回输出 DOCX 路径。
 
@@ -316,7 +320,13 @@ def build_with_project(
         chapter_scope=chapter_scope,
         chapter_order=chapter_order,
     )
+    if fixed_document_version:
+        config["fixedDocumentVersion"] = True
     output = build(config=config, prepared=prepared)
+    if export_properties:
+        from doc_tool.application.export.document_properties import apply_document_properties
+
+        apply_document_properties(output, export_properties)
     if on_warning is not None:
         for warning in config.get("_expressionWarnings", []):
             on_warning(warning)

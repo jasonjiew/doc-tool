@@ -226,6 +226,234 @@ class QuickExportWiringTests(unittest.TestCase):
         self.assertIn("当前编辑内容", tooltip)
         self.assertIn("2 章未保存修改", tooltip)
 
+    def test_quick_export_reenables_button_and_action_after_completion(self):
+        from doc_tool.application import project_export as export_mod
+
+        class _Report:
+            roundId = "round-1"
+            captureId = "cap-1"
+            projectRoot = str(self.summary.project_root)
+            destination = str(self.summary.paths.output_dir)
+            scope = None
+            sourceMode = SOURCE_MODE_SAVED
+            results = []
+
+            def failed_formats(self):
+                return []
+
+            def summary_lines(self, limit=3):
+                return ["Word已生成"]
+
+            def usable_results(self):
+                return []
+
+        def _fake_run(request, **kwargs):
+            return _Report()
+
+        self.assertTrue(self.window._project_bar._quick_export_btn.isEnabled())
+        self.assertTrue(self.window._quick_export_action.isEnabled())
+
+        with patch.object(export_mod, "run_project_export", _fake_run), patch.object(
+            self.window, "_present_export_report", lambda report, **kw: None
+        ):
+            self.window._on_quick_export_word()
+            # 导出运行期间按钮与动作被禁用
+            self.assertFalse(self.window._project_bar._quick_export_btn.isEnabled())
+            self.assertFalse(self.window._quick_export_action.isEnabled())
+
+            deadline = time.monotonic() + 30
+            while self.window.runner.is_running and time.monotonic() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.02)
+            QApplication.processEvents()
+
+        # 导出完成后按钮与动作必须重新置为可用（解除置灰）
+        self.assertTrue(self.window._project_bar._quick_export_btn.isEnabled())
+        self.assertTrue(self.window._quick_export_action.isEnabled())
+        self.assertEqual(self.window._current_task, "")
+
+    def test_quick_export_forwards_progress_and_updates_dock(self):
+        from doc_tool.application import project_export as export_mod
+
+        class _Report:
+            roundId = "round-2"
+            captureId = "cap-2"
+            projectRoot = str(self.summary.project_root)
+            destination = str(self.summary.paths.output_dir)
+            scope = None
+            sourceMode = SOURCE_MODE_SAVED
+            results = []
+
+            def failed_formats(self):
+                return []
+
+            def summary_lines(self, limit=3):
+                return ["Word已生成"]
+
+            def usable_results(self):
+                return []
+
+        captured_progress = []
+        progress_values = []
+
+        def _fake_run(request, **kwargs):
+            prog = kwargs.get("progress")
+            captured_progress.append(prog)
+            if prog:
+                prog("prepare", "started", "正在准备导出内容快照…")
+                time.sleep(0.02)
+                prog("prepare", "succeeded", "快照就绪")
+                time.sleep(0.02)
+                prog("build", "started", "开始构建 DOCX")
+                time.sleep(0.02)
+                prog("build", "succeeded", "DOCX 构建完成")
+                time.sleep(0.02)
+            return _Report()
+
+        with patch.object(export_mod, "run_project_export", _fake_run), patch.object(
+            self.window, "_present_export_report", lambda report, **kw: None
+        ):
+            self.window._on_quick_export_word()
+            # 刚启动时，已为 DOCX 初始化管线步骤清单，进度条不为不可用的破损状态
+            dock = self.window._task_dock
+            self.assertGreater(dock._step_list.count(), 0)
+
+            deadline = time.monotonic() + 30
+            while self.window.runner.is_running and time.monotonic() < deadline:
+                QApplication.processEvents()
+                progress_values.append(dock._step_footer._progress.value())
+                time.sleep(0.02)
+            QApplication.processEvents()
+
+        self.assertIsNotNone(captured_progress[0], "run_project_export 必须收到 progress 回调")
+        # 进度条在导出运行过程中真实推进
+        distinct_progress = set(progress_values)
+        self.assertTrue(any(v > 0 for v in distinct_progress), "导出期间进度条必须有大于0的推进数值")
+        # 导出结束后按钮恢复可用
+        self.assertTrue(self.window._project_bar._quick_export_btn.isEnabled())
+
+
+    def test_quick_export_terminal_result_state_and_dock_preservation(self):
+        from doc_tool.application import project_export as export_mod
+        from doc_tool.application.intake_contract import FormatResult
+
+        out_file = self.summary.paths.output_dir / "test.docx"
+        out_file.write_bytes(b"dummy")
+
+        class _Report:
+            roundId = "round-succ"
+            captureId = "cap-succ"
+            projectRoot = str(self.summary.project_root)
+            destination = str(self.summary.paths.output_dir)
+            scope = None
+            sourceMode = SOURCE_MODE_SAVED
+            results = [
+                FormatResult(format=FORMAT_DOCX, status="ready", path=str(out_file))
+            ]
+
+            def failed_formats(self):
+                return []
+
+            def summary_lines(self, limit=3):
+                return ["Word已生成"]
+
+            def usable_results(self):
+                return self.results
+
+        def _fake_run(request, **kwargs):
+            return _Report()
+
+        with patch.object(export_mod, "run_project_export", _fake_run), patch.object(
+            self.window, "_present_export_report", lambda report, **kw: None
+        ):
+            self.window._on_quick_export_word()
+            deadline = time.monotonic() + 30
+            while self.window.runner.is_running and time.monotonic() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.02)
+            QApplication.processEvents()
+
+        # 终态校验：_result_state 必须被赋予 terminal 状态，而非停留在 running
+        self.assertTrue(self.window._result_state.is_terminal)
+        self.assertEqual(self.window._result_state.status, "success")
+        self.assertEqual(self.window._result_state.task, "project-export")
+        self.assertEqual(self.window._result_state.title, "导出完成")
+
+        # TaskDock 必须展示结果卡片，按钮与菜单项全部恢复可用
+        self.assertTrue(self.window._task_dock._has_result)
+        self.assertTrue(self.window._project_bar._quick_export_btn.isEnabled())
+        self.assertTrue(self.window._project_bar._export_settings_btn.isEnabled())
+        self.assertTrue(self.window._quick_export_action.isEnabled())
+        if hasattr(self.window, "_export_settings_action"):
+            self.assertTrue(self.window._export_settings_action.isEnabled())
+
+    def test_html_only_export_shows_dedicated_steps_without_docx_stages(self):
+        from doc_tool.application import project_export as export_mod
+        from doc_tool.application.intake_contract import ExportRequest, ExportScope, FORMAT_HTML
+
+        html_dir = self.summary.paths.output_dir / "html"
+        html_dir.mkdir(parents=True, exist_ok=True)
+        index_file = html_dir / "index.html"
+        index_file.write_text("<html></html>", encoding="utf-8")
+
+        class _Report:
+            roundId = "round-html"
+            captureId = "cap-html"
+            projectRoot = str(self.summary.project_root)
+            destination = str(self.summary.paths.output_dir)
+            scope = None
+            sourceMode = SOURCE_MODE_SAVED
+            results = []
+
+            def failed_formats(self):
+                return []
+
+            def summary_lines(self, limit=3):
+                return ["HTML已生成"]
+
+            def usable_results(self):
+                return []
+
+        def _fake_run(request, **kwargs):
+            prog = kwargs.get("progress")
+            if prog:
+                prog("html", "开始生成离线 HTML")
+                time.sleep(0.02)
+                prog("html", "离线 HTML 已生成")
+                time.sleep(0.02)
+            return _Report()
+
+        req = ExportRequest(
+            formats=[FORMAT_HTML],
+            scope=ExportScope(kind="project"),
+            destination=str(self.summary.paths.output_dir),
+        )
+
+        with patch.object(export_mod, "run_project_export", _fake_run), patch.object(
+            self.window, "_present_export_report", lambda report, **kw: None
+        ):
+            self.window._submit_export_request(req)
+            # 刚启动时，步骤清单只包含 HTML 专用步骤，不得泄漏 DOCX 8阶段
+            steps = self.window._task_dock._step_list
+            self.assertEqual(steps.count(), 1)
+
+            deadline = time.monotonic() + 30
+            while self.window.runner.is_running and time.monotonic() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.02)
+            QApplication.processEvents()
+
+        self.assertTrue(self.window._result_state.is_terminal)
+        self.assertEqual(self.window._result_state.status, "success")
+        self.assertTrue(self.window._project_bar._quick_export_btn.isEnabled())
+
+    def test_project_bar_reset_disables_export_settings_btn(self):
+        bar = ProjectBar()
+        bar._export_settings_btn.setEnabled(True)
+        bar.reset()
+        self.assertFalse(bar._export_settings_btn.isEnabled())
+        self.assertFalse(bar._quick_export_btn.isEnabled())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
