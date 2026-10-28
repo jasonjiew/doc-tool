@@ -27,9 +27,9 @@ def _force_utf8_stdio() -> None:
 _force_utf8_stdio()
 
 # 内网 GitLab 地址与项目信息一律由环境变量注入，避免把内部主机名/项目 id 固化进源码。
-GITLAB_BASE = os.getenv("GITLAB_BASE", "").rstrip("/")
-PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "")
-PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "")
+GITLAB_BASE = os.getenv("GITLAB_BASE", "http://192.168.0.242:8899").rstrip("/")
+PROJECT_PATH = os.getenv("GITLAB_PROJECT_PATH", "application/ai/doc-tool")
+PROJECT_ID_RAW = os.getenv("GITLAB_PROJECT_ID", "119")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from doc_tool.domain.version import APP_VERSION
 VERSION = APP_VERSION

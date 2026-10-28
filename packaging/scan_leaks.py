@@ -300,6 +300,7 @@ def scan_source_terms(root: Path, categories: Dict[str, List[str]]) -> List[str]
             "scripts/tests/test_brand_consistency.py",
             "scripts/tests/test_public_export.py",
             "packaging/export_public_source.py",
+            "packaging/publish_release.py",
             "SECURITY.md",
         ):
             continue
