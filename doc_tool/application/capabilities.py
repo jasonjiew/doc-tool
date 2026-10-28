@@ -107,6 +107,20 @@ def get_capabilities_report() -> Dict[str, Any]:
                 "exitCodes": {"0": "全部门禁满足且证据充分", "1": "测试未通过、证据不齐或信息受阻", "2": "参数或解析错误"},
             },
             {
+                "name": "upgrade",
+                "description": "检查并执行应用在线自升级（支持 --check、--yes、--output human|json）",
+                "readOnly": False,
+                "options": ["--check", "--yes", "--output", "--custom-url"],
+                "exitCodes": {
+                    "0": "检查完成或升级启动成功",
+                    "1": "存在错误或校验失败",
+                    "2": "源码开发态拒绝自覆盖或参数错误",
+                },
+                "requiresWord": False,
+                "requiresModel": False,
+                "sourceMode": "any",
+            },
+            {
                 "name": "check",
                 "description": "统一质量门禁检查（源校验/可选构建）",
                 "readOnly": True,

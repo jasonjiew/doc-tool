@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     暂存发布目录：把启动脚本与诊断脚本放进 dist\ ，并把诊断基线刷新为本次构建的真实值。
@@ -36,9 +36,10 @@ foreach ($Need in @(
 # 0) 透明加密加固（幂等）：主构建流程已执行过；单独跑 stage_dist/make_portable 时兜底
 & "$PSScriptRoot\harden_dist.ps1" -RepoRoot $RepoRoot
 
-# 1) 启动脚本 + 预检脚本（1.4.4：启动前校验关键文件并自修复 base_library.zip）
+# 1) 启动脚本 + 预检脚本 + 自升级脚本
 Copy-Item (Join-Path $RepoRoot "packaging\portable\启动DocTool.cmd") $DistRoot -Force
 Copy-Item (Join-Path $RepoRoot "packaging\portable\preflight.ps1") $DistRoot -Force
+Copy-Item (Join-Path $RepoRoot "packaging\portable\apply_update.ps1") $DistRoot -Force
 
 # 2) 诊断脚本：以真实构建产物刷新基线
 $bl = Join-Path $Internal "base_library.zip"

@@ -182,6 +182,11 @@ DEFAULT_TESTS = [
     "test_mainflow_intelligence.py",
     "test_mainflow_intelligence_evidence.py",
     "test_mainflow_intelligence_ai.py",
+    # 在线自升级与版本索引回归
+    "test_update_domain.py",
+    "test_updater_service.py",
+    "test_update_cli_and_ui.py",
+    "simulate_update_scenarios.py",
 ]
 
 

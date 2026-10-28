@@ -341,7 +341,7 @@ jobs:
 
           Get-ChildItem packaging\Output | Select-Object Name, Length | Format-Table -AutoSize
 
-      - name: 生成发布说明
+      - name: 生成发布说明与版本索引
         shell: pwsh
         run: |
           $setup = "packaging\Output\DocTool-Setup-$env:APP_VERSION.exe"
@@ -353,6 +353,13 @@ jobs:
           "" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
           "## 便携包校验" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
           "- 便携包 SHA-256: $portableHash" | Out-File packaging\Output\release-notes.md -Append -Encoding utf8
+
+          python packaging/generate_latest_json.py `
+            --output packaging\Output\latest.json `
+            --version $env:APP_VERSION `
+            --setup-exe $setup `
+            --portable-zip $portable `
+            --release-notes packaging\Output\release-notes.md
 
       - name: 上传发布资产
         uses: actions/upload-artifact@v4
@@ -389,7 +396,8 @@ jobs:
             "DocTool-$v-sbom.txt",
             "DocTool-$v.cdx.json",
             "DocTool-$v.spdx.json",
-            "release-notes.md"
+            "release-notes.md",
+            "latest.json"
           )
           $missing = @()
           foreach ($r in $required) { if (!(Test-Path (Join-Path assets $r))) { $missing += $r } }
@@ -424,3 +432,4 @@ jobs:
             assets/DocTool-${{ env.APP_VERSION }}-sbom.txt
             assets/DocTool-${{ env.APP_VERSION }}.cdx.json
             assets/DocTool-${{ env.APP_VERSION }}.spdx.json
+            assets/latest.json

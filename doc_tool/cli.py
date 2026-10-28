@@ -57,6 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
     advice_p.add_argument("--output", choices=("human", "json"), default="human")
     advice_p.add_argument("--no-check", action="store_true", help="不运行只读规则，保留检查状态为未知")
 
+    upgrade_p = sub.add_parser("upgrade", help="检查并执行在线自升级（GitHub Release / 内网源）")
+    upgrade_p.add_argument("--check", action="store_true", help="仅检查是否有新版本，不执行下载或安装")
+    upgrade_p.add_argument("--yes", "-y", action="store_true", help="自动确认升级，无需交互式确认")
+    upgrade_p.add_argument("--custom-url", default=None, help="自定义元数据/升级包 URL 或内网镜像源")
+    _add_output(upgrade_p)
+
     # --- 研发流程接入与免安装薄入口 ---
     cap_p = sub.add_parser("capabilities", help="显示工具版本、固化构建来源与命令契约")
     cap_p.add_argument("--format", choices=("json", "human"), default="json")
@@ -2199,6 +2205,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
     if args.command == "mainflow-advice":
         return _mainflow_advice_command(args)
+    if args.command == "upgrade":
+        return _upgrade_command(args)
     if args.command == "capabilities":
         return _capabilities_command(args)
     if args.command == "baseline-check":
@@ -2295,3 +2303,48 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _upgrade_command(args) -> int:
+    from doc_tool.application.cli_commands import upgrade_command
+    check_only = bool(getattr(args, "check", False))
+    auto_confirm = bool(getattr(args, "yes", False))
+    custom_url = getattr(args, "custom_url", None)
+    output_fmt = getattr(args, "output", "human")
+
+    result = upgrade_command(
+        check_only=check_only,
+        auto_confirm=auto_confirm,
+        custom_url=custom_url,
+    )
+
+    if output_fmt == "json":
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        if result.get("error"):
+            print(f"检查/升级失败: {result['error']}", file=sys.stderr)
+        elif not result.get("hasUpdate"):
+            print(f"当前已是最新版本 (v{result.get('currentVersion', '')})，无需升级。")
+        else:
+            latest = result.get("latestVersion", "")
+            current = result.get("currentVersion", "")
+            mode = result.get("installMode", "")
+            print(f"发现新版本: v{latest}（当前版本: v{current}，运行形态: {mode}）")
+            manifest = result.get("manifest") or {}
+            notes = (manifest.get("release_notes") or "").strip()
+            if notes:
+                print("\n【更新说明】")
+                print(notes)
+            action = result.get("actionTaken", "")
+            if action == "launched_installer":
+                print("\n已拉起安装程序，请按提示完成覆盖安装。")
+            elif action == "launched_portable_updater":
+                print("\n已拉起后台切换脚本，主程序退出后将自动完成便携版原子切换。")
+            elif action == "needs_confirmation":
+                print("\n提示: 执行升级请添加 --yes 参数，例如: doc-tool upgrade --yes")
+            elif action == "refused_source_mode":
+                print("\n提示: 当前处于源码开发态，请使用 git pull 更新代码。")
+
+    if not result.get("success"):
+        return 2 if result.get("actionTaken") == "refused_source_mode" else 1
+    return 0

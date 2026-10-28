@@ -264,6 +264,19 @@ class MainWindow(QMainWindow):
         self._branch_btn.clicked.connect(self._on_switch_branch_clicked)
         status_bar.addWidget(self._branch_btn)
 
+        # 在线自升级胶囊按钮（默认隐藏，发现新版本时显示）
+        self._available_update_manifest = None
+        self._update_capsule = QPushButton("", self)
+        self._update_capsule.setObjectName("updateCapsule")
+        self._update_capsule.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_capsule.setStyleSheet(
+            "QPushButton { background-color: #0078d4; color: white; border-radius: 9px; padding: 2px 10px; font-weight: bold; border: none; } "
+            "QPushButton:hover { background-color: #106ebe; }"
+        )
+        self._update_capsule.setVisible(False)
+        self._update_capsule.clicked.connect(self._on_update_capsule_clicked)
+        status_bar.addPermanentWidget(self._update_capsule)
+
         # 构建成功产物动作胶囊条（默认隐藏，构建完成有产物时显示）
         self._output_capsules_widget = QWidget(self)
         capsule_layout = QHBoxLayout(self._output_capsules_widget)
@@ -404,6 +417,7 @@ class MainWindow(QMainWindow):
         from doc_tool.ui.controllers.export_orchestrator import ExportOrchestrator
 
         self._export_orchestrator = ExportOrchestrator(self)
+        QTimer.singleShot(2000, self._start_background_update_check)
 
     def _build_nav_bar(self) -> QWidget:
         """路径导航条（UI2-C 3.1/3.4）：后退/前进 + 真实章节路径 + 定位当前章。
@@ -868,6 +882,9 @@ class MainWindow(QMainWindow):
 
         # 帮助
         help_menu = menubar.addMenu("帮助")
+        update_action = QAction("检查更新…", self)
+        update_action.triggered.connect(self._on_check_update_manual)
+        help_menu.addAction(update_action)
         about_action = QAction("关于 / 环境诊断", self)
         about_action.setShortcut(QKeySequence("F1"))
         about_action.triggered.connect(self._on_about)
@@ -1649,6 +1666,15 @@ class MainWindow(QMainWindow):
         from doc_tool.ui.command_palette import CommandPaletteDialog, PaletteItem
 
         items: List[PaletteItem] = []
+        items.append(
+            PaletteItem(
+                title="检查更新…",
+                category="帮助",
+                description="检查并下载在线升级包",
+                callback=self._on_check_update_manual,
+            )
+        )
+
 
         # 文件 / 项目操作
         items.append(
@@ -7302,3 +7328,124 @@ class MainWindow(QMainWindow):
         )
         self._standard_pack_dialog = dialog
         dialog.exec()
+
+    def _start_background_update_check(self) -> None:
+        """后台静默检查更新（带 24h TTL 缓存与跳过版本检查）。"""
+        from doc_tool.application.updater import check_for_updates, load_update_state
+        state = load_update_state()
+        if not state.auto_check:
+            return
+
+        import threading
+
+        def _worker():
+            res = check_for_updates(force=False)
+            if res.has_update and not res.is_skipped and res.manifest:
+                QTimer.singleShot(0, lambda: self._on_update_discovered(res.manifest))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_update_discovered(self, manifest) -> None:
+        """发现新版本时在状态栏右侧显示升级胶囊。"""
+        self._available_update_manifest = manifest
+        if hasattr(self, "_update_capsule"):
+            self._update_capsule.setText(f"发现新版本 v{manifest.version}")
+            self._update_capsule.setVisible(True)
+
+    def _on_update_capsule_clicked(self) -> None:
+        """点击状态栏升级胶囊弹出升级详情弹窗。"""
+        if self._available_update_manifest:
+            from doc_tool.ui.about_dialog import show_update_dialog
+            show_update_dialog(
+                self,
+                self._available_update_manifest,
+                on_upgrade_confirmed=self._perform_upgrade,
+            )
+
+    def _on_check_update_manual(self) -> None:
+        """手动触发检查更新（菜单或命令面板调用）。"""
+        from doc_tool.application.updater import check_for_updates
+        from doc_tool.ui.about_dialog import show_update_dialog
+        import threading
+
+        self.statusBar().showMessage("正在检查更新…", 3000)
+
+        def _worker():
+            res = check_for_updates(force=True)
+            def _update_ui():
+                if res.error:
+                    QMessageBox.warning(self, "检查更新失败", f"无法获取更新信息：\n{res.error}")
+                elif res.has_update and res.manifest:
+                    self._on_update_discovered(res.manifest)
+                    show_update_dialog(
+                        self,
+                        res.manifest,
+                        on_upgrade_confirmed=self._perform_upgrade,
+                    )
+                else:
+                    from doc_tool.domain.version import APP_VERSION
+                    QMessageBox.information(
+                        self,
+                        "检查更新",
+                        f"当前已是最新版本 (v{APP_VERSION})，无需升级。",
+                    )
+            QTimer.singleShot(0, _update_ui)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _perform_upgrade(self, manifest) -> bool:
+        """执行升级前置门禁检查与自升级拉起。"""
+        # 1. 检查未保存章节（与窗口安全关闭共用同一套保护逻辑）
+        if hasattr(self, "_confirm_close_with_unsaved"):
+            if not self._confirm_close_with_unsaved():
+                return False
+        else:
+            ws = getattr(self, "_content_workspace", None)
+            tabs_host = getattr(ws, "tabs_host", None) if ws is not None else None
+            dirty_paths = collect_unsaved(tabs_host.editors()) if tabs_host is not None else []
+            if dirty_paths:
+                choice = confirm_unsaved_dialog(dirty_paths, parent=self)
+                if choice == UnsavedChoice.CANCEL:
+                    return False
+                if choice == UnsavedChoice.SAVE:
+                    self._on_save_all()
+
+        # 2. 检查 Word 任务忙闲
+        from doc_tool.application.delivery.word_busy import status as get_word_busy_status
+        busy_status = get_word_busy_status()
+        if busy_status.busy:
+            QMessageBox.warning(
+                self,
+                "无法升级",
+                f"Word 当前正在执行任务（PID {busy_status.pid}），无法退出。\n请等待其完成后重试。",
+            )
+            return False
+
+        # 3. 运行形态与下载执行
+        from doc_tool.domain.update import detect_install_mode
+        mode = detect_install_mode()
+        if mode == "source":
+            QMessageBox.information(
+                self,
+                "源码运行态",
+                "当前处于源码开发态，无法直接自升级覆盖工作树。\n请使用 git pull 更新代码。",
+            )
+            return False
+
+        from doc_tool.application.updater import (
+            download_and_verify,
+            apply_installer_update,
+            apply_portable_update,
+        )
+        try:
+            staging_or_exe, target_dir = download_and_verify(manifest, install_mode=mode)
+            if mode == "installer":
+                apply_installer_update(staging_or_exe, silent=True)
+            else:
+                apply_portable_update(staging_or_exe, target_dir)
+            self.close()
+            QApplication.instance().quit()
+            return True
+        except Exception as exc:
+            QMessageBox.critical(self, "升级失败", f"下载或校验失败:\n{exc}")
+            return False

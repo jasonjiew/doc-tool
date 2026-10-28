@@ -174,6 +174,42 @@ def show_about_dialog(parent) -> None:
 
     copy_diagnostics._clear_timer = None
 
+
+    # 检查更新按钮与状态
+    check_update_btn = QPushButton("检查更新…", dialog)
+    check_update_btn.setProperty("btnRole", "secondary")
+
+    update_status_label = QLabel("", dialog)
+    update_status_label.setObjectName("statusMuted")
+
+    def _do_check():
+        update_status_label.setText("正在检查更新…")
+        from doc_tool.application.updater import check_for_updates
+        import threading
+        from PySide6.QtCore import QTimer
+
+        def _bg():
+            res = check_for_updates(force=True)
+            def _update_ui():
+                if res.error:
+                    update_status_label.setText(f"检查失败: {res.error}")
+                elif res.has_update and res.manifest:
+                    update_status_label.setText(f"发现新版本 v{res.manifest.version}！")
+                    show_update_dialog(
+                        dialog,
+                        res.manifest,
+                        on_upgrade_confirmed=getattr(parent, "_perform_upgrade", None),
+                    )
+                else:
+                    update_status_label.setText("当前已是最新版本")
+            QTimer.singleShot(0, _update_ui)
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    check_update_btn.clicked.connect(_do_check)
+    button_row.addWidget(update_status_label)
+    button_row.addWidget(check_update_btn)
+
     copy_btn = QPushButton("复制诊断信息", dialog)
     copy_btn.setProperty("btnRole", "secondary")
     copy_btn.clicked.connect(copy_diagnostics)
@@ -185,4 +221,69 @@ def show_about_dialog(parent) -> None:
     button_row.addWidget(close_btn)
     layout.addLayout(button_row)
 
+    dialog.exec()
+
+
+def show_update_dialog(parent, manifest, on_upgrade_confirmed=None) -> None:
+    """显示版本更新提示与 Release Notes 预览弹窗。"""
+    from PySide6.QtWidgets import (
+        QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFrame
+    )
+    from doc_tool.application.updater import skip_version
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(f"发现新版本 - v{manifest.version}")
+    dialog.resize(500, 420)
+    dialog.setMinimumSize(400, 320)
+
+    layout = QVBoxLayout(dialog)
+    layout.setContentsMargins(16, 16, 16, 16)
+    layout.setSpacing(10)
+
+    title_label = QLabel(f"发现 Doc Tool 新版本 v{manifest.version}！", dialog)
+    title_label.setObjectName("welcomeTitle")
+    layout.addWidget(title_label)
+
+    if manifest.release_notes:
+        notes_frame = QFrame(dialog)
+        notes_frame.setProperty("card", True)
+        n_layout = QVBoxLayout(notes_frame)
+        n_layout.setContentsMargins(8, 8, 8, 8)
+        lbl = QLabel("更新说明：", notes_frame)
+        lbl.setObjectName("statusMuted")
+        n_layout.addWidget(lbl)
+        notes_edit = QTextEdit(notes_frame)
+        notes_edit.setReadOnly(True)
+        notes_edit.setPlainText(manifest.release_notes)
+        n_layout.addWidget(notes_edit)
+        layout.addWidget(notes_frame)
+
+    btn_row = QHBoxLayout()
+    skip_btn = QPushButton("跳过此版本", dialog)
+    skip_btn.setProperty("btnRole", "secondary")
+
+    def _on_skip():
+        skip_version(manifest.version)
+        dialog.reject()
+
+    skip_btn.clicked.connect(_on_skip)
+    btn_row.addWidget(skip_btn)
+    btn_row.addStretch(1)
+
+    later_btn = QPushButton("稍后提示", dialog)
+    later_btn.clicked.connect(dialog.reject)
+    btn_row.addWidget(later_btn)
+
+    upgrade_btn = QPushButton("立即升级并重启", dialog)
+    upgrade_btn.setProperty("btnRole", "primary")
+
+    def _on_upgrade():
+        dialog.accept()
+        if on_upgrade_confirmed:
+            on_upgrade_confirmed(manifest)
+
+    upgrade_btn.clicked.connect(_on_upgrade)
+    btn_row.addWidget(upgrade_btn)
+
+    layout.addLayout(btn_row)
     dialog.exec()

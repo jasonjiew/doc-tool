@@ -547,3 +547,78 @@ def autolink_command(args) -> CommandResult:
 
     projects = args.project if isinstance(args.project, list) else [args.project]
     return run_per_project("autolink", projects, operation)
+
+
+def upgrade_command(
+    check_only: bool = False,
+    auto_confirm: bool = False,
+    custom_url: str | None = None,
+) -> dict:
+    """执行 CLI upgrade 命令，返回结构化结果字典。"""
+    from doc_tool.application.updater import (
+        apply_installer_update,
+        apply_portable_update,
+        check_for_updates,
+        download_and_verify,
+    )
+    from doc_tool.domain.version import APP_VERSION
+
+    check_res = check_for_updates(force=True, custom_url=custom_url)
+
+    result = {
+        "command": "upgrade",
+        "success": True,
+        "hasUpdate": check_res.has_update,
+        "currentVersion": check_res.current_version or APP_VERSION,
+        "latestVersion": check_res.latest_version,
+        "installMode": check_res.install_mode,
+        "isSkipped": check_res.is_skipped,
+        "error": check_res.error,
+        "manifest": check_res.manifest.to_dict() if check_res.manifest else None,
+        "actionTaken": "check" if check_only else "none",
+    }
+
+    if check_res.error:
+        result["success"] = False
+        return result
+
+    if not check_res.has_update:
+        return result
+
+    if check_only:
+        return result
+
+    if check_res.install_mode == "source":
+        result["success"] = False
+        result["error"] = "源码开发态禁止直接自覆盖，请使用 git pull 更新代码。"
+        result["actionTaken"] = "refused_source_mode"
+        return result
+
+    if not auto_confirm:
+        result["actionTaken"] = "needs_confirmation"
+        return result
+
+    if not check_res.manifest:
+        result["success"] = False
+        result["error"] = "缺少有效的 Release 元数据。"
+        result["actionTaken"] = "failed"
+        return result
+
+    # 执行下载并校验
+    try:
+        staging_or_exe, target_dir = download_and_verify(
+            manifest=check_res.manifest,
+            install_mode=check_res.install_mode,
+        )
+        if check_res.install_mode == "installer":
+            apply_installer_update(staging_or_exe, silent=True)
+            result["actionTaken"] = "launched_installer"
+        else:
+            apply_portable_update(staging_or_exe, target_dir)
+            result["actionTaken"] = "launched_portable_updater"
+    except Exception as exc:
+        result["success"] = False
+        result["error"] = str(exc)
+        result["actionTaken"] = "failed"
+
+    return result

@@ -246,6 +246,7 @@ release-upload:
       $sbom = "packaging\Output\DocTool-$env:APP_VERSION-sbom.txt"
       $cyclone = "packaging\Output\DocTool-$env:APP_VERSION.cdx.json"
       $spdx = "packaging\Output\DocTool-$env:APP_VERSION.spdx.json"
+      $latestJson = "packaging\Output\latest.json"
 
       # 生成发布说明
       $notes = "packaging\Output\release-notes.md"
@@ -257,6 +258,14 @@ release-upload:
       "## 本版变更`n- 自包含桌面应用与事务化 Word 项目导入`n- 受保护的校验、Word 刷新和原子发布管线`n- 按用户安装、升级与非破坏性卸载`n`n" | Out-File $notes -Append -Encoding utf8
       "## 已知限制`n- 正式合并需要交互式 Windows 会话和 Microsoft Word`n- 未配置公司代码签名证书时产物仅限受控试点`n`n" | Out-File $notes -Append -Encoding utf8
       "## 依赖`n见 SBOM 文件`n`n" | Out-File $notes -Append -Encoding utf8
+
+      # 生成最新版本元数据索引
+      python packaging/generate_latest_json.py `
+        --output $latestJson `
+        --version $env:APP_VERSION `
+        --setup-exe $exe `
+        --portable-zip $portable `
+        --release-notes $notes
 
       # 使用 curl 上传到 GitLab Release（需要 CI_JOB_TOKEN）
       $url = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/releases"
@@ -295,3 +304,5 @@ release-upload:
           url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-$APP_VERSION.cdx.json"
         - name: "SPDX SBOM"
           url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/DocTool-$APP_VERSION.spdx.json"
+        - name: "latest.json"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/packaging/Output/latest.json"

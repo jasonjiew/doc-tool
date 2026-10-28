@@ -182,6 +182,42 @@ export DOC_TOOL_CLI="/d/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe"
 
 ---
 
+### 3.7 在线自升级与版本检查 (`upgrade`)
+
+支持从 GitHub Releases（或内网镜像源）自动拉取轻量 `latest.json` 索引，完成版本探测、SHA-256 校验与双形态自升级：
+
+1. **只读检查当前是否有新版本（不执行下载）：**
+```powershell
+& $env:DOC_TOOL_CLI upgrade --check --output json
+```
+输出纯净结构化 JSON，便于自动化脚本与 AI 接入：
+```json
+{
+  "command": "upgrade",
+  "success": true,
+  "hasUpdate": true,
+  "currentVersion": "3.0.1",
+  "latestVersion": "3.1.0",
+  "installMode": "portable",
+  "actionTaken": "check",
+  "manifest": { ... }
+}
+```
+
+2. **执行一键升级（免交互）：**
+```powershell
+& $env:DOC_TOOL_CLI upgrade --yes
+```
+- **安装版**：下载到纯 ASCII 临时目录，强校验 SHA-256 后静默拉起 Inno Setup 覆盖升级并自动重启。
+- **便携版**：同盘解压至 `.upgrade_staging` 并校验关键二进制头（MZ/PK），退出后由 `apply_update.ps1` 完成 `DocTool -> DocTool.prev` 原子切换（失败自动回滚旧版）。
+- **源码开发态**：拒绝自覆盖工作树，明确提示使用 `git pull` 更新。
+
+3. **指定内网镜像源或离线包源：**
+```powershell
+& $env:DOC_TOOL_CLI upgrade --check --custom-url "https://internal-repo.example.com/releases/latest.json"
+```
+
+
 ## 4. 故障排查与诊断指引
 
 若在受限办公环境（如亿赛通、深信服等安全终端）遇到启动阻断或运行时异常：

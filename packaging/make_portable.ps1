@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     生成团队分发便携包：dist\DocTool + 启动脚本 + 诊断脚本 →
@@ -46,6 +46,7 @@ try {
         (Join-Path $RepoRoot "dist\启动DocTool.cmd"),
         (Join-Path $RepoRoot "dist\diagnose.cmd"),
         (Join-Path $RepoRoot "dist\preflight.ps1"),
+        (Join-Path $RepoRoot "dist\apply_update.ps1"),
         (Join-Path $RepoRoot "packaging\portable\请先读我.txt"),
         (Join-Path $RepoRoot "packaging\portable\安装证书.cmd")
     )
