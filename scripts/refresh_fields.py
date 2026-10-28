@@ -16,6 +16,10 @@ import threading
 import time
 from typing import Optional, Sequence, Tuple
 
+REPO_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_BASE not in sys.path:
+    sys.path.insert(0, REPO_BASE)
+
 from docx_common import AutomationError, discover_document_types, load_config
 
 
@@ -518,8 +522,13 @@ def supervise(
     # 捕获 worker stderr：失败细节与 [REASON] 标记经父进程 stderr 透出，
     # 保持原命令行可见性的同时让管线拿到稳定原因键。阶段标记同路回传，
     # 由后台读取线程实时解析，超时后仍能说明“卡在哪一步”。
+    env = dict(os.environ)
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    current_pp = env.get("PYTHONPATH", "")
+    parts = [p for p in [REPO_BASE, scripts_dir, current_pp] if p]
+    env["PYTHONPATH"] = os.pathsep.join(parts)
     process = subprocess.Popen(
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env
     )
     report = WordOperationReport(
         operation="word-refresh", source=document or "", target=output_path,

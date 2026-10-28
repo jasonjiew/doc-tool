@@ -8,7 +8,6 @@ separate so that the validator can inspect generated OOXML independently.
 
 from __future__ import annotations
 
-from doc_tool.domain.blocks import parse_blocks, parse_blocks_file
 
 import os
 import re
@@ -32,6 +31,7 @@ BASE = os.environ.get("DOC_TOOL_TEST_BASE") or REPO_BASE
 # （migration 薄壳本已如此），幂等。
 if REPO_BASE not in sys.path:
     sys.path.insert(0, REPO_BASE)
+from doc_tool.domain.blocks import parse_blocks, parse_blocks_file  # noqa: E402
 
 from doc_tool.domain.markdown_structure import (  # noqa: E402
     check_mermaid_structure,
