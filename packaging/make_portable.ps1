@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 <#
 .SYNOPSIS
     生成团队分发便携包：dist\DocTool + 启动脚本 + 诊断脚本 →
