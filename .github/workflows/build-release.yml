@@ -11,7 +11,7 @@ name: Build & Release
 #   - 公共正式发布授权门禁（release_gate --public）
 #
 # 触发约定：
-#   - push main        → 校验 + 测试 + 构建（不发布）
+#   - push main        → 不触发；自动发布仅由版本标签启动
 #   - push tag v*.*.*  → 全流程，并发布 GitHub Release 资产
 #   - 手动 dispatch     → 同上，可勾选只跑校验与测试
 #
@@ -19,7 +19,6 @@ name: Build & Release
 
 on:
   push:
-    branches: [main]
     tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
