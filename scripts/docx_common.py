@@ -342,7 +342,7 @@ def scan_entries(
     )
 
     from doc_tool.domain.merge_policy import DEFAULT_MERGE_POLICY
-    active_policy = policy if policy is not None else STRICT_MERGE_POLICY
+    active_policy = policy if policy is not None else DEFAULT_MERGE_POLICY
     renumber_mode = active_policy.effective_renumber_mode()
     allow_extended = active_policy.allow_extended_titles()
     allow_unnumbered = active_policy.allow_unnumbered_titles()

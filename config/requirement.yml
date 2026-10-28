@@ -38,3 +38,5 @@ output:
 
 refresh:
   timeoutSeconds: 900
+
+mergePolicy: strict

@@ -167,16 +167,18 @@ class MergePolicy:
     @classmethod
     def from_profile(cls, profile: str) -> "MergePolicy":
         key = (profile or MERGE_PROFILE_STRICT).strip().lower()
+        if key == MERGE_PROFILE_STRICT:
+            return STRICT_MERGE_POLICY
         if key == MERGE_PROFILE_TOLERANT:
             return TOLERANT_MERGE_POLICY
         if key == MERGE_PROFILE_SCOPED:
             return SCOPED_MERGE_POLICY
-        return STRICT_MERGE_POLICY
+        return DEFAULT_MERGE_POLICY
 
     @classmethod
     def from_dict(cls, data: Optional[Dict[str, Any]]) -> "MergePolicy":
         if not data or not isinstance(data, dict):
-            return STRICT_MERGE_POLICY
+            return DEFAULT_MERGE_POLICY
         if isinstance(data, MergePolicy):
             return data
         profile = str(data.get("profile", MERGE_PROFILE_STRICT) or MERGE_PROFILE_STRICT).strip().lower()
@@ -277,7 +279,7 @@ DEFAULT_MERGE_POLICY = MergePolicy(
 def resolve_merge_policy(config: Optional[Dict[str, Any]] = None) -> MergePolicy:
     """从内核 config 字典解析生效的 ``MergePolicy``。"""
     if not config or not isinstance(config, dict):
-        return STRICT_MERGE_POLICY
+        return DEFAULT_MERGE_POLICY
     raw = config.get("mergePolicy") or config.get("merge_policy")
     if isinstance(raw, MergePolicy):
         policy = raw
@@ -286,7 +288,7 @@ def resolve_merge_policy(config: Optional[Dict[str, Any]] = None) -> MergePolicy
     elif isinstance(raw, str):
         policy = MergePolicy.from_profile(raw)
     else:
-        policy = STRICT_MERGE_POLICY
+        policy = DEFAULT_MERGE_POLICY
     extra_scope = config.get("chapterScope") or config.get("chapter_scope")
     if extra_scope:
         policy = policy.with_scope(extra_scope)
