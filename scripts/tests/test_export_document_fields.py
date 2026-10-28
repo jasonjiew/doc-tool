@@ -63,8 +63,8 @@ class ExportDocumentFieldsTests(unittest.TestCase):
         self.addCleanup(fixtures.cleanup, self.work)
         self.project = fixtures.two_chapter_project(self.work / "project")
         self.manifest = ProjectManifest.load(self.project)
-        self.manifest.documentNo = "KF-2090-1-001"
-        self.manifest.documentName = "康尚健康云软件需求说明书"
+        self.manifest.documentNo = "DOC-REQ-2026-001"
+        self.manifest.documentName = "通用软件需求规格说明书"
         self.manifest.documentVersion = "1.0"
         self.manifest.save(self.project)
         self.content = self.project / self.manifest.relative_content_root()
@@ -81,7 +81,7 @@ class ExportDocumentFieldsTests(unittest.TestCase):
     def test_default_filename_uses_captured_revision(self):
         report = self.export()
         self.assertTrue(report.result_for(FORMAT_DOCX).usable, report.summary_lines())
-        self.assertEqual(Path(report.docxPath).name, "KF-2090-1-001 康尚健康云软件需求说明书(3.8).docx")
+        self.assertEqual(Path(report.docxPath).name, "DOC-REQ-2026-001 通用软件需求规格说明书(3.8).docx")
         self.assertEqual(report.documentVersion, "3.8")
         self.assertEqual((Path(report.snapshotWorkDir) / "content" / "_revision_record.md").read_text(encoding="utf-8"), self.revision.read_text(encoding="utf-8"))
 

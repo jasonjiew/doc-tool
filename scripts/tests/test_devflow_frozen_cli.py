@@ -35,7 +35,7 @@ class FrozenCliEndToEndTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         data = json.loads(res.stdout)
         self.assertEqual(data["command"], "capabilities")
-        self.assertEqual(data["tool"]["appVersion"], "3.0.0")
+        self.assertEqual(data["tool"]["appVersion"], APP_VERSION)
         self.assertEqual(data["tool"]["commit"], "83094d0a0eb3")
         self.assertTrue(data["tool"]["frozen"])
         self.assertEqual(data["tool"]["buildSource"], "devflow-portable-package")
@@ -44,10 +44,10 @@ class FrozenCliEndToEndTests(unittest.TestCase):
             self.assertIn(expected, cmd_names)
 
     def test_frozen_baseline_check_conflict(self):
-        hcp_req = Path("D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书")
-        hcp_readme = Path("D:/ai_flow_space/hcp-docs/README.md")
+        hcp_req = Path("D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书")
+        hcp_readme = Path("D:/ai_flow_space/sample-docs/README.md")
         if not hcp_req.is_dir() or not hcp_readme.is_file():
-            self.skipTest("hcp-docs path not present")
+            self.skipTest("sample-docs path not present")
 
         res = self.run_cli("baseline-check", "--project", str(hcp_req), "--declare-file", str(hcp_readme), "--format", "json")
         self.assertEqual(res.returncode, 1, "Baseline conflict should yield exit code 1")

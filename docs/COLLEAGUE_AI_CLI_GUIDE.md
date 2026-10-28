@@ -72,8 +72,8 @@ export DOC_TOOL_CLI="/d/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe"
 
 ```powershell
 & $env:DOC_TOOL_CLI baseline-check `
-    --project "D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书" `
-    --declare-file "D:/ai_flow_space/hcp-docs/README.md" `
+    --project "D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书" `
+    --declare-file "D:/ai_flow_space/sample-docs/README.md" `
     --format json
 ```
 **输出要点**：
@@ -88,13 +88,13 @@ export DOC_TOOL_CLI="/d/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe"
 ```powershell
 # 列出指定文档项目全部条目（支持分页）
 & $env:DOC_TOOL_CLI item-list `
-    --project "D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书" `
+    --project "D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书" `
     --page 1 --page-size 20 `
     --format json
 
 # 查询指定条目详情（含行号、正文原子范围与锚点）
 & $env:DOC_TOOL_CLI item-show `
-    --project "D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书" `
+    --project "D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书" `
     --item "DOC-REQ-001" `
     --format json
 ```
@@ -107,7 +107,7 @@ export DOC_TOOL_CLI="/d/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe"
 
 ```powershell
 & $env:DOC_TOOL_CLI review-status `
-    --project "D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书" `
+    --project "D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书" `
     --baseline "3.8" `
     --format json
 ```
@@ -122,7 +122,7 @@ export DOC_TOOL_CLI="/d/Tools/DocTool-3.0.0-portable/DocTool/doc-tool-cli.exe"
 
 ```powershell
 & $env:DOC_TOOL_CLI trace-plan `
-    --project "D:/ai_flow_space/hcp-docs/requirements/KF-2090-1-001 康尚健康云软件需求说明书" `
+    --project "D:/ai_flow_space/sample-docs/requirements/DOC-REQ-2026-001 通用软件需求规格说明书" `
     --report-file "D:/ai_flow_space/doc-tool/analysis/trace_plan_preview.json" `
     --format json
 ```

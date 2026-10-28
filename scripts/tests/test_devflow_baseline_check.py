@@ -11,6 +11,7 @@ from doc_tool.application.baseline_check import check_baselines, check_project_b
 from doc_tool.application.content.baselines import BaselineStore
 from doc_tool.application.review.review_store import ReviewStore
 from doc_tool.domain.manifest import ProjectManifest
+from doc_tool.domain.version import APP_VERSION
 
 
 class DevFlowBaselineCheckTests(unittest.TestCase):
@@ -24,8 +25,8 @@ class DevFlowBaselineCheckTests(unittest.TestCase):
         self.manifest_file.write_text(
             "schemaVersion: 1\n"
             "projectId: proj-base-01\n"
-            "documentNo: KF-2090-1-001\n"
-            "documentName: 康尚健康云软件需求说明书\n"
+            "documentNo: DOC-REQ-2026-001\n"
+            "documentName: 通用软件需求规格说明书\n"
             "documentVersion: '3.8'\n"
             "paths:\n"
             "  contentRoot: content/requirement\n",
@@ -53,7 +54,7 @@ class DevFlowBaselineCheckTests(unittest.TestCase):
             "# 文档清单\n\n"
             "| 文档编号 | 文档名称 | 当前版本 | 目录 |\n"
             "|---|---|---|---|\n"
-            "| KF-2090-1-001 | 康尚健康云软件需求说明书 | 3.10 | `requirements/` |\n",
+            "| DOC-REQ-2026-001 | 通用软件需求规格说明书 | 3.10 | `requirements/` |\n",
             encoding="utf-8",
         )
 
@@ -114,7 +115,7 @@ class DevFlowBaselineCheckTests(unittest.TestCase):
     def test_baseline_check_tool_metadata(self):
         res = check_baselines(self.proj)
         self.assertIn("tool", res)
-        self.assertEqual(res["tool"]["appVersion"], "3.0.0")
+        self.assertEqual(res["tool"]["appVersion"], APP_VERSION)
         self.assertIn("commit", res["tool"])
 
     def test_frozen_baseline_verification_and_corruption(self):
