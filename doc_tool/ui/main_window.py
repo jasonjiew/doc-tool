@@ -7330,20 +7330,21 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _start_background_update_check(self) -> None:
-        """后台静默检查更新（带 24h TTL 缓存与跳过版本检查）。"""
-        from doc_tool.application.updater import check_for_updates, load_update_state
+        """后台静默检查更新（受 24h TTL 与版本跳过控制）。"""
+        from doc_tool.application.updater import (
+            load_update_state,
+            run_update_check_async,
+        )
+
         state = load_update_state()
         if not state.auto_check:
             return
 
-        import threading
-
-        def _worker():
-            res = check_for_updates(force=False)
+        def _on_result(res):
             if res.has_update and not res.is_skipped and res.manifest:
                 QTimer.singleShot(0, lambda: self._on_update_discovered(res.manifest))
 
-        threading.Thread(target=_worker, daemon=True).start()
+        run_update_check_async(_on_result, force=False)
 
     def _on_update_discovered(self, manifest) -> None:
         """发现新版本时在状态栏右侧显示升级胶囊。"""
@@ -7363,15 +7364,13 @@ class MainWindow(QMainWindow):
             )
 
     def _on_check_update_manual(self) -> None:
-        """手动触发检查更新（菜单或命令面板调用）。"""
-        from doc_tool.application.updater import check_for_updates
+        """手动检查更新（菜单栏触发）。"""
+        from doc_tool.application.updater import run_update_check_async
         from doc_tool.ui.about_dialog import show_update_dialog
-        import threading
 
-        self.statusBar().showMessage("正在检查更新…", 3000)
+        self.statusBar().showMessage("正在检查更新...", 3000)
 
-        def _worker():
-            res = check_for_updates(force=True)
+        def _on_result(res):
             def _update_ui():
                 if res.error:
                     QMessageBox.warning(self, "检查更新失败", f"无法获取更新信息：\n{res.error}")
@@ -7387,11 +7386,11 @@ class MainWindow(QMainWindow):
                     QMessageBox.information(
                         self,
                         "检查更新",
-                        f"当前已是最新版本 (v{APP_VERSION})，无需升级。",
+                        f"当前已是最新版本 (v{APP_VERSION})。",
                     )
             QTimer.singleShot(0, _update_ui)
 
-        threading.Thread(target=_worker, daemon=True).start()
+        run_update_check_async(_on_result, force=True)
 
     def _perform_upgrade(self, manifest) -> bool:
         """执行升级前置门禁检查与自升级拉起。"""

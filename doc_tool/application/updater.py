@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import tempfile
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import urllib.error
@@ -528,3 +529,24 @@ def apply_portable_update(
         creationflags=creation_flags,
         close_fds=True,
     )
+
+
+def run_update_check_async(
+    on_result: Callable[[UpdateCheckResult], None],
+    force: bool = False,
+    custom_endpoint: Optional[str] = None,
+) -> threading.Thread:
+    """在后台线程中执行更新检查，并在结果就绪后调用 on_result。"""
+    def _worker() -> None:
+        try:
+            res = check_for_updates(force=force, custom_endpoint=custom_endpoint)
+        except Exception as exc:
+            res = UpdateCheckResult(error=str(exc))
+        try:
+            on_result(res)
+        except Exception:
+            pass
+
+    th = threading.Thread(target=_worker, daemon=True)
+    th.start()
+    return th

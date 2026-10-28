@@ -273,7 +273,7 @@ def main() -> int:
             ("V09 删除复杂表格", "requirement", requirement, mutate_delete_complex_table, False),
             ("V10 图片 relationship 目标缺失", "design", design, mutate_missing_image_target, False),
             ("V11 document.xml 非法 updateFields", "requirement", requirement, mutate_illegal_update_fields, False),
-            ("V12 重复媒体文件", "design", design, mutate_duplicate_media, False),
+            ("V12 重复媒体文件", "design", design, mutate_duplicate_media, True),
         ]
         for index, (name, document, config, mutation, should_pass) in enumerate(scenarios, start=1):
             output = config["paths"]["output"]
