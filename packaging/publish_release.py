@@ -85,8 +85,8 @@ def calc_sha256(filepath: str) -> str:
 
 
 def upload_file(token: str, filename: str, filepath: str) -> None:
-    base = GITLAB_BASE or get_gitlab_base()
-    project_id = PROJECT_ID or get_project_id()
+    base = get_gitlab_base()
+    project_id = get_project_id()
     url = f"{base}/api/v4/projects/{project_id}/packages/generic/{PACKAGE_NAME}/{VERSION}/{filename}"
     size_mb = os.path.getsize(filepath) / (1024 * 1024)
     print(f"正在上传 {filename} ({size_mb:.1f} MB)...", flush=True)
@@ -107,8 +107,8 @@ def upload_file(token: str, filename: str, filepath: str) -> None:
 
 
 def get_package_files(token: str) -> list[dict]:
-    base = GITLAB_BASE or get_gitlab_base()
-    project_id = PROJECT_ID or get_project_id()
+    base = get_gitlab_base()
+    project_id = get_project_id()
     # 1. 获取 package_id
     url = f"{base}/api/v4/projects/{project_id}/packages?package_name={PACKAGE_NAME}"
     req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
@@ -132,8 +132,8 @@ def get_package_files(token: str) -> list[dict]:
 
 
 def create_or_update_release(token: str, description: str, links: list[dict]) -> dict:
-    base = GITLAB_BASE or get_gitlab_base()
-    project_id = PROJECT_ID or get_project_id()
+    base = get_gitlab_base()
+    project_id = get_project_id()
     url = f"{base}/api/v4/projects/{project_id}/releases"
     payload = {
         "name": TAG_NAME,
