@@ -206,6 +206,7 @@ def check_for_updates(
     custom_url: Optional[str] = None,
     timeout: float = DEFAULT_CHECK_TIMEOUT,
     current_version: Optional[str] = None,
+    custom_endpoint: Optional[str] = None,
 ) -> UpdateCheckResult:
     """检查在线更新。
 
@@ -237,8 +238,9 @@ def check_for_updates(
             pass
 
     # 2. 确定检查 URL
+    effective_url = custom_url or custom_endpoint
     latest_url = (
-        custom_url
+        effective_url
         or os.environ.get("DOC_TOOL_UPDATE_URL")
         or state.custom_endpoint
         or DEFAULT_LATEST_JSON_URL
@@ -535,11 +537,14 @@ def run_update_check_async(
     on_result: Callable[[UpdateCheckResult], None],
     force: bool = False,
     custom_endpoint: Optional[str] = None,
+    custom_url: Optional[str] = None,
 ) -> threading.Thread:
-    """在后台线程中执行更新检查，并在结果就绪后调用 on_result。"""
+    """在后台线程执行更新检查，并在结束时调用 on_result。"""
+    effective_url = custom_url or custom_endpoint
+
     def _worker() -> None:
         try:
-            res = check_for_updates(force=force, custom_endpoint=custom_endpoint)
+            res = check_for_updates(force=force, custom_url=effective_url)
         except Exception as exc:
             res = UpdateCheckResult(error=str(exc))
         try:
