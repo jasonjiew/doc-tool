@@ -119,6 +119,11 @@ class GuiLoopTests(unittest.TestCase):
         self.auto_box = _AutoBox()
         self._patches = [
             patch("doc_tool.ui.main_window.QMessageBox", self.auto_box.make()),
+            patch.object(
+                __import__("doc_tool.ui.export_settings_dialog", fromlist=["ExportSettingsDialog"]).ExportSettingsDialog,
+                "exec",
+                lambda self: (self._on_submit(), __import__("PySide6.QtWidgets", fromlist=["QDialog"]).QDialog.DialogCode.Accepted)[1],
+            ),
         ]
         for item in self._patches:
             item.start()

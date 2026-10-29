@@ -134,6 +134,11 @@ class ReadingViewWindowTests(unittest.TestCase):
             patch("doc_tool.ui.main_window.QMessageBox.information", lambda *a, **k: None),
             patch("doc_tool.ui.main_window.QMessageBox.warning", lambda *a, **k: None),
             patch.object(QMessageBox, "exec", lambda self: None),
+            patch.object(
+                __import__("doc_tool.ui.export_settings_dialog", fromlist=["ExportSettingsDialog"]).ExportSettingsDialog,
+                "exec",
+                lambda self: (self._on_submit(), __import__("PySide6.QtWidgets", fromlist=["QDialog"]).QDialog.DialogCode.Accepted)[1],
+            ),
         ]
         for item in self._patches:
             item.start()
