@@ -112,13 +112,18 @@ class ToolbarOverflowTests(unittest.TestCase):
             [name for name in names if name in EXPECTED_FORMAT_ACTIONS],
             list(EXPECTED_FORMAT_ACTIONS), "原格式动作相对顺序必须保持",
         )
-        self.assertFalse(
-            self.panel._overflow_btn.isVisible(), "宽窗口下 14 个动作应同排可见"
-        )
         self.assertTrue(
-            all(button.isVisible() for _n, button in self.panel._md_actions),
-            "宽窗口下不应有动作被收起",
+            self.panel._overflow_btn.isVisible(), "宽窗口下「更多 ▾」应常驻收纳低频动作"
         )
+        # CF-02: 低频动作与工具固定收纳，常用格式在宽窗口下同排可见
+        low_names = {"表格网格", "粘贴为表格", "Mermaid", "批量转图", "片段"}
+        for name, button in self.panel._md_actions:
+            if name in low_names:
+                self.assertTrue(button.isHidden(), f"低频操作 {name} 不得平铺在工具栏")
+            else:
+                self.assertFalse(button.isHidden(), f"常用格式 {name} 在宽窗口应同排可见")
+        for btn in (self.panel._rollback_btn, self.panel._history_btn, self.panel._ext_btn):
+            self.assertTrue(btn.isHidden(), "回滚/历史/外部打开不得平铺在工具栏")
 
         # 窄窗口：放不下的动作进入「更多 ▾」，动作一个都不能丢。
         self.host.resize(1024, 640)
@@ -233,6 +238,60 @@ class ToolbarOverflowTests(unittest.TestCase):
         self._app.processEvents()
         self.assertTrue(self.panel.is_dirty())
         self.assertTrue(self.panel._save_btn.isEnabled(), "有未保存修改时保存必须可点")
+
+
+    def test_low_freq_actions_stay_in_overflow_across_resizes_and_readonly(self):
+        """CF-02: 窗口、预览、侧栏变化后低频动作不回到工具栏、不重复，只读保护保持。"""
+        self._show(1280)
+        self.panel.load("general/01 概述.md", "# 概述\n\n正文。\n")
+        self._app.processEvents()
+
+        low_names = {"表格网格", "粘贴为表格", "Mermaid", "批量转图", "片段"}
+        utility_btns = (self.panel._rollback_btn, self.panel._history_btn, self.panel._ext_btn)
+
+        # 1. 经历多次窗口变化、展开收起目录与预览
+        for w in (1024, 1280, 1920, 900, 1440):
+            self.host.resize(w, 720)
+            self.panel._reflow_format_toolbar()
+            self._app.processEvents()
+
+            # 切换大纲与预览
+            self.panel.toggle_outline()
+            self.panel._toggle_preview()
+            self.panel._reflow_format_toolbar()
+            self._app.processEvents()
+
+            # 验证低频按钮始终隐藏在工具栏
+            for name, button in self.panel._md_actions:
+                if name in low_names:
+                    self.assertTrue(button.isHidden(), f"宽度 {w} 时低频操作 {name} 不应出现在工具栏")
+            for btn in utility_btns:
+                self.assertTrue(btn.isHidden(), f"宽度 {w} 时工具按钮不应出现在工具栏")
+
+            # 验证「更多 ▾」菜单项没有重复
+            menu_texts = [a.text() for a in self.panel._overflow_menu.actions() if not a.isSeparator()]
+            self.assertEqual(len(menu_texts), len(set(menu_texts)), f"宽度 {w} 时更多菜单不应有重复项: {menu_texts}")
+            # 低频操作均在菜单中出现
+            self.assertTrue(any("表格网格" in t for t in menu_texts))
+            self.assertTrue(any("Mermaid" in t for t in menu_texts))
+            self.assertTrue(any("本地历史" in t for t in menu_texts))
+            self.assertTrue(any("外部" in t for t in menu_texts))
+
+        # 2. 只读模式验证：写入动作禁用，只读查看类动作保持可用
+        self.panel._writable = False
+        self.panel._apply_edit_state()
+        self._app.processEvents()
+
+        menu_actions = {a.text(): a for a in self.panel._overflow_menu.actions() if not a.isSeparator()}
+        for title, action in menu_actions.items():
+            if "外部" in title or "本地历史" in title:
+                self.assertTrue(action.isEnabled(), f"只读模式下 {title} 应保持可用")
+            elif "表格网格" in title or "粘贴" in title or "Mermaid" in title:
+                self.assertFalse(action.isEnabled(), f"只读模式下写入动作 {title} 应被禁用")
+
+        # 恢复可写
+        self.panel._writable = True
+        self.panel._apply_edit_state()
 
     def test_outline_is_on_demand_and_toggle_keeps_text(self):
         self._show(1280)

@@ -241,6 +241,18 @@ class RoundRegenerationTests(_ProjectCase):
             paths=ProjectPaths(self.project), is_writable=True,
         )
 
+    def _confirm_settings(self):
+        from PySide6.QtCore import QTimer
+        from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+
+        def _do_confirm():
+            for top in self.app.topLevelWidgets():
+                if isinstance(top, ExportSettingsDialog) and top.isVisible():
+                    top._submit_btn.click()
+                    return
+
+        QTimer.singleShot(20, _do_confirm)
+
     def tearDown(self):
         self.window.close()
         self.window.deleteLater()
@@ -257,6 +269,7 @@ class RoundRegenerationTests(_ProjectCase):
         self.window._collect_buffer_texts = lambda: {self.selected: "# 修改正文\n新轮未保存正文标记\n"}
         captured = []
         self.window._on_export_task_done = lambda report: captured.append(report)
+        self._confirm_settings()
         self.window._task_dock.results_view()._regenerate_btn.click()
         deadline = time.monotonic() + 30
         while self.window.runner.is_running and time.monotonic() < deadline:
@@ -273,7 +286,11 @@ class RoundRegenerationTests(_ProjectCase):
         self.assertNotEqual(second.roundId, first.roundId)
         self.assertEqual((self.content / self.selected).read_bytes(), old_bytes)
         if os.environ.get("PRODUCT_EXPORT_FIX_EVIDENCE") == "1":
-            evidence = ROOT / "analysis" / "product-export-fixes-20261003" / "scoped-regeneration" / kind
+            artifact_root = os.environ.get("DOC_TOOL_TEST_ARTIFACT_ROOT")
+            if artifact_root:
+                evidence = Path(artifact_root) / "scoped-regeneration" / kind
+            else:
+                evidence = ROOT / "analysis" / "product-export-fixes-20261003" / "scoped-regeneration" / kind
             evidence.mkdir(parents=True, exist_ok=True)
             for label, report in (("original", first), ("regenerated", second)):
                 shutil.copytree(Path(report.result_for(FORMAT_HTML).path).parent, evidence / label, dirs_exist_ok=True)
@@ -322,6 +339,7 @@ class RoundRegenerationTests(_ProjectCase):
         self.assertIsNone(self.window._report_for_round(view))
         submissions = []
         self.window._run_export_task = lambda **task: submissions.append(task)
+        self._confirm_settings()
         self.window._on_regenerate_round(view)
         self.assertEqual(submissions[0]["args"][0].scope.to_dict(), first.scope.to_dict())
 
@@ -357,6 +375,7 @@ class RoundRegenerationTests(_ProjectCase):
         self.window._run_export_task = lambda **task: submissions.append(task)
         chosen = str(self.work / "another-output")
         with patch("doc_tool.ui.main_window.QFileDialog.getExistingDirectory", return_value=chosen):
+            self._confirm_settings()
             self.window._on_change_export_destination(view)
         self.assertEqual(submissions[0]["args"][0].scope.to_dict(), first.scope.to_dict())
         self.assertEqual(submissions[0]["args"][0].destination, chosen)
@@ -428,6 +447,62 @@ class RoundRegenerationTests(_ProjectCase):
         self.assertEqual(artifact.read_bytes(), old_bytes)
         self.assertEqual(read_export_index(first.indexPath).captureId, first.captureId)
 
+
+    def test_regenerate_round_cancelled_produces_zero_tasks_and_zero_captures(self):
+        from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+        from PySide6.QtCore import QTimer
+
+        first = self._export()
+        self.window._refresh_export_results(first)
+        view = self.window._task_dock.results_view().current_round()
+        old_bytes = (self.content / self.selected).read_bytes()
+        self.window._collect_buffer_texts = lambda: {self.selected: "# 未保存正文\n新内容\n"}
+
+        submissions = []
+        self.window._run_export_task = lambda **task: submissions.append(task)
+
+        def _cancel_settings():
+            for top in self.app.topLevelWidgets():
+                if isinstance(top, ExportSettingsDialog) and top.isVisible():
+                    top.reject()
+                    return
+
+        QTimer.singleShot(20, _cancel_settings)
+        self.window._task_dock.results_view()._regenerate_btn.click()
+        self.app.processEvents()
+
+        self.assertEqual(submissions, [], "取消设置时不应提交任何后台导出任务")
+        self.assertIn("已取消导出设置", self.window._status_label.text())
+        self.assertEqual((self.content / self.selected).read_bytes(), old_bytes, "取消导出不应向磁盘写入正文")
+
+    def test_retry_existing_content_reuses_capture_without_prompting_settings_and_ignores_buffers(self):
+        first = self._old_docx(self._export())
+        write_export_index(first)
+        self.window._refresh_export_results(first)
+        view = self.window._task_dock.results_view().current_round()
+
+        # 修改当前活动缓冲
+        self.window._collect_buffer_texts = lambda: {self.selected: "# 冲突的未保存修改\n不应进入旧重试\n"}
+
+        opened_settings = []
+        self.window._on_export_settings = lambda *a, **k: opened_settings.append(True)
+
+        captured = []
+        self.window._on_export_task_done = lambda report: captured.append(report)
+
+        # 触发重试原内容
+        self.window._on_retry_export_round(view)
+        deadline = time.monotonic() + 30
+        while self.window.runner.is_running and time.monotonic() < deadline:
+            self.app.processEvents()
+            time.sleep(0.01)
+        self.app.processEvents()
+
+        self.assertEqual(opened_settings, [], "原内容重试不得打开设置弹窗")
+        self.assertEqual(len(captured), 1)
+        retry_report = captured[0]
+        self.assertEqual(retry_report.captureId, first.captureId, "原内容重试必须复用原 captureId")
+        self.assertEqual(retry_report.roundId, first.roundId, "原内容重试必须保持原 roundId")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

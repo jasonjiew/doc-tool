@@ -2766,9 +2766,9 @@ class MainWindow(QMainWindow):
         self._status_label.setText("已复制完整章节路径：{0}".format(rel_path))
 
     def _on_content_request_validate(self) -> None:
-        """替换/重命名写回后自动跑校验管线（复用现有校验任务）。"""
+        """替换/重命名写回后自动跑校验管线（复用现有校验任务，保留面板偏好）。"""
         self._append_log("内容写回完成，自动执行校验以检查悬空引用…")
-        self._on_validate()
+        self._on_validate(show_dock=False)
 
     def _content_workspace_available(self) -> bool:
         return bool(
@@ -3080,13 +3080,12 @@ class MainWindow(QMainWindow):
         self._start_task(spec)
         self._append_log("ℹ 提示：本地尚未生成 Word 产物，已自动执行【Markdown 源码与结构检查】。")
 
-    def _on_validate(self) -> None:
+    def _on_validate(self, _checked: bool = False, *, show_dock: bool = True) -> None:
         """F5 checks what the author is editing, never an implicitly selected old DOCX."""
         if not self._project_summary or self.runner.is_running:
             return
-        flush = getattr(self, "_flush_unsaved_and_sync_version", None)
-        if callable(flush):
-            flush()
+        if show_dock:
+            self._select_content_tab(4)
         workspace = getattr(self, "_content_workspace", None)
         run_lint = getattr(workspace, "run_lint", None)
         if callable(run_lint):
@@ -4298,7 +4297,8 @@ class MainWindow(QMainWindow):
         try:
             dialog.exec()
         finally:
-            dialog.deleteLater()
+            if hasattr(dialog, "deleteLater"):
+                dialog.deleteLater()
 
     def _module_buffer_source(self):
         """当前章节的内存缓冲快照（relPath, text）；无脏缓冲返回 ("", "")。
@@ -4767,6 +4767,48 @@ class MainWindow(QMainWindow):
             self._project_summary, buffers=buffers, active_chapter=current_ch
         )
 
+    def _detect_export_conflicts(self, scope=None) -> List[Dict[str, Any]]:
+        """在导出前核对本次范围内的章节是否存在外部修改与窗口缓冲冲突。
+
+        范围外冲突不阻断本次导出。
+        """
+        workspace = getattr(self, "_content_workspace", None)
+        tabs = getattr(workspace, "tabs_host", None) if workspace is not None else None
+        if tabs is None or not hasattr(tabs, "open_rel_paths"):
+            return []
+
+        in_scope_chapters = None
+        if scope is not None and hasattr(scope, "chapters") and scope.kind == "chapters":
+            in_scope_chapters = set(scope.chapters)
+        elif scope is not None and getattr(scope, "kind", "") == "current":
+            in_scope_chapters = {scope.current} if scope.current else set()
+
+        conflicts = []
+        for rel_path in tabs.open_rel_paths():
+            editor = tabs.editor_for(rel_path) if hasattr(tabs, "editor_for") else None
+            if editor is None:
+                continue
+            norm_rel = str(rel_path).replace("\\", "/")
+            doc_type = ""
+            try:
+                doc_type = str(self._project_summary.manifest.documentType or "")
+            except Exception:
+                pass
+            ch_key = norm_rel
+            if doc_type and ch_key.startswith(doc_type + "/"):
+                ch_key = ch_key[len(doc_type) + 1:]
+
+            if in_scope_chapters is not None and ch_key not in in_scope_chapters and norm_rel not in in_scope_chapters:
+                continue
+
+            status_checker = getattr(editor, "check_buffer_disk_status", None)
+            if callable(status_checker):
+                status = status_checker()
+                if status.get("is_fork"):
+                    status["chapter_key"] = ch_key
+                    conflicts.append(status)
+        return conflicts
+
     def _on_export_settings(self, preset_request=None, *, notice="") -> None:
         """打开导出设置；一次“开始导出”即提交原服务。"""
         from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
@@ -4775,6 +4817,7 @@ class MainWindow(QMainWindow):
             self._show_status_message("请先打开项目后再使用导出设置")
             return
         context = self._export_settings_context()
+        conflicts = self._detect_export_conflicts(preset_request.scope if preset_request else None)
         dialog = ExportSettingsDialog(
             project_root=context["project_root"],
             destination=context["destination"],
@@ -4790,33 +4833,63 @@ class MainWindow(QMainWindow):
             document_properties=context.get("document_properties"),
             property_notice=context.get("property_notice", ""),
             notice=notice,
+            conflicts=conflicts,
             parent=self,
         )
         if preset_request is not None:
             dialog.apply_request(preset_request)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            self._status_label.setText("已取消导出设置：编辑缓冲与原有成果保持不变")
-            return
-        request = dialog.submitted_request()
-        if request is None:
-            return
-        self._submit_export_request(request)
+        try:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self._status_label.setText("已取消导出设置：编辑缓冲与原有成果保持不变")
+                return
+            request = dialog.submitted_request()
+            if request is None:
+                return
+            self._submit_export_request(request)
+        finally:
+            if hasattr(dialog, 'deleteLater'):
+                dialog.deleteLater()
+            self.activateWindow()
 
     def _submit_export_request(self, request) -> None:
         """用原 TaskRunner 提交一次导出；当前缓冲在 UI 线程采集后传入后台。"""
         from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
         from doc_tool.application.project_export import run_project_export
+        from doc_tool.application.effective_snapshot import sha256_text
 
         buffers = (
             self._collect_buffer_texts()
             if request.source_mode == SOURCE_MODE_CURRENT_BUFFER
             else {}
         )
+
+        expected_hashes: Dict[str, str] = {}
+        if self._project_summary is not None:
+            proj_root = Path(self._project_summary.project_root)
+            manifest = self._project_summary.manifest
+            content_root = proj_root / manifest.relative_content_root()
+            from doc_tool.application.effective_snapshot import discover_chapters, _select_chapters
+            from doc_tool.application.intake_contract import ExportScope
+            chapters = discover_chapters(content_root)
+            selected, _ = _select_chapters(chapters, request.scope or ExportScope())
+            pool = [rel for rel, _ in selected]
+
+            for ch in pool:
+                if request.source_mode == SOURCE_MODE_CURRENT_BUFFER and ch in buffers:
+                    expected_hashes[ch] = sha256_text(buffers[ch])
+                else:
+                    target_file = content_root / ch
+                    if target_file.is_file():
+                        try:
+                            expected_hashes[ch] = sha256_text(target_file.read_text(encoding="utf-8"))
+                        except Exception:
+                            pass
+
         self._run_export_task(
             name="project-export",
             target=run_project_export,
             args=(request,),
-            kwargs={"buffer_texts": buffers},
+            kwargs={"buffer_texts": buffers, "expected_hashes": expected_hashes},
             message="正在按导出设置生成（{0}）…".format(
                 "、".join(request.formats)
             ),
@@ -4829,19 +4902,13 @@ class MainWindow(QMainWindow):
         argv0 = os.path.basename(sys.argv[0]).lower() if sys.argv else ""
         return "pytest" in argv0 or argv0.startswith("test_") or argv0.endswith("_test.py")
 
-    def _on_quick_export_word(self, *, prompt_settings: Optional[bool] = None) -> None:
+    def _on_quick_export_word(self) -> None:
         """快速导出 Word：日常交互先弹出导出设置弹窗，确认后开始生成。"""
         if self._project_summary is None:
             return
         if self.runner.is_running:
             # 忙时只拒绝重复启动：运行中的任务/轮次保持，编辑与成果查看不受影响。
             self._status_label.setText("已有任务正在运行，本次导出未开始；可继续编辑或查看已有成果")
-            return
-
-        if prompt_settings is False:
-            buffers = self._collect_buffer_texts()
-            request = self._quick_export_defaults(buffers)
-            self._submit_export_request(request)
             return
 
         self._on_export_settings()
@@ -5179,28 +5246,34 @@ class MainWindow(QMainWindow):
         return request, buffers
 
     def _on_regenerate_round(self, view) -> None:
-        """按当前修改重新生成：UI 线程收集缓冲，后台建立新 current-buffer 轮次。"""
-        from doc_tool.application.intake_contract import SOURCE_MODE_CURRENT_BUFFER
-        from doc_tool.application.project_export import run_project_export
+        """按当前修改重新生成：预填原参数（明确 current-buffer），打开设置确认后提交。"""
+        from doc_tool.application.intake_contract import (
+            SCOPE_CHAPTERS,
+            SCOPE_CURRENT_CHAPTER,
+            SOURCE_MODE_CURRENT_BUFFER,
+        )
 
-        if self._project_summary is None:
+        if view is None or self._project_summary is None:
             return
-        # 该入口的语义就是“按最新内容”：原轮即使是已保存来源，这一轮也明确
-        # 建立 current-buffer 捕获（不静默沿用旧来源口径）。
-        request, buffers = self._new_round_request(
-            view, force_source=SOURCE_MODE_CURRENT_BUFFER
-        )
-        if request is None:
-            return
-        self._run_export_task(
-            name="project-export",
-            target=run_project_export,
-            args=(request,),
-            kwargs={"buffer_texts": buffers},
-            message="正在按当前修改建立新一轮（含 {0} 章未保存修改）…".format(
-                len(buffers)
-            ) if buffers else "正在按当前修改建立新一轮…",
-        )
+        report = self._report_for_round(view)
+        scope = self._scope_for_export_round(view, report)
+        request = self._round_request(view, report)
+        request.project_root = str(self._project_summary.project_root)
+        request.capture_id = ""
+        request.source_mode = SOURCE_MODE_CURRENT_BUFFER
+        request.destination = view.destination or str(self._project_summary.paths.output_dir)
+
+        missing = scope is None
+        if scope is not None and scope.kind in (SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER):
+            available = set(self._export_settings_context()["chapters"])
+            wanted = scope.chapters if scope.kind == SCOPE_CHAPTERS else [scope.current]
+            missing = not wanted or any(chapter not in available for chapter in wanted)
+
+        if missing:
+            notice = "原范围缺失或部分章节已不可用：请查看下方实际范围，可改选章节或整份后开始导出。旧成果保留。"
+        else:
+            notice = "按当前修改重新生成（新轮次；旧成果保留）。"
+        self._on_export_settings(request, notice=notice)
 
     def _on_export_settings_for_round(self, view) -> None:
         """从旧轮打开导出设置：带入可解析的原范围/格式/目录，提交产生新轮。
@@ -5220,10 +5293,15 @@ class MainWindow(QMainWindow):
         self._on_export_settings(preset, notice=notice)
 
     def _on_change_export_destination(self, view) -> None:
-        """换目录并重新导出：明示来源/范围，建立新轮，旧成果保留。"""
-        from doc_tool.application.project_export import run_project_export
+        """换目录并重新导出：打开设置预填新目录与原参数，确认后提交产生新轮。"""
+        from doc_tool.application.intake_contract import (
+            SCOPE_CHAPTERS,
+            SCOPE_CURRENT_CHAPTER,
+            SOURCE_MODE_CURRENT_BUFFER,
+            SOURCE_MODE_SAVED,
+        )
 
-        if self._project_summary is None:
+        if view is None or self._project_summary is None:
             return
         chosen = QFileDialog.getExistingDirectory(
             self, "选择新的导出目录（默认按当前内容建立新轮）", view.destination or ""
@@ -5231,16 +5309,29 @@ class MainWindow(QMainWindow):
         if not chosen:
             self._status_label.setText("已取消换目录：原成果保持不变")
             return
-        request, buffers = self._new_round_request(view, destination=chosen)
-        if request is None:
-            return
-        self._run_export_task(
-            name="project-export",
-            target=run_project_export,
-            args=(request,),
-            kwargs={"buffer_texts": buffers},
-            message="正在导出到新目录（新轮次；旧成果保留）…",
-        )
+        report = self._report_for_round(view)
+        scope = self._scope_for_export_round(view, report)
+        request = self._round_request(view, report)
+        request.project_root = str(self._project_summary.project_root)
+        request.capture_id = ""
+        request.destination = chosen
+        previous_mode = str(getattr(report, "sourceMode", "") or "")
+        if previous_mode == SOURCE_MODE_SAVED:
+            request.source_mode = SOURCE_MODE_SAVED
+        else:
+            request.source_mode = SOURCE_MODE_CURRENT_BUFFER
+
+        missing = scope is None
+        if scope is not None and scope.kind in (SCOPE_CHAPTERS, SCOPE_CURRENT_CHAPTER):
+            available = set(self._export_settings_context()["chapters"])
+            wanted = scope.chapters if scope.kind == SCOPE_CHAPTERS else [scope.current]
+            missing = not wanted or any(chapter not in available for chapter in wanted)
+
+        if missing:
+            notice = "原范围缺失或部分章节已不可用：请查看下方实际范围，可改选章节或整份后开始导出。旧成果保留。"
+        else:
+            notice = "正在导出到新目录（新轮次；旧成果保留）。"
+        self._on_export_settings(request, notice=notice)
 
     def _present_export_report(self, report, *, allow_retry: bool = True, show_modal: bool = False) -> None:
         """出稿结果：更新非模态成果 Dock，不弹出阻塞模态框。"""

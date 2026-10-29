@@ -361,6 +361,7 @@ class EditorPanel(QWidget):
         self._autosave = autosave
         self._rel_path: Optional[str] = None
         self._mtime: Optional[float] = None
+        self._disk_baseline_hash: Optional[str] = None
         self._dirty = False
         self._draft_loaded = False
         self._last_synced_heading = None  # 内容来自草稿（尚未落盘到正式文件）
@@ -469,18 +470,18 @@ class EditorPanel(QWidget):
         md_btn("表格", self._insert_table, "插入表格骨架")
         md_btn("美化表", self.format_table_at_cursor, "美化对齐当前表格 (Ctrl+Alt+T)")
         # V3.4：普通表格网格与显式表格粘贴（普通 Ctrl+V 行为不变）
-        btn_grid = md_btn("表格网格", self.open_table_grid, "网格编辑光标所在的普通表格 (Ctrl+Alt+G)，一次撤销可还原")
-        btn_grid.setVisible(False)
-        btn_paste_tbl = md_btn("粘贴为表格", self.paste_as_table, "把剪贴板 TSV/管道表格预览后插入为表格 (Ctrl+Alt+V)")
-        btn_paste_tbl.setVisible(False)
+        self._btn_grid = md_btn("表格网格", self.open_table_grid, "网格编辑光标所在的普通表格 (Ctrl+Alt+G)，一次撤销可还原")
+        self._btn_grid.setVisible(False)
+        self._btn_paste_tbl = md_btn("粘贴为表格", self.paste_as_table, "把剪贴板 TSV/管道表格预览后插入为表格 (Ctrl+Alt+V)")
+        self._btn_paste_tbl.setVisible(False)
         md_btn("链接", self._insert_link, "插入链接")
         md_btn("图片", self._on_insert_image, "插入图片（粘贴/选择文件）")
-        btn_mermaid = md_btn("Mermaid", self.open_mermaid_workbench, "Mermaid 图形工作台")
-        btn_mermaid.setVisible(False)
-        btn_batch = md_btn("批量转图", self.batch_convert_mermaid, "转换当前文档中的历史 Mermaid 源码")
-        btn_batch.setVisible(False)
-        btn_snippet = md_btn("片段", self.open_snippet_manager, "代码片段管理器")
-        btn_snippet.setVisible(False)
+        self._btn_mermaid = md_btn("Mermaid", self.open_mermaid_workbench, "Mermaid 图形工作台")
+        self._btn_mermaid.setVisible(False)
+        self._btn_batch = md_btn("批量转图", self.batch_convert_mermaid, "转换当前文档中的历史 Mermaid 源码")
+        self._btn_batch.setVisible(False)
+        self._btn_snippet = md_btn("片段", self.open_snippet_manager, "代码片段管理器")
+        self._btn_snippet.setVisible(False)
 
         # 窄窗口溢出：放不下的格式动作进入「更多 ▾」菜单，动作本身不丢失。
         self._overflow_btn = QToolButton(self._md_toolbar)
@@ -488,25 +489,7 @@ class EditorPanel(QWidget):
         self._overflow_btn.setToolTip("更多格式与高级工具操作")
         self._overflow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._overflow_menu = QMenu(self._overflow_btn)
-        # 预置高级低频操作
-        act_grid = self._overflow_menu.addAction("表格网格编辑 (Ctrl+Alt+G)")
-        act_grid.triggered.connect(lambda: self.open_table_grid())
-        act_pt = self._overflow_menu.addAction("粘贴剪贴板为表格 (Ctrl+Alt+V)")
-        act_pt.triggered.connect(lambda: self.paste_as_table())
-        self._overflow_menu.addSeparator()
-        act_mmd = self._overflow_menu.addAction("Mermaid 图形工作台…")
-        act_mmd.triggered.connect(lambda: self.open_mermaid_workbench())
-        act_bmmd = self._overflow_menu.addAction("批量转换 Mermaid 源码")
-        act_bmmd.triggered.connect(lambda: self.batch_convert_mermaid())
-        act_snp = self._overflow_menu.addAction("代码片段管理器…")
-        act_snp.triggered.connect(lambda: self.open_snippet_manager())
-        self._overflow_menu.addSeparator()
-        act_hist = self._overflow_menu.addAction("本地历史版本…")
-        act_hist.triggered.connect(lambda: self.open_local_history())
-        act_roll = self._overflow_menu.addAction("回滚上次保存 (.bak)")
-        act_roll.triggered.connect(lambda: self.rollback_last())
-        act_ext = self._overflow_menu.addAction("在系统外部编辑器中打开")
-        act_ext.triggered.connect(lambda: self.open_external())
+        self._fixed_low_freq_names = {"表格网格", "粘贴为表格", "Mermaid", "批量转图", "片段"}
         self._overflow_btn.setMenu(self._overflow_menu)
         self._overflow_btn.setVisible(True)
         md_layout.addWidget(self._overflow_btn)
@@ -579,6 +562,21 @@ class EditorPanel(QWidget):
         self._save_btn.setToolTip("保存修改并原子写入磁盘 (Ctrl+S)")
         self._save_btn.clicked.connect(self.save)
         layout.addWidget(self._save_btn)
+
+        # 预置高级低频操作定义（固定收纳进更多菜单，不参与工具栏平铺候选）
+        self._fixed_overflow_defs = [
+            ("表格网格编辑 (Ctrl+Alt+G)", self._btn_grid, "表格网格"),
+            ("粘贴剪贴板为表格 (Ctrl+Alt+V)", self._btn_paste_tbl, "粘贴为表格"),
+            ("separator", None, None),
+            ("Mermaid 图形工作台…", self._btn_mermaid, "Mermaid"),
+            ("批量转换 Mermaid 源码", self._btn_batch, "批量转图"),
+            ("代码片段管理器…", self._btn_snippet, "片段"),
+            ("separator", None, None),
+            ("本地历史版本…", self._history_btn, None),
+            ("回滚上次保存 (.bak)", self._rollback_btn, None),
+            ("在系统外部编辑器中打开", self._ext_btn, None),
+        ]
+        self._reflow_format_toolbar()
 
         self._toolbar = bar
         outer = QVBoxLayout(self)
@@ -752,6 +750,8 @@ class EditorPanel(QWidget):
         """加载文件内容到编辑器并刷新预览（干净状态，不写草稿）。"""
         self._rel_path = rel_path
         self._mtime = self._file_mtime(rel_path)
+        import hashlib
+        self._disk_baseline_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         self._dismissed_external.clear()
         self._editor.blockSignals(True)
         try:
@@ -785,6 +785,12 @@ class EditorPanel(QWidget):
         """
         self._rel_path = rel_path
         self._mtime = self._file_mtime(rel_path)
+        import hashlib
+        try:
+            disk_text = self._writer_abs(rel_path).read_text(encoding="utf-8")
+            self._disk_baseline_hash = hashlib.sha256(disk_text.encode("utf-8")).hexdigest()
+        except OSError:
+            self._disk_baseline_hash = None
         self._editor.blockSignals(True)
         try:
             self._editor.setPlainText(text)
@@ -855,6 +861,8 @@ class EditorPanel(QWidget):
             self._status_label.setText("保存失败：{0}".format(result.error))
             return False
         self._mtime = self._file_mtime(self._rel_path)
+        import hashlib
+        self._disk_baseline_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         self._dismissed_external.clear()
         self._dirty = False
         self._draft_loaded = False
@@ -1465,19 +1473,23 @@ class EditorPanel(QWidget):
         self._reflow_format_toolbar()
 
     def _reflow_format_toolbar(self) -> None:
-        """以真实宽度分配动作；主动作保留，次要动作进入可达的更多菜单。"""
+        """以真实宽度分配动作；常用格式按宽度溢出，低频工具固定在更多菜单。"""
         if not hasattr(self, "_overflow_menu") or not self._md_buttons:
             return
         width = max(0, self.width() - 12)
-        self._overflow_btn.setText("更多")
+        self._overflow_btn.setText("更多 ▾")
         self._overflow_btn.setMinimumWidth(self._overflow_btn.sizeHint().width())
         self._heading_btn.setMinimumWidth(self._heading_btn.sizeHint().width())
         self._status_label.setVisible(width >= 900)
-        utilities = [
-            ("回滚", self._rollback_btn),
-            ("本地历史", self._history_btn),
-            ("外部打开", self._ext_btn),
-        ]
+
+        # 低频操作与工具固定收纳，绝不参加常驻平铺计算
+        for btn in (self._rollback_btn, self._history_btn, self._ext_btn):
+            btn.hide()
+        low_names = getattr(self, "_fixed_low_freq_names", set())
+        for name, button in self._md_actions:
+            if name in low_names:
+                button.hide()
+
         fixed_widgets = [self._heading_btn, self._outline_btn, self._preview_btn, self._save_btn]
         fixed = sum(widget.sizeHint().width() + 6 for widget in fixed_widgets)
         fixed += self._file_label.minimumWidth() + 38
@@ -1486,21 +1498,15 @@ class EditorPanel(QWidget):
         if width >= 900:
             fixed += 100
         reserve_more = self._overflow_btn.sizeHint().width() + 6
-        utility_overflow = []
-        for name, button in utilities:
-            need = button.sizeHint().width() + 6
-            if width - fixed - need - reserve_more >= 220:
-                button.show()
-                button.setMinimumWidth(button.sizeHint().width())
-                fixed += need
-            else:
-                button.hide()
-                utility_overflow.append((name, button))
-        total = sum(button.sizeHint().width() + 2 for _name, button in self._md_actions[1:])
-        available = max(0, width - fixed - (reserve_more if total > width - fixed or utility_overflow else 0))
+
+        common_actions = [
+            (name, button) for name, button in self._md_actions[1:]
+            if name not in low_names
+        ]
+        available = max(0, width - fixed - reserve_more)
         used = 0
         overflow = []
-        for name, button in self._md_actions[1:]:
+        for name, button in common_actions:
             need = button.sizeHint().width() + 2
             if used + need <= available:
                 used += need
@@ -1509,29 +1515,49 @@ class EditorPanel(QWidget):
             else:
                 button.hide()
                 overflow.append((name, button))
+
         self._overflow_menu.clear()
         self._overflow_items = []
+
+        # 1) 溢出的常用格式动作
+        writable = getattr(self, "_writable", True)
         for name, button in overflow:
             action = self._overflow_menu.addAction(name)
             action.setToolTip(button.toolTip())
-            action.setEnabled(button.isEnabled())
+            action.setEnabled(button.isEnabled() and (writable or not button.isEnabled()))
             action.triggered.connect(lambda _checked=False, target=button: target.click())
             self._overflow_items.append((name, action, button))
-        if utility_overflow and overflow:
+
+        if overflow:
             self._overflow_menu.addSeparator()
-        for name, button in utility_overflow:
-            action = self._overflow_menu.addAction(name)
+
+        # 2) 预置固定低频操作（表格网格、Mermaid、本地历史等）
+        fixed_defs = getattr(self, "_fixed_overflow_defs", [])
+        for title, button, md_name in fixed_defs:
+            if title == "separator":
+                self._overflow_menu.addSeparator()
+                continue
+            action = self._overflow_menu.addAction(title)
             action.setToolTip(button.toolTip())
-            action.setEnabled(button.isEnabled())
+            if title in ("在系统外部编辑器中打开", "本地历史版本…"):
+                action.setEnabled(button.isEnabled())
+            else:
+                action.setEnabled(button.isEnabled() and writable)
             action.triggered.connect(lambda _checked=False, target=button: target.click())
-        self._utility_overflow = utility_overflow
+            if md_name:
+                self._overflow_items.append((md_name, action, button))
+
+        self._utility_overflow = [
+            ("本地历史", self._history_btn),
+            ("回滚", self._rollback_btn),
+            ("外部打开", self._ext_btn),
+        ]
         md_width = self._heading_btn.sizeHint().width()
-        md_width += sum(button.sizeHint().width() + 2 for _name, button in self._md_actions[1:] if not button.isHidden())
-        if overflow or utility_overflow:
-            md_width += self._overflow_btn.sizeHint().width() + 2
+        md_width += sum(button.sizeHint().width() + 2 for _name, button in common_actions if not button.isHidden())
+        md_width += self._overflow_btn.sizeHint().width() + 2
         self._md_toolbar.setFixedWidth(md_width + 4)
-        self._overflow_btn.setVisible(bool(overflow or utility_overflow))
-        self._overflow_btn.setToolTip("更多操作：{0} 项，包含收起的格式和文件操作".format(len(overflow) + len(utility_overflow)))
+        self._overflow_btn.setVisible(True)
+        self._overflow_btn.setToolTip("更多格式与高级工具操作（{0} 个动作）".format(len(self._overflow_items)))
 
     def _set_file_label(self, rel_path: str) -> None:
         """文件标识：显示用文件名（长路径由 QLabel 省略号截断），完整值可复制。
@@ -2431,14 +2457,75 @@ class EditorPanel(QWidget):
 
     def _apply_edit_state(self) -> None:
         self._editor.setReadOnly(not self._writable)
-        if hasattr(self, "_md_toolbar"):
-            self._md_toolbar.setEnabled(self._writable)
+        if hasattr(self, "_heading_btn"):
+            self._heading_btn.setEnabled(self._writable)
+        if hasattr(self, "_md_buttons"):
+            for btn in self._md_buttons:
+                btn.setEnabled(self._writable)
+        self._update_save_state()
+        if hasattr(self, "_reflow_format_toolbar"):
+            self._reflow_format_toolbar()
 
     def _update_save_state(self) -> None:
         can = self._writable and self._rel_path is not None
         self._save_btn.setEnabled(can and self._dirty)
         self._rollback_btn.setEnabled(can)
         self._ext_btn.setEnabled(self._rel_path is not None)
+
+    def check_buffer_disk_status(self) -> Dict[str, Any]:
+        """核对当前编辑器缓冲与磁盘内容状态（用于导出前来源核对，纯只读不弹窗）。"""
+        import hashlib
+
+        rel_path = self._rel_path or ""
+        buffer_text = self._editor.toPlainText()
+        buffer_hash = hashlib.sha256(buffer_text.encode("utf-8")).hexdigest()
+        baseline_hash = getattr(self, "_disk_baseline_hash", None)
+
+        disk_text = None
+        disk_hash = None
+        if self._rel_path is not None:
+            try:
+                disk_text = self._writer_abs(self._rel_path).read_text(encoding="utf-8")
+                disk_hash = hashlib.sha256(disk_text.encode("utf-8")).hexdigest()
+            except OSError:
+                disk_text = None
+                disk_hash = None
+
+        same_content = bool(disk_hash is not None and buffer_hash == disk_hash)
+        baseline_unknown = baseline_hash is None
+        dirty = bool(self._dirty)
+
+        is_fork = False
+        only_buffer = False
+        only_disk = False
+
+        if same_content:
+            pass
+        elif not dirty:
+            if disk_hash is not None and (baseline_unknown or disk_hash != baseline_hash):
+                only_disk = True
+        else:
+            if baseline_unknown:
+                is_fork = True
+            elif disk_hash is not None and disk_hash == baseline_hash:
+                only_buffer = True
+            elif disk_hash is not None and disk_hash != baseline_hash:
+                is_fork = True
+            elif disk_hash is None:
+                is_fork = True
+
+        return {
+            "rel_path": rel_path,
+            "dirty": dirty,
+            "is_fork": is_fork,
+            "only_buffer": only_buffer,
+            "only_disk": only_disk,
+            "same_content": same_content,
+            "baseline_unknown": baseline_unknown,
+            "disk_hash": disk_hash,
+            "buffer_hash": buffer_hash,
+            "baseline_hash": baseline_hash,
+        }
 
     def _file_mtime(self, rel_path: str) -> Optional[float]:
         target = self._writer_abs(rel_path)

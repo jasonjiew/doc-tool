@@ -166,6 +166,7 @@ class ExportSettingsDialog(QDialog):
         document_properties: Optional[dict] = None,
         property_notice: str = "",
         notice: str = "",
+        conflicts: Optional[Sequence[Dict[str, Any]]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -175,6 +176,7 @@ class ExportSettingsDialog(QDialog):
         self._chapters = list(chapters or [])
         self._current_chapter = str(current_chapter or "")
         self._unsaved_count = int(unsaved_count or 0)
+        self._conflicts = list(conflicts or [])
         self._variants = list(variants or [])
         self._request: Optional[ExportRequest] = None
         self._property_info = dict(document_properties or {})
@@ -188,17 +190,20 @@ class ExportSettingsDialog(QDialog):
         self._version_edited = False
 
         outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setSpacing(12)
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         content = QWidget(scroll)
         scroll.setWidget(content)
         outer_layout.addWidget(scroll, 1)
         layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
         self._recovery_notice = QLabel(str(notice), self)
         self._recovery_notice.setWordWrap(True)
         self._recovery_notice.setVisible(bool(notice))
         layout.addWidget(self._recovery_notice)
-        layout.setSpacing(8)
+        layout.setSpacing(12)
 
         # =====================================================================
         # 基础常用项（优先呈现，可直接开始）
@@ -260,12 +265,18 @@ class ExportSettingsDialog(QDialog):
         # --- 内容来源 ---
         layout.addWidget(self._section_label("内容来源"))
         self._source_combo = QComboBox(self)
-        self._source_combo.addItem("当前编辑内容（含未保存修改）", SOURCE_MODE_CURRENT_BUFFER)
-        self._source_combo.addItem("已保存版本", SOURCE_MODE_SAVED)
-        if self._unsaved_count == 0:
-            idx = self._source_combo.findData(SOURCE_MODE_SAVED)
-            if idx >= 0:
-                self._source_combo.setCurrentIndex(idx)
+        if self._conflicts:
+            self._source_combo.addItem("请选择内容来源（检测到外部与窗口修改冲突）", "")
+            self._source_combo.addItem("采用窗口修改（未纳入外部磁盘修改）", SOURCE_MODE_CURRENT_BUFFER)
+            self._source_combo.addItem("采用磁盘修改（未纳入窗口未保存修改）", SOURCE_MODE_SAVED)
+            self._source_combo.setCurrentIndex(0)
+        else:
+            self._source_combo.addItem("当前编辑内容（含未保存修改）", SOURCE_MODE_CURRENT_BUFFER)
+            self._source_combo.addItem("已保存版本", SOURCE_MODE_SAVED)
+            if self._unsaved_count == 0:
+                idx = self._source_combo.findData(SOURCE_MODE_SAVED)
+                if idx >= 0:
+                    self._source_combo.setCurrentIndex(idx)
         self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         layout.addWidget(self._source_combo)
         self._source_hint = QLabel("", self)
@@ -463,8 +474,8 @@ class ExportSettingsDialog(QDialog):
         outer_layout.addWidget(self._summary)
 
         self._error_label = QLabel("", self)
-        self._error_label.setObjectName("statusWarning")
-        self._error_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
+        self._error_label.setObjectName("exportErrorLabel")
+        self._error_label.setProperty("statusTone", "failure")
         self._error_label.setWordWrap(True)
         self._error_label.setVisible(False)
         outer_layout.addWidget(self._error_label)
@@ -473,7 +484,9 @@ class ExportSettingsDialog(QDialog):
         self._submit_btn = self._buttons.addButton(
             "开始导出", QDialogButtonBox.ButtonRole.AcceptRole
         )
-        self._buttons.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
+        self._submit_btn.setProperty("btnRole", "primary")
+        self._cancel_btn = self._buttons.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
+        self._cancel_btn.setProperty("btnRole", "secondary")
         self._buttons.accepted.connect(self._on_submit)
         outer_layout.addWidget(self._buttons)
         self._buttons.rejected.connect(self.reject)
@@ -543,7 +556,10 @@ class ExportSettingsDialog(QDialog):
         return chosen
 
     def source_mode(self) -> str:
-        return str(self._source_combo.currentData() or SOURCE_MODE_CURRENT_BUFFER)
+        data = self._source_combo.currentData()
+        if data is None or data == "":
+            return "" if self._conflicts else SOURCE_MODE_CURRENT_BUFFER
+        return str(data)
 
     def request(self) -> ExportRequest:
         """当前表单对应的真实请求（未校验，直接映射既有契约）。"""
@@ -605,7 +621,22 @@ class ExportSettingsDialog(QDialog):
             self._summary.setText(
                 self._summary.text() + "（未勾选格式：将按默认 Word 提交）"
             )
-        if self.source_mode() == SOURCE_MODE_SAVED and self._unsaved_count:
+        if self._conflicts:
+            ch_names = [c.get("chapter_key") or c.get("rel_path") or "" for c in self._conflicts]
+            ch_str = "、".join(filter(None, ch_names))
+            if self.source_mode() == SOURCE_MODE_CURRENT_BUFFER:
+                self._source_hint.setText(
+                    "已明确采用窗口修改：章节 {0} 的外部磁盘修改未纳入本次导出，窗口缓冲保持。".format(ch_str)
+                )
+            elif self.source_mode() == SOURCE_MODE_SAVED:
+                self._source_hint.setText(
+                    "已明确采用磁盘保存内容：章节 {0} 的窗口未保存修改未纳入本次导出，窗口脏标记与正文保持。".format(ch_str)
+                )
+            else:
+                self._source_hint.setText(
+                    "警告：章节 {0} 存在外部修改与窗口未保存冲突，不能静默使用默认来源。请明确选择采用窗口或磁盘修改。".format(ch_str)
+                )
+        elif self.source_mode() == SOURCE_MODE_SAVED and self._unsaved_count:
             self._source_hint.setText(
                 "已选择「已保存版本」：当前 {0} 章未保存修改不会纳入本次导出，编辑缓冲保持。".format(
                     self._unsaved_count
@@ -631,9 +662,47 @@ class ExportSettingsDialog(QDialog):
                     "未勾选任何章节：将按整份文档回退（界面已明示，可直接提交或改选）。"
                 )
 
-    def _on_submit(self) -> None:
+    def _clear_errors(self) -> None:
         self._error_label.setVisible(False)
         self._error_label.setText("")
+        candidates = [
+            getattr(self, "_destination_entry", None),
+            getattr(self, "_name_entry", None),
+            getattr(self, "_scope_combo", None),
+            getattr(self, "_source_combo", None),
+            getattr(self, "_document_no", None),
+            getattr(self, "_document_name", None),
+            getattr(self, "_document_version", None),
+        ]
+        if hasattr(self, "_property_entries"):
+            candidates.extend(self._property_entries.values())
+        for widget in candidates:
+            if widget is not None and widget.property("hasError"):
+                widget.setProperty("hasError", False)
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+
+    def _set_field_error(self, widget: Optional[QWidget], message: str) -> None:
+        self._clear_errors()
+        self._error_label.setText(message)
+        self._error_label.setVisible(True)
+        if widget is not None:
+            widget.setProperty("hasError", True)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            try:
+                widget.setFocus()
+            except Exception:
+                pass
+
+    def _on_submit(self) -> None:
+        self._clear_errors()
+        if not self.source_mode():
+            self._set_field_error(
+                self._source_combo,
+                "检测到外部修改与窗口未保存冲突，请先在「内容来源」中明确选择采用窗口或磁盘。",
+            )
+            return
         if self._has_document_fields and self._document_no is not None:
             from doc_tool.domain.paths import build_output_filename
             from doc_tool.application.export.document_properties import validate_property_value
@@ -644,21 +713,29 @@ class ExportSettingsDialog(QDialog):
                     self._document_version.text().strip(),
                     self._document_type,
                 )
-                for key, entry in self._property_entries.items():
-                    if self._property_info[key].get("editable", True) and entry.text() != str(self._property_info[key].get("value") or ""):
-                        validate_property_value(self._property_info[key], entry.text())
             except (ValueError, Exception) as exc:
-                self._error_label.setText("文档信息需要完善：" + str(exc))
-                self._error_label.setVisible(True)
+                err_str = str(exc)
+                target = self._document_no
+                if "documentNo" in err_str or "文件编号" in err_str or "编号" in err_str:
+                    target = self._document_no
+                elif "文件名称" in err_str or "名称" in err_str:
+                    target = self._document_name
+                elif "版本" in err_str:
+                    target = self._document_version
+                self._set_field_error(target, "文档信息需要完善：" + err_str)
                 return
+
+            for key, entry in self._property_entries.items():
+                if self._property_info[key].get("editable", True) and entry.text() != str(self._property_info[key].get("value") or ""):
+                    try:
+                        validate_property_value(self._property_info[key], entry.text())
+                    except (ValueError, Exception) as exc:
+                        self._set_field_error(entry, "文档属性需要完善：" + str(exc))
+                        return
         self._request = self.request()
         self.accept()
 
     def exec(self) -> int:
-        import os
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" and not getattr(self, "_force_interactive", False):
-            self._on_submit()
-            return QDialog.DialogCode.Accepted if self._request is not None else QDialog.DialogCode.Rejected
         return super().exec()
 
     def apply_request(self, request: ExportRequest) -> None:

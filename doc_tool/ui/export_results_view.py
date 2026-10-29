@@ -31,6 +31,36 @@ from PySide6.QtWidgets import (
 )
 
 
+def _is_destination_error(round_view) -> bool:
+    err = str(getattr(round_view, "error_code", "") or "")
+    if err in ("E8001", "destination") or err.startswith("E8"):
+        return True
+    for f in getattr(round_view, "formats", []):
+        f_err = str(getattr(f, "error_code", "") or "")
+        if f_err in ("E8001", "destination") or f_err.startswith("E8"):
+            return True
+        if "无法写入导出目录" in getattr(f, "message", ""):
+            return True
+    for w in getattr(round_view, "warnings", []):
+        if "无法写入导出目录" in str(w):
+            return True
+    return False
+
+
+def _is_origin_unavailable(round_view) -> bool:
+    if not getattr(round_view, "capture_id", ""):
+        return True
+    for f in getattr(round_view, "formats", []):
+        if getattr(f, "error_code", "") == "export-origin-unavailable":
+            return True
+        if "原轮输入" in getattr(f, "message", ""):
+            return True
+    for w in getattr(round_view, "warnings", []):
+        if "原轮捕获不可用" in str(w) or "原轮来源身份缺失" in str(w):
+            return True
+    return False
+
+
 class ExportResultsView(QWidget):
     """成果页：轮次选择 + 逐文件结果 + 恢复动作。"""
 
@@ -137,6 +167,16 @@ class ExportResultsView(QWidget):
         self._copy_diag_btn.clicked.connect(self._copy_diagnostics)
         actions.add(self._copy_diag_btn)
 
+        from PySide6.QtWidgets import QMenu, QToolButton
+        self._more_btn = QToolButton(self)
+        self._more_btn.setObjectName("resultsMoreBtn")
+        self._more_btn.setText("更多 ▾")
+        self._more_btn.setProperty("btnRole", "compact")
+        self._more_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._more_menu = QMenu(self)
+        self._more_btn.setMenu(self._more_menu)
+        actions.add(self._more_btn)
+
         layout.addWidget(actions)
 
         self.set_rounds([], "")
@@ -184,19 +224,21 @@ class ExportResultsView(QWidget):
             self._primary_btn.setVisible(False)
             self._copy_diag_btn.setEnabled(False)
             self._copy_diag_btn.setVisible(False)
+            self._more_btn.setEnabled(False)
+            self._more_btn.setVisible(False)
+            self._more_menu.clear()
             for button in (self._retry_btn, self._regenerate_btn, self._settings_btn, self._destination_btn):
                 button.setEnabled(False)
                 button.setVisible(False)
             return
 
-        # 依据真实机器事实推荐恰好一个主要操作
+        # D7.5 事实表决定唯一主要操作
         if getattr(round_view, "has_usable_docx", False):
             if getattr(round_view, "has_pending_refresh", False):
                 self._primary_btn.setText("打开 Word (待刷新)")
-                self._primary_action_kind = "open_word"
             else:
                 self._primary_btn.setText("打开 Word")
-                self._primary_action_kind = "open_word"
+            self._primary_action_kind = "open_word"
             self._primary_btn.setVisible(True)
             self._primary_btn.setEnabled(True)
         elif getattr(round_view, "primary_location", None):
@@ -204,14 +246,24 @@ class ExportResultsView(QWidget):
             self._primary_action_kind = "locate_problem"
             self._primary_btn.setVisible(True)
             self._primary_btn.setEnabled(True)
-        elif getattr(round_view, "has_retryable", False):
+        elif _is_destination_error(round_view):
+            self._primary_btn.setText("换目录并重新导出…")
+            self._primary_action_kind = "change_destination"
+            self._primary_btn.setVisible(True)
+            self._primary_btn.setEnabled(True)
+        elif getattr(round_view, "has_retryable", False) and not _is_origin_unavailable(round_view):
             self._primary_btn.setText("重试本次内容")
             self._primary_action_kind = "retry"
             self._primary_btn.setVisible(True)
             self._primary_btn.setEnabled(True)
-        else:
+        elif _is_origin_unavailable(round_view):
             self._primary_btn.setText("按当前内容生成")
             self._primary_action_kind = "regenerate"
+            self._primary_btn.setVisible(True)
+            self._primary_btn.setEnabled(True)
+        else:
+            self._primary_btn.setText("复制诊断")
+            self._primary_action_kind = "copy_diagnostics"
             self._primary_btn.setVisible(True)
             self._primary_btn.setEnabled(True)
 
@@ -233,6 +285,7 @@ class ExportResultsView(QWidget):
             empty.setObjectName("statusMuted")
             empty.setWordWrap(True)
             self._rows_layout.addWidget(empty)
+        self._rows_layout.addStretch(1)
 
         # 交互简化：区分「完全成功」与「失败/待补缺」两类状态，精简次级操作按钮
         is_clean_success = (
@@ -244,39 +297,45 @@ class ExportResultsView(QWidget):
         )
 
         if is_clean_success:
-            # 导出成功时：主按钮「打开 Word」，次级操作精简为「重新导出…」（支持改范围/换目录/换格式），
-            # 隐藏「重试本次内容」「按当前内容生成」「换目录」与「复制诊断」等冗余按钮。
             self._settings_btn.setText("重新导出…")
             self._settings_btn.setToolTip("带入本轮配置打开导出设置（可更换输出目录、格式或范围）")
-            self._settings_btn.setEnabled(True)
-            self._settings_btn.setVisible(True)
-
-            self._retry_btn.setEnabled(False)
-            self._retry_btn.setVisible(False)
-            self._regenerate_btn.setEnabled(False)
-            self._regenerate_btn.setVisible(False)
-            self._destination_btn.setEnabled(False)
-            self._destination_btn.setVisible(False)
-            self._copy_diag_btn.setEnabled(False)
-            self._copy_diag_btn.setVisible(False)
         else:
-            # 存在失败或待刷新时：保留完整恢复工具箱
             self._settings_btn.setText("更改设置…")
             self._settings_btn.setToolTip("带入本轮原范围/格式/目录打开导出设置，提交产生新轮")
-            self._settings_btn.setEnabled(True)
-            self._settings_btn.setVisible(True)
+        self._settings_btn.setEnabled(True)
+        self._settings_btn.setVisible(True)
 
-            self._retry_btn.setEnabled(bool(round_view.has_retryable))
-            self._retry_btn.setVisible(bool(round_view.has_retryable))
+        # 更多 ▾ 菜单：收纳其余适用动作与“打开本次记录”，主要动作不在次级区重复
+        self._more_menu.clear()
+        if (self._primary_action_kind != "retry"
+                and getattr(round_view, "has_retryable", False)
+                and not _is_origin_unavailable(round_view)):
+            act = self._more_menu.addAction("重试本次内容")
+            act.triggered.connect(lambda: self._invoke(self._on_retry_formats))
+        if self._primary_action_kind != "regenerate":
+            act = self._more_menu.addAction("按当前内容生成")
+            act.triggered.connect(lambda: self._invoke(self._on_regenerate_round))
+        if self._primary_action_kind != "change_destination":
+            act = self._more_menu.addAction("换目录并重新导出…")
+            act.triggered.connect(lambda: self._invoke(self._on_change_destination))
+        if self._primary_action_kind != "copy_diagnostics":
+            act = self._more_menu.addAction("复制诊断")
+            act.triggered.connect(self._copy_diagnostics)
+        act_rec = self._more_menu.addAction("打开本次记录")
+        act_rec.triggered.connect(self._open_saved_record)
 
-            self._regenerate_btn.setEnabled(True)
-            self._regenerate_btn.setVisible(True)
+        self._more_btn.setEnabled(True)
+        self._more_btn.setVisible(True)
 
-            self._destination_btn.setEnabled(True)
-            self._destination_btn.setVisible(True)
-
-            self._copy_diag_btn.setEnabled(True)
-            self._copy_diag_btn.setVisible(True)
+        # 固定不平铺完整工具箱：次级按钮收起至更多，避免界面拥挤与主次重复
+        self._retry_btn.setEnabled(bool(round_view.has_retryable))
+        self._retry_btn.setVisible(False)
+        self._regenerate_btn.setEnabled(True)
+        self._regenerate_btn.setVisible(False)
+        self._destination_btn.setEnabled(True)
+        self._destination_btn.setVisible(False)
+        self._copy_diag_btn.setEnabled(True)
+        self._copy_diag_btn.setVisible(False)
 
     def _add_row(self, item) -> None:
         row = QFrame(self._rows_host)
@@ -347,6 +406,8 @@ class ExportResultsView(QWidget):
         self._warning.setText("")
         self._primary_btn.setVisible(False)
         self._copy_diag_btn.setVisible(False)
+        self._more_btn.setVisible(False)
+        self._more_menu.clear()
         for button in (self._retry_btn, self._regenerate_btn, self._settings_btn, self._destination_btn):
             button.setVisible(False)
 
@@ -370,6 +431,10 @@ class ExportResultsView(QWidget):
     def _invoke(self, callback) -> None:
         if callback is None or self._current is None:
             return
+        cur = self.current_round()
+        if cur is None or cur.round_id != self._current.round_id:
+            self._warning.setText("当前选中的导出轮次已变更，请重新选择恢复操作。")
+            return
         callback(self._current)
 
     def _open_format(self, fmt: str, path: str) -> None:
@@ -391,15 +456,34 @@ class ExportResultsView(QWidget):
         elif self._primary_action_kind == "locate_problem":
             loc = getattr(self._current, "primary_location", None)
             if loc:
-                self._locate_source(loc.get("path", ""), loc.get("line"))
+                target_path = loc.get("path") or loc.get("relPath", "")
+                self._locate_source(target_path, loc.get("line"))
+        elif self._primary_action_kind == "change_destination":
+            self._invoke(self._on_change_destination)
         elif self._primary_action_kind == "retry":
             self._invoke(self._on_retry_formats)
         elif self._primary_action_kind == "regenerate":
             self._invoke(self._on_regenerate_round)
+        elif self._primary_action_kind == "copy_diagnostics":
+            self._copy_diagnostics()
 
     def _locate_source(self, path: str, line: Optional[int] = None) -> None:
         if self._on_locate_source is not None and path:
             self._on_locate_source(path, line)
+
+    def _open_saved_record(self) -> None:
+        if self._current is None:
+            return
+        path = getattr(self._current, "diagnostics_md_path", "") or getattr(self._current, "diagnostics_path", "")
+        if path and Path(path).is_file():
+            if self._on_open_format is not None:
+                self._on_open_format("markdown", path)
+            else:
+                from PySide6.QtGui import QDesktopServices
+                from PySide6.QtCore import QUrl
+                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        else:
+            self._warning.setText("本次导出诊断记录未保存或文件不存在。")
 
     def _copy_diagnostics(self) -> None:
         if self._current is None:

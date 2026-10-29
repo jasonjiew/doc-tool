@@ -180,6 +180,83 @@ class SnapshotTests(_SharedProjectMixin, unittest.TestCase):
         self.assertTrue(mark_source_updated(snapshot))
 
 
+    def test_capture_source_verification_on_read_bytes(self):
+        """Task 12.3: 在用于导出的同一份读取字节上验证确认时来源。"""
+        from doc_tool.application.effective_snapshot import sha256_text
+        from doc_tool.application.intake_contract import (
+            ExportRequest, FORMAT_DOCX, STATUS_FAILED,
+        )
+        from doc_tool.application.project_export import run_project_export
+
+        target_rel = self._chapter_rel("1.md")
+        content_root = self.project / "content" / "general"
+        chapter_path = content_root / target_rel
+        old_text = chapter_path.read_text(encoding="utf-8")
+        old_hash = sha256_text(old_text)
+
+        # 1. 模拟确认后到读取间被外部修改：预期摘要不符，抛出异常并带原章节与原因
+        chapter_path.write_text("# 外部篡改正文\n", encoding="utf-8")
+        with self.assertRaises(ValueError) as ctx:
+            capture_snapshot(
+                self.project,
+                source_mode=SOURCE_MODE_SAVED,
+                expected_hashes={target_rel: old_hash},
+            )
+        self.assertIn(target_rel, str(ctx.exception))
+        self.assertIn("不一致", str(ctx.exception))
+
+        # 2. 通过 run_project_export 触发：不进入构建，不伪造 captureId，保留输入准备失败阶段
+        request = ExportRequest(
+            project_root=str(self.project),
+            formats=[FORMAT_DOCX],
+            destination=str(self.project / "output"),
+            source_mode=SOURCE_MODE_SAVED,
+        )
+        report = run_project_export(
+            request,
+            expected_hashes={target_rel: old_hash},
+            skip_word_refresh=True,
+        )
+        self.assertEqual(report.captureId, "", "捕获未成功不得伪造 captureId")
+        self.assertEqual(report.diagnostics.get("failedStage"), "prepare")
+        self.assertEqual(report.diagnostics.get("errorCode"), "E1001")
+        self.assertEqual(report.results[0].status, STATUS_FAILED)
+        self.assertIn(target_rel, report.warnings[0])
+
+        # 3. 模拟文件不可读/被删除：抛出 IOError 并指明章节
+        chapter_path.unlink()
+        with self.assertRaises(IOError) as ctx_io:
+            capture_snapshot(
+                self.project,
+                source_mode=SOURCE_MODE_SAVED,
+                expected_hashes={target_rel: old_hash},
+            )
+        self.assertIn(target_rel, str(ctx_io.exception))
+        self.assertIn("不可读或已删除", str(ctx_io.exception))
+
+        # 4. 恢复文件并成功导出后，继续修改源文件不改变已生成的快照与成果
+        chapter_path.write_text(old_text, encoding="utf-8")
+        succ_report = run_project_export(
+            request,
+            skip_word_refresh=True,
+        )
+        self.assertTrue(succ_report.captureId)
+        old_snap_hash = succ_report.results[0].sha256
+
+        # 编辑正文
+        chapter_path.write_text("# 导出后继续编辑的内容\n", encoding="utf-8")
+        self.assertEqual(succ_report.results[0].sha256, old_snap_hash, "已成功捕获后继续编辑不改变本轮产物")
+
+        # 5. 原捕获重试不读新磁盘
+        retried = run_project_export(
+            request,
+            prior=succ_report,
+            only_formats=[FORMAT_DOCX],
+            skip_word_refresh=True,
+        )
+        self.assertEqual(retried.captureId, succ_report.captureId, "原内容重试复用旧快照，不读新磁盘")
+
+
 class ExportTests(_SharedProjectMixin, unittest.TestCase):
     """多格式出稿；默认诊断构建（不依赖 Word 刷新）以保证可重复。"""
 

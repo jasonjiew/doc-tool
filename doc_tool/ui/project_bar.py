@@ -70,7 +70,7 @@ class ProjectBar(QWidget):
         layout.setSpacing(2)
 
         main = QHBoxLayout()
-        main.setSpacing(10)
+        main.setSpacing(8)
 
         # 文档身份：长名称省略显示，完整值与项目路径可由提示/右键菜单取得。
         self._name_label = QLabel("未打开项目", self)
@@ -118,7 +118,6 @@ class ProjectBar(QWidget):
         self._quick_export_btn.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred
         )
-        self._quick_export_btn.setShortcut("Ctrl+E")
         self._quick_export_btn.setToolTip(
             "打开简洁设置并导出 Word 文档 (Ctrl+E)"
         )
@@ -270,7 +269,7 @@ class ProjectBar(QWidget):
         self._overflow.register("branch", self._branch_btn, self._branch_action)
         self._overflow.register("toggle_summary", self._toggle_btn, self._toggle_action)
         self._overflow.register("close", self._close_btn, self._close_action)
-        self._overflow.register("export_settings", self._export_settings_btn, self._export_settings_action)
+        self._overflow.register("export_settings", self._export_settings_btn, self._export_settings_action, overflow_only=True)
 
     def refresh_action_overflow(self, available_width: Optional[int] = None) -> bool:
         """按当前可用宽度重排次级动作；返回是否有动作进入「更多」。
@@ -382,7 +381,7 @@ class ProjectBar(QWidget):
             actions.get("quick_export", None),
             self._quick_export_tooltip(),
         )
-        self._set_enabled(self._export_settings_btn, actions.get("quick_export", None), "设置导出范围、文件名和本次文档属性")
+        self._sync_action(self._export_settings_btn, self._export_settings_action, actions.get("quick_export", None), "配置其它导出格式与高级范围")
         # 「成果」始终可点：没有轮次时给出明确空态说明，而不是禁用成死按钮。
         self._results_btn.setEnabled(True)
         self._results_btn.setToolTip(
@@ -530,6 +529,7 @@ class ProjectBar(QWidget):
             getattr(self, "_merge_action", None),
             getattr(self, "_branch_action", None),
             getattr(self, "_close_action", None),
+            getattr(self, "_export_settings_action", None),
         ):
             if action is not None:
                 action.setEnabled(False)

@@ -139,11 +139,11 @@ class ExportRoundView:
     def primary_location(self) -> Optional[Dict[str, Any]]:
         """首个可验证的源 Markdown 定位。"""
         for loc in self.locations:
-            if loc.get("path") and loc.get("line"):
+            if (loc.get("path") or loc.get("relPath")) and loc.get("line"):
                 return loc
         for f in self.formats:
             for loc in f.locations:
-                if loc.get("path") and loc.get("line"):
+                if (loc.get("path") or loc.get("relPath")) and loc.get("line"):
                     return loc
         return None
 
@@ -207,6 +207,21 @@ def round_view_from_report(report) -> ExportRoundView:
             scope_text = ""
     elif not getattr(report, "scopeKnown", True):
         scope_text = "范围记录缺失"
+
+    diag_dict = getattr(report, "diagnostics", None) or {}
+    failed_stage = diag_dict.get("failedStage", "")
+    error_code = diag_dict.get("errorCode", "")
+    locations = list(diag_dict.get("locations", []) or [])
+    if not failed_stage:
+        for f in formats:
+            if f.failed_stage:
+                failed_stage = f.failed_stage
+                if not error_code:
+                    error_code = f.error_code
+                if not locations:
+                    locations = list(f.locations)
+                break
+
     return ExportRoundView(
         round_id=str(getattr(report, "roundId", "") or ""),
         capture_id=str(getattr(report, "captureId", "") or ""),
@@ -225,12 +240,12 @@ def round_view_from_report(report) -> ExportRoundView:
         docx_path=str(getattr(report, "docxPath", "") or ""),
         scope=ExportScope.from_dict(scope.to_dict()) if scope is not None and hasattr(scope, "to_dict") else None,
         execution_id=str(getattr(report, "executionId", "") or ""),
-        diagnostics=getattr(report, "diagnostics", None),
+        diagnostics=diag_dict or None,
         diagnostics_path=str(getattr(report, "diagnosticsPath", "") or ""),
         diagnostics_md_path=str(getattr(report, "diagnosticsMdPath", "") or ""),
-        failed_stage=getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: "")("failedStage", ""),
-        error_code=getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: "")("errorCode", ""),
-        locations=list(getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: [])("locations", []) or []),
+        failed_stage=failed_stage,
+        error_code=error_code,
+        locations=locations,
     )
 
 

@@ -325,6 +325,7 @@ def capture_snapshot(
     progress=None,
     cache_root=None,
     variant_id: str = "",
+    expected_hashes: Optional[Dict[str, str]] = None,
 ) -> EffectiveSnapshot:
     """捕获一次不可变的有效内容快照，并物化到私有工作目录。
 
@@ -361,6 +362,12 @@ def capture_snapshot(
     selected, omitted = _select_chapters(chapters, effective_scope)
     snapshot.omittedChapters = omitted
 
+    if expected_hashes is not None:
+        selected_rel_set = {rel for rel, _ in selected}
+        for exp_rel in expected_hashes:
+            if exp_rel not in selected_rel_set:
+                raise IOError("章节文件不可读或已删除：{0}".format(exp_rel))
+
     buffers = dict(buffer_texts or {})
     captured_texts: Dict[str, str] = {}
     texts: List[str] = []
@@ -371,13 +378,33 @@ def capture_snapshot(
             # 变体未纳入该章：既不出稿也不报缺失
             snapshot.omittedChapters.append(rel_path)
             continue
+        disk_bytes = None
         try:
-            disk_text = path.read_text(encoding="utf-8")
-        except OSError:
+            disk_bytes = path.read_bytes()
+            disk_text = disk_bytes.decode("utf-8")
+        except OSError as exc:
             disk_text = ""
-        disk_hash = sha256_text(disk_text)
+            if expected_hashes is not None and rel_path in expected_hashes:
+                raise IOError("章节文件不可读或已删除：{0} ({1})".format(rel_path, exc)) from exc
+        except UnicodeDecodeError as exc:
+            disk_text = ""
+            if expected_hashes is not None and rel_path in expected_hashes:
+                raise ValueError("章节文件编码异常：{0} ({1})".format(rel_path, exc)) from exc
+
+        disk_hash = sha256_text(disk_text) if disk_text else ""
         from_buffer = effective_mode == SOURCE_MODE_CURRENT_BUFFER and rel_path in buffers
         text = buffers.get(rel_path, disk_text) if from_buffer else disk_text
+
+        # Task 12.3: 在用于导出的同一份读取字节上验证确认时来源
+        if expected_hashes is not None and rel_path in expected_hashes:
+            expected = expected_hashes[rel_path]
+            actual_hash = sha256_text(text)
+            if actual_hash != expected:
+                raise ValueError(
+                    "章节在确认后发生变动，与导出确认时的内容不一致：{0}（预期摘要 {1}，实际读取 {2}）".format(
+                        rel_path, expected[:8], actual_hash[:8]
+                    )
+                )
         if variant_id and snapshot.variantApplied and rel_path in variant_texts:
             # 变体展开优先（含变量/模块版本）；同章缓冲语义仍然生效
             text = variant_texts[rel_path]

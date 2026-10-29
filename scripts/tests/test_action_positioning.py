@@ -24,7 +24,7 @@ from doc_tool.domain.manifest import ProjectManifest
 from doc_tool.domain.paths import ProjectPaths
 from doc_tool.ui.main_window import MainWindow, TASK_UI
 from doc_tool.ui.project_bar import ProjectBar
-from doc_tool.ui.workbench_state import ActionState, WorkbenchState
+from doc_tool.ui.workbench_state import ActionState, WorkbenchState, WorkView
 
 
 class TestActionPositioningAndLogic(unittest.TestCase):
@@ -37,6 +37,7 @@ class TestActionPositioningAndLogic(unittest.TestCase):
 
     def test_project_bar_button_order_and_labels(self):
         bar = ProjectBar()
+        bar.show()
         self.assertTrue(bar._validate_btn.text() in ("项目检查", "检查 (F5)"))
         self.assertEqual(bar._diag_btn.text(), "快速构建")
         self.assertEqual(bar._merge_btn.text(), "正式出稿")
@@ -218,6 +219,58 @@ class TestActionPositioningAndLogic(unittest.TestCase):
         self.assertFalse(window._check_output_file_locked_and_prompt(self.work / "not_exist.docx"))
         window.close()
 
+
+
+    def test_export_settings_stays_in_overflow_across_widths_and_state_recovery(self):
+        """CF-01: 导出设置按 overflow_only 固定到更多，多次缩放无并列设置，菜单项恰好一次。"""
+        bar = ProjectBar()
+        manifest = ProjectManifest(
+            documentNo="DOC-001",
+            documentName="测试文档",
+            documentVersion="1.0",
+            documentType="requirement",
+            sourceSha256="",
+        )
+        paths = ProjectPaths(self.work)
+        summary = ProjectSummary(
+            manifest=manifest,
+            paths=paths,
+            project_root=self.work,
+            is_writable=True,
+            source_exists=False,
+            template_exists=False,
+            content_exists=True,
+            output_exists=True,
+        )
+        state = WorkbenchState(view=WorkView.IDLE,
+            actions={
+                "quick_export": ActionState(enabled=True),
+                "validate": ActionState(enabled=True),
+                "diag_build": ActionState(enabled=True),
+                "merge": ActionState(enabled=True),
+            },
+        )
+        bar.render(summary, state)
+        # 测试在窄窗口 (1024), 典型 (1280), 宽窗口 (1920) 反复缩放下
+        for w in (1024, 1280, 1920, 1024, 1440):
+            bar.resize(w, 60)
+            bar.refresh_action_overflow(w)
+            self.assertTrue(bar._export_settings_btn.isHidden(), f"宽度 {w} 时导出设置不应平铺显示")
+            self.assertFalse(bar._quick_export_btn.isHidden(), f"宽度 {w} 时导出 Word 应保持可见")
+            self.assertFalse(bar._results_btn.isHidden(), f"宽度 {w} 时成果应保持可见")
+            settings_actions = [a for a in bar._overflow_menu.actions() if "格式设置" in a.text()]
+            self.assertEqual(len(settings_actions), 1, f"宽度 {w} 时菜单中格式设置项应恰好出现一次")
+            self.assertTrue(settings_actions[0].isEnabled())
+            self.assertTrue(bar._export_settings_btn.isEnabled())
+
+        # 状态重置与恢复
+        bar.reset()
+        self.assertFalse(bar._export_settings_action.isEnabled())
+        self.assertFalse(bar._export_settings_btn.isEnabled())
+
+        bar.render(summary, state)
+        self.assertTrue(bar._export_settings_action.isEnabled())
+        self.assertTrue(bar._export_settings_btn.isEnabled())
 
 if __name__ == "__main__":
     unittest.main()

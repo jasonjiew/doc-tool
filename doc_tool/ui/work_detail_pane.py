@@ -374,9 +374,9 @@ class ResultCard(QFrame):
         self._action_buttons = []
         self._tech_frame.hide()
 
-    def _add_action(self, text: str, callback: Callable[[], None]) -> None:
+    def _add_action(self, text: str, callback: Callable[[], None], is_primary: bool = False) -> None:
         button = QPushButton(text, self)
-        button.setProperty("btnRole", "compact")
+        button.setProperty("btnRole", "primary" if is_primary or len(self._action_buttons) == 0 else "compact")
         button.clicked.connect(callback)
         self._actions.addWidget(button)
         self._action_buttons.append(button)

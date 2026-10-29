@@ -6,7 +6,7 @@
 
 ### Requirement: Each export diagnostic belongs to the actual execution
 
-系统 SHALL 将导出的阶段事实、错误、警告和各格式结果关联到真实项目、执行及已存在的捕获身份，覆盖输入准备、预处理、构建、校验、Word 刷新和写成果。阶段状态 SHALL 由已有执行事件产生；捕获前失败须保留已知执行身份并标捕获未建立，不伪造成功阶段或捕获标识。各格式可用性与正式状态 SHALL 沿用既有权威结果。
+[CF-04] 系统 SHALL 将导出的阶段事实、错误、警告和各格式结果关联到真实项目、执行及已存在的捕获身份，覆盖输入准备、预处理、构建、校验、Word 刷新和写成果。阶段状态 SHALL 由已有执行事件产生；捕获前失败须保留已知执行身份并标捕获未建立，不伪造成功阶段或捕获标识。各格式可用性与正式状态 SHALL 沿用既有权威结果。
 
 #### Scenario: Capture fails before a snapshot exists
 - **WHEN** 无法读取当前输入而导出在建立快照前失败
@@ -19,6 +19,18 @@
 #### Scenario: One format fails after others succeed
 - **WHEN** 同一捕获的 Word、HTML 已成功而 PDF 失败
 - **THEN** 诊断保留各格式状态及实际失败阶段，成功文件仍可打开，聚合诊断不提升或降低已有成果的正式状态
+
+#### Scenario: A failure is followed by cleanup or skipped stages
+- **WHEN** 真实构建或校验失败后还记录了跳过、清理或结束事件
+- **THEN** 结果、历史视图和 Markdown 诊断仍保留真正失败阶段、错误码及已存在源位置，不将最后一条清理事件或格式名当成唯一失败阶段
+
+#### Scenario: Readable output exists despite a failed stage
+- **WHEN** 任务保留了可用 Word，但其中一个实际阶段失败或未完成
+- **THEN** 文件可打开性保持，失败阶段和待办仍进入诊断，不因文件可用而丢弃已发生的失败，也不把可读稿登记为正式成功
+
+#### Scenario: Failure evidence reaches the real result view
+- **WHEN** 真实导出服务返回内容或资源失败，且底层已产生结构化阶段与位置
+- **THEN** 经结果记录转换后，界面、复制的 Markdown 和保存的诊断仍表达相同阶段和原章节位置，不要求调用者手工补造位置或重跑任务
 
 ### Requirement: Failure location maps to original authoring content
 

@@ -56,10 +56,10 @@
 
 ### Requirement: Export recovery presents one primary action from actual facts
 
-导出结果 SHALL 根据该项目、捕获、文件状态和实际诊断推荐一个主要动作，其它适用操作放入更多。原输入重试 SHALL 沿用已确认设置及捕获，无需重复配置；使用当前内容重新生成 SHALL 先显示预填设置，确认后另建导出并显示范围与来源。源位置无法核实、快照缺失或故障尚无确定修复方式时 SHALL 说明限制，不提供误导性定位或以反复重试代替原因说明。
+[CF-03、CF-04] 导出结果 SHALL 根据该项目、捕获、文件状态和实际诊断推荐一个主要动作，其它适用操作放入已有更多菜单，主要动作不在下面再次平铺。原输入重试 SHALL 沿用已确认设置及捕获，无需重复配置；使用当前内容重新生成 SHALL 先显示预填设置，确认后另建导出并显示范围与来源。源位置无法核实、快照缺失或故障尚无确定修复方式时 SHALL 说明限制，不提供误导性定位或以反复重试代替原因说明；没有可用文件和适用恢复依据时，主要动作是复制已有诊断。
 
 #### Scenario: Known source image problem
-- **WHEN** 诊断已确定原 Markdown 中某处图片引用存在问题
+- **WHEN** 没有可打开 Word，诊断已确定原 Markdown 中某处图片引用存在问题
 - **THEN** 主要动作是定位问题，可展开原因与技术详情，不要求用户先猜更换目录、改设置或补旧格式中的哪一个动作
 
 #### Scenario: Retry while current text has changed
@@ -73,6 +73,22 @@
 #### Scenario: Project or selected result changed before click
 - **WHEN** 恢复动作展示后项目、选中导出或其输入身份发生变化
 - **THEN** 系统重新核实适用性，拒绝失效动作并刷新原结果说明，不作用于另一项目或另一导出
+
+#### Scenario: Unknown failure without a verified source location
+- **WHEN** 没有可打开 Word、可核实源位置或确定的恢复依据
+- **THEN** 结果显示实际短原因，主要动作复制该次诊断，其它仍适用操作在更多中可达，不默认建议反复重试或直接用当前正文重新生成
+
+#### Scenario: Destination is the confirmed cause
+- **WHEN** 实际错误已确定导出位置不可用且没有可打开 Word
+- **THEN** 主要动作进入已有导出设置更改位置，预填可恢复的范围、格式和来源；取消不启动，确认后只提交一次，不另建目录修复向导
+
+#### Scenario: Inspect the actual export evidence
+- **WHEN** 用户在所选结果的更多菜单查看诊断或打开其记录位置
+- **THEN** 操作使用该结果真实保存的诊断与日志引用；引用不存在时说明未保存或不可用，不以当前项目通用日志目录冒充该次证据
+
+#### Scenario: Pending refresh keeps the same compact layout
+- **WHEN** Word 可打开但目录或页码仍待刷新，或附加格式失败
+- **THEN** 主要动作仍可打开实际可用 Word，真实待办及其它恢复动作进入更多，结果不重新展开整套恢复按钮
 
 ### Requirement: Export interaction keeps editing context and provides a short return path
 
@@ -101,3 +117,23 @@
 #### Scenario: Keyboard navigation and escape
 - **WHEN** 用户以键盘访问导出动作、更多菜单、结果或诊断
 - **THEN** Tab 顺序与可见布局一致，焦点清晰，Ctrl+E 在可用时打开同一设置页，Esc 关闭当前设置、菜单或诊断且返回原焦点；取消未提交设置不建立任务，关闭诊断不等同取消后台导出
+
+### Requirement: Export results present a readable summary before technical details
+
+[VS-03] 结果区 SHALL 从顶部按状态标题、短摘要/原因、实际阶段/原位置、主要动作与更多呈现，采用现有主题的文字层级和语义色。长原因 SHALL 换行，长路径可查看完整值，技术详情默认折叠且可复制。短结果 SHALL 不因空白占位而垂直居中，日志及完整异常不得挤占首屏摘要和主动作。样式 SHALL 保留真实成功、待刷新、失败、部分成功与未知状态，以及既有主要动作、项目归属、历史和焦点规则。
+
+#### Scenario: Short failure in a tall result pane
+- **WHEN** 结果面板较高而本次只有一条失败原因
+- **THEN** 标题、原因与阶段/原位置从顶部依次可见，不在中央堆放异常字符串，主要动作清楚且其它动作仍在更多中
+
+#### Scenario: Long reason and file path in a narrow result pane
+- **WHEN** 用户缩窄结果面板，真实错误和输出路径较长
+- **THEN** 原因换行，路径可在原控件查看完整值，内容不横向撑出面板；窄到无法并排时主要动作与更多按原响应布局排列且可达
+
+#### Scenario: Pending refresh or partial output remains understandable
+- **WHEN** Word 可用但待刷新，或附加格式失败
+- **THEN** 可用 Word、待办与附加格式失败分别有文字说明，主要动作仍按真实事实选择，不因统一样式被误标为全成功或全失败
+
+#### Scenario: Read and copy the underlying diagnostic
+- **WHEN** 用户展开技术详情或从更多复制诊断
+- **THEN** 可以取得本次真实阶段、错误、位置与保存情况，视觉摘要或路径省略不截断复制内容，不新增诊断页面或确认步骤

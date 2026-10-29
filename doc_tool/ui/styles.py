@@ -164,6 +164,7 @@ QPushButton#statusBranchBtn:pressed, QPushButton#barBranchBtn:pressed {{
 /* --- 按钮层级 --- */
 QPushButton {{ {font_body} background: {panel_alt}; border: 1px solid {border}; border-radius: 6px; padding: 6px 16px; }}
 QPushButton:hover {{ background: {panel}; border-color: {accent}; }}
+QPushButton:focus {{ border-color: {accent}; }}
 QPushButton:pressed {{ background: {accent_press}; color: {text_on_accent}; }}
 QPushButton:disabled {{ color: {disabled_text}; background: {panel_alt}; border-color: {border}; }}
 
@@ -185,6 +186,7 @@ QToolButton:disabled {{ color: {disabled_text}; background: {panel_alt}; border-
 QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox {{ {font_body} background: {input_bg}; border: 1px solid {border}; border-radius: 4px; padding: 3px 6px; selection-background-color: {accent}; selection-color: {text_on_accent}; }}
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus {{ border-color: {accent}; }}
 QLineEdit:disabled, QPlainTextEdit:disabled, QTextEdit:disabled {{ color: {disabled_text}; background: {panel_alt}; }}
+QLineEdit[hasError="true"], QPlainTextEdit[hasError="true"], QTextEdit[hasError="true"], QComboBox[hasError="true"], QSpinBox[hasError="true"] {{ border: 1px solid {failure}; }}
 QComboBox {{ {font_body} background: {input_bg}; border: 1px solid {border}; border-radius: 4px; padding: 3px 8px; }}
 QComboBox:focus {{ border-color: {accent}; }}
 QComboBox QAbstractItemView {{ background: {panel}; border: 1px solid {border}; selection-background-color: {selection_bg}; selection-color: {selection_fg}; }}
@@ -210,6 +212,7 @@ QPlainTextEdit#logView {{ font-family: "{mono}"; font-size: {font_small_pt}pt; b
 QFrame[cardClass="result"] {{ background: {panel}; border: 1px solid {border}; border-radius: 6px; }}
 QFrame[cardClass="resultSuccess"] {{ background: {panel}; border: 1px solid {success}; border-radius: 6px; }}
 QFrame[cardClass="resultFailure"] {{ background: {panel}; border: 1px solid {failure}; border-radius: 6px; }}
+QFrame[cardClass="resultWarning"] {{ background: {panel}; border: 1px solid {warning}; border-radius: 6px; }}
 
 /* --- 编辑器操作栏 --- */
 QWidget#editorToolbar {{ background: {panel}; border-bottom: 1px solid {border}; border-radius: 4px; }}
@@ -250,6 +253,8 @@ QLabel#barTitle, QLabel#dockTitle, QLabel#sectionTitle {{ {font_heading} color: 
 QLabel#resultTitle, QLabel#recentTitle {{ {font_heading} color: {text}; }}
 QLabel#statusMuted, QLabel#techDetail {{ {font_small} color: {text_muted}; }}
 QLabel#statusWarning {{ {font_small} color: {warning}; }}
+QLabel#exportErrorLabel {{ {font_body_bold} color: {failure}; }}
+QLabel#resultLocations {{ font-family: "{mono}"; font-size: {font_small_pt}pt; color: {text}; }}
 QLabel[strong="true"] {{ font-weight: 600; }}
 
 /* --- 首页任务页（项目 + 工具双栏） --- */

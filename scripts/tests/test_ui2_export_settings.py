@@ -259,6 +259,46 @@ class ExportSettingsDialogTests(unittest.TestCase):
         self.assertFalse(request.strict, "带入旧轮不得静默打开严格模式")
         dialog.deleteLater()
 
+    def test_error_semantics_and_field_highlight(self):
+        dialog = self._dialog(
+            document_no="",
+            document_name="需求说明",
+            document_version="1.0",
+            document_type="requirement",
+        )
+        dialog.show()
+        self.assertEqual(dialog._error_label.property("statusTone"), "failure")
+        self.assertNotIn("#d32f2f", dialog._error_label.styleSheet())
+        dialog._on_submit()
+        self.assertFalse(dialog._error_label.isHidden())
+        self.assertTrue(dialog._document_no.property("hasError"))
+        dialog._document_no.setText("KF-001")
+        dialog._clear_errors()
+        self.assertTrue(dialog._error_label.isHidden())
+        self.assertFalse(dialog._document_no.property("hasError"))
+        dialog.deleteLater()
+
+    def test_conflict_field_highlight(self):
+        dialog = self._dialog(
+            conflicts=[{"chapter_key": "ch/a.md", "rel_path": "ch/a.md"}]
+        )
+        dialog.show()
+        self.assertEqual(dialog.source_mode(), "")
+        dialog._on_submit()
+        self.assertFalse(dialog._error_label.isHidden())
+        self.assertTrue(dialog._source_combo.property("hasError"))
+        dialog._source_combo.setCurrentIndex(1)
+        dialog._clear_errors()
+        self.assertFalse(dialog._source_combo.property("hasError"))
+        dialog.deleteLater()
+
+    def test_dialog_layout_margins_and_buttons_hierarchy(self):
+        dialog = self._dialog()
+        self.assertEqual(dialog._submit_btn.property("btnRole"), "primary")
+        self.assertEqual(dialog._cancel_btn.property("btnRole"), "secondary")
+        self.assertEqual(dialog.layout().contentsMargins().left(), 12)
+        dialog.deleteLater()
+
 
 class ExportSubmissionTests(unittest.TestCase):
     """真实窗口：设置提交走原 TaskRunner 并产出真实文件。"""
@@ -482,12 +522,23 @@ class ExportSubmissionTests(unittest.TestCase):
         self.assertTrue(report.index_path)
 
     def test_quick_word_does_not_inherit_advanced_settings(self):
+        from PySide6.QtCore import QTimer
         captured = {}
-        self.window._collect_buffer_texts = lambda: {"a.md": "缓冲"}
+        self.window._collect_buffer_texts = lambda: {"a.md": "文"}
+
+        def _confirm_active_dialog():
+            from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+            for w in QApplication.topLevelWidgets():
+                if isinstance(w, ExportSettingsDialog) and w.isVisible():
+                    w._submit_btn.click()
+                    return
+            QTimer.singleShot(20, _confirm_active_dialog)
+
         with patch(
             "doc_tool.application.project_export.run_project_export",
             side_effect=lambda request, **kwargs: captured.update({"request": request}),
         ):
+            QTimer.singleShot(20, _confirm_active_dialog)
             self.window._on_quick_export_word()
             self._drain(30)
         request = captured["request"]

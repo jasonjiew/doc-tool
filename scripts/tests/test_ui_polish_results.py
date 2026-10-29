@@ -257,6 +257,18 @@ class MainWindowResultsTests(unittest.TestCase):
             "补缺不得把当前编辑器缓冲混入原轮",
         )
 
+    def _auto_confirm_settings(self):
+        from PySide6.QtCore import QTimer
+        from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+
+        def _do():
+            for top in self._app.topLevelWidgets():
+                if isinstance(top, ExportSettingsDialog) and top.isVisible():
+                    top._submit_btn.click()
+                    return
+
+        QTimer.singleShot(20, _do)
+
     def test_regenerate_creates_new_current_buffer_round(self):
         first = self._run_export()
         view = self.window._record_export_round(first)
@@ -268,6 +280,7 @@ class MainWindowResultsTests(unittest.TestCase):
             return first
 
         self.window._collect_buffer_texts = lambda: {"01-a.md": "改过的正文"}
+        self._auto_confirm_settings()
         with patch(
             "doc_tool.application.project_export.run_project_export", _fake_run
         ):
@@ -307,6 +320,7 @@ class MainWindowResultsTests(unittest.TestCase):
             captured["request"] = request
             return report
 
+        self._auto_confirm_settings()
         with patch(
             "doc_tool.ui.main_window.QFileDialog.getExistingDirectory", return_value=new_dir
         ), patch("doc_tool.application.project_export.run_project_export", _fake_run):
@@ -327,6 +341,7 @@ class MainWindowResultsTests(unittest.TestCase):
         view = self.window._record_export_round(report)
         started = []
         self.window.runner._is_running = True
+        self._auto_confirm_settings()
         try:
             with patch(
                 "doc_tool.application.project_export.run_project_export",
@@ -371,5 +386,138 @@ class MainWindowResultsTests(unittest.TestCase):
         )
 
 
+    def test_results_view_long_reason_and_path_wrap_and_primary_prominence(self):
+        from doc_tool.ui.export_results_view import ExportResultsView
+        from doc_tool.ui.export_rounds import ExportRoundView, RoundFormatView
+        from doc_tool.application.intake_contract import FORMAT_DOCX, STATUS_READY
+
+        view = ExportResultsView()
+        self.assertEqual(view._primary_btn.property("btnRole"), "primary")
+        self.assertTrue(view._summary.wordWrap())
+
+        long_dest = "D:/very/deep/and/long/output/directory/path/with/chinese/中文测试/项目出稿/dist/DocTool/output"
+        r = ExportRoundView(
+            round_id="R_LONG",
+            capture_id="C_LONG",
+            destination=long_dest,
+            warnings=["这是一个测试用的很长很长的导出警告信息，用于验证在狭窄侧栏或不同窗口宽度下的自动换行显示能力"],
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_READY, path=long_dest + "/DocTool.docx", usable=True)],
+        )
+        with patch("pathlib.Path.is_file", return_value=True):
+            view.render([r], "R_LONG")
+        self.assertEqual(view._primary_btn.text(), "打开 Word")
+        self.assertTrue(view._warning.wordWrap())
+        self.assertIn(long_dest, view._summary.text())
+        view.deleteLater()
+
+    def test_work_detail_pane_result_card_primary_action_role(self):
+        from doc_tool.ui.work_detail_pane import ResultCard
+        from doc_tool.ui.workbench_state import ResultState
+
+        card = ResultCard()
+        # 成功态：打开产物为主按钮
+        res = ResultState(
+            status="success",
+            title="Word 导出成功",
+            summary="已按当前编辑内容生成 DOCX",
+            output_path=r"D:	est\out.docx",
+        )
+        with patch("pathlib.Path.is_file", return_value=True):
+            card.render(res)
+        self.assertGreater(len(card._action_buttons), 0)
+        self.assertEqual(card._action_buttons[0].property("btnRole"), "primary")
+        if len(card._action_buttons) > 1:
+            self.assertEqual(card._action_buttons[1].property("btnRole"), "compact")
+        card.deleteLater()
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+class ResultsViewD75Tests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_d75_fact_table_primary_action_and_no_duplicate(self):
+        from doc_tool.ui.export_results_view import ExportResultsView
+        from doc_tool.ui.export_rounds import ExportRoundView, RoundFormatView
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX, STATUS_READY, STATUS_PENDING_REFRESH, STATUS_FAILED,
+        )
+
+        view = ExportResultsView()
+
+        # 1. 有可打开 Word（正常）
+        r1 = ExportRoundView(
+            round_id="R1", capture_id="C1",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_READY, path="a.docx", usable=True)]
+        )
+        with patch("pathlib.Path.is_file", return_value=True):
+            view.render([r1], "R1")
+        self.assertEqual(view._primary_btn.text(), "打开 Word")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("打开 Word", menu_texts)
+        self.assertIn("打开本次记录", menu_texts)
+        self.assertFalse(view._retry_btn.isVisible())
+
+        # 2. 有可打开 Word（待刷新）
+        r2 = ExportRoundView(
+            round_id="R2", capture_id="C2",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_PENDING_REFRESH, path="a.docx", usable=True)]
+        )
+        with patch("pathlib.Path.is_file", return_value=True):
+            view.render([r2], "R2")
+        self.assertEqual(view._primary_btn.text(), "打开 Word (待刷新)")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("打开 Word (待刷新)", menu_texts)
+
+        # 3. 无 Word，有源定位
+        r3 = ExportRoundView(
+            round_id="R3", capture_id="C3",
+            locations=[{"relPath": "ch1.md", "line": 10}],
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, usable=False)]
+        )
+        view.render([r3], "R3")
+        self.assertEqual(view._primary_btn.text(), "定位问题")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("定位问题", menu_texts)
+
+        # 4. 无 Word，目录错 (E8001)
+        r4 = ExportRoundView(
+            round_id="R4", capture_id="C4",
+            error_code="E8001",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, error_code="E8001", usable=False)]
+        )
+        view.render([r4], "R4")
+        self.assertEqual(view._primary_btn.text(), "换目录并重新导出…")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("换目录并重新导出…", menu_texts)
+
+        # 5. 无 Word，可重试且原输入可用
+        r5 = ExportRoundView(
+            round_id="R5", capture_id="C5",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, usable=False)]
+        )
+        view.render([r5], "R5")
+        self.assertEqual(view._primary_btn.text(), "重试本次内容")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("重试本次内容", menu_texts)
+
+        # 6. 无 Word，原输入失效
+        r6 = ExportRoundView(
+            round_id="R6", capture_id="",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, usable=False)]
+        )
+        view.render([r6], "R6")
+        self.assertEqual(view._primary_btn.text(), "按当前内容生成")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("按当前内容生成", menu_texts)
+
+        # 7. 无 Word，未知故障
+        r7 = ExportRoundView(
+            round_id="R7", capture_id="C7",
+            formats=[RoundFormatView(format=FORMAT_DOCX, status="skipped", usable=False)]
+        )
+        view.render([r7], "R7")
+        self.assertEqual(view._primary_btn.text(), "复制诊断")
+        menu_texts = [a.text() for a in view._more_menu.actions()]
+        self.assertNotIn("复制诊断", menu_texts)

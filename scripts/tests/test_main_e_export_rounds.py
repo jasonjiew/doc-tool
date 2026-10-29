@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 import shutil
 import sys
 import tempfile
@@ -284,6 +287,123 @@ class ExportRoundTests(unittest.TestCase):
         view._copy_diag_btn.click()
         clip_text = app.clipboard().text()
         self.assertIn("图片缺失", clip_text)
+
+    def test_pipeline_failure_with_trailing_cleanup_and_readable_draft_branches(self):
+        """Task 11.1: 覆盖失败后还有清理事件、以及仍保留可读稿的分支，显示实际失败阶段。"""
+        from unittest.mock import patch
+        from doc_tool.application.pipeline import PipelineResult, StageEvent
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX, STATUS_FAILED, STATUS_PENDING_REFRESH,
+        )
+        from doc_tool.ui.export_rounds import round_view_from_report
+
+        # 分支 1：构建前校验失败，且随后伴随 cleanup 事件
+        fake_fail_events = [
+            StageEvent(stage="build", status="succeeded", detail="构建完成"),
+            StageEvent(
+                stage="validate_pre", status="failed", error_code="E2001",
+                detail="表格语法错误", metrics={"locations": [{"relPath": "01-a.md", "line": 15}]}
+            ),
+            StageEvent(stage="cleanup", status="succeeded", detail="清理临时资源"),
+        ]
+        pipe_fail = PipelineResult(
+            success=False, events=fake_fail_events, output_path=None,
+            pending_output_path=None, error_code="E2001"
+        )
+
+        with patch("doc_tool.application.pipeline.run_pipeline", return_value=pipe_fail):
+            report = self._export(formats=[FORMAT_DOCX])
+
+        docx_res = report.result_for(FORMAT_DOCX)
+        self.assertEqual(docx_res.status, STATUS_FAILED)
+        self.assertEqual(docx_res.failed_stage, "validate_pre", "不能只取最后的 cleanup 事件作为失败阶段")
+        self.assertEqual(docx_res.error_code, "E2001")
+        self.assertEqual(report.diagnostics["failedStage"], "validate_pre")
+        self.assertEqual(report.diagnostics["errorCode"], "E2001")
+
+        round_view = round_view_from_report(report)
+        self.assertEqual(round_view.failed_stage, "validate_pre")
+        self.assertEqual(round_view.error_code, "E2001")
+        self.assertIsNotNone(round_view.primary_location)
+        self.assertIn("validate_pre", round_view.diagnostics_markdown)
+
+        # 分支 2：Word 刷新失败，但仍保留可读稿待刷新产物
+        dummy_draft = self.tmp / "draft.docx"
+        dummy_draft.write_text("dummy-content", encoding="utf-8")
+        fake_refresh_fail_events = [
+            StageEvent(stage="build", status="succeeded", detail="构建完成"),
+            StageEvent(stage="word_refresh", status="failed", error_code="E4001", detail="Word 刷新超时"),
+        ]
+        pipe_refresh_fail = PipelineResult(
+            success=False, events=fake_refresh_fail_events,
+            output_path=str(dummy_draft), pending_output_path=str(dummy_draft),
+            error_code="E4001"
+        )
+
+        with patch("doc_tool.application.pipeline.run_pipeline", return_value=pipe_refresh_fail):
+            report2 = self._export(formats=[FORMAT_DOCX])
+
+        docx_res2 = report2.result_for(FORMAT_DOCX)
+        self.assertTrue(docx_res2.usable, "可读稿产物必须保留且可打开")
+        self.assertEqual(docx_res2.status, STATUS_PENDING_REFRESH)
+        self.assertEqual(docx_res2.failed_stage, "word_refresh", "不能因 usable=True 丢弃真实失败阶段")
+        self.assertEqual(docx_res2.error_code, "E4001")
+        self.assertEqual(report2.diagnostics["failedStage"], "word_refresh")
+
+        round_view2 = round_view_from_report(report2)
+        self.assertTrue(round_view2.has_usable_docx)
+        self.assertTrue(round_view2.has_pending_refresh)
+        self.assertEqual(round_view2.failed_stage, "word_refresh")
+        self.assertIn("word_refresh", round_view2.diagnostics_markdown)
+
+    def test_results_view_more_menu_actions_and_evidence_open(self):
+        """Task 11.2 & 11.3: 更多菜单收纳其余动作与打开本次记录，不重复平铺。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX, STATUS_FAILED, STATUS_READY,
+        )
+        from doc_tool.ui.export_results_view import ExportResultsView
+        from doc_tool.ui.export_rounds import ExportRoundView, RoundFormatView
+
+        app = QApplication.instance() or QApplication([])
+        opened_records = []
+        view = ExportResultsView(on_open_format=lambda fmt, path: opened_records.append((fmt, path)))
+
+        dummy_md = self.project / "output" / "diagnostics" / "exec-test" / "diagnostics.md"
+        dummy_md.parent.mkdir(parents=True, exist_ok=True)
+        dummy_md.write_text("# 诊断记录", encoding="utf-8")
+
+        round_obj = ExportRoundView(
+            round_id="R-TEST",
+            capture_id="C-TEST",
+            project_root=str(self.project),
+            diagnostics_md_path=str(dummy_md),
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, usable=False)],
+        )
+        view.render([round_obj], "R-TEST")
+
+        # 主要动作应为重试本次内容
+        self.assertEqual(view._primary_btn.text(), "重试本次内容")
+        # 次级完整工具箱收起至更多，不平铺重复
+        self.assertFalse(view._retry_btn.isVisible())
+        self.assertFalse(view._regenerate_btn.isVisible())
+        self.assertFalse(view._destination_btn.isVisible())
+        self.assertFalse(view._copy_diag_btn.isVisible())
+
+        # 更多菜单中不包含主要动作「重试本次内容」，但包含「打开本次记录」
+        menu_actions = {a.text(): a for a in view._more_menu.actions()}
+        self.assertNotIn("重试本次内容", menu_actions)
+        self.assertIn("打开本次记录", menu_actions)
+        self.assertIn("按当前内容生成", menu_actions)
+
+        # 触发打开本次记录
+        menu_actions["打开本次记录"].trigger()
+        self.assertEqual(opened_records, [("markdown", str(dummy_md))])
+
+        # 记录不存在时安全提示不崩溃
+        dummy_md.unlink()
+        view._open_saved_record()
+        self.assertIn("未保存或文件不存在", view._warning.text())
 
 if __name__ == "__main__":
     unittest.main()

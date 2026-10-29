@@ -491,5 +491,55 @@ class QuickExportWiringTests(unittest.TestCase):
                 time.sleep(0.02)
         self.assertEqual(len(captured), 1, "确认后应且仅提交一次任务")
 
+    def test_quick_export_real_events_button_and_shortcut(self):
+        """Task 9.2: 用真实 Qt 按钮点击和 Ctrl+E 快捷键驱动打开→取消→重开→确认。"""
+        from PySide6.QtTest import QTest
+        from PySide6.QtCore import Qt, QTimer
+        from doc_tool.application.intake_contract import FORMAT_DOCX, SOURCE_MODE_CURRENT_BUFFER
+
+        # 临时停止 setup 中的 exec patch，让测试面对真实 ExportSettingsDialog
+        self._patches[5].stop()
+        try:
+            self.window.show()
+            self.window.activateWindow()
+            self.window._refresh_interaction_state()
+            QApplication.processEvents()
+            self.assertTrue(self.window._quick_export_action.isEnabled())
+
+            submissions = []
+            self.window._submit_export_request = lambda req: submissions.append(req)
+            self.window._collect_buffer_texts = lambda: {"01-x.md": "活缓冲修改"}
+
+            # 1. 项目条按钮点击 -> 弹出设置 -> 取消
+            def _on_cancel():
+                dlgs = [w for w in QApplication.topLevelWidgets() if isinstance(w, ExportSettingsDialog) and w.isVisible()]
+                self.assertEqual(len(dlgs), 1, "按钮点击只能打开一个设置弹窗")
+                dlgs[0].reject()
+
+            QTimer.singleShot(30, _on_cancel)
+            self.window._project_bar._quick_export_btn.click()
+            QApplication.processEvents()
+
+            self.assertEqual(len(submissions), 0, "取消设置不应提交任务")
+            self.assertIn("已取消导出设置", self.window._status_label.text())
+
+            # 2. 真实 Ctrl+E 快捷键 -> 弹出设置 -> 确认
+            def _on_confirm():
+                dlgs = [w for w in QApplication.topLevelWidgets() if isinstance(w, ExportSettingsDialog) and w.isVisible()]
+                self.assertEqual(len(dlgs), 1, "Ctrl+E 只能打开一个设置弹窗")
+                dlgs[0]._submit_btn.click()
+
+            QTimer.singleShot(30, _on_confirm)
+            self.window.activateWindow()
+            QTest.keyClick(self.window, Qt.Key.Key_E, Qt.KeyboardModifier.ControlModifier)
+            QApplication.processEvents()
+
+            self.assertEqual(len(submissions), 1, "确认后应且仅提交一次任务")
+            req = submissions[0]
+            self.assertEqual(req.formats, [FORMAT_DOCX])
+            self.assertEqual(req.source_mode, SOURCE_MODE_CURRENT_BUFFER)
+        finally:
+            self._patches[5].start()
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

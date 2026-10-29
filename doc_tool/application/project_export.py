@@ -407,6 +407,54 @@ def _emit_progress(progress, stage: str, status: str, detail: str = "") -> None:
         pass
 
 
+def _map_locations(
+    raw_locs: Sequence[object],
+    snapshot: Optional[EffectiveSnapshot],
+    manifest: Optional[object],
+) -> List[Dict[str, Any]]:
+    mapped: List[Dict[str, Any]] = []
+    proj_root = Path(snapshot.projectRoot) if snapshot and snapshot.projectRoot else None
+    content_rel = manifest.relative_content_root() if manifest and hasattr(manifest, "relative_content_root") else Path("content")
+    for loc in raw_locs:
+        if not isinstance(loc, dict):
+            continue
+        entry = dict(loc)
+        rel_path = str(loc.get("relPath") or "")
+        path_str = str(loc.get("path") or "")
+        target_path: Optional[Path] = None
+        if proj_root:
+            if rel_path:
+                cand1 = proj_root / content_rel / rel_path
+                cand2 = proj_root / rel_path
+                if cand1.is_file():
+                    target_path = cand1
+                elif cand2.is_file():
+                    target_path = cand2
+            if target_path is None and path_str:
+                if snapshot and snapshot.workDir:
+                    try:
+                        work_rel = Path(path_str).resolve().relative_to(Path(snapshot.workDir).resolve())
+                        cand = proj_root / work_rel
+                        if cand.is_file():
+                            target_path = cand
+                    except (ValueError, OSError):
+                        pass
+                if target_path is None and Path(path_str).is_file():
+                    try:
+                        Path(path_str).resolve().relative_to(proj_root.resolve())
+                        target_path = Path(path_str)
+                    except (ValueError, OSError):
+                        pass
+        if target_path is not None:
+            entry["path"] = str(target_path)
+            try:
+                entry["relPath"] = target_path.resolve().relative_to(proj_root.resolve()).as_posix()
+            except Exception:
+                pass
+        mapped.append(entry)
+    return mapped
+
+
 def _run_docx(
     snapshot: EffectiveSnapshot,
     request: ExportRequest,
@@ -470,11 +518,27 @@ def _run_docx(
     elif getattr(paths, "diagnostic_docx", None) and paths.diagnostic_docx.is_file():
         source_output = paths.diagnostic_docx
         pending = True
+    failed_ev = next((ev for ev in result.events if ev.status == "failed"), None)
+    failed_stage = ""
+    error_code = ""
+    locations: List[Dict[str, Any]] = []
+    if failed_ev is not None:
+        failed_stage = failed_ev.stage
+        error_code = failed_ev.error_code or result.error_code or ""
+        if isinstance(failed_ev.metrics, dict):
+            raw_locs = failed_ev.metrics.get("locations")
+            if isinstance(raw_locs, list):
+                locations = _map_locations(raw_locs, snapshot, manifest)
+    elif not result.success:
+        failed_stage = result.last_stage.stage if result.last_stage else ""
+        error_code = result.error_code or ""
+
     if source_output is None:
-        detail = result.last_stage.detail if result.last_stage else "构建未产出可用文件"
+        detail = (failed_ev.detail if failed_ev and failed_ev.detail else "") or (result.last_stage.detail if result.last_stage else "构建未产出可用文件")
         return FormatResult(
-            format=FORMAT_DOCX, status=STATUS_FAILED, error_code=result.error_code or "",
+            format=FORMAT_DOCX, status=STATUS_FAILED, error_code=error_code,
             message=detail or "构建失败", backend="kernel",
+            failed_stage=failed_stage, locations=locations,
         ), ""
     target = fresh_output_path(destination / "{0}.docx".format(stem))
     try:
@@ -483,6 +547,7 @@ def _run_docx(
         return FormatResult(
             format=FORMAT_DOCX, status=STATUS_FAILED, error_code="E8001",
             message="无法写入导出目录：{0}".format(exc), backend="kernel",
+            failed_stage="destination",
         ), ""
     formal = bool(use_refresh and is_formal_docx(source_output))
     status = STATUS_READY if formal else STATUS_PENDING_REFRESH
@@ -554,6 +619,9 @@ def _run_docx(
         warnings=warnings,
         message=("正式状态登记待完成（可读稿已刷新）" if status == STATUS_PENDING_REGISTRATION
                  else "" if formal else "目录/页码待刷新"),
+        failed_stage=failed_stage,
+        error_code=error_code,
+        locations=locations,
     ), str(target)
 
 
@@ -772,6 +840,7 @@ def run_project_export(
     prior: Optional[ExportReport] = None,
     only_formats: Optional[Sequence[str]] = None,
     word_available: Optional[bool] = None,
+    expected_hashes: Optional[Dict[str, str]] = None,
 ) -> ExportReport:
     """执行一次统一出稿（多格式、同源、部分成功保留）。
 
@@ -833,6 +902,7 @@ def run_project_export(
                 external_destination=str(destination) if request.destination else "",
                 cancel_token=cancel_token,
                 variant_id=str(getattr(request, "variant_id", "") or ""),
+                expected_hashes=expected_hashes,
             )
             manifest = _prepare_snapshot_document(snapshot, request)
         except Exception as exc:
@@ -1026,12 +1096,18 @@ def run_project_export(
             "message": r.message or ("生成成功" if r.usable else "未达到就绪状态"),
             "errorCode": r.error_code,
         })
-        if not r.usable and not diag.failedStage:
+        if r.failed_stage and not diag.failedStage:
+            diag.failedStage = r.failed_stage
+            diag.errorCode = r.error_code
+            if not r.usable:
+                diag.message = r.message or "格式 {0} 导出未成功".format(r.format)
+        elif not r.usable and not diag.failedStage:
             diag.failedStage = r.failed_stage or r.format
             diag.errorCode = r.error_code
             diag.message = r.message or "格式 {0} 导出未成功".format(r.format)
         for loc in r.locations:
-            diag.locations.append(loc)
+            if loc not in diag.locations:
+                diag.locations.append(loc)
     try:
         diag_dir = Path(destination) / "diagnostics" / exec_id
         if diag.save(diag_dir):
