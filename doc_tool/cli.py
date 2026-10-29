@@ -2300,11 +2300,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(output)
     return result.exit_code
 
-
-if __name__ == "__main__":
-    sys.exit(main())
-
-
 def _upgrade_command(args) -> int:
     from doc_tool.application.cli_commands import upgrade_command
     check_only = bool(getattr(args, "check", False))
@@ -2348,3 +2343,7 @@ def _upgrade_command(args) -> int:
     if not result.get("success"):
         return 2 if result.get("actionTaken") == "refused_source_mode" else 1
     return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
