@@ -735,19 +735,6 @@ class ExportSettingsDialog(QDialog):
         self._request = self.request()
         self.accept()
 
-    def exec(self) -> int:
-        import os
-        is_headless = (
-            os.environ.get("QT_QPA_PLATFORM") == "offscreen"
-            or os.environ.get("GITHUB_ACTIONS") == "true"
-            or os.environ.get("CI") == "true"
-            or os.environ.get("DOC_TOOL_TEST_MODE") == "1"
-        )
-        if is_headless and not getattr(self, "_force_interactive", False):
-            self._on_submit()
-            return QDialog.DialogCode.Accepted if self._request is not None else QDialog.DialogCode.Rejected
-        return super().exec()
-
     def apply_request(self, request: ExportRequest) -> None:
         """把已有请求带入表单（旧轮“更改设置”）；只读取真实字段，不反解析文本。"""
         if request is None:
