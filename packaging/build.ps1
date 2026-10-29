@@ -120,7 +120,8 @@ if (-not $SkipPyInstaller) {
     Write-Host "  产物内容校验..." -ForegroundColor Yellow
     $InternalDir = "$RepoRoot\dist\DocTool\_internal"
     foreach ($Need in @('python313.dll', 'Qt6Core.dll', 'shiboken6.abi3.dll')) {
-        if (-not (Test-Path "$InternalDir\$Need")) {
+        $found = (Test-Path "$InternalDir\$Need") -or (Test-Path "$InternalDir\PySide6\$Need") -or (Test-Path "$InternalDir\shiboken6\$Need")
+        if (-not $found) {
             throw "构建产物缺少 $InternalDir\$Need——请确认 PYTHONPATH 挂载了 build\pyside-runtime（直接运行 python -m PyInstaller 会用到残缺的 site-packages PySide6）。"
         }
     }
