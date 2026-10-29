@@ -215,6 +215,8 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if "QT_QPA_PLATFORM" not in env:
+        env["QT_QPA_PLATFORM"] = "offscreen"
     existing_pythonpath = env.get("PYTHONPATH", "")
     # 与启动脚本保持一致：若 PySide6 以 .vendor/site-packages 内嵌提供
     # （部分公司 PC 的 DLP 阻止 pip 原子重命名），把它前置到 PYTHONPATH，

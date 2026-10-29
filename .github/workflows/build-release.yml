@@ -36,6 +36,7 @@ env:
   COVERAGE_MIN: '60'
   PYTHONUTF8: '1'
   PYTHONDONTWRITEBYTECODE: '1'
+  QT_QPA_PLATFORM: 'offscreen'
 
 permissions:
   contents: read

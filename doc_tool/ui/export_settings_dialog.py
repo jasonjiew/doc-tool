@@ -737,7 +737,13 @@ class ExportSettingsDialog(QDialog):
 
     def exec(self) -> int:
         import os
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" and not getattr(self, "_force_interactive", False):
+        is_headless = (
+            os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+            or os.environ.get("GITHUB_ACTIONS") == "true"
+            or os.environ.get("CI") == "true"
+            or os.environ.get("DOC_TOOL_TEST_MODE") == "1"
+        )
+        if is_headless and not getattr(self, "_force_interactive", False):
             self._on_submit()
             return QDialog.DialogCode.Accepted if self._request is not None else QDialog.DialogCode.Rejected
         return super().exec()
