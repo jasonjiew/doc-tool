@@ -687,6 +687,7 @@ def run_pipeline(
             output_override=output_override,
             fixed_document_version=document_version_override is not None,
             document_properties=document_properties,
+            render_mermaid=render_mermaid,
         )
         if not result.success:
             _rollback_revision_sync(revision_sync, manifest, log)
@@ -812,6 +813,7 @@ def _run_pipeline_inner(
     output_override: Optional[str] = None,
     fixed_document_version: bool = False,
     document_properties: Optional[Dict[str, str]] = None,
+    render_mermaid: bool = False,
 ) -> PipelineResult:
     """管线内部执行（锁已获取），分离以便 finally 释放锁。
 
