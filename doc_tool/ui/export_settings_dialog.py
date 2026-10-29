@@ -736,6 +736,10 @@ class ExportSettingsDialog(QDialog):
         self.accept()
 
     def exec(self) -> int:
+        import os
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" and not getattr(self, "_force_interactive", False):
+            self._on_submit()
+            return QDialog.DialogCode.Accepted if self._request is not None else QDialog.DialogCode.Rejected
         return super().exec()
 
     def apply_request(self, request: ExportRequest) -> None:
