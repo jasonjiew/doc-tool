@@ -42,7 +42,7 @@ class TestActionPositioningAndLogic(unittest.TestCase):
         self.assertEqual(bar._merge_btn.text(), "正式出稿")
 
         # UI 包 1.2：日常主操作是顶部「导出 Word」，正式出稿降为次级动作。
-        self.assertTrue(bar._quick_export_btn.text() in ("导出 Word", "导出正式 Word"))
+        self.assertTrue(bar._quick_export_btn.text() in ("导出 Word", "导出正式 Word", "导出 Word…"))
         self.assertEqual(bar._quick_export_btn.property("btnRole"), "primary")
         self.assertEqual(bar._validate_btn.property("btnRole"), "secondary")
         self.assertEqual(bar._diag_btn.property("btnRole"), "secondary")

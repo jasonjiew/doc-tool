@@ -324,6 +324,129 @@ class BuildWithPreparedSourceTests(unittest.TestCase):
         finally:
             prepared.cleanup()
 
+    def test_mixed_mermaid_and_static_image_builds_and_validates(self):
+        from build_docx import build
+        from validate_docx import validate
+
+        project_assets = Path(self.config["paths"]["asset_root"])
+        (project_assets / "images").mkdir(parents=True, exist_ok=True)
+        static_img = project_assets / "images" / "test_static.png"
+        static_img.write_bytes(_png_bytes())
+
+        self.source.write_text(
+            "## 1.1 混合图示\n\n```mermaid\nflowchart TD\n  A --> B\n```\n\n"
+            "![静态截图](images/test_static.png)\n\n结尾段落\n",
+            encoding="utf-8",
+        )
+        prepared = prepare_markdown(
+            str(self.source),
+            cache_root=self.root / "cache",
+            renderer=lambda source, kind: _StubResult(png=_png_bytes(), width=40, height=30),
+        )
+        try:
+            config = dict(self.config)
+            output = build(config=config, prepared=[prepared])
+            self.assertTrue(Path(output).is_file())
+
+            val_config = dict(self.config)
+            if prepared.asset_root:
+                val_config["assetRootOverrides"] = {
+                    str(self.source.resolve()): prepared.asset_root
+                }
+            if prepared.prepared_text:
+                val_config["preparedTexts"] = {
+                    str(self.source.resolve()): prepared.read_prepared_text()
+                }
+
+            val_report = self.root / "val_report.md"
+            ok = validate(config=val_config, report_override=str(val_report), require_refreshed=False)
+            self.assertTrue(ok, "预校验应成功通过混合 Mermaid 和静态图片的章节")
+        finally:
+            prepared.cleanup()
+
+
+    def test_line_remapping_after_mermaid_collapse(self):
+        # 6 行 Mermaid 被折叠为 1 行，后续图片位于原第 12 行
+        content = (
+            "# 第 1 章\n\n"
+            "```mermaid\n"
+            "flowchart TD\n"
+            "  A --> B\n"
+            "  B --> C\n"
+            "```\n\n"
+            "中间段落\n\n"
+            "![普通图](images/test_static.png)\n"
+        )
+        self.source.write_text(content, encoding="utf-8")
+        orig_lines = content.split("\n")
+        # 确认原图在第 11 行（0-based 10）
+        orig_img_line = None
+        for idx, line in enumerate(orig_lines):
+            if "![普通图]" in line:
+                orig_img_line = idx + 1
+                break
+        self.assertEqual(orig_img_line, 11)
+
+        prepared = prepare_markdown(
+            str(self.source),
+            cache_root=self.root / "cache",
+            renderer=lambda source, kind: _StubResult(png=_png_bytes(), width=40, height=30),
+        )
+        try:
+            from docx_common import parse_blocks, remap_parsed_document_locations
+            prep_text = prepared.read_prepared_text()
+            doc = parse_blocks(prep_text, str(self.source))
+            # 折叠后，在 prepared 中图片行号减少
+            prep_img_block = [b for b in doc.blocks if getattr(b, "relative_path", "") == "images/test_static.png"][0]
+            self.assertLess(prep_img_block.location.start_line, orig_img_line)
+
+            # 重映射后，必须恢复为原第 11 行
+            remap_parsed_document_locations(doc, prepared.line_map)
+            self.assertEqual(prep_img_block.location.start_line, orig_img_line)
+        finally:
+            prepared.cleanup()
+
+    def test_same_name_image_isolation(self):
+        from docx_common import resolve_image_resource, AutomationError
+        # 模拟工程资源目录与生成图目录
+        project_assets = Path(self.config["paths"]["asset_root"])
+        (project_assets / "images").mkdir(parents=True, exist_ok=True)
+        (project_assets / "images" / "same_name.png").write_bytes(b"PROJECT_IMAGE_DATA")
+
+        temp_gen_dir = self.root / "temp_gen"
+        temp_gen_dir.mkdir(parents=True, exist_ok=True)
+        gen_img = temp_gen_dir / "same_name.png"
+        gen_img.write_bytes(b"GENERATED_IMAGE_DATA")
+
+        gen_map = {"same_name.png": str(gen_img)}
+
+        # 1. 生成图引用：按 generated_map 命中
+        resolved_gen, kind_gen = resolve_image_resource(
+            "same_name.png",
+            default_asset_root=str(project_assets),
+            generated_map=gen_map,
+        )
+        self.assertEqual(kind_gen, "generated")
+        self.assertEqual(Path(resolved_gen).read_bytes(), b"GENERATED_IMAGE_DATA")
+
+        # 2. 原普通图片引用 images/same_name.png：未在 gen_map，解析至 project_assets，绝不串图
+        resolved_proj, kind_proj = resolve_image_resource(
+            "images/same_name.png",
+            default_asset_root=str(project_assets),
+            generated_map=gen_map,
+        )
+        self.assertEqual(kind_proj, "captured")
+        self.assertEqual(Path(resolved_proj).read_bytes(), b"PROJECT_IMAGE_DATA")
+
+    def test_traversal_image_rejected(self):
+        from docx_common import resolve_image_resource, AutomationError
+        project_assets = Path(self.config["paths"]["asset_root"])
+        with self.assertRaises(AutomationError):
+            resolve_image_resource(
+                "../../outside.png",
+                default_asset_root=str(project_assets),
+            )
+
     def test_source_file_never_modified(self):
         original = self.source.read_text(encoding="utf-8")
         prepared = prepare_markdown(
@@ -336,6 +459,33 @@ class BuildWithPreparedSourceTests(unittest.TestCase):
             self.assertEqual(self.source.read_text(encoding="utf-8"), original)
         finally:
             prepared.cleanup()
+
+    def test_render_mermaid_disabled_for_word_export(self):
+        from doc_tool.application.prepared_source import prepare_documents
+        text = "## 1.1 章节\n\n```mermaid\nflowchart TD\n  A --> B\n```\n\n结尾段落。\n"
+        self.source.write_text(text, encoding="utf-8")
+        
+        # When render_mermaid=False (default for Word export):
+        prepared = prepare_markdown(
+            str(self.source),
+            cache_root=self.root / "cache",
+            render_mermaid=False,
+        )
+        try:
+            self.assertEqual(prepared.prepared_text, text)
+            self.assertIn("```mermaid", prepared.prepared_text)
+            self.assertEqual(prepared.asset_root, "")
+            self.assertFalse(prepared.temp_dir)
+            self.assertEqual(len(prepared.assets), 0)
+        finally:
+            prepared.cleanup()
+
+        # Batch documents also default to render_mermaid=False
+        results, shared_temp = prepare_documents([str(self.source)])
+        self.assertIsNone(shared_temp)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].prepared_text, text)
+        self.assertEqual(results[0].asset_root, "")
 
 
 if __name__ == "__main__":

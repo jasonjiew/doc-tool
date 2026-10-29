@@ -16,11 +16,14 @@ UI 包 UI-C 的纯逻辑层（无 Qt 依赖，可直接单测）：
 
 from __future__ import annotations
 
+from doc_tool.domain.export_diagnostics import ExportDiagnostics
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from doc_tool.application.intake_contract import (
+    FORMAT_DOCX,
     ExportScope,
     FORMAT_LABELS,
     FORMAT_STATUS_LABELS,
@@ -46,6 +49,9 @@ class RoundFormatView:
     usable: bool = False
     message: str = ""
     formal: bool = False
+    failed_stage: str = ""
+    error_code: str = ""
+    locations: List[Dict[str, Any]] = field(default_factory=list)
 
     @property
     def label(self) -> str:
@@ -96,6 +102,50 @@ class ExportRoundView:
     word_stages: List[str] = field(default_factory=list)
     # 仅供新轮设置预填；补原轮仍读取真实报告并核对身份。
     scope: Optional[ExportScope] = None
+    execution_id: str = ""
+    diagnostics: Optional[Dict[str, Any]] = None
+    diagnostics_path: str = ""
+    diagnostics_md_path: str = ""
+    failed_stage: str = ""
+    error_code: str = ""
+    locations: List[Dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def diagnostics_markdown(self) -> str:
+        if self.diagnostics:
+            diag_obj = ExportDiagnostics.from_dict(self.diagnostics)
+            if diag_obj:
+                return diag_obj.to_markdown(self.project_root)
+        return "# 导出诊断记录\n\n该导出记录未附带详细诊断数据（可能是早期历史导出或未记录诊断）。\n"
+
+
+    @property
+    def has_usable_docx(self) -> bool:
+        """是否有可直接打开的 Word 成果文件。"""
+        return any(
+            item.format == FORMAT_DOCX and item.can_open
+            for item in self.formats
+        )
+
+    @property
+    def has_pending_refresh(self) -> bool:
+        """是否处于待 Word 刷新状态。"""
+        return any(
+            item.status == "pending-refresh"
+            for item in self.formats
+        )
+
+    @property
+    def primary_location(self) -> Optional[Dict[str, Any]]:
+        """首个可验证的源 Markdown 定位。"""
+        for loc in self.locations:
+            if loc.get("path") and loc.get("line"):
+                return loc
+        for f in self.formats:
+            for loc in f.locations:
+                if loc.get("path") and loc.get("line"):
+                    return loc
+        return None
 
     @property
     def usable_formats(self) -> List[RoundFormatView]:
@@ -141,6 +191,9 @@ def round_view_from_report(report) -> ExportRoundView:
                 usable=usable,
                 message=str(getattr(item, "message", "") or ""),
                 formal=bool(getattr(item, "formal", False)),
+                failed_stage=str(getattr(item, "failed_stage", "") or ""),
+                error_code=str(getattr(item, "error_code", "") or ""),
+                locations=list(getattr(item, "locations", []) or []),
             )
         )
     scope = getattr(report, "scope", None)
@@ -171,6 +224,13 @@ def round_view_from_report(report) -> ExportRoundView:
         index_path=str(getattr(report, "indexPath", "") or ""),
         docx_path=str(getattr(report, "docxPath", "") or ""),
         scope=ExportScope.from_dict(scope.to_dict()) if scope is not None and hasattr(scope, "to_dict") else None,
+        execution_id=str(getattr(report, "executionId", "") or ""),
+        diagnostics=getattr(report, "diagnostics", None),
+        diagnostics_path=str(getattr(report, "diagnosticsPath", "") or ""),
+        diagnostics_md_path=str(getattr(report, "diagnosticsMdPath", "") or ""),
+        failed_stage=getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: "")("failedStage", ""),
+        error_code=getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: "")("errorCode", ""),
+        locations=list(getattr(getattr(report, "diagnostics", None) or {}, "get", lambda *a: [])("locations", []) or []),
     )
 
 

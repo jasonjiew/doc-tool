@@ -26,7 +26,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.tests import core_fixtures as fixtures  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox  # noqa: E402
+from doc_tool.ui.export_settings_dialog import ExportSettingsDialog  # noqa: E402
 
 from doc_tool.application.intake_contract import (  # noqa: E402
     FORMAT_DOCX,
@@ -104,6 +105,11 @@ class QuickExportWiringTests(unittest.TestCase):
             patch("doc_tool.ui.main_window.QMessageBox.information", lambda *a, **k: None),
             patch("doc_tool.ui.main_window.QMessageBox.warning", lambda *a, **k: None),
             patch.object(QMessageBox, "exec", lambda self: None),
+            patch.object(
+                ExportSettingsDialog,
+                "exec",
+                lambda self: (self._on_submit(), QDialog.DialogCode.Accepted)[1],
+            ),
         ]
         for item in self._patches:
             item.start()
@@ -454,6 +460,36 @@ class QuickExportWiringTests(unittest.TestCase):
         self.assertFalse(bar._export_settings_btn.isEnabled())
         self.assertFalse(bar._quick_export_btn.isEnabled())
 
+
+    def test_quick_export_open_cancel_and_reopen_confirm(self):
+        """Task 4.5: 打开设置、取消、再次打开并确认的真实 Qt 回归。"""
+        from doc_tool.application import project_export as export_mod
+
+        captured = []
+        def _fake_run(request, **kwargs):
+            captured.append(request)
+            return None
+
+        # 1. 模拟取消：执行零任务、零正文写入
+        with patch.object(
+            ExportSettingsDialog, "exec", lambda self: QDialog.DialogCode.Rejected
+        ):
+            self.window._on_quick_export_word()
+        self.assertEqual(len(captured), 0, "取消设置不应提交任何任务")
+        self.assertIn("已取消导出设置", self.window._status_label.text())
+
+        # 2. 再次打开并确认：正常提交
+        with patch.object(export_mod, "run_project_export", _fake_run), patch.object(
+            ExportSettingsDialog,
+            "exec",
+            lambda self: (self._on_submit(), QDialog.DialogCode.Accepted)[1],
+        ):
+            self.window._on_quick_export_word()
+            deadline = time.monotonic() + 30
+            while self.window.runner.is_running and time.monotonic() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.02)
+        self.assertEqual(len(captured), 1, "确认后应且仅提交一次任务")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

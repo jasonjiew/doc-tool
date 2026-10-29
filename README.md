@@ -3,12 +3,12 @@
 > **Docs-as-Code for Enterprise Documents**  
 > 把大型 Word 文档工程化拆解为可版本追踪、可多人协同、可严谨审查的 Markdown 章节树，并在出稿时一键可靠重建为符合企业规范的正式 DOCX 交付物。
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/jasonjiew/doc-tool)
+[![Version](https://img.shields.io/badge/version-3.0.2-blue.svg)](https://github.com/jasonjiew/doc-tool)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/badge/issues-feedback-orange.svg)](https://github.com/jasonjiew/doc-tool/issues)
 
-- **当前代码版本**：`v3.0.1`（包含 Word 导出链路重构、全场景还原与全链路自检闭环，AI / CLI 免安装研发流程接入与全功能便携分发）
+- **当前代码版本**：`v3.0.2`（包含 Word 导出链路重构、全场景还原与全链路自检闭环，AI / CLI 免安装研发流程接入与全功能便携分发）
 - **分支与仓库定位**：本 GitHub 仓库是作为**对外公开发布镜像与社区反馈分支**，专门用于对外发布二进制安装包/便携包（Releases 下载）、问题追踪与需求/建议收集。
 - **发布下载（Releases）**：<https://github.com/jasonjiew/doc-tool/releases>
 - **问题与建议反馈（Issues）**：<https://github.com/jasonjiew/doc-tool/issues> （欢迎在此提交任何使用问题、缺陷报告或改进建议）
@@ -124,8 +124,8 @@ graph LR
 
 | 分发方式 | 文件名示例 | 说明与推荐场景 |
 | :--- | :--- | :--- |
-| **安装版** | `DocTool-Setup-3.0.1.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
-| **免安装便携版（推荐）** | `DocTool-3.0.1-portable.zip` | 解压即用，无需安装系统 Python 或 pip。内置桌面 GUI（`DocTool.exe`）与无头 CLI（`doc-tool-cli.exe`）。原地加载启动（绝不复制到 `%TEMP%`）。双击「`启动DocTool.cmd`」启动 GUI；AI/脚本通过 `doc-tool-cli.exe` 执行只读基线核对、影响分析与 MR 附件生成。 |
+| **安装版** | `DocTool-Setup-3.0.2.exe` | 双击运行安装，默认部署到 `%LOCALAPPDATA%\DocTool`（**无需管理员权限**）。支持桌面快捷方式与开始菜单，升级自动平滑迁移配置。 |
+| **免安装便携版（推荐）** | `DocTool-3.0.2-portable.zip` | 解压即用，无需安装系统 Python 或 pip。内置桌面 GUI（`DocTool.exe`）与无头 CLI（`doc-tool-cli.exe`）。原地加载启动（绝不复制到 `%TEMP%`）。双击「`启动DocTool.cmd`」启动 GUI；AI/脚本通过 `doc-tool-cli.exe` 执行只读基线核对、影响分析与 MR 附件生成。 |
 
 > **诊断提示**：若在特殊加密或受管环境遇到启动问题，双击安装目录或便携包根目录下的 `diagnose.cmd`，将生成的 `DocTool-diagnose.txt` 发送给维护人员。
 
@@ -142,7 +142,7 @@ Doc Tool 现已支持基于 GitHub Release 的双形态在线自升级：
 便携包内置 `doc-tool-cli.exe`，支持在任意无源码、无 Python 环境下进行机器调用：
 
 ```powershell
-$env:DOC_TOOL_CLI = 'D:/Tools/DocTool-3.0.1-portable/DocTool/doc-tool-cli.exe'
+$env:DOC_TOOL_CLI = 'D:/Tools/DocTool-3.0.2-portable/DocTool/doc-tool-cli.exe'
 & $env:DOC_TOOL_CLI --version
 & $env:DOC_TOOL_CLI capabilities --format json
 & $env:DOC_TOOL_CLI baseline-check --project '<文档项目绝对路径>' --format json

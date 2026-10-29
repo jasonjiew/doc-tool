@@ -40,6 +40,7 @@ from doc_tool.application.content.unsaved import UnsavedChoice  # noqa: E402
 from doc_tool.domain.manifest import ProjectManifest  # noqa: E402
 from doc_tool.ui.main_window import MainWindow  # noqa: E402
 from doc_tool.ui.project_bar import ProjectBar  # noqa: E402
+from doc_tool.ui.export_settings_dialog import ExportSettingsDialog  # noqa: E402
 
 LONG_NAME = "企业研发系统软件需求说明书（超长中文名称用于窄窗口验收）"
 PRIMARY_TEXTS = ("导出 Word", "成果")
@@ -134,10 +135,15 @@ class ProjectBarOverflowTests(unittest.TestCase):
 
     def test_wide_bar_has_no_overflow(self):
         bar = self._bar(1920)
-        self.assertFalse(bar._more_btn.isVisible(), "宽窗口不应出现更多菜单")
-        self.assertEqual(bar._overflow.hidden_keys, [])
-        for button in (bar._validate_btn, bar._diag_btn, bar._merge_btn):
-            self.assertTrue(button.isVisible())
+        # 精简后：主按钮「导出 Word」、次级「检查 (F5)」与「成果」常驻；开发诊断/老出稿动作收纳进「更多 ▾」
+        self.assertTrue(bar._quick_export_btn.isVisible())
+        self.assertTrue(bar._validate_btn.isVisible())
+        self.assertTrue(bar._results_btn.isVisible())
+        self.assertTrue(bar._more_btn.isVisible(), "快速构建与正式出稿常驻于「更多 ▾」中")
+        self.assertIn("diag_build", bar._overflow.hidden_keys)
+        self.assertIn("merge", bar._overflow.hidden_keys)
+        self.assertFalse(bar._diag_btn.isVisible())
+        self.assertFalse(bar._merge_btn.isVisible())
 
 
 class LongNameInformationTests(unittest.TestCase):
@@ -205,6 +211,11 @@ class SharedActionAndFocusTests(unittest.TestCase):
             patch("doc_tool.ui.main_window.QMessageBox.information", lambda *a, **k: None),
             patch("doc_tool.ui.main_window.QMessageBox.warning", lambda *a, **k: None),
             patch.object(QMessageBox, "exec", lambda self: None),
+            patch.object(
+                ExportSettingsDialog,
+                "exec",
+                lambda self: (self._on_submit(), QDialog.DialogCode.Accepted)[1],
+            ),
         ]
         for item in self._patches:
             item.start()

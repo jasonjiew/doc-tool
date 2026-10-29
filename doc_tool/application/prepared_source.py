@@ -117,6 +117,11 @@ class PreparedSource:
     skipped: List[Dict[str, object]] = field(default_factory=list)
     cancelled: bool = False
     owns_temp_dir: bool = True
+    generated_images: Dict[str, str] = field(default_factory=dict)
+    line_map: Dict[int, int] = field(default_factory=dict)
+
+    def map_line(self, line: int) -> int:
+        return self.line_map.get(line, line)
 
     @property
     def images(self) -> int:
@@ -388,6 +393,29 @@ def _default_renderer(source: str, kind: str):
     return render(source, kind, use_cli=True, want_png=True)
 
 
+
+def _build_line_map(orig_line_count: int, replacements: List[Tuple[int, int, List[str]]]) -> Dict[int, int]:
+    sorted_replacements = sorted(replacements, key=lambda item: item[0])
+    line_map: Dict[int, int] = {}
+    orig_idx = 0
+    prep_idx = 0
+    for start, end, ref_lines in sorted_replacements:
+        while orig_idx < start:
+            line_map[prep_idx + 1] = orig_idx + 1
+            orig_idx += 1
+            prep_idx += 1
+        ref_count = max(1, len(ref_lines))
+        for _ in range(ref_count):
+            line_map[prep_idx + 1] = start + 1
+            prep_idx += 1
+        orig_idx = end
+    while orig_idx < orig_line_count:
+        line_map[prep_idx + 1] = orig_idx + 1
+        orig_idx += 1
+        prep_idx += 1
+    return line_map
+
+
 def prepare_markdown(
     path: str,
     *,
@@ -398,6 +426,7 @@ def prepare_markdown(
     text: Optional[str] = None,
     asset_subdir: str = "assets",
     resolver: Optional[Callable[[str, str], str]] = None,
+    render_mermaid: bool = True,
 ) -> PreparedSource:
     """把一份 Markdown 预处理成可构建的临时文件。
 
@@ -445,8 +474,8 @@ def prepare_markdown(
     prepared.warnings.extend(prepared.parse_warnings)
 
     code_blocks = [block for block in document.blocks if block.kind == KIND_CODE and block.is_mermaid]
-    if not code_blocks:
-        # 没有需要预处理的图：保持原文，不建临时目录。
+    if not render_mermaid or not code_blocks:
+        # 导出 Word 默认不渲染 Mermaid 为图片（保留为代码块文本），或没有需要预处理的图：保持原文，不建临时目录。
         prepared.prepared_text = text
         prepared.prepared_path = path
         prepared.asset_root = ""
@@ -494,6 +523,12 @@ def prepare_markdown(
         prepared_text = "\n".join(lines[:start] + reference + lines[end:])
         lines = prepared_text.split("\n")
 
+    prepared.line_map = _build_line_map(len(text.split("\n")), replacements)
+    prepared.generated_images = {
+        asset.relative_path: asset.image_path
+        for asset in prepared.assets
+        if asset.image_path
+    }
     prepared.prepared_text = prepared_text
     prepared_path = Path(temp_dir) / (Path(path).stem + ".prepared.md")
     prepared_path.write_text(prepared_text, encoding="utf-8")
@@ -672,6 +707,7 @@ def prepare_documents(
     renderer: Optional[Callable[[str, str], object]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     resolver: Optional[Callable[[str, str], str]] = None,
+    render_mermaid: bool = False,
 ) -> Tuple[List[PreparedSource], Optional[str]]:
     """批量预处理多份 Markdown，共用一个临时目录。
 
@@ -689,6 +725,7 @@ def prepare_documents(
             renderer=renderer,
             cancel_check=cancel_check,
             resolver=resolver,
+            render_mermaid=render_mermaid,
         )
         if prepared.temp_dir:
             # 子目录已挂到共享目录下，交给共享目录统一清理。

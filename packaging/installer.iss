@@ -30,7 +30,7 @@
 
 #define MyAppName "Doc Tool"
 #define MyAppNameEn "DocTool"
-#define MyAppVersion "3.0.1"
+#define MyAppVersion "3.0.2"
 #define MyAppPublisher "Doc Tool Project"
 #define MyAppURL "https://github.com/wangjie0721666-web/doc-tool"
 #define MyAppExeName "DocTool.exe"

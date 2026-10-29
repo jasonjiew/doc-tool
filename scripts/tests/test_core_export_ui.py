@@ -17,6 +17,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.tests import core_fixtures as fixtures  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QDialog
+from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
 from doc_tool.ui.main_window import MainWindow  # noqa: E402
 
 
@@ -60,6 +62,11 @@ class QuickExportUiTests(unittest.TestCase):
             patch("doc_tool.ui.main_window.QMessageBox.information", lambda *a, **k: None),
             patch("doc_tool.ui.main_window.QMessageBox.warning", lambda *a, **k: None),
             patch("doc_tool.ui.main_window.QMessageBox.critical", lambda *a, **k: None),
+            patch.object(
+                ExportSettingsDialog,
+                "exec",
+                lambda self: (self._on_submit(), QDialog.DialogCode.Accepted)[1],
+            ),
         ]
         for item in self._patches:
             item.start()
@@ -211,7 +218,6 @@ class ChangeDirectoryActionTests(unittest.TestCase):
 
     def _drive_change_directory(self, source_mode: str, *, destination: str):
         from unittest.mock import patch
-
         from doc_tool.ui.main_window import MainWindow
 
         report = self._report(source_mode)

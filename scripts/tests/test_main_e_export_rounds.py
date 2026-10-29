@@ -135,5 +135,155 @@ class ExportRoundTests(unittest.TestCase):
         self.assertEqual(ExportScope().kind, SCOPE_PROJECT)
 
 
+    def test_diagnostics_persistence_and_desensitization(self):
+        """Task 3.1-3.4: 导出生成 diagnostics.json 与同源 Markdown，且白名单脱敏。"""
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX,
+            SCOPE_PROJECT,
+            SOURCE_MODE_SAVED,
+            ExportRequest,
+            ExportScope,
+        )
+        from doc_tool.application.project_export import run_project_export
+        from doc_tool.domain.export_diagnostics import ExportDiagnostics
+
+        request = ExportRequest(
+            project_root=str(self.project),
+            formats=[FORMAT_DOCX],
+            scope=ExportScope(kind=SCOPE_PROJECT),
+            source_mode=SOURCE_MODE_SAVED,
+            destination=str(self.project / "output"),
+        )
+        report = run_project_export(request, skip_word_refresh=True)
+        self.assertTrue(report.executionId.startswith("exec-"))
+        self.assertTrue(report.diagnostics)
+        self.assertTrue(Path(report.diagnosticsPath).is_file())
+        self.assertTrue(Path(report.diagnosticsMdPath).is_file())
+
+        md_content = Path(report.diagnosticsMdPath).read_text(encoding="utf-8")
+        self.assertIn("# 导出诊断报告", md_content)
+        self.assertIn(report.executionId, md_content)
+        # 脱敏验证：不能包含用户绝对主目录
+        self.assertNotIn("Users\\", md_content)
+
+    def test_old_index_compatibility_without_diagnostics(self):
+        """Task 3.5: 旧版本 export-result.json 缺少 diagnostics 字段时兼容读取，不报错不伪造。"""
+        import json
+        from doc_tool.application.project_export import read_export_index
+        from doc_tool.ui.export_rounds import load_round_from_index
+
+        index_file = self.project / "output" / "export-result.json"
+        index_file.parent.mkdir(parents=True, exist_ok=True)
+        old_data = {
+            "schemaVersion": 1,
+            "roundId": "20261028-120000",
+            "captureId": "cap-20261028-old",
+            "createdAt": "2026-10-28T12:00:00Z",
+            "projectRoot": str(self.project),
+            "destination": str(self.project / "output"),
+            "results": [
+                {
+                    "format": "docx",
+                    "status": "ready",
+                    "path": str(self.project / "output" / "old.docx"),
+                    "usable": True,
+                }
+            ],
+        }
+        index_file.write_text(json.dumps(old_data), encoding="utf-8")
+
+        read_back = read_export_index(index_file)
+        self.assertIsNotNone(read_back)
+        self.assertEqual(read_back.roundId, "20261028-120000")
+        self.assertEqual(read_back.executionId, "")
+        self.assertIsNone(read_back.diagnostics)
+
+        round_view = load_round_from_index(index_file)
+        self.assertIsNotNone(round_view)
+        self.assertEqual(round_view.round_id, "20261028-120000")
+        self.assertIn("未附带详细诊断数据", round_view.diagnostics_markdown)
+
+    def test_diagnostics_unwritable_fallback_to_memory(self):
+        """Task 3.5: 当诊断无法持久化时，回退到内存并允许复制，saved 标 False。"""
+        from doc_tool.domain.export_diagnostics import ExportDiagnostics
+        from unittest.mock import patch
+
+        diag = ExportDiagnostics(
+            roundId="R-MEM",
+            captureId="cap-mem",
+            message="内存诊断测试",
+            stages=[{"stage": "preprocess", "outcome": "failed", "detail": "假错误"}],
+            failedStage="preprocess",
+            errorCode="ERR_TEST",
+        )
+        with patch("pathlib.Path.mkdir", side_effect=OSError("模拟只读目录无法创建")):
+            saved_ok = diag.save(self.tmp / "nonexistent" / "dir")
+        self.assertFalse(saved_ok)
+        self.assertFalse(diag.saved)
+        md = diag.to_markdown()
+        self.assertIn("未持久保存（内存可复制）", md)
+        self.assertIn("ERR_TEST", md)
+
+    def test_results_view_primary_action_and_copy_diagnostics(self):
+        """Task 5.1 & 5.2: 依据事实派生单一主要操作，并支持复制诊断。"""
+        from PySide6.QtWidgets import QApplication
+        from doc_tool.application.intake_contract import (
+            FORMAT_DOCX,
+            FORMAT_PDF,
+            STATUS_FAILED,
+            STATUS_PENDING_REFRESH,
+            STATUS_READY,
+        )
+        from doc_tool.ui.export_results_view import ExportResultsView
+        from doc_tool.ui.export_rounds import ExportRoundView, RoundFormatView
+
+        app = QApplication.instance() or QApplication([])
+        located = []
+        view = ExportResultsView(on_locate_source=lambda p, l: located.append((p, l)))
+
+        # 1. 有可用 Word 产物：主要操作为「打开 Word」
+        dummy_docx = self.project / "output" / "test.docx"
+        dummy_docx.write_text("word", encoding="utf-8")
+        round1 = ExportRoundView(
+            round_id="R1",
+            project_root=str(self.project),
+            formats=[
+                RoundFormatView(format=FORMAT_DOCX, status=STATUS_READY, path=str(dummy_docx), usable=True)
+            ],
+        )
+        view.render([round1], "R1")
+        self.assertFalse(view._primary_btn.isHidden())
+        self.assertEqual(view._primary_btn.text(), "打开 Word")
+
+        # 2. Word 待刷新：主要操作为「打开 Word (待刷新)」
+        round2 = ExportRoundView(
+            round_id="R2",
+            project_root=str(self.project),
+            formats=[
+                RoundFormatView(format=FORMAT_DOCX, status=STATUS_PENDING_REFRESH, path=str(dummy_docx), usable=True)
+            ],
+        )
+        view.render([round2], "R2")
+        self.assertEqual(view._primary_btn.text(), "打开 Word (待刷新)")
+
+        # 3. 失败且有确切源定位：主要操作为「定位问题」
+        round3 = ExportRoundView(
+            round_id="R3",
+            project_root=str(self.project),
+            failed_stage="preprocess",
+            locations=[{"path": "ch1.md", "line": 42}],
+            diagnostics={"message": "图片缺失", "locations": [{"path": "ch1.md", "line": 42}]},
+            formats=[RoundFormatView(format=FORMAT_DOCX, status=STATUS_FAILED, usable=False)],
+        )
+        view.render([round3], "R3")
+        self.assertEqual(view._primary_btn.text(), "定位问题")
+        view._primary_btn.click()
+        self.assertEqual(located, [("ch1.md", 42)])
+
+        # 4. 复制诊断到剪贴板
+        view._copy_diag_btn.click()
+        clip_text = app.clipboard().text()
+        self.assertIn("图片缺失", clip_text)
+
 if __name__ == "__main__":
     unittest.main()

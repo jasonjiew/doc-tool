@@ -200,92 +200,32 @@ class ExportSettingsDialog(QDialog):
         layout.addWidget(self._recovery_notice)
         layout.setSpacing(8)
 
-        # --- 文档属性设置（文档部件 → 选择域 → 文档属性） ---
-        if self._has_document_fields:
-            layout.addWidget(self._section_label("文档属性设置（文档部件 → 选择域 → 文档属性）"))
-            form = QFormLayout()
-            self._document_no = QLineEdit(str(document_no or ""), self)
-            self._document_name = QLineEdit(str(document_name or ""), self)
-            self._document_version = QLineEdit(self._current_document_version, self)
-            for label, entry in (("文件编号", self._document_no), ("文件名称", self._document_name), ("版本", self._document_version)):
-                form.addRow(label, entry)
-                entry.textChanged.connect(self._refresh_summary)
-            self._document_version.textEdited.connect(self._mark_version_edited)
-            layout.addLayout(form)
-            self._filename_preview = QLabel("", self)
-            self._filename_preview.setWordWrap(True)
-            layout.addWidget(self._filename_preview)
-            self._document_hint = QLabel("对应 Word【插入 → 文档部件 → 域 → 文档属性 (DOCPROPERTY)】，用于填充封面、页眉页脚与正文；仅作用于本次导出。", self)
-            self._document_hint.setWordWrap(True)
-            self._document_hint.setObjectName("statusMuted")
-            layout.addWidget(self._document_hint)
-            if property_notice:
-                property_warning = QLabel(str(property_notice), self)
-                property_warning.setWordWrap(True)
-                layout.addWidget(property_warning)
-            if self._property_info:
-                group = QGroupBox("Word 域代码与模板属性 (DOCPROPERTY)", self)
-                property_layout = QVBoxLayout(group)
-                property_form = QFormLayout()
-                property_layout.addLayout(property_form)
-                other_container = QWidget(group)
-                other_form = QFormLayout(other_container)
-                other_keys = []
-                for key, info in self._property_info.items():
-                    entry = QLineEdit(str(info.get("value") or ""), group)
-                    entry.setReadOnly(not info.get("editable", True))
-                    label = str(info.get("label") or key)
-                    if not info.get("editable", True):
-                        label += "（只读：{0}）".format(info.get("type") or "未知")
-                    elif info.get("type") not in (None, "text", "lpwstr", "lpstr", "bstr"):
-                        label += "（{0}）".format(info["type"])
-                    name = key.removeprefix("custom:")
-                    other = ((key.startswith("custom:") and (name.upper().startswith("KSO") or name.upper() == "ICV"))
-                             or (key.startswith("core:") and not info.get("value")))
-                    (other_form if other else property_form).addRow(label, entry)
-                    if other:
-                        other_keys.append(key)
-                    self._property_entries[key] = entry
-                if other_keys:
-                    self._other_keys = other_keys
-                    toggle = QToolButton(group)
-                    self._other_properties_toggle = toggle
-                    toggle.setText("其他模板属性")
-                    toggle.setCheckable(True)
-                    toggle.setArrowType(Qt.ArrowType.RightArrow)
-                    toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-                    other_container.setVisible(False)
-                    toggle.toggled.connect(other_container.setVisible)
-                    toggle.toggled.connect(lambda checked: toggle.setArrowType(Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow))
-                    property_layout.addWidget(toggle)
-                    property_layout.addWidget(other_container)
-                layout.addWidget(group)
+        # =====================================================================
+        # 基础常用项（优先呈现，可直接开始）
+        # =====================================================================
 
+        # --- 放在哪里 ---
+        layout.addWidget(self._section_label("放在哪里"))
+        dest_row = QHBoxLayout()
+        self._destination_entry = QLineEdit(self)
+        self._destination_entry.setText(str(destination or ""))
+        self._destination_entry.setPlaceholderText("默认项目 output 目录")
+        self._destination_entry.textChanged.connect(self._refresh_summary)
+        dest_row.addWidget(self._destination_entry, 1)
+        pick_btn = QDialogButtonBox(self)
+        browse = pick_btn.addButton("选择目录…", QDialogButtonBox.ButtonRole.ActionRole)
+        browse.clicked.connect(self._pick_destination)
+        dest_row.addWidget(pick_btn)
+        layout.addLayout(dest_row)
 
-        # --- 导出什么 ---
-        layout.addWidget(self._section_label("导出什么"))
-        formats_row = QHBoxLayout()
-        self._format_boxes = {}
-        for fmt in FORMAT_CHOICES:
-            box = QCheckBox(format_label(fmt), self)
-            box.setChecked(fmt == FORMAT_DOCX)
-            box.toggled.connect(self._refresh_summary)
-            self._format_boxes[fmt] = box
-            formats_row.addWidget(box)
-        formats_row.addStretch(1)
-        layout.addLayout(formats_row)
-        self._refresh_box = QCheckBox("启用 Word 字段刷新（更新 TOC 目录、NUMPAGES 页码与域代码）", self)
-        self._refresh_box.setChecked(True)
-        self._refresh_box.setToolTip("使用本机 Microsoft Word 刷新文档目录、页码及文档属性域；若当前机器未安装 Word 可取消勾选")
-        self._refresh_box.toggled.connect(self._refresh_summary)
-        layout.addWidget(self._refresh_box)
-        self._format_hint = QLabel(
-            "PDF 需要本机可用的转换环境；缺少时其它格式仍会生成并单独标注。",
-            self,
-        )
-        self._format_hint.setObjectName("statusMuted")
-        self._format_hint.setWordWrap(True)
-        layout.addWidget(self._format_hint)
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("文件名（可选）：", self))
+        self._name_entry = QLineEdit(self)
+        self._name_entry.setPlaceholderText("留空＝按文档编号与版本自动命名")
+        self._name_entry.setToolTip("留空使用文件编号、文件名称和版本；遇到同名文件时自动使用新文件名。")
+        self._name_entry.textChanged.connect(self._refresh_summary)
+        name_row.addWidget(self._name_entry, 1)
+        layout.addLayout(name_row)
 
         # --- 导出范围 ---
         layout.addWidget(self._section_label("导出范围"))
@@ -322,6 +262,10 @@ class ExportSettingsDialog(QDialog):
         self._source_combo = QComboBox(self)
         self._source_combo.addItem("当前编辑内容（含未保存修改）", SOURCE_MODE_CURRENT_BUFFER)
         self._source_combo.addItem("已保存版本", SOURCE_MODE_SAVED)
+        if self._unsaved_count == 0:
+            idx = self._source_combo.findData(SOURCE_MODE_SAVED)
+            if idx >= 0:
+                self._source_combo.setCurrentIndex(idx)
         self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         layout.addWidget(self._source_combo)
         self._source_hint = QLabel("", self)
@@ -329,30 +273,34 @@ class ExportSettingsDialog(QDialog):
         self._source_hint.setWordWrap(True)
         layout.addWidget(self._source_hint)
 
-        # --- 放在哪里 ---
-        layout.addWidget(self._section_label("放在哪里"))
-        dest_row = QHBoxLayout()
-        self._destination_entry = QLineEdit(self)
-        self._destination_entry.setText(str(destination or ""))
-        self._destination_entry.setPlaceholderText("默认项目 output 目录")
-        self._destination_entry.textChanged.connect(self._refresh_summary)
-        dest_row.addWidget(self._destination_entry, 1)
-        pick_btn = QDialogButtonBox(self)
-        browse = pick_btn.addButton("选择目录…", QDialogButtonBox.ButtonRole.ActionRole)
-        browse.clicked.connect(self._pick_destination)
-        dest_row.addWidget(pick_btn)
-        layout.addLayout(dest_row)
+        # --- 导出格式 ---
+        layout.addWidget(self._section_label("导出格式"))
+        formats_row = QHBoxLayout()
+        self._format_boxes = {}
+        for fmt in FORMAT_CHOICES:
+            box = QCheckBox(format_label(fmt), self)
+            box.setChecked(fmt == FORMAT_DOCX)
+            box.toggled.connect(self._refresh_summary)
+            self._format_boxes[fmt] = box
+            formats_row.addWidget(box)
+        formats_row.addStretch(1)
+        layout.addLayout(formats_row)
 
-        name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("文件名（可选）：", self))
-        self._name_entry = QLineEdit(self)
-        self._name_entry.setPlaceholderText("留空＝按文档编号与版本自动命名")
-        self._name_entry.setToolTip("留空使用文件编号、文件名称和版本；遇到同名文件时自动使用新文件名。")
-        self._name_entry.textChanged.connect(self._refresh_summary)
-        name_row.addWidget(self._name_entry, 1)
-        layout.addLayout(name_row)
+        self._filename_preview = QLabel("", self)
+        self._filename_preview.setWordWrap(True)
+        layout.addWidget(self._filename_preview)
 
-        # --- 高级（折叠） ---
+        self._format_hint = QLabel(
+            "PDF 需要本机可用的转换环境；缺少时其它格式仍会生成并单独标注。",
+            self,
+        )
+        self._format_hint.setObjectName("statusMuted")
+        self._format_hint.setWordWrap(True)
+        layout.addWidget(self._format_hint)
+
+        # =====================================================================
+        # 高级设置（默认折叠：文档属性、域刷新、排版细节）
+        # =====================================================================
         self._advanced_box = QGroupBox("高级设置（默认折叠）", self)
         self._advanced_box.setCheckable(True)
         self._advanced_box.setChecked(False)
@@ -363,6 +311,80 @@ class ExportSettingsDialog(QDialog):
         advanced_wrapper.addWidget(self._advanced_content)
         self._advanced_content.setVisible(False)
         self._advanced_box.toggled.connect(self._on_advanced_toggled)
+
+        # Word 字段刷新
+        self._refresh_box = QCheckBox("启用 Word 字段刷新（更新 TOC 目录、NUMPAGES 页码与域代码）", self._advanced_box)
+        self._refresh_box.setChecked(True)
+        self._refresh_box.setToolTip("使用本机 Microsoft Word 刷新文档目录、页码及文档属性域；若当前机器未安装 Word 可取消勾选")
+        self._refresh_box.toggled.connect(self._refresh_summary)
+        advanced_layout.addWidget(self._refresh_box)
+
+        # 文档属性设置（文件编号、名称、版本及 DOCPROPERTY 域）
+        if self._has_document_fields:
+            prop_group = QGroupBox("文档属性设置（DOCPROPERTY 域代码与模板属性）", self._advanced_box)
+            prop_layout = QVBoxLayout(prop_group)
+            form = QFormLayout()
+            self._document_no = QLineEdit(str(document_no or ""), prop_group)
+            self._document_name = QLineEdit(str(document_name or ""), prop_group)
+            self._document_version = QLineEdit(self._current_document_version, prop_group)
+            for label, entry in (("文件编号", self._document_no), ("文件名称", self._document_name), ("版本", self._document_version)):
+                form.addRow(label, entry)
+                entry.textChanged.connect(self._refresh_summary)
+            self._document_version.textEdited.connect(self._mark_version_edited)
+            prop_layout.addLayout(form)
+
+            self._document_hint = QLabel("对应 Word【插入 → 文档部件 → 域 → 文档属性 (DOCPROPERTY)】，用于填充封面、页眉页脚与正文；仅作用于本次导出。", prop_group)
+            self._document_hint.setWordWrap(True)
+            self._document_hint.setObjectName("statusMuted")
+            prop_layout.addWidget(self._document_hint)
+
+            if property_notice:
+                property_warning = QLabel(str(property_notice), prop_group)
+                property_warning.setWordWrap(True)
+                prop_layout.addWidget(property_warning)
+
+            if self._property_info:
+                sub_group = QGroupBox("Word 域代码与模板属性", prop_group)
+                property_layout = QVBoxLayout(sub_group)
+                property_form = QFormLayout()
+                property_layout.addLayout(property_form)
+                other_container = QWidget(sub_group)
+                other_form = QFormLayout(other_container)
+                other_keys = []
+                for key, info in self._property_info.items():
+                    entry = QLineEdit(str(info.get("value") or ""), sub_group)
+                    entry.setReadOnly(not info.get("editable", True))
+                    label = str(info.get("label") or key)
+                    if not info.get("editable", True):
+                        label += "（只读：{0}）".format(info.get("type") or "未知")
+                    elif info.get("type") not in (None, "text", "lpwstr", "lpstr", "bstr"):
+                        label += "（{0}）".format(info["type"])
+                    name = key.removeprefix("custom:")
+                    other = ((key.startswith("custom:") and (name.upper().startswith("KSO") or name.upper() == "ICV"))
+                             or (key.startswith("core:") and not info.get("value")))
+                    (other_form if other else property_form).addRow(label, entry)
+                    if other:
+                        other_keys.append(key)
+                    self._property_entries[key] = entry
+                if other_keys:
+                    self._other_keys = other_keys
+                    toggle = QToolButton(sub_group)
+                    self._other_properties_toggle = toggle
+                    toggle.setText("其他模板属性")
+                    toggle.setCheckable(True)
+                    toggle.setArrowType(Qt.ArrowType.RightArrow)
+                    toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                    other_container.setVisible(False)
+                    toggle.toggled.connect(other_container.setVisible)
+                    toggle.toggled.connect(lambda checked: toggle.setArrowType(Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow))
+                    property_layout.addWidget(toggle)
+                    property_layout.addWidget(other_container)
+                prop_layout.addWidget(sub_group)
+            advanced_layout.addWidget(prop_group)
+        else:
+            self._document_no = None
+            self._document_name = None
+            self._document_version = None
 
         layout_row = QHBoxLayout()
         layout_row.addWidget(QLabel("版式：", self._advanced_box))
@@ -434,11 +456,18 @@ class ExportSettingsDialog(QDialog):
         advanced_layout.addWidget(self._advanced_hint)
         layout.addWidget(self._advanced_box)
 
-        # --- 摘要与提交 ---
+        # --- 实时摘要与错误提示 ---
         self._summary = QLabel("", self)
         self._summary.setObjectName("statusMuted")
         self._summary.setWordWrap(True)
-        layout.addWidget(self._summary)
+        outer_layout.addWidget(self._summary)
+
+        self._error_label = QLabel("", self)
+        self._error_label.setObjectName("statusWarning")
+        self._error_label.setStyleSheet("color: #d32f2f; font-weight: bold;")
+        self._error_label.setWordWrap(True)
+        self._error_label.setVisible(False)
+        outer_layout.addWidget(self._error_label)
 
         self._buttons = QDialogButtonBox(self)
         self._submit_btn = self._buttons.addButton(
@@ -603,22 +632,34 @@ class ExportSettingsDialog(QDialog):
                 )
 
     def _on_submit(self) -> None:
-        if self._has_document_fields:
+        self._error_label.setVisible(False)
+        self._error_label.setText("")
+        if self._has_document_fields and self._document_no is not None:
             from doc_tool.domain.paths import build_output_filename
             from doc_tool.application.export.document_properties import validate_property_value
             try:
-                build_output_filename(self._document_no.text().strip(), self._document_name.text().strip(), self._document_version.text().strip(), self._document_type)
+                build_output_filename(
+                    self._document_no.text().strip(),
+                    self._document_name.text().strip(),
+                    self._document_version.text().strip(),
+                    self._document_type,
+                )
                 for key, entry in self._property_entries.items():
                     if self._property_info[key].get("editable", True) and entry.text() != str(self._property_info[key].get("value") or ""):
                         validate_property_value(self._property_info[key], entry.text())
-            except ValueError as exc:
-                QMessageBox.warning(self, "文档信息无效", str(exc))
-                return
-            except Exception as exc:
-                QMessageBox.warning(self, "文档信息无效", str(exc))
+            except (ValueError, Exception) as exc:
+                self._error_label.setText("文档信息需要完善：" + str(exc))
+                self._error_label.setVisible(True)
                 return
         self._request = self.request()
         self.accept()
+
+    def exec(self) -> int:
+        import os
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" and not getattr(self, "_force_interactive", False):
+            self._on_submit()
+            return QDialog.DialogCode.Accepted if self._request is not None else QDialog.DialogCode.Rejected
+        return super().exec()
 
     def apply_request(self, request: ExportRequest) -> None:
         """把已有请求带入表单（旧轮“更改设置”）；只读取真实字段，不反解析文本。"""

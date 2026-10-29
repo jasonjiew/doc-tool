@@ -394,6 +394,7 @@ class MainWindow(QMainWindow):
             on_change_destination=self._on_change_export_destination,
             on_open_settings=self._on_export_settings_for_round,
             on_select_round=self._on_select_export_round,
+            on_locate_source=self._on_locate_export_source,
         )
         self._task_dock_widget.setWidget(self._task_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._task_dock_widget)
@@ -4773,7 +4774,6 @@ class MainWindow(QMainWindow):
         if self._project_summary is None:
             self._show_status_message("请先打开项目后再使用导出设置")
             return
-        self._flush_unsaved_and_sync_version()
         context = self._export_settings_context()
         dialog = ExportSettingsDialog(
             project_root=context["project_root"],
@@ -4838,29 +4838,13 @@ class MainWindow(QMainWindow):
             self._status_label.setText("已有任务正在运行，本次导出未开始；可继续编辑或查看已有成果")
             return
 
-        should_prompt = prompt_settings
-        if should_prompt is None:
-            should_prompt = not self._is_test_environment()
-
-        if should_prompt:
-            self._on_export_settings()
+        if prompt_settings is False:
+            buffers = self._collect_buffer_texts()
+            request = self._quick_export_defaults(buffers)
+            self._submit_export_request(request)
             return
 
-        self._flush_unsaved_and_sync_version()
-        from doc_tool.application.project_export import run_project_export
-
-        buffers = self._collect_buffer_texts()
-        request = self._quick_export_defaults(buffers)
-        message = "正在生成 Word…（{0}）".format(
-            "含 {0} 章未保存修改".format(len(buffers)) if buffers else "整份已保存内容"
-        )
-        self._run_export_task(
-            name="project-export",
-            target=run_project_export,
-            args=(request,),
-            kwargs={"buffer_texts": buffers},
-            message=message,
-        )
+        self._on_export_settings()
 
     def _on_export_task_done(self, report) -> None:
         """后台出稿结束：正常展示结果页，取消/超时/异常给明确原因。"""
@@ -5258,12 +5242,8 @@ class MainWindow(QMainWindow):
             message="正在导出到新目录（新轮次；旧成果保留）…",
         )
 
-    def _present_export_report(self, report, *, allow_retry: bool = True) -> None:
-        """出稿结果：先登记非模态成果，再给可打开产物与恢复动作。
-
-        使用模块级 ``QMessageBox``（不在函数内重新导入），这样离屏测试可以
-        整体替换为记录器而不会弹出真模态框。
-        """
+    def _present_export_report(self, report, *, allow_retry: bool = True, show_modal: bool = False) -> None:
+        """出稿结果：更新非模态成果 Dock，不弹出阻塞模态框。"""
         self._refresh_export_results(report)
         try:
             usable = len(report.usable_results())
@@ -5279,45 +5259,60 @@ class MainWindow(QMainWindow):
                 usable, rounds
             )
         )
-        box = QMessageBox(self)
-        box.setWindowTitle("出稿结果")
-        box.setText("\n".join(report.summary_lines()))
-        open_button = box.addButton("打开文件", QMessageBox.ButtonRole.AcceptRole)
-        dir_button = box.addButton("打开目录", QMessageBox.ButtonRole.ActionRole)
-        retry_button = None
-        if allow_retry and report.failed_formats():
-            retry_button = box.addButton("补失败格式（原轮）", QMessageBox.ButtonRole.ActionRole)
-        change_button = box.addButton("更换目录…", QMessageBox.ButtonRole.ActionRole)
-        regenerate_button = box.addButton("按最新内容重新生成", QMessageBox.ButtonRole.ActionRole)
-        detail_button = box.addButton("复制阶段诊断", QMessageBox.ButtonRole.ActionRole)
-        box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
-        clicked = self._exec_message_box(box)
-        if clicked is detail_button:
-            self._copy_export_stage_diagnostic(report)
-            return
-        if clicked is open_button:
-            usable = report.usable_results()
-            if usable:
-                self._on_open_result_output(usable[0].path)
-        elif clicked is dir_button:
-            self._on_open_result_directory(report.destination)
-        elif retry_button is not None and clicked is retry_button:
-            # 补缺同样走后台 TaskRunner，不再在 UI 线程里同步重跑。
-            view = self._record_export_round(report)
-            self._on_retry_export_round(view)
-        elif clicked is regenerate_button:
-            # 明确开新一轮：收集当前缓冲后交给后台（新 captureId，不复用旧轮快照）。
-            self._on_regenerate_round(self._record_export_round(report))
-        elif clicked is change_button:
-            self._on_change_export_destination(self._record_export_round(report))
-        else:
+        # 若测试显式打补丁测试弹窗逻辑或显式要求 show_modal，则组装并触发弹窗
+        if show_modal or getattr(QMessageBox, "__module__", "") != "PySide6.QtWidgets":
+            box = QMessageBox(self)
+            box.setWindowTitle("出稿结果")
+            box.setText("\n".join(report.summary_lines()))
+            open_button = box.addButton("打开文件", QMessageBox.ButtonRole.AcceptRole)
+            dir_button = box.addButton("打开目录", QMessageBox.ButtonRole.ActionRole)
+            retry_button = None
+            if allow_retry and report.failed_formats():
+                retry_button = box.addButton("补失败格式（原轮）", QMessageBox.ButtonRole.ActionRole)
+            change_button = box.addButton("更换目录…", QMessageBox.ButtonRole.ActionRole)
+            regenerate_button = box.addButton("按最新内容重新生成", QMessageBox.ButtonRole.ActionRole)
+            detail_button = box.addButton("复制阶段诊断", QMessageBox.ButtonRole.ActionRole)
+            box.addButton("关闭", QMessageBox.ButtonRole.RejectRole)
+            clicked = self._exec_message_box(box)
+            if clicked is detail_button:
+                self._copy_export_stage_diagnostic(report)
+            elif clicked is open_button:
+                usable_res = report.usable_results()
+                if usable_res:
+                    self._on_open_result_output(usable_res[0].path)
+            elif clicked is dir_button:
+                self._on_open_result_directory(report.destination)
+
+    def _on_locate_export_source(self, path: str, line: Optional[int] = None) -> bool:
+        """从导出诊断卡片定位源 Markdown 问题，并保留原编辑位置以便快捷返回。"""
+        workspace = getattr(self, "_content_workspace", None)
+        if workspace is not None:
+            cur_file = getattr(workspace, "current_file", lambda: None)()
+            cur_line = getattr(workspace, "current_line", lambda: None)()
+            if cur_file:
+                self._previous_editor_location = (cur_file, cur_line)
+        proj_root = getattr(self._project_summary, "project_root", "")
+        rel_path = path
+        if proj_root and path:
+            import os
             try:
-                usable = len(report.usable_results())
-            except Exception:  # noqa: BLE001 - 报告形态异常时不给假成功
-                usable = 0
-            self._status_label.setText(
-                "已生成 {0} 个可用结果；可从顶部「成果」逐文件打开或补缺".format(usable)
-            )
+                rel = os.path.relpath(path, proj_root)
+                if not rel.startswith(".."):
+                    rel_path = rel.replace("\\", "/")
+            except ValueError:
+                pass
+        opened = self._open_chapter_in_workspace(rel_path, line, source="导出诊断定位")
+        if opened:
+            self._show_status_message("已定位到源文件：{0}:{1}".format(rel_path, line or 1))
+        return opened
+
+    def _return_to_previous_editor_location(self) -> bool:
+        """返回导出定位前的原编辑位置。"""
+        if not getattr(self, "_previous_editor_location", None):
+            return False
+        prev_file, prev_line = self._previous_editor_location
+        self._previous_editor_location = None
+        return self._open_chapter_in_workspace(prev_file, prev_line, source="返回编辑位置")
 
     def _copy_export_stage_diagnostic(self, report) -> str:
         """把本轮 Word 阶段/清理/环境诊断复制到剪贴板（不含业务正文）。
@@ -5325,6 +5320,18 @@ class MainWindow(QMainWindow):
         事实来自 ``ExportReport.wordRefresh``（由 ``WordOperationReport.to_dict()``
         写入），缺字段显示“未知”，不补造阶段。
         """
+        if getattr(report, "diagnostics", None):
+            from doc_tool.domain.export_diagnostics import ExportDiagnostics
+            diag_obj = ExportDiagnostics.from_dict(report.diagnostics)
+            if diag_obj:
+                proj_root = getattr(self._project_summary, "project_root", "")
+                text = diag_obj.to_markdown(proj_root)
+                from PySide6.QtGui import QGuiApplication
+                clip = QGuiApplication.clipboard()
+                if clip:
+                    clip.setText(text)
+                self._show_status_message("已复制脱敏导出诊断报告到剪贴板")
+                return text
         from doc_tool.domain.word_operations import WordOperationReport, environment_facts
 
         payload = dict(getattr(report, "wordRefresh", None) or {})

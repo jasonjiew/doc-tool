@@ -111,7 +111,7 @@ class ProjectBar(QWidget):
 
         # 高频入口：日常「导出 Word」优先可见可点（与菜单 Ctrl+E 同一 handler）；
         # 项目检查 / 快速构建 / 正式出稿作为次级动作保留完整流水线语义。
-        self._quick_export_btn = QPushButton("导出正式 Word", self)
+        self._quick_export_btn = QPushButton("导出 Word…", self)
         self._quick_export_btn.setObjectName("barQuickExportBtn")
         self._quick_export_btn.setProperty("btnRole", "primary")
         # 主要动作不参与溢出：按完整样式（QSS 生效后）的最小尺寸保留，不裁切文字。
@@ -120,7 +120,7 @@ class ProjectBar(QWidget):
         )
         self._quick_export_btn.setShortcut("Ctrl+E")
         self._quick_export_btn.setToolTip(
-            "一键保存修改、同步版本并导出 Word 文档 (Ctrl+E)"
+            "打开简洁设置并导出 Word 文档 (Ctrl+E)"
         )
         self._quick_export_btn.clicked.connect(self._handle_quick_export)
         main.addWidget(self._quick_export_btn)
@@ -131,7 +131,7 @@ class ProjectBar(QWidget):
         self._export_settings_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._export_settings_btn.setToolTip("弹窗配置文档属性（文档部件 → 域 → 文档属性）、格式与范围")
         self._export_settings_btn.clicked.connect(lambda: self._on_export_settings() if self._on_export_settings else None)
-        self._export_settings_btn.setVisible(True)
+        self._export_settings_btn.setVisible(False)
         main.addWidget(self._export_settings_btn)
 
         # 「成果」：非模态逐文件结果入口（关闭后仍能从这里找回最近轮次）。
@@ -155,12 +155,14 @@ class ProjectBar(QWidget):
         self._diag_btn.setProperty("btnRole", "secondary")
         self._diag_btn.setToolTip("【开发诊断】快速生成 DOCX 预览（跳过 Word 目录与域刷新） (Ctrl+Shift+B)")
         self._diag_btn.clicked.connect(self._handle_diag_build)
+        self._diag_btn.setVisible(False)
         main.addWidget(self._diag_btn)
 
         self._merge_btn = QPushButton("正式出稿", self)
         self._merge_btn.setProperty("btnRole", "secondary")
         self._merge_btn.setToolTip("【开发诊断】直接进行完整构建与 Word 刷新（跳过导出设置弹窗）")
         self._merge_btn.clicked.connect(self._handle_merge)
+        self._merge_btn.setVisible(False)
         main.addWidget(self._merge_btn)
 
         # 摘要折叠开关
@@ -247,6 +249,12 @@ class ProjectBar(QWidget):
         self._close_action.setToolTip("保存并关闭当前项目，返回主页 (Ctrl+Shift+W)")
         self._close_action.triggered.connect(self._handle_close_project)
 
+        self._export_settings_action = QAction("其它格式设置…", self)
+        self._export_settings_action.setToolTip("配置其它导出格式与高级范围")
+        self._export_settings_action.triggered.connect(
+            lambda: self._on_export_settings() if self._on_export_settings else None
+        )
+
         # 摘要详情折叠：次级动作，窄窗口时可进入「更多」。
         self._toggle_action = QAction("收起摘要", self)
         self._toggle_action.setToolTip("折叠/展开文档编号、指纹、路径等细节")
@@ -256,12 +264,13 @@ class ProjectBar(QWidget):
             self, self._overflow_menu, self._more_btn, spacing=6
         )
         self._overflow.register("validate", self._validate_btn, self._validate_action)
-        self._overflow.register("diag_build", self._diag_btn, self._diag_action)
-        self._overflow.register("merge", self._merge_btn, self._merge_action)
+        self._overflow.register("diag_build", self._diag_btn, self._diag_action, overflow_only=True)
+        self._overflow.register("merge", self._merge_btn, self._merge_action, overflow_only=True)
         # 分支按钮只在有分支时出现：原地控件常驻登记，可见性由渲染与溢出共同决定。
         self._overflow.register("branch", self._branch_btn, self._branch_action)
         self._overflow.register("toggle_summary", self._toggle_btn, self._toggle_action)
         self._overflow.register("close", self._close_btn, self._close_action)
+        self._overflow.register("export_settings", self._export_settings_btn, self._export_settings_action)
 
     def refresh_action_overflow(self, available_width: Optional[int] = None) -> bool:
         """按当前可用宽度重排次级动作；返回是否有动作进入「更多」。
@@ -286,12 +295,11 @@ class ProjectBar(QWidget):
         self._quick_export_btn.setMinimumWidth(
             max(0, self._quick_export_btn.sizeHint().width())
         )
-        self._export_settings_btn.setMinimumWidth(max(0, self._export_settings_btn.sizeHint().width()))
-        for widget in (self._quick_export_btn, self._export_settings_btn, self._results_btn, self._more_btn):
+        for widget in (self._quick_export_btn, self._results_btn, self._more_btn):
             reserved += max(0, widget.sizeHint().width()) + 10
         self._overflow.set_primary_width(reserved)
         # 主要动作不得被压缩：布局后被挤压时继续溢出次级动作。
-        self._overflow.protect(self._quick_export_btn, self._export_settings_btn, self._results_btn)
+        self._overflow.protect(self._quick_export_btn, self._results_btn)
         return self._overflow.refresh(max(0, total))
 
     def showEvent(self, event) -> None:  # noqa: N802

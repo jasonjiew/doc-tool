@@ -24,6 +24,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from lxml import etree
 
 from docx_common import (
+    resolve_image_resource,
+    remap_parsed_document_locations,
     is_baseline_error_blocking,
     AutomationError,
     OOXMLSecurityError,
@@ -652,15 +654,44 @@ def expected_events_for_document(
                 events.append(caption_event)
             continue
         if block.kind == KIND_IMAGE:
-            # V2.7：Mermaid 等生成图在任务临时目录，按章节覆盖资源根，
-            # 否则预期侧会把图当成缺失引用而误报。
-            asset_root = (config.get("assetRootOverrides") or {}).get(
-                os.path.abspath(path), config["paths"]["asset_root"]
-            )
-            image_path = resolve_resource(asset_root, block.relative_path, "图片")
-            with open(image_path, "rb") as image_file:
-                image_hash = hashlib.sha256(image_file.read()).hexdigest()
-            events.append(Event("I", (image_hash,), source))
+            # 统一按来源解析图片：生成图走生成映射，普通资产走捕获资源根
+            default_asset_root = (config.get("paths") or {}).get("asset_root", "")
+            chapter_key = os.path.abspath(path)
+            chapter_generated = dict((config.get("chapterGeneratedImages") or {}).get(chapter_key) or {})
+            if not chapter_generated and config.get("generatedImages"):
+                chapter_generated = dict(config["generatedImages"])
+            if config.get("assetRootOverrides"):
+                overridden = (config.get("assetRootOverrides") or {}).get(chapter_key)
+                if overridden and overridden != default_asset_root:
+                    candidate = os.path.abspath(os.path.normpath(os.path.join(overridden, block.relative_path)))
+                    if os.path.isfile(candidate):
+                        chapter_generated[block.relative_path] = candidate
+            try:
+                image_path, _ = resolve_image_resource(
+                    block.relative_path,
+                    default_asset_root=default_asset_root,
+                    chapter_path=path,
+                    generated_map=chapter_generated,
+                    module_resources=config.get("moduleResources"),
+                    label="图片",
+                )
+            except AutomationError:
+                image_path = os.path.join(default_asset_root, block.relative_path)
+
+            try:
+                with open(image_path, "rb") as image_file:
+                    image_hash = hashlib.sha256(image_file.read()).hexdigest()
+                events.append(Event("I", (image_hash,), source))
+            except Exception:
+                events.append(
+                    Event(
+                        "P",
+                        normalize_business_text(
+                            "【图片缺失或损坏: {0}】".format(block.alt or block.relative_path)
+                        ),
+                        source,
+                    )
+                )
             caption_event = _expected_caption_event(block, registry, source)
             if caption_event is not None:
                 events.append(caption_event)

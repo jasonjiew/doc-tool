@@ -498,6 +498,71 @@ def resolve_resource(root: str, relative_path: str, label: str) -> str:
     return candidate
 
 
+def resolve_image_resource(
+    relative_path: str,
+    default_asset_root: str,
+    *,
+    chapter_path: str = "",
+    generated_map: Optional[Dict[str, str]] = None,
+    module_resources: Optional[Dict[str, str]] = None,
+    label: str = "图片",
+) -> Tuple[str, str]:
+    """按来源解析图片资源，返回 (image_path, source_kind)。
+    source_kind 为 'generated'、'module' 或 'captured'。
+
+    1. 生成图（Mermaid 等）：若 relative_path 在 generated_map 中，使用已登记的生成图绝对路径。
+    2. 模块资源：若 relative_path 在 module_resources 中，使用模块资源路径。
+    3. 捕获资源：使用 default_asset_root 与 relative_path 解析，并校验路径边界。
+    """
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", relative_path):
+        raise AutomationError("{0} 不支持远程 URL: {1}".format(label, relative_path))
+
+    # 1. 显式生成图映射
+    if generated_map and relative_path in generated_map:
+        target = generated_map[relative_path]
+        return os.path.abspath(target), "generated"
+
+    # 2. 显式模块资源
+    if module_resources and relative_path in module_resources:
+        target = module_resources[relative_path]
+        return os.path.abspath(target), "module"
+
+    # 3. 捕获资源
+    if not default_asset_root:
+        raise AutomationError("{0} 未配置资源根目录: {1}".format(label, relative_path))
+
+    candidate = os.path.abspath(os.path.normpath(os.path.join(default_asset_root, relative_path)))
+    if not _inside_root(default_asset_root, candidate):
+        raise AutomationError("{0} 路径越界资源目录: {1}".format(label, relative_path))
+
+    return candidate, "captured"
+
+
+def remap_parsed_document_locations(document, line_map: Dict[int, int]) -> None:
+    """将经过预处理替换后的文档块行号映射回原 Markdown 文件行号。"""
+    if not line_map or not hasattr(document, "blocks"):
+        return
+    from doc_tool.domain.blocks import SourceLocation
+    for block in document.blocks:
+        loc = getattr(block, "location", None)
+        if loc is not None:
+            orig_start = line_map.get(loc.start_line, loc.start_line)
+            orig_end = line_map.get(loc.end_line, loc.end_line)
+            try:
+                block.location = SourceLocation(loc.path, orig_start, orig_end)
+            except Exception:
+                pass
+    for warning in getattr(document, "warnings", []) or []:
+        loc = getattr(warning, "location", None)
+        if loc is not None:
+            orig_start = line_map.get(loc.start_line, loc.start_line)
+            orig_end = line_map.get(loc.end_line, loc.end_line)
+            try:
+                warning.location = SourceLocation(loc.path, orig_start, orig_end)
+            except Exception:
+                pass
+
+
 def split_markdown_table_row(line: str) -> List[str]:
     r"""Split a pipe table row without treating ``\|`` as a delimiter.
 

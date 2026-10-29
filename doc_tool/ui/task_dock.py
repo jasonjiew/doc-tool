@@ -189,6 +189,7 @@ class TaskDock(QWidget):
         on_change_destination: Optional[Callable[[object], None]] = None,
         on_open_settings: Optional[Callable[[object], None]] = None,
         on_select_round: Optional[Callable[[str], None]] = None,
+        on_locate_source: Optional[Callable[[str, Optional[int]], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -236,6 +237,7 @@ class TaskDock(QWidget):
             on_change_destination=on_change_destination,
             on_open_settings=on_open_settings,
             on_select_round=on_select_round,
+            on_locate_source=on_locate_source,
             parent=self,
         )
         self._stack.addWidget(self._results_view)

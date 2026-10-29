@@ -794,6 +794,9 @@ class FormatResult:
     error_code: str = ""
     message: str = ""
     attempts: int = 1
+    failed_stage: str = ""
+    locations: List[Dict[str, Any]] = field(default_factory=list)
+    diagnostics: Optional[Dict[str, Any]] = None
 
     @property
     def usable(self) -> bool:

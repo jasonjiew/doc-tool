@@ -26,6 +26,10 @@ from doc_tool.application.effective_snapshot import (
     mark_source_updated,
 )
 from doc_tool.domain.version import APP_VERSION
+from doc_tool.domain.export_diagnostics import (
+    ExportDiagnostics,
+    new_execution_id,
+)
 from doc_tool.application.intake_contract import (
     FORMAT_DOCX,
     FORMAT_HTML,
@@ -91,6 +95,10 @@ class ExportReport:
     #: V4.0 40-D：本轮 Word 刷新的真实阶段与清理事实（缺项表示未知）。
     wordStages: List[str] = field(default_factory=list)
     wordRefresh: Dict[str, object] = field(default_factory=dict)
+    executionId: str = ""
+    diagnostics: Optional[Dict[str, Any]] = None
+    diagnosticsPath: str = ""
+    diagnosticsMdPath: str = ""
 
     # --- 查询 ---
 
@@ -179,6 +187,10 @@ class ExportReport:
             "snapshotWorkDir": self.snapshotWorkDir,
             "docxPath": self.docxPath,
             "indexPath": self.indexPath,
+            "executionId": self.executionId,
+            "diagnostics": self.diagnostics,
+            "diagnosticsPath": self.diagnosticsPath,
+            "diagnosticsMdPath": self.diagnosticsMdPath,
         }
 
     def to_dict(self) -> Dict[str, object]:
@@ -215,7 +227,7 @@ def read_export_index(path) -> Optional[ExportReport]:
         data = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not isinstance(data, dict) or data.get("schemaVersion") != INDEX_SCHEMA_VERSION:
+    if not isinstance(data, dict) or data.get("schemaVersion", INDEX_SCHEMA_VERSION) != INDEX_SCHEMA_VERSION:
         return None
     report = ExportReport(
         variantId=str(data.get("variantId") or ""),
@@ -246,6 +258,10 @@ def read_export_index(path) -> Optional[ExportReport]:
         readonlyProject=bool(data.get("readonlyProject", False)),
         wordStages=[str(item) for item in data.get("wordStages") or []],
         wordRefresh=dict(data.get("wordRefresh") or {}),
+        executionId=str(data.get("executionId") or ""),
+        diagnostics=data.get("diagnostics"),
+        diagnosticsPath=str(data.get("diagnosticsPath") or ""),
+        diagnosticsMdPath=str(data.get("diagnosticsMdPath") or ""),
     )
     return report
 
@@ -766,6 +782,7 @@ def run_project_export(
     from doc_tool.domain.manifest import ProjectManifest
     from doc_tool.domain.paths import ProjectPaths
 
+    exec_id = new_execution_id()
     paths = ProjectPaths(project_root)
     preferred = Path(request.destination or (prior.destination if prior else "")) if (
         request.destination or (prior and prior.destination)
@@ -803,17 +820,63 @@ def run_project_export(
         formats_preview = normalize_formats(only_formats if only_formats is not None else request.formats)
         if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
             _emit_progress(pipeline_progress, "prepare", "started", "正在准备导出内容快照…")
-        manifest = ProjectManifest.load(project_root)
-        snapshot = capture_snapshot(
-            project_root,
-            scope=request.scope,
-            source_mode=request.source_mode,
-            buffer_texts=buffer_texts,
-            external_destination=str(destination) if request.destination else "",
-            cancel_token=cancel_token,
-            variant_id=str(getattr(request, "variant_id", "") or ""),
-        )
-        manifest = _prepare_snapshot_document(snapshot, request)
+        exec_id = new_execution_id()
+        manifest = None
+        snapshot = None
+        try:
+            manifest = ProjectManifest.load(project_root)
+            snapshot = capture_snapshot(
+                project_root,
+                scope=request.scope,
+                source_mode=request.source_mode,
+                buffer_texts=buffer_texts,
+                external_destination=str(destination) if request.destination else "",
+                cancel_token=cancel_token,
+                variant_id=str(getattr(request, "variant_id", "") or ""),
+            )
+            manifest = _prepare_snapshot_document(snapshot, request)
+        except Exception as exc:
+            fail_report = ExportReport(
+                executionId=exec_id,
+                captureId="",
+                roundId=new_round_id(),
+                projectRoot=str(project_root),
+                destination=str(destination),
+                scope=request.scope,
+                sourceMode=request.source_mode,
+                warnings=[str(exc)],
+            )
+            diag = ExportDiagnostics(
+                executionId=exec_id,
+                roundId=fail_report.roundId,
+                captureId="",
+                stages=[{"stage": "prepare", "status": "failed", "message": str(exc), "errorCode": "E1001"}],
+                failedStage="prepare",
+                errorCode="E1001",
+                message="输入准备失败: {0}".format(exc),
+            )
+            # 安全落盘
+            try:
+                diag_dir = Path(destination) / "diagnostics" / exec_id
+                if diag.save(diag_dir):
+                    fail_report.diagnosticsPath = diag.savedPath
+                    fail_report.diagnosticsMdPath = diag.markdownPath
+            except Exception:
+                pass
+            fail_report.diagnostics = diag.to_dict()
+            formats_preview = normalize_formats(only_formats if only_formats is not None else request.formats)
+            for fmt in formats_preview:
+                fail_report.results.append(
+                    FormatResult(
+                        format=fmt,
+                        status=STATUS_FAILED,
+                        error_code="E1001",
+                        message="输入准备失败: {0}".format(exc),
+                        failed_stage="prepare",
+                    )
+                )
+            write_export_index(fail_report, destination)
+            return fail_report
         if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
             _emit_progress(pipeline_progress, "prepare", "succeeded", "导出内容快照已就绪")
         report = ExportReport(
@@ -943,6 +1006,41 @@ def run_project_export(
         report.warnings.append("严格模式：{0} 未达到正式要求".format(
             "、".join(format_label(item) for item in report.strict_violations())
         ))
+    report.executionId = exec_id
+    diag = ExportDiagnostics(
+        executionId=exec_id,
+        roundId=report.roundId,
+        captureId=report.captureId,
+        createdAt=report.createdAt,
+        failedStage="",
+        errorCode="",
+        message="本次导出执行完成（共 {0} 个格式）".format(len(report.results)),
+        stages=[
+            {"stage": "prepare", "status": "succeeded", "message": "正文与快照准备完成"},
+        ],
+    )
+    for r in report.results:
+        diag.stages.append({
+            "stage": r.format,
+            "status": r.status,
+            "message": r.message or ("生成成功" if r.usable else "未达到就绪状态"),
+            "errorCode": r.error_code,
+        })
+        if not r.usable and not diag.failedStage:
+            diag.failedStage = r.failed_stage or r.format
+            diag.errorCode = r.error_code
+            diag.message = r.message or "格式 {0} 导出未成功".format(r.format)
+        for loc in r.locations:
+            diag.locations.append(loc)
+    try:
+        diag_dir = Path(destination) / "diagnostics" / exec_id
+        if diag.save(diag_dir):
+            report.diagnosticsPath = diag.savedPath
+            report.diagnosticsMdPath = diag.markdownPath
+    except Exception:
+        pass
+    report.diagnostics = diag.to_dict()
+
     write_export_index(report, destination)
     return report
 

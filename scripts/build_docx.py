@@ -32,6 +32,8 @@ from lxml import etree
 from PIL import Image
 
 from docx_common import (
+    resolve_image_resource,
+    remap_parsed_document_locations,
     AutomationError,
     ImageReference,
     find_revision_table_info,
@@ -2750,11 +2752,30 @@ def _render_image_block(
     next_object_id,
     registry=None,
     asset_base: str = "",
+    chapter_path: str = "",
 ) -> Tuple[int, int]:
     """图片块：复用既有图片关系/尺寸逻辑，题注走共享注册表。"""
-    # 预处理生成的图（Mermaid 等）落在任务临时目录；用户资产仍在项目资源目录。
-    asset_root = asset_base or config.get("preparedAssetRoot") or config["paths"]["asset_root"]
-    image_path = resolve_resource(asset_root, block.relative_path, "图片")
+    # 统一按来源解析图片：生成图走生成映射，普通资产走捕获资源根
+    default_asset_root = (config.get("paths") or {}).get("asset_root", "")
+    norm_chapter = os.path.abspath(chapter_path) if chapter_path else ""
+    chapter_generated = dict((config.get("chapterGeneratedImages") or {}).get(norm_chapter) or {})
+    if not chapter_generated and config.get("generatedImages"):
+        chapter_generated = dict(config["generatedImages"])
+    if asset_base:
+        candidate = os.path.abspath(os.path.normpath(os.path.join(asset_base, block.relative_path)))
+        if os.path.isfile(candidate) and asset_base != default_asset_root:
+            chapter_generated[block.relative_path] = candidate
+    try:
+        image_path, _ = resolve_image_resource(
+            block.relative_path,
+            default_asset_root=default_asset_root,
+            chapter_path=chapter_path,
+            generated_map=chapter_generated,
+            module_resources=config.get("moduleResources"),
+            label="图片",
+        )
+    except AutomationError:
+        image_path = os.path.join(default_asset_root, block.relative_path)
     try:
         with open(image_path, "rb") as handle:
             data = handle.read()
@@ -3014,6 +3035,7 @@ def process_parsed_document(
                     next_object_id,
                     registry=registry,
                     asset_base=asset_base,
+                    chapter_path=document.path,
                 )
                 inserted += count
                 image_count += 1
@@ -3279,6 +3301,20 @@ def build(
         source = os.path.abspath(getattr(item, "source_path", "") or "")
         if source:
             prepared_map[source] = item
+    chapter_generated_map = {}
+    flat_generated_map = {}
+    for item in prepared_map.values():
+        src = os.path.abspath(getattr(item, "source_path", "") or "")
+        imgs = dict(getattr(item, "generated_images", {}) or {})
+        if not imgs and getattr(item, "assets", None):
+            imgs = {a.relative_path: a.image_path for a in item.assets if getattr(a, "image_path", "")}
+        if imgs and src:
+            chapter_generated_map[src] = imgs
+            flat_generated_map.update(imgs)
+    if chapter_generated_map:
+        config["chapterGeneratedImages"] = chapter_generated_map
+    if flat_generated_map:
+        config.setdefault("generatedImages", {}).update(flat_generated_map)
     prepared_asset_root = ""
     for item in prepared_map.values():
         root = getattr(item, "asset_root", "")
@@ -3319,7 +3355,10 @@ def build(
                 )
                 if msg not in warnings_list:
                     warnings_list.append(msg)
-        parsed_documents.append(parse_blocks(markdown_text, markdown_path))
+        parsed_doc = parse_blocks(markdown_text, markdown_path)
+        if item is not None and getattr(item, "line_map", None):
+            remap_parsed_document_locations(parsed_doc, item.line_map)
+        parsed_documents.append(parsed_doc)
     registry = build_registry(parsed_documents)
     set_active_registry(registry)
     # 歧义/缺失引用不阻断出稿，但必须带源文件与行号透出。

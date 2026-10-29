@@ -40,6 +40,7 @@ class ActionOverflow:
         self._button = button
         self._spacing = max(0, int(spacing))
         self._items: List[OverflowItem] = []
+        self._overflow_only_keys: set[str] = set()
         self._primary_width = 0
         self._hidden: List[str] = []
         self._menu_action_pairs: List[Tuple[QAction, QAction]] = []
@@ -55,14 +56,18 @@ class ActionOverflow:
         action: QAction,
         *,
         minimum_width: Optional[int] = None,
+        overflow_only: bool = False,
     ) -> None:
         """登记一个可溢出动作。
 
         宽度取 ``sizeHint``（完整文字 + QSS 内边距后的自然宽度）而不是
         ``minimumSizeHint``：后者允许 Qt 继续压缩按钮，会重现「文字被裁切」。
+        若 ``overflow_only=True``，动作不参与常驻排布，固定收纳在「更多 ▾」菜单中。
         """
+        if overflow_only:
+            self._overflow_only_keys.add(key)
         if minimum_width is None:
-            if widget is not None:
+            if widget is not None and not overflow_only:
                 hint = widget.sizeHint().width()
                 minimum_width = max(hint, widget.minimumSizeHint().width())
             else:
@@ -179,7 +184,7 @@ class ActionOverflow:
                     break
         for index in range(len(self._items) - 1, -1, -1):
             key, widget, _action, _min = self._items[index]
-            if widget is None or key in self._hidden:
+            if widget is None or key in self._hidden or key in self._overflow_only_keys:
                 continue
             try:
                 if widget.isHidden():
@@ -224,11 +229,16 @@ class ActionOverflow:
         """在预算内尽量多保留原位动作；溢出按钮自身也要占位。"""
         fits = set()
         used = 0
-        count = len(self._items)
-        for index, (key, _widget, _action, width) in enumerate(self._items):
+        candidates = [
+            item for item in self._items
+            if item[0] not in self._overflow_only_keys
+        ]
+        count = len(candidates)
+        has_permanent_overflow = bool(self._overflow_only_keys)
+        for index, (key, _widget, _action, width) in enumerate(candidates):
             remaining = count - index - 1
             need = width + self._spacing
-            reserve = (self._button.sizeHint().width() + self._spacing) if remaining else 0
+            reserve = (self._button.sizeHint().width() + self._spacing) if (remaining or has_permanent_overflow) else 0
             if used + need + reserve <= budget:
                 used += need
                 fits.add(key)

@@ -554,6 +554,7 @@ def run_pipeline(
     revision_author: str = "系统",
     document_version_override: Optional[str] = None,
     document_properties: Optional[Dict[str, str]] = None,
+    render_mermaid: bool = False,
 ) -> PipelineResult:
     """执行构建→前校验→Word 刷新→后校验管线，返回结构化结果。
 
@@ -1009,6 +1010,7 @@ def _run_pipeline_inner(
             markdown_paths,
             cancel_check=lambda: token.is_cancelled,
             resolver=reuse_resolver,
+            render_mermaid=render_mermaid,
         )
         prepare_warnings = []
         for prepared in prepared_sources:
