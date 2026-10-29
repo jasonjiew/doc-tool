@@ -7349,7 +7349,7 @@ class MainWindow(QMainWindow):
 
         def _on_result(res):
             if res.has_update and not res.is_skipped and res.manifest:
-                QTimer.singleShot(0, lambda: self._on_update_discovered(res.manifest))
+                QTimer.singleShot(0, self, lambda: self._on_update_discovered(res.manifest))
 
         run_update_check_async(_on_result, force=False)
 
@@ -7395,7 +7395,7 @@ class MainWindow(QMainWindow):
                         "检查更新",
                         f"当前已是最新版本 (v{APP_VERSION})。",
                     )
-            QTimer.singleShot(0, _update_ui)
+            QTimer.singleShot(0, self, _update_ui)
 
         run_update_check_async(_on_result, force=True)
 

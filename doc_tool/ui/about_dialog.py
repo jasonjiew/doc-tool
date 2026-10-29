@@ -180,29 +180,39 @@ def show_about_dialog(parent) -> None:
     check_update_btn.setProperty("btnRole", "secondary")
 
     update_status_label = QLabel("", dialog)
-    update_status_label.setObjectName("statusMuted")
+    update_status_label.setObjectName("updateStatusLabel")
 
     def _do_check():
-        update_status_label.setText("正在检查更新…")
-        from doc_tool.application.updater import check_for_updates
+        update_status_label.setText("\u6b63\u5728\u68c0\u67e5\u66f4\u65b0\u2026")
+        check_update_btn.setEnabled(False)
+        from doc_tool.application.updater import check_for_updates, UpdateCheckResult
         import threading
         from PySide6.QtCore import QTimer
 
         def _bg():
-            res = check_for_updates(force=True)
+            try:
+                res = check_for_updates(force=True)
+            except Exception as exc:
+                res = UpdateCheckResult(error=str(exc))
+
             def _update_ui():
-                if res.error:
-                    update_status_label.setText(f"检查失败: {res.error}")
-                elif res.has_update and res.manifest:
-                    update_status_label.setText(f"发现新版本 v{res.manifest.version}！")
-                    show_update_dialog(
-                        dialog,
-                        res.manifest,
-                        on_upgrade_confirmed=getattr(parent, "_perform_upgrade", None),
-                    )
-                else:
-                    update_status_label.setText("当前已是最新版本")
-            QTimer.singleShot(0, _update_ui)
+                try:
+                    check_update_btn.setEnabled(True)
+                    if res.error:
+                        update_status_label.setText(f"\u68c0\u67e5\u5931\u8d25: {res.error}")
+                    elif res.has_update and res.manifest:
+                        update_status_label.setText(f"\u53d1\u73b0\u65b0\u7248\u672c v{res.manifest.version}\uff01")
+                        show_update_dialog(
+                            dialog,
+                            res.manifest,
+                            on_upgrade_confirmed=getattr(parent, "_perform_upgrade", None),
+                        )
+                    else:
+                        update_status_label.setText("\u5f53\u524d\u5df2\u662f\u6700\u65b0\u7248\u672c")
+                except RuntimeError:
+                    pass
+
+            QTimer.singleShot(0, dialog, _update_ui)
 
         threading.Thread(target=_bg, daemon=True).start()
 
