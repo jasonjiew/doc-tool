@@ -240,13 +240,21 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
     for key, value in (extra_env or {}).items():
         env[str(key)] = str(value)
     started = time.monotonic()
-    completed = subprocess.run(
-        command, cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False,
-    )
-    duration = time.monotonic() - started
-    print(completed.stdout, end="", flush=True)
-    return {"name": name, "code": completed.returncode, "duration": duration, "output": completed.stdout}
+    try:
+        completed = subprocess.run(
+            command, cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False,
+            timeout=180,
+        )
+        duration = time.monotonic() - started
+        code = completed.returncode
+        output = completed.stdout
+    except subprocess.TimeoutExpired as exc:
+        duration = time.monotonic() - started
+        code = 124
+        output = f"TIMEOUT: test {name} exceeded 180s timeout limit.\nOutput before timeout:\n{exc.stdout or ''}"
+    print(output, end="", flush=True)
+    return {"name": name, "code": code, "duration": duration, "output": output}
 
 
 def write_junit(path: Path, results: list[dict]) -> None:

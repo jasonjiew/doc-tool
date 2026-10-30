@@ -250,6 +250,7 @@ class RoundRegenerationTests(_ProjectCase):
                 if isinstance(top, ExportSettingsDialog) and top.isVisible():
                     top._submit_btn.click()
                     return
+            QTimer.singleShot(20, _do_confirm)
 
         QTimer.singleShot(20, _do_confirm)
 
@@ -466,6 +467,7 @@ class RoundRegenerationTests(_ProjectCase):
                 if isinstance(top, ExportSettingsDialog) and top.isVisible():
                     top.reject()
                     return
+            QTimer.singleShot(20, _cancel_settings)
 
         QTimer.singleShot(20, _cancel_settings)
         self.window._task_dock.results_view()._regenerate_btn.click()

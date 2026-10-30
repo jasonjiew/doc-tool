@@ -266,6 +266,7 @@ class MainWindowResultsTests(unittest.TestCase):
                 if isinstance(top, ExportSettingsDialog) and top.isVisible():
                     top._submit_btn.click()
                     return
+            QTimer.singleShot(20, _do)
 
         QTimer.singleShot(20, _do)
 
