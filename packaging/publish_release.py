@@ -69,11 +69,55 @@ PROJECT_ID = int(PROJECT_ID_RAW) if PROJECT_ID_RAW.strip().isdigit() else 0
 
 def get_token() -> str:
     token = os.getenv("GITLAB_TOKEN")
-    if not token and len(sys.argv) > 1:
-        token = sys.argv[1]
     if not token:
-        raise RuntimeError("请设置 GITLAB_TOKEN 环境变量或通过命令行参数传入 Token: python packaging/publish_release.py <TOKEN>")
+        for arg in sys.argv[1:]:
+            if not arg.startswith("-") and ("glpat-" in arg or len(arg) >= 20):
+                token = arg
+                break
+    if not token:
+        token_file = Path(__file__).resolve().parent.parent / ".gitlab_token"
+        if token_file.exists():
+            token = token_file.read_text(encoding="utf-8").strip()
+    if not token:
+        raise RuntimeError("请设置 GITLAB_TOKEN 环境变量，或在根目录创建 .gitlab_token，或通过命令行参数传入 Token")
     return token
+
+
+def ensure_release_assets(out_dir: str, version: str) -> None:
+    """若本地缺少发布资产或指定了 --from-github，则自动从 GitHub Release 下载同步。"""
+    required = [
+        f"DocTool-Setup-{version}.exe",
+        f"DocTool-Setup-{version}.exe.sha256",
+        f"DocTool-{version}-portable.zip",
+        f"DocTool-{version}-portable.zip.sha256",
+    ]
+    missing = [f for f in required if not os.path.exists(os.path.join(out_dir, f))]
+    sync_requested = "--from-github" in sys.argv or "--sync" in sys.argv
+    if not missing and not sync_requested:
+        return
+
+    print(f"正在从 GitHub Release v{version} 同步发布资产...", flush=True)
+    api_url = f"https://api.github.com/repos/jasonjiew/doc-tool/releases/tags/v{version}"
+    try:
+        req = urllib.request.Request(api_url, headers={"User-Agent": "doc-tool-sync"})
+        rel_data = json.loads(urllib.request.urlopen(req).read())
+        for asset in rel_data.get("assets", []):
+            name = asset["name"]
+            url = asset["browser_download_url"]
+            dest = os.path.join(out_dir, name)
+            if os.path.exists(dest) and os.path.getsize(dest) == asset["size"] and not sync_requested:
+                continue
+            print(f"  下载 {name} ({asset['size'] / (1024*1024):.1f} MB)...", flush=True)
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "doc-tool-sync"})) as resp, open(dest, "wb") as f:
+                while chunk := resp.read(1024 * 1024):
+                    f.write(chunk)
+        notes_dest = os.path.join(out_dir, "release-notes.md")
+        if rel_data.get("body"):
+            with open(notes_dest, "w", encoding="utf-8") as f:
+                f.write(rel_data["body"])
+        print("GitHub Release 资产同步完成。", flush=True)
+    except Exception as e:
+        print(f"从 GitHub 同步资产提示（若本地已有产物将直接使用）: {e}", flush=True)
 
 
 def calc_sha256(filepath: str) -> str:
@@ -192,6 +236,7 @@ def main():
     from doc_tool.domain.version import get_commit_id
     commit_sha = get_commit_id()[:7]
     out_dir = os.path.join(repo_root, "packaging", "Output")
+    ensure_release_assets(out_dir, VERSION)
 
     files_to_upload = [
         (f"DocTool-Setup-{VERSION}.exe", os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe")),
@@ -201,6 +246,7 @@ def main():
         (f"DocTool-{VERSION}-sbom.txt", os.path.join(out_dir, f"DocTool-{VERSION}-sbom.txt")),
         (f"DocTool-{VERSION}.cdx.json", os.path.join(out_dir, f"DocTool-{VERSION}.cdx.json")),
         (f"DocTool-{VERSION}.spdx.json", os.path.join(out_dir, f"DocTool-{VERSION}.spdx.json")),
+        ("latest.json", os.path.join(out_dir, "latest.json")),
     ]
 
     signing_dir = os.environ.get("CODE_SIGNING_DIR") or os.path.expanduser("~/.doctool/signing")
@@ -248,7 +294,12 @@ def main():
     setup_sha = calc_sha256(os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe"))
     portable_sha = calc_sha256(os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip"))
 
-    description = f"""# Doc Tool v{VERSION}
+    notes_path = os.path.join(out_dir, "release-notes.md")
+    if os.path.exists(notes_path) and os.path.getsize(notes_path) > 50:
+        with open(notes_path, "r", encoding="utf-8") as f:
+            description = f.read().strip()
+    else:
+        description = f"""# Doc Tool v{VERSION}
 
 公司内部文档维护工具：把大型 Word 文档转成可维护、可审查、可可靠重建的 Markdown 项目，编辑完成后一键重建正式 DOCX 交付物。
 

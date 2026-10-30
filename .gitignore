@@ -34,6 +34,7 @@ env/
 # --- 密钥与本地配置 ---
 .env
 .env.local
+.gitlab_token
 *.pem
 *.pfx
 *.key
