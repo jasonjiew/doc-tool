@@ -242,17 +242,18 @@ class RoundRegenerationTests(_ProjectCase):
         )
 
     def _confirm_settings(self):
-        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QDialog
         from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
 
-        def _do_confirm():
-            for top in self.app.topLevelWidgets():
-                if isinstance(top, ExportSettingsDialog) and top.isVisible():
-                    top._submit_btn.click()
-                    return
-            QTimer.singleShot(20, _do_confirm)
+        def _auto_submit(dlg):
+            dlg._on_submit()
+            if dlg._request is None:
+                dlg._request = dlg.request()
+            return QDialog.DialogCode.Accepted
 
-        QTimer.singleShot(20, _do_confirm)
+        patcher = patch.object(ExportSettingsDialog, "exec", _auto_submit)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         self.window.close()
@@ -462,16 +463,10 @@ class RoundRegenerationTests(_ProjectCase):
         submissions = []
         self.window._run_export_task = lambda **task: submissions.append(task)
 
-        def _cancel_settings():
-            for top in self.app.topLevelWidgets():
-                if isinstance(top, ExportSettingsDialog) and top.isVisible():
-                    top.reject()
-                    return
-            QTimer.singleShot(20, _cancel_settings)
-
-        QTimer.singleShot(20, _cancel_settings)
-        self.window._task_dock.results_view()._regenerate_btn.click()
-        self.app.processEvents()
+        from PySide6.QtWidgets import QDialog
+        with patch.object(ExportSettingsDialog, "exec", lambda dlg: QDialog.DialogCode.Rejected):
+            self.window._task_dock.results_view()._regenerate_btn.click()
+            self.app.processEvents()
 
         self.assertEqual(submissions, [], "取消设置时不应提交任何后台导出任务")
         self.assertIn("已取消导出设置", self.window._status_label.text())

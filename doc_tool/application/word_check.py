@@ -404,6 +404,10 @@ def check_word_available(
     dispatch_check: bool = True,
     dispatch_timeout_seconds: float = 10.0,
 ) -> WordAvailability:
+    if os.environ.get("DOC_TOOL_SKIP_WORD_PROBE") == "1":
+        report = WordAvailability()
+        report.reasons.append("CI 或测试环境显式跳过 Word COM 探测")
+        return report
     """组合检查 Microsoft Word 是否可用于正式合并。
 
     Args:

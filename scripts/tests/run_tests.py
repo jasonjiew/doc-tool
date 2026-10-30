@@ -197,6 +197,8 @@ def parse_args():
     parser.add_argument("--coverage-min", type=float, default=0.0)
     parser.add_argument("--coverage-xml", default=str(ROOT / "coverage.xml"))
     parser.add_argument("--coverage-json", default=str(ROOT / "coverage.json"))
+    parser.add_argument("--fail-fast", "-x", action="store_true", help="遇首个失败立即退出")
+    parser.add_argument("--workers", "-j", type=int, default=1, help="并发测试进程数（默认 1）")
     parser.add_argument("tests", nargs="*")
     # 显式环境覆盖（如 UI 包 5.2 的离屏缩放证据需要 QT_SCALE_FACTOR）。
     parser.add_argument(
@@ -206,8 +208,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
-    print("\n== {0} ==".format(name), flush=True)
+def run_one(name: str, coverage: bool, extra_env: dict | None = None, verbose: bool = True) -> dict:
+    if verbose:
+        print("\n== {0} ==".format(name), flush=True)
     command = [sys.executable]
     if coverage:
         command.extend(["-m", "coverage", "run", "--parallel-mode", "--source=doc_tool,scripts"])
@@ -254,7 +257,8 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
         duration = time.monotonic() - started
         code = 124
         output = f"TIMEOUT: test {name} exceeded 300s timeout limit.\nOutput before timeout:\n{exc.stdout or ''}"
-    print(output, end="", flush=True)
+    if verbose:
+        print(output, end="", flush=True)
     return {"name": name, "code": code, "duration": duration, "output": output}
 
 
@@ -304,7 +308,34 @@ def main() -> int:
         key, _, value = str(item).partition("=")
         if key:
             extra_env[key] = value
-    results = [run_one(name, args.coverage, extra_env) for name in tests]
+
+    if args.workers > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        results = []
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            future_to_name = {
+                executor.submit(run_one, name, args.coverage, extra_env, False): name
+                for name in tests
+            }
+            for future in as_completed(future_to_name):
+                res = future.result()
+                results.append(res)
+                print(f"\n== {res['name']} == (耗时: {res['duration']:.2f}s, 退出码: {res['code']})\n{res['output']}", flush=True)
+                if args.fail_fast and res["code"] != 0:
+                    print(f"\n[FAIL-FAST] {res['name']} 失败，终止测试。", flush=True)
+                    for f in future_to_name:
+                        f.cancel()
+                    break
+    else:
+        results = []
+        for name in tests:
+            res = run_one(name, args.coverage, extra_env, True)
+            results.append(res)
+            if args.fail_fast and res["code"] != 0:
+                print(f"\n[FAIL-FAST] {name} 失败，终止测试。", flush=True)
+                break
+
     write_junit(Path(args.junit), results)
     test_code = 1 if any(result["code"] != 0 for result in results) else 0
     coverage_code = finish_coverage(args) if args.coverage else 0

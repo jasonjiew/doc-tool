@@ -1,0 +1,76 @@
+name: Fast CI (PR & Push)
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+      - 'codex/**'
+    tags-ignore:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+  QT_QPA_PLATFORM: 'offscreen'
+  DOC_TOOL_SKIP_WORD_PROBE: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  quick-check:
+    name: Fast Unit & Contract Tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: 安装基础依赖
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt --no-cache-dir
+
+      - name: 运行核心逻辑与快速契约测试（4 并发 + 快速熔断）
+        shell: pwsh
+        run: |
+          python scripts\tests\run_tests.py --fail-fast --workers 4 `
+            test_docx_common.py `
+            test_ooxml_security.py `
+            test_validator_negative.py `
+            test_iteration_scenarios.py `
+            test_project_model.py `
+            test_style_mapping.py `
+            test_authoring_services.py `
+            test_issues.py `
+            test_format_check_search.py `
+            test_markdown_structure.py `
+            test_cli_machine.py `
+            test_quality_gates.py `
+            test_quality_traceability.py `
+            test_safety_recovery.py `
+            test_vcs_changes.py `
+            test_revision_record.py `
+            test_table_format.py `
+            test_expression_contract.py `
+            test_prepared_source.py `
+            test_schema_v2_migration.py `
+            test_update_domain.py `
+            test_updater_service.py

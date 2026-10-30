@@ -526,19 +526,21 @@ class ExportSubmissionTests(unittest.TestCase):
         captured = {}
         self.window._collect_buffer_texts = lambda: {"a.md": "文"}
 
-        def _confirm_active_dialog():
-            from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
-            for w in QApplication.topLevelWidgets():
-                if isinstance(w, ExportSettingsDialog) and w.isVisible():
-                    w._submit_btn.click()
-                    return
-            QTimer.singleShot(20, _confirm_active_dialog)
+        from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
+        from PySide6.QtWidgets import QDialog
+
+        def _submit_exec(dlg):
+            dlg._on_submit()
+            if dlg._request is None:
+                dlg._request = dlg.request()
+            return QDialog.DialogCode.Accepted
 
         with patch(
             "doc_tool.application.project_export.run_project_export",
             side_effect=lambda request, **kwargs: captured.update({"request": request}),
+        ), patch.object(
+            ExportSettingsDialog, "exec", _submit_exec
         ):
-            QTimer.singleShot(20, _confirm_active_dialog)
             self.window._on_quick_export_word()
             self._drain(30)
         request = captured["request"]

@@ -37,6 +37,7 @@ env:
   PYTHONUTF8: '1'
   PYTHONDONTWRITEBYTECODE: '1'
   QT_QPA_PLATFORM: 'offscreen'
+  DOC_TOOL_SKIP_WORD_PROBE: '1'
 
 permissions:
   contents: read
@@ -108,7 +109,7 @@ jobs:
 
       - name: 单元测试与覆盖率（下限 ${{ env.COVERAGE_MIN }}%）
         shell: pwsh
-        run: python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN
+        run: python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN --fail-fast --workers 2
 
       - name: 依赖漏洞审计
         if: always()

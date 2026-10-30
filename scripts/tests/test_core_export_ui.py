@@ -350,19 +350,20 @@ class ChangeDirectoryActionTests(unittest.TestCase):
             from PySide6.QtWidgets import QApplication
             from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
 
-            def _confirm_settings():
-                for top in QApplication.topLevelWidgets():
-                    if isinstance(top, ExportSettingsDialog) and top.isVisible():
-                        top._submit_btn.click()
-                        return
+            def _submit_exec(dlg):
+                dlg._on_submit()
+                if dlg._request is None:
+                    dlg._request = dlg.request()
+                return QDialog.DialogCode.Accepted
 
             with patch(
                 "doc_tool.ui.main_window.QFileDialog.getExistingDirectory",
                 return_value=destination,
             ), patch(
                 "doc_tool.application.project_export.run_project_export", _fake_export
+            ), patch.object(
+                ExportSettingsDialog, "exec", _submit_exec
             ):
-                QTimer.singleShot(20, _confirm_settings)
                 window._on_change_export_destination(view)
                 import time
 

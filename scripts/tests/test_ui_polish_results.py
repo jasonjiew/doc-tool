@@ -258,17 +258,18 @@ class MainWindowResultsTests(unittest.TestCase):
         )
 
     def _auto_confirm_settings(self):
-        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QDialog
         from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
 
-        def _do():
-            for top in self._app.topLevelWidgets():
-                if isinstance(top, ExportSettingsDialog) and top.isVisible():
-                    top._submit_btn.click()
-                    return
-            QTimer.singleShot(20, _do)
+        def _do(dlg):
+            dlg._on_submit()
+            if dlg._request is None:
+                dlg._request = dlg.request()
+            return QDialog.DialogCode.Accepted
 
-        QTimer.singleShot(20, _do)
+        patcher = patch.object(ExportSettingsDialog, "exec", _do)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_regenerate_creates_new_current_buffer_round(self):
         first = self._run_export()
