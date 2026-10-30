@@ -608,6 +608,15 @@ def _document_for_expectation(path: str, config: Dict, depth: Optional[int] = No
     policy = resolve_merge_policy(config)
     overrides = config.get("preparedTexts") or {}
     prepared_text = overrides.get(os.path.abspath(path))
+    if prepared_text is None and overrides:
+        try:
+            norm_target = os.path.normcase(os.path.abspath(path))
+            for k, v in overrides.items():
+                if os.path.normcase(os.path.abspath(k)) == norm_target:
+                    prepared_text = v
+                    break
+        except Exception:
+            pass
     if prepared_text is None:
         try:
             with open(path, encoding="utf-8") as handle:
@@ -661,7 +670,17 @@ def expected_events_for_document(
             if not chapter_generated and config.get("generatedImages"):
                 chapter_generated = dict(config["generatedImages"])
             if config.get("assetRootOverrides"):
-                overridden = (config.get("assetRootOverrides") or {}).get(chapter_key)
+                overrides_map = config.get("assetRootOverrides") or {}
+                overridden = overrides_map.get(chapter_key)
+                if not overridden:
+                    try:
+                        norm_target = os.path.normcase(os.path.abspath(path))
+                        for k, v in overrides_map.items():
+                            if os.path.normcase(os.path.abspath(k)) == norm_target:
+                                overridden = v
+                                break
+                    except Exception:
+                        pass
                 if overridden and overridden != default_asset_root:
                     candidate = os.path.abspath(os.path.normpath(os.path.join(overridden, block.relative_path)))
                     if os.path.isfile(candidate):

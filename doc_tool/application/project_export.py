@@ -890,10 +890,9 @@ def run_project_export(
         if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
             _emit_progress(pipeline_progress, "prepare", "started", "正在准备导出内容快照…")
         exec_id = new_execution_id()
-        manifest = None
+        manifest = ProjectManifest.load(project_root)
         snapshot = None
         try:
-            manifest = ProjectManifest.load(project_root)
             snapshot = capture_snapshot(
                 project_root,
                 scope=request.scope,
@@ -904,7 +903,6 @@ def run_project_export(
                 variant_id=str(getattr(request, "variant_id", "") or ""),
                 expected_hashes=expected_hashes,
             )
-            manifest = _prepare_snapshot_document(snapshot, request)
         except Exception as exc:
             fail_report = ExportReport(
                 executionId=exec_id,
@@ -947,6 +945,7 @@ def run_project_export(
                 )
             write_export_index(fail_report, destination)
             return fail_report
+        manifest = _prepare_snapshot_document(snapshot, request)
         if FORMAT_DOCX in formats_preview and pipeline_progress is not None:
             _emit_progress(pipeline_progress, "prepare", "succeeded", "导出内容快照已就绪")
         report = ExportReport(

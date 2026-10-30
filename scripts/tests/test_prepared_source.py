@@ -325,6 +325,7 @@ class BuildWithPreparedSourceTests(unittest.TestCase):
             prepared.cleanup()
 
     def test_mixed_mermaid_and_static_image_builds_and_validates(self):
+        import os
         from build_docx import build
         from validate_docx import validate
 
@@ -349,13 +350,17 @@ class BuildWithPreparedSourceTests(unittest.TestCase):
             self.assertTrue(Path(output).is_file())
 
             val_config = dict(self.config)
+            resolved_key = str(self.source.resolve())
+            abs_key = os.path.abspath(str(self.source))
             if prepared.asset_root:
                 val_config["assetRootOverrides"] = {
-                    str(self.source.resolve()): prepared.asset_root
+                    resolved_key: prepared.asset_root,
+                    abs_key: prepared.asset_root,
                 }
             if prepared.prepared_text:
                 val_config["preparedTexts"] = {
-                    str(self.source.resolve()): prepared.read_prepared_text()
+                    resolved_key: prepared.read_prepared_text(),
+                    abs_key: prepared.read_prepared_text(),
                 }
 
             val_report = self.root / "val_report.md"

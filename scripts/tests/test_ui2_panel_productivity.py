@@ -76,15 +76,14 @@ class NarrowPanelLayoutTests(unittest.TestCase):
         self.assertLessEqual(view.minimumSizeHint().width(), 340)
         self.assertTrue(view._actions_row.is_stacked(), "340px 下动作必须竖排")
         for button in (
-            view._retry_btn,
-            view._regenerate_btn,
+            view._primary_btn,
             view._settings_btn,
-            view._destination_btn,
+            view._more_btn,
         ):
-            self.assertTrue(button.isVisible(), button.text())
+            self.assertTrue(button.isVisible(), button.text() or button.objectName())
             self.assertGreaterEqual(
                 button.width(), button.sizeHint().width(),
-                "窄面板不得压缩动作文字：{0}".format(button.text()),
+                "窄面板不得压缩动作文字：{0}".format(button.text() or button.objectName()),
             )
             self.assertLessEqual(button.geometry().right(), view.width())
         view.close()

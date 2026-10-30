@@ -381,7 +381,7 @@ def capture_snapshot(
         disk_bytes = None
         try:
             disk_bytes = path.read_bytes()
-            disk_text = disk_bytes.decode("utf-8")
+            disk_text = disk_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
         except OSError as exc:
             disk_text = ""
             if expected_hashes is not None and rel_path in expected_hashes:
@@ -609,7 +609,7 @@ def _materialize(
     for rel_path in snapshot.indexDiskHashes:
         target = root / "content" / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(buffers[rel_path], encoding="utf-8")
+        target.write_text(buffers[rel_path].replace("\r\n", "\n").replace("\r", "\n"), encoding="utf-8", newline="\n")
     for chapter in snapshot.chapters:
         text = buffers.get(chapter.rel_path)
         target = root / "content" / chapter.rel_path
@@ -629,7 +629,7 @@ def _materialize(
                 except OSError:
                     pass
             text = resolved
-        target.write_text(text, encoding="utf-8")
+        target.write_text(text.replace("\r\n", "\n").replace("\r", "\n"), encoding="utf-8", newline="\n")
 
     # 资源：按实际引用复制（保持相对结构），不复制无关资源。
     for rel_key, _digest in snapshot.assetHashes.items():

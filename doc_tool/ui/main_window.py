@@ -3085,7 +3085,9 @@ class MainWindow(QMainWindow):
         if not self._project_summary or self.runner.is_running:
             return
         if show_dock:
-            self._select_content_tab(4)
+            selector = getattr(self, "_select_content_tab", None)
+            if callable(selector):
+                selector(4)
         workspace = getattr(self, "_content_workspace", None)
         run_lint = getattr(workspace, "run_lint", None)
         if callable(run_lint):
