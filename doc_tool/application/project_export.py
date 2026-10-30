@@ -1016,6 +1016,12 @@ def run_project_export(
             elif fmt == FORMAT_PDF:
                 if prior is not None and not docx_path:
                     result = _unavailable_original_result(fmt, previous)
+                elif skip_word_refresh:
+                    result = FormatResult(
+                        format=FORMAT_PDF,
+                        status=STATUS_PENDING_CONVERT,
+                        message="跳过 Word 刷新环境，PDF 待转换（后续可补）。",
+                    )
                 else:
                     if pipeline_progress is not None:
                         _emit_progress(pipeline_progress, "pdf", "started", "正在由 Word 转换 PDF…")

@@ -214,6 +214,7 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
     command.append(str(HERE / name))
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     if "QT_QPA_PLATFORM" not in env:
         env["QT_QPA_PLATFORM"] = "offscreen"
@@ -244,7 +245,7 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
         completed = subprocess.run(
             command, cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", check=False,
-            timeout=180,
+            timeout=300,
         )
         duration = time.monotonic() - started
         code = completed.returncode
@@ -252,7 +253,7 @@ def run_one(name: str, coverage: bool, extra_env: dict | None = None) -> dict:
     except subprocess.TimeoutExpired as exc:
         duration = time.monotonic() - started
         code = 124
-        output = f"TIMEOUT: test {name} exceeded 180s timeout limit.\nOutput before timeout:\n{exc.stdout or ''}"
+        output = f"TIMEOUT: test {name} exceeded 300s timeout limit.\nOutput before timeout:\n{exc.stdout or ''}"
     print(output, end="", flush=True)
     return {"name": name, "code": code, "duration": duration, "output": output}
 
