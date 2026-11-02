@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 """验证 Mermaid 图形导出、CLI 后端与缓存兼容（Group 6：REQ-MM-04、REQ-MM-05、REQ-MM-06、REQ-MD-04、REQ-MD-07、REQ-MD-08）。"""
 
+import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
+
 import os
 import shutil
 import tempfile

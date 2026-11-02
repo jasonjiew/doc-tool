@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 """验证来源定位、异步更新与阅读连续性（Group 7：REQ-MD-04、REQ-MD-06、REQ-MD-07、REQ-ED-01、REQ-MM-04）。"""
 
+import sys
+from pathlib import Path
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
+
 import os
 import sys
 import unittest

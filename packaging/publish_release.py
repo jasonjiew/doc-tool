@@ -184,6 +184,62 @@ def get_package_files(token: str) -> list[dict]:
         return json.loads(resp.read())
 
 
+
+def sync_release_links(token: str, base: str, project_id: str, tag_name: str, links: list[dict]) -> None:
+    """确保 Release 的资产链接在 GitLab Release Assets 中正确挂载。"""
+    existing_url = f"{base}/api/v4/projects/{project_id}/releases/{tag_name}/assets/links"
+    req = urllib.request.Request(existing_url, headers={"PRIVATE-TOKEN": token})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            existing_links = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"获取已存在 Release links 失败: {e}", flush=True)
+        existing_links = []
+
+    existing_by_url = {item["url"]: item for item in existing_links}
+    existing_by_name = {item["name"]: item for item in existing_links}
+
+    for link in links:
+        url = link["url"]
+        name = link["name"]
+        link_type = link.get("link_type", "package")
+
+        if item := existing_by_name.get(name):
+            if item["url"] == url:
+                print(f"  Release 资产已就绪: {name}", flush=True)
+                continue
+            del_url = f"{existing_url}/{item['id']}"
+            del_req = urllib.request.Request(del_url, headers={"PRIVATE-TOKEN": token}, method="DELETE")
+            try:
+                urllib.request.urlopen(del_req)
+            except Exception:
+                pass
+        elif item := existing_by_url.get(url):
+            del_url = f"{existing_url}/{item['id']}"
+            del_req = urllib.request.Request(del_url, headers={"PRIVATE-TOKEN": token}, method="DELETE")
+            try:
+                urllib.request.urlopen(del_req)
+            except Exception:
+                pass
+
+        post_payload = {
+            "name": name,
+            "url": url,
+            "link_type": link_type,
+        }
+        post_req = urllib.request.Request(
+            existing_url,
+            data=json.dumps(post_payload).encode("utf-8"),
+            headers={"PRIVATE-TOKEN": token, "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(post_req) as resp:
+                created = json.loads(resp.read().decode("utf-8"))
+                print(f"  已成功挂载 Release 资产: {name} (id={created.get('id')})", flush=True)
+        except Exception as e:
+            print(f"  挂载 Release 资产失败 {name}: {e}", flush=True)
+
 def create_or_update_release(token: str, description: str, links: list[dict]) -> dict:
     base = get_gitlab_base()
     project_id = get_project_id()
@@ -216,7 +272,7 @@ def create_or_update_release(token: str, description: str, links: list[dict]) ->
             method="PUT",
         )
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+            rel = json.loads(resp.read().decode("utf-8"))
     else:
         print(f"正在创建 Release {TAG_NAME}...", flush=True)
         req = urllib.request.Request(
@@ -226,7 +282,13 @@ def create_or_update_release(token: str, description: str, links: list[dict]) ->
             method="POST",
         )
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+            rel = json.loads(resp.read().decode("utf-8"))
+
+    if links:
+        print("正在同步挂载 Release 资产下载链接...", flush=True)
+        sync_release_links(token, base, project_id, TAG_NAME, links)
+
+    return rel
 
 
 def main():
@@ -279,28 +341,70 @@ def main():
             zip_mb = f"{zip_file['size'] / (1024 * 1024):.1f}" if zip_file else "73.0"
 
             link_specs = [
-                (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（安装包，{exe_mb} MB）"),
-                (f"DocTool-Setup-{VERSION}.exe.sha256", "安装包 SHA-256"),
-                (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）"),
-                (f"DocTool-{VERSION}-portable.zip.sha256", "便携包 SHA-256"),
-                (f"DocTool-{VERSION}-sbom.txt", "清单 SBOM"),
-                (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM"),
-                (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM"),
-                ("codesign.cer", "codesign.cer（公司证书公钥）"),
+                (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（Windows 安装包，{exe_mb} MB）", "package"),
+                (f"DocTool-Setup-{VERSION}.exe.sha256", "安装包 SHA-256 校验和", "other"),
+                (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）", "package"),
+                (f"DocTool-{VERSION}-portable.zip.sha256", "便携版 SHA-256 校验和", "other"),
+                (f"DocTool-{VERSION}-sbom.txt", "依赖物料清单 SBOM", "other"),
+                (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM (JSON)", "other"),
+                (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM (JSON)", "other"),
+                ("latest.json", "latest.json（客户端更新元数据）", "other"),
+                ("codesign.cer", "codesign.cer（公司证书公钥）", "other"),
             ]
-            for filename, display_name in link_specs:
-                if item := name_to_file.get(filename):
-                    url = f"{base}/{project_path}/-/package_files/{item['id']}/download"
+            for item in link_specs:
+                filename = item[0]
+                display_name = item[1]
+                link_type = item[2] if len(item) > 2 else "other"
+                if pkg_file := name_to_file.get(filename):
+                    url = f"{base}/{project_path}/-/package_files/{pkg_file['id']}/download"
                     links.append({
                         "name": display_name,
                         "url": url,
                         "direct_asset_url": url,
-                        "link_type": "other"
+                        "link_type": link_type,
+                        "filename": filename,
+                        "size": pkg_file.get("size", 0),
                     })
         except Exception as exc:
             print(f"获取 Package 资产链接提示: {exc}")
     else:
         print("提示: 当前为 Release 说明发布模式或本地暂无产物，跳过资产包上传。")
+    if not links:
+        try:
+            package_files = get_package_files(token)
+            name_to_file = {f["file_name"]: f for f in package_files}
+            exe_file = name_to_file.get(f"DocTool-Setup-{VERSION}.exe")
+            zip_file = name_to_file.get(f"DocTool-{VERSION}-portable.zip")
+            exe_mb = f"{exe_file['size'] / (1024 * 1024):.1f}" if exe_file else "45.7"
+            zip_mb = f"{zip_file['size'] / (1024 * 1024):.1f}" if zip_file else "73.0"
+            link_specs = [
+                (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（Windows 安装包，{exe_mb} MB）", "package"),
+                (f"DocTool-Setup-{VERSION}.exe.sha256", "安装包 SHA-256 校验和", "other"),
+                (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）", "package"),
+                (f"DocTool-{VERSION}-portable.zip.sha256", "便携版 SHA-256 校验和", "other"),
+                (f"DocTool-{VERSION}-sbom.txt", "依赖物料清单 SBOM", "other"),
+                (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM (JSON)", "other"),
+                (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM (JSON)", "other"),
+                ("latest.json", "latest.json（客户端更新元数据）", "other"),
+                ("codesign.cer", "codesign.cer（公司证书公钥）", "other"),
+            ]
+            for item in link_specs:
+                filename = item[0]
+                display_name = item[1]
+                link_type = item[2] if len(item) > 2 else "other"
+                if pkg_file := name_to_file.get(filename):
+                    url = f"{base}/{project_path}/-/package_files/{pkg_file['id']}/download"
+                    links.append({
+                        "name": display_name,
+                        "url": url,
+                        "direct_asset_url": url,
+                        "link_type": link_type,
+                        "filename": filename,
+                        "size": pkg_file.get("size", 0),
+                    })
+        except Exception as exc:
+            print(f"回填 Package 资产链接提示: {exc}", flush=True)
+
 
     setup_file = os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe")
     setup_sha = calc_sha256(setup_file) if os.path.exists(setup_file) else "待构建生成"
@@ -456,6 +560,28 @@ def main():
 - 升级使用相同 AppId 与安装目录，自动关闭旧进程后覆盖；
 - 旧设置（窗口几何、最近项目）首次启动时只读迁移，旧值保留便于回滚。
 """
+
+        # 确保正文包含资产下载直链表格与校验和
+    if links and "## 下载与安装资产" not in description and "## 资产下载" not in description:
+        asset_table_lines = [
+            "\n\n## 下载与安装资产 (Release Assets)\n",
+            "| 资产文件 | 类型 | 大小 | SHA-256 校验和 | 官方直链下载 |",
+            "| :--- | :--- | :--- | :--- | :--- |",
+        ]
+        sha_map = {
+            f"DocTool-Setup-{VERSION}.exe": setup_sha,
+            f"DocTool-{VERSION}-portable.zip": portable_sha,
+        }
+        for lk in links:
+            fn = lk.get("filename", lk["name"])
+            sz_bytes = lk.get("size", 0)
+            sz_mb = f"{sz_bytes / (1024 * 1024):.1f} MB" if sz_bytes > 1024*1024 else (f"{max(1, sz_bytes // 1024)} KB" if sz_bytes > 0 else "-")
+            sha = sha_map.get(fn, "-")
+            if len(sha) > 16:
+                sha = f"`{sha[:8]}...{sha[-8:]}`"
+            type_label = lk['name'].split("（")[0]
+            asset_table_lines.append(f"| `{fn}` | {type_label} | {sz_mb} | {sha} | [直接下载]({lk['url']}) |")
+        description += "\n" + "\n".join(asset_table_lines) + "\n"
 
     rel = create_or_update_release(token, description, links)
     print("\nRelease 发布成功！")
