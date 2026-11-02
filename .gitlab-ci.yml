@@ -8,6 +8,10 @@
 #
 # 需要带 PowerShell 的 Windows GitLab Runner。
 # Release 作业仅在 vX.Y.Z 标签上触发。
+#
+# 【项目发布规范】（详见 docs/release/06-gitlab-release-specification.md）：
+# 内网 GitLab Release 统一通过本地脚本 python packaging/publish_release.py 手动上传与发布，
+# 无需依赖或等待 GitLab CI Windows Runner 流水线。
 
 stages:
   - validate

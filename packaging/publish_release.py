@@ -1,5 +1,14 @@
-# -*- coding: utf-8 -*-
-"""GitLab Release 发布脚本：上传打包产物并创建/更新 Release。"""
+"""GitLab Release 手动发布与资产同步脚本。
+
+项目规范（docs/release/06-gitlab-release-specification.md）：
+内网 GitLab (http://192.168.0.242:8899/application/ai/doc-tool) 的正式 Release 统一通过本脚本
+手动执行上传与发布，无需依赖或等待 GitLab CI 流水线。
+
+使用方式：
+    python packaging/publish_release.py                # 上传本地已打包资产并发布 Release
+    python packaging/publish_release.py --from-github  # 从 GitHub Release 同步资产后发布到 GitLab
+    python packaging/publish_release.py --release-only # 仅创建/更新 Release 说明文档（无需二进制资产）
+"""
 
 from __future__ import annotations
 
@@ -254,45 +263,49 @@ def main():
     if os.path.exists(cer_path):
         files_to_upload.append(("codesign.cer", cer_path))
 
-    for name, path in files_to_upload:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"文件不存在: {path}")
-        upload_file(token, name, path)
-
-    # 获取 package_files 信息并生成 links
-    package_files = get_package_files(token)
-    name_to_file = {f["file_name"]: f for f in package_files}
-
-    exe_file = name_to_file.get(f"DocTool-Setup-{VERSION}.exe")
-    zip_file = name_to_file.get(f"DocTool-{VERSION}-portable.zip")
-
-    exe_mb = f"{exe_file['size'] / (1024 * 1024):.1f}" if exe_file else "45.7"
-    zip_mb = f"{zip_file['size'] / (1024 * 1024):.1f}" if zip_file else "73.0"
-
+    release_only = "--release-only" in sys.argv
+    existing_files = [item for item in files_to_upload if os.path.exists(item[1])]
     links = []
-    link_specs = [
-        (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（安装版，{exe_mb} MB）"),
-        (f"DocTool-Setup-{VERSION}.exe.sha256", "安装版 SHA-256"),
-        (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）"),
-        (f"DocTool-{VERSION}-portable.zip.sha256", "便携版 SHA-256"),
-        (f"DocTool-{VERSION}-sbom.txt", "依赖清单 SBOM"),
-        (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM"),
-        (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM"),
-        ("codesign.cer", "codesign.cer（公司证书公钥）"),
-    ]
 
-    for filename, display_name in link_specs:
-        if item := name_to_file.get(filename):
-            url = f"{base}/{project_path}/-/package_files/{item['id']}/download"
-            links.append({
-                "name": display_name,
-                "url": url,
-                "direct_asset_url": url,
-                "link_type": "other"
-            })
+    if not release_only and existing_files:
+        for name, path in existing_files:
+            upload_file(token, name, path)
+        try:
+            package_files = get_package_files(token)
+            name_to_file = {f["file_name"]: f for f in package_files}
+            exe_file = name_to_file.get(f"DocTool-Setup-{VERSION}.exe")
+            zip_file = name_to_file.get(f"DocTool-{VERSION}-portable.zip")
+            exe_mb = f"{exe_file['size'] / (1024 * 1024):.1f}" if exe_file else "45.7"
+            zip_mb = f"{zip_file['size'] / (1024 * 1024):.1f}" if zip_file else "73.0"
 
-    setup_sha = calc_sha256(os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe"))
-    portable_sha = calc_sha256(os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip"))
+            link_specs = [
+                (f"DocTool-Setup-{VERSION}.exe", f"DocTool-Setup-{VERSION}.exe（安装包，{exe_mb} MB）"),
+                (f"DocTool-Setup-{VERSION}.exe.sha256", "安装包 SHA-256"),
+                (f"DocTool-{VERSION}-portable.zip", f"DocTool-{VERSION}-portable.zip（免安装便携版，{zip_mb} MB）"),
+                (f"DocTool-{VERSION}-portable.zip.sha256", "便携包 SHA-256"),
+                (f"DocTool-{VERSION}-sbom.txt", "清单 SBOM"),
+                (f"DocTool-{VERSION}.cdx.json", "CycloneDX SBOM"),
+                (f"DocTool-{VERSION}.spdx.json", "SPDX SBOM"),
+                ("codesign.cer", "codesign.cer（公司证书公钥）"),
+            ]
+            for filename, display_name in link_specs:
+                if item := name_to_file.get(filename):
+                    url = f"{base}/{project_path}/-/package_files/{item['id']}/download"
+                    links.append({
+                        "name": display_name,
+                        "url": url,
+                        "direct_asset_url": url,
+                        "link_type": "other"
+                    })
+        except Exception as exc:
+            print(f"获取 Package 资产链接提示: {exc}")
+    else:
+        print("提示: 当前为 Release 说明发布模式或本地暂无产物，跳过资产包上传。")
+
+    setup_file = os.path.join(out_dir, f"DocTool-Setup-{VERSION}.exe")
+    setup_sha = calc_sha256(setup_file) if os.path.exists(setup_file) else "待构建生成"
+    portable_file = os.path.join(out_dir, f"DocTool-{VERSION}-portable.zip")
+    portable_sha = calc_sha256(portable_file) if os.path.exists(portable_file) else "待构建生成"
 
     notes_path = os.path.join(out_dir, "release-notes.md")
     if os.path.exists(notes_path) and os.path.getsize(notes_path) > 50:
