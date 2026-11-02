@@ -40,7 +40,7 @@ _RESOLVE_FAILURES: List[Dict[str, str]] = []
 
 
 #: 缓存格式版本；渲染参数或输出结构变化时必须递增，避免复用旧语义结果。
-CACHE_FORMAT_VERSION = "v1"
+CACHE_FORMAT_VERSION = "v2"
 
 #: 单图渲染超时（秒）；超时走缓存/源码兜底。
 RENDER_TIMEOUT_SECONDS = 120
@@ -172,14 +172,20 @@ def compute_cache_key(
     kind: str,
     *,
     renderer_version: str = "",
+    theme: str = "default",
+    font_family: str = "",
+    layout: str = "",
     params: Optional[Dict[str, object]] = None,
 ) -> str:
-    """SHA-256 缓存键：源码 + 图种 + 渲染器版本 + 尺寸/主题参数。"""
+    """SHA-256 缓存键：源码 + 图种 + 渲染器版本 + 主题 + 字体 + 布局 + 尺寸参数（REQ-MM-04、REQ-MD-07）。"""
     payload = {
         "format": CACHE_FORMAT_VERSION,
         "source": source.replace("\r\n", "\n").strip(),
         "kind": kind,
         "rendererVersion": renderer_version,
+        "theme": theme,
+        "fontFamily": font_family,
+        "layout": layout,
         "params": dict(params or RENDER_PARAMS),
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -234,7 +240,8 @@ def read_cache(cache_root: Path, cache_key: str) -> Optional[_CacheHit]:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         if not isinstance(meta, dict):
             return None
-        if meta.get("format") != CACHE_FORMAT_VERSION:
+        format_version = meta.get("format")
+        if format_version not in ("v1", "v2"):
             return None
         data = png_path.read_bytes()
         if not data:

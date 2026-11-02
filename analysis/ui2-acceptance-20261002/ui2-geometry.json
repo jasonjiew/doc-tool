@@ -19,14 +19,14 @@
       "stacked": true,
       "buttons": [
         {
-          "text": "补这次成果（原轮）",
-          "width": 348,
-          "hint": 128
+          "text": "重试本次内容",
+          "width": 100,
+          "hint": 92
         },
         {
-          "text": "按当前修改重新生成",
-          "width": 348,
-          "hint": 128
+          "text": "按当前内容生成",
+          "width": 100,
+          "hint": 104
         },
         {
           "text": "更改设置…",
@@ -35,11 +35,14 @@
         },
         {
           "text": "换目录并重新导出…",
-          "width": 348,
+          "width": 100,
           "hint": 128
         }
       ],
-      "compressedButtons": []
+      "compressedButtons": [
+        "按当前内容生成",
+        "换目录并重新导出…"
+      ]
     },
     {
       "kind": "results-panel",
@@ -55,29 +58,28 @@
       "stacked": false,
       "buttons": [
         {
-          "text": "补这次成果（原轮）",
-          "width": 107,
-          "hint": 128
+          "text": "重试本次内容",
+          "width": 100,
+          "hint": 92
         },
         {
-          "text": "按当前修改重新生成",
-          "width": 107,
-          "hint": 128
+          "text": "按当前内容生成",
+          "width": 100,
+          "hint": 104
         },
         {
           "text": "更改设置…",
-          "width": 80,
+          "width": 317,
           "hint": 80
         },
         {
           "text": "换目录并重新导出…",
-          "width": 107,
+          "width": 100,
           "hint": 128
         }
       ],
       "compressedButtons": [
-        "补这次成果（原轮）",
-        "按当前修改重新生成",
+        "按当前内容生成",
         "换目录并重新导出…"
       ]
     },
@@ -95,27 +97,30 @@
       "stacked": false,
       "buttons": [
         {
-          "text": "补这次成果（原轮）",
-          "width": 170,
-          "hint": 128
+          "text": "重试本次内容",
+          "width": 100,
+          "hint": 92
         },
         {
-          "text": "按当前修改重新生成",
-          "width": 170,
-          "hint": 128
+          "text": "按当前内容生成",
+          "width": 100,
+          "hint": 104
         },
         {
           "text": "更改设置…",
-          "width": 170,
+          "width": 597,
           "hint": 80
         },
         {
           "text": "换目录并重新导出…",
-          "width": 170,
+          "width": 100,
           "hint": 128
         }
       ],
-      "compressedButtons": []
+      "compressedButtons": [
+        "按当前内容生成",
+        "换目录并重新导出…"
+      ]
     },
     {
       "kind": "window",
@@ -140,21 +145,22 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
-        "validate",
         "diag_build",
         "merge",
         "branch",
-        "toggle_summary"
+        "toggle_summary",
+        "close",
+        "export_settings"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -183,21 +189,22 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
       ],
       "moreVisible": true,
       "overflowKeys": [
-        "validate",
         "diag_build",
         "merge",
         "branch",
-        "toggle_summary"
+        "toggle_summary",
+        "close",
+        "export_settings"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -226,10 +233,10 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
@@ -238,8 +245,8 @@
       "overflowKeys": [
         "diag_build",
         "merge",
-        "branch",
-        "toggle_summary"
+        "close",
+        "export_settings"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -268,10 +275,10 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
@@ -280,8 +287,8 @@
       "overflowKeys": [
         "diag_build",
         "merge",
-        "branch",
-        "toggle_summary"
+        "close",
+        "export_settings"
       ],
       "viewMode": "write",
       "fontStep": 1.0,
@@ -310,16 +317,20 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
       ],
-      "moreVisible": false,
-      "overflowKeys": [],
+      "moreVisible": true,
+      "overflowKeys": [
+        "diag_build",
+        "merge",
+        "export_settings"
+      ],
       "viewMode": "write",
       "fontStep": 1.0,
       "screenshot": "window-1920x1080-light.png"
@@ -347,16 +358,20 @@
         26
       ],
       "quickExport": [
-        151,
+        138,
         27
       ],
-      "quickExportSizeHint": 151,
+      "quickExportSizeHint": 138,
       "results": [
         52,
         27
       ],
-      "moreVisible": false,
-      "overflowKeys": [],
+      "moreVisible": true,
+      "overflowKeys": [
+        "diag_build",
+        "merge",
+        "export_settings"
+      ],
       "viewMode": "write",
       "fontStep": 1.0,
       "screenshot": "window-1920x1080-dark.png"

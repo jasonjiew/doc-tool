@@ -85,13 +85,19 @@ _SEQ_KEYWORDS_RE = re.compile(
     re.I,
 )
 _NODE_RE = re.compile(
-    r"(?P<id>\w[\w/.-]*)"
-    r"(?:(?:\*\*)?\[\[(?:\*\*)?(?P<sub>.*?)(?:\*\*)?\]\](?:\*\*)?"
+    r"(?P<id>[\w/.-]+)"
+    r"(?:(?:\*\*)?\(\(\((?:\*\*)?(?P<dblcircle>.*?)(?:\*\*)?\)\)\)(?:\*\*)?"
+    r"|(?:\*\*)?\[\[(?:\*\*)?(?P<sub>.*?)(?:\*\*)?\]\](?:\*\*)?"
     r"|(?:\*\*)?\(\((?:\*\*)?(?P<circle>.*?)(?:\*\*)?\)\)(?:\*\*)?"
     r"|(?:\*\*)?\[\((?:\*\*)?(?P<cyl>.*?)(?:\*\*)?\)\](?:\*\*)?"
+    r"|(?:\*\*)?\{\{(?:\*\*)?(?P<hex>.*?)(?:\*\*)?\}\}(?:\*\*)?"
+    r"|(?:\*\*)?\[/(?:\*\*)?(?P<paraleft>.*?)(?:\*\*)?[/\\]\](?:\*\*)?"
+    r"|(?:\*\*)?\[\\(?:\*\*)?(?P<pararight>.*?)(?:\*\*)?[/\\]\](?:\*\*)?"
+    r"|(?:\*\*)?\(\[(?:\*\*)?(?P<stadium>.*?)(?:\*\*)?\]\)(?:\*\*)?"
+    r"|(?:\*\*)?>\s*(?P<flag>.*?)(?:\*\*)?\](?:\*\*)?"
     r"|(?:\*\*)?\[(?:\*\*)?(?P<box>.*?)(?:\*\*)?\](?:\*\*)?"
     r"|(?:\*\*)?\((?:\*\*)?(?P<round>.*?)(?:\*\*)?\)(?:\*\*)?"
-    r"|(?:\*\*)?\{(?:\*\*)?(?P<diamond>.*?)(?:\*\*)?\}(?:\*\*)?)?"
+    r"|(?:\*\*)?\{(?:\*\*)?(?P<diamond>.*?)(?:\*\*)?\})?"
 )
 _EDGE_RE = re.compile(
     r"^(?P<left>.+?)\s*"
@@ -244,6 +250,7 @@ class RenderResult:
     height: Optional[int] = None
     backend: str = ""
     error: Optional[str] = None
+    claims_fidelity: bool = False
 
 
 @dataclass(frozen=True)
@@ -445,8 +452,25 @@ def _balanced_error(line: str, kind: str = "") -> Optional[str]:
     return None
 
 
-def validate(source: str, kind: Optional[str] = None) -> List[MermaidError]:
+def validate_official(source: str) -> List[MermaidError]:
+    """高保真校验：在 GUI 运行时使用官方 Mermaid 引擎作为语法权威（REQ-MM-01）。"""
+    try:
+        from PySide6.QtWidgets import QApplication
+        if QApplication.instance():
+            from doc_tool.ui.content.mermaid_renderer import get_official_mermaid_renderer
+            official = get_official_mermaid_renderer()
+            if official._page_ready:
+                return official.validate(source)
+    except Exception:
+        pass
+    return validate(source)
+
+
+def validate(source: str, kind: Optional[str] = None, *, use_official: bool = False) -> List[MermaidError]:
     """校验 Mermaid 语法（兼容全量 Mermaid 图表格式），错误行相对源码从 1 开始。"""
+    if use_official:
+        return validate_official(source)
+
     lines = (source or "").splitlines()
     if not lines or not source.strip():
         return [MermaidError(1, "Mermaid 源码为空")]
@@ -1210,12 +1234,60 @@ def _render_with_cli(source: str, want_png: bool = True) -> Optional[RenderResul
         return RenderResult(True, svg, png, width, height, "mermaid-cli", None)
 
 
+def get_cli_status() -> Dict[str, Any]:
+    """检测当前 CLI 运行环境中的 Mermaid 后端能力（REQ-MM-05、REQ-MM-06、REQ-MD-08）。"""
+    path_mmdc = shutil.which("mmdc")
+    if path_mmdc:
+        return {
+            "available": True,
+            "type": "path",
+            "path": path_mmdc,
+            "backend_name": "mermaid-cli",
+            "claims_desktop_parity": True,
+        }
+    root = _repo_root()
+    for candidate in (
+        root / "tools" / "mermaid-cli" / "node_modules" / ".bin" / "mmdc.cmd",
+        root / "tools" / "mermaid-cli" / "node_modules" / ".bin" / "mmdc",
+        root / "node_modules" / ".bin" / "mmdc.cmd",
+    ):
+        if candidate.is_file():
+            return {
+                "available": True,
+                "type": "local",
+                "path": str(candidate),
+                "backend_name": "mermaid-cli",
+                "claims_desktop_parity": True,
+            }
+    return {
+        "available": False,
+        "type": "none",
+        "path": None,
+        "backend_name": "builtin-approximate",
+        "claims_desktop_parity": False,
+    }
+
+
+def export_svg(result: RenderResult, assets_root, doc_type: str) -> str:
+    """保存成功渲染的 SVG，返回 images/mermaid_NNNN.svg（REQ-MM-04、REQ-MM-05）。"""
+    if not result.ok or not result.svg:
+        raise ValueError(result.error or "没有可导出的 SVG")
+    folder = Path(assets_root) / doc_type / "images"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = next_mermaid_name(assets_root, doc_type, ext="svg")
+    (folder / name).write_bytes(result.svg)
+    return "images/{0}".format(name)
+
+
 def render(
     source: str,
     kind: Optional[str] = None,
     *,
     use_cli: bool = True,
     want_png: bool = True,
+    theme: str = "default",
+    engine_version: str = "11.16.1",
+    config_hash: str = "",
 ) -> RenderResult:
     """渲染 Mermaid：CLI 可用时优先，否则使用子集渲染器。
     
@@ -1228,7 +1300,7 @@ def render(
         first = errors[0]
         return RenderResult(False, error="第 {0} 行：{1}".format(first.line, first.message))
 
-    cache_key = (source.strip(), actual, use_cli, want_png)
+    cache_key = (source.strip(), actual, use_cli, want_png, theme, engine_version, config_hash)
     if cache_key in _RENDER_CACHE:
         return _RENDER_CACHE[cache_key]
 
@@ -1311,6 +1383,7 @@ def batch_convert(
     *,
     include_fenced: bool = False,
     use_cli: bool = True,
+    renderer: Optional[Callable[[str, Optional[str]], RenderResult]] = None,
 ) -> BatchConversionResult:
     """逐个渲染并替换 Mermaid 源码；exporter 返回完整 Markdown 引用。"""
     blocks = [block for block in extract_blocks(md_text) if include_fenced or not block.fenced]
@@ -1318,7 +1391,10 @@ def batch_convert(
     replacements = []
     failures: List[BatchFailure] = []
     for block in blocks:
-        result = render(block.source, block.kind, use_cli=use_cli)
+        if renderer is not None:
+            result = renderer(block.source, block.kind)
+        else:
+            result = render(block.source, block.kind, use_cli=use_cli)
         if not result.ok:
             failures.append(BatchFailure(block.start_line, result.error or "渲染失败"))
             continue

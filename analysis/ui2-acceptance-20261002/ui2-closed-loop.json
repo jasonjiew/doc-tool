@@ -17,20 +17,20 @@
   "importSubmissions": 1,
   "exportSubmissions": 1,
   "openClicks": 1,
-  "roundId": "r-01c9334cfc",
-  "captureId": "20261027T171154-5ae5ecdc",
+  "roundId": "r-cdf0665ee0",
+  "captureId": "20261031T115954-8302c3e4",
   "sourceMode": "current-buffer",
   "scope": "",
   "artifacts": [
     {
       "format": "docx",
       "status": "ready",
-      "path": "D:\\ai_develop_project_space\\ai-dev-hub\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-23148-1\\proj\\output\\proj(1.0).docx"
+      "path": "D:\\ai_develop_project_space\\ai-dev-hub\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-29484-1\\proj\\output\\proj(1.0).docx"
     },
     {
       "format": "html",
       "status": "ready",
-      "path": "D:\\ai_develop_project_space\\ai-dev-hub\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-23148-1\\proj\\output\\html\\preview\\20261027T171203925598Z-c77ec754\\index.html"
+      "path": "D:\\ai_develop_project_space\\ai-dev-hub\\doc-tool\\tmp\\core-scratch\\ui2-acceptance-case-29484-1\\proj\\output\\html\\preview\\20261031T120004690012Z-7ac24cc1\\index.html"
     }
   ]
 }

@@ -435,17 +435,40 @@ def render_preview_blocks(
 
 
 def normalize_markdown_for_preview(md_text: str) -> str:
-    """转换项目扩展语法，使 Qt Markdown 渲染器可以直接显示。
+    """转换项目扩展语法使 Qt Markdown 渲染器能直接显示。
 
-    文档构建链路允许图片写成 ``![说明](images/example.png =640x480)``，
-    但这不是 CommonMark 语法。预览时移除尺寸后缀，保留图片和说明；尺寸仍由
-    Word 构建链路使用。``<EMPTY_PAR/>`` 是构建占位符，也不应出现在阅读预览中。
+    文档路径中的图片写作 ``![说明](images/example.png =640x480)``。
+    对 Qt 原生轻量渲染器移除尺寸后缀，Word 构建占位符 ``<EMPTY_PAR/>`` 在正文中不展示。
+    保护代码围栏中的相同示例文本不受破坏。
     """
-    text = _IMAGE_SIZE_SUFFIX_RE.sub(r"\1\2", md_text)
-    return "\n".join(
-        line for line in text.splitlines() if not _EMPTY_PAR_RE.match(line)
-    )
+    lines = md_text.splitlines()
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    result_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not in_fence:
+            m = _FENCE_LINE_RE.match(stripped)
+            if m:
+                in_fence = True
+                fence_char = stripped[0]
+                fence_len = len(stripped.split()[0])
+                result_lines.append(line)
+                continue
+        else:
+            if stripped.startswith(fence_char * fence_len):
+                in_fence = False
+            result_lines.append(line)
+            continue
 
+        if _EMPTY_PAR_RE.match(line):
+            continue
+        line_clean = _IMAGE_SIZE_SUFFIX_RE.sub(r"\1\2", line)
+        line_clean = _IMAGE_OUTER_SIZE_SUFFIX_RE.sub(r"\1", line_clean)
+        result_lines.append(line_clean)
+
+    return "\n".join(result_lines)
 
 def build_caption_registry(md_texts, paths=None):
     """从若干份 Markdown 构造共享题注注册表（预览与出稿同源）。

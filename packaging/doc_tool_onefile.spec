@@ -126,10 +126,6 @@ a = Analysis(
         "test",  # Python 标准库 test 套件
         "tests",
         # 排除未使用的 PySide6 Addons 大件（仅保留 QtCore/QtGui/QtWidgets/QtPdf）
-        "PySide6.QtWebEngineCore",
-        "PySide6.QtWebEngineWidgets",
-        "PySide6.QtWebEngineQuick",
-        "PySide6.QtWebChannel",
         "PySide6.QtNetwork",
         "PySide6.QtQml",
         "PySide6.QtQuick",

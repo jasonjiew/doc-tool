@@ -1,5 +1,5 @@
 # UI-B/5.2 控件几何证据（离屏 Qt，仅结构证据；实机 DPI 见 5.3）
-# 记录时间：2026-10-30 00:19:51
+# 记录时间：2026-10-31 20:01:00
 # 每一行是一个逻辑窗口尺寸下的实测值（JSON）
 {"windowLogical": [1024, 640], "actualWindow": [1024, 640], "devicePixelRatio": 1.0, "logicalDpi": 96.0, "fontFamily": "Sans Serif", "fontPointSize": 9.0, "bodyRect": [461, 390], "centerHostRect": [781, 456], "treeDockWidth": 240, "panelsDockVisible": false, "taskDockVisible": false, "saveRect": [629, 3, 140, 20], "moreRect": [250, 0, 80, 19], "previewRect": [543, 3, 80, 20], "outlineRect": [457, 3, 80, 20], "overflowVisible": true, "saveText": "保存 (Ctrl+S)"}
 {"windowLogical": [1280, 720], "actualWindow": [1280, 720], "devicePixelRatio": 1.0, "logicalDpi": 96.0, "fontFamily": "Sans Serif", "fontPointSize": 9.0, "bodyRect": [614, 470], "centerHostRect": [1036, 536], "treeDockWidth": 240, "panelsDockVisible": false, "taskDockVisible": false, "saveRect": [884, 3, 140, 20], "moreRect": [414, 0, 80, 19], "previewRect": [798, 3, 80, 20], "outlineRect": [712, 3, 80, 20], "overflowVisible": true, "saveText": "保存 (Ctrl+S)"}

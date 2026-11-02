@@ -76,3 +76,17 @@ subprocess, tempfile, shutil, zipfile, posixpath, re, copy,
 collections, datetime, functools, typing, unittest
 
 许可：PSF-2.0 License
+
+
+前端离线静态资源（离线预览内置）：
+-----------------------------------
+
+12. markdown-it 14.1.0
+   许可证：MIT License
+   用途：离线高保真 Markdown 解析与结构渲染
+   https://github.com/markdown-it/markdown-it
+
+13. Mermaid 11.16.1
+   许可证：MIT License
+   用途：离线官方 Mermaid 矢量渲染与布局生成
+   https://github.com/mermaid-js/mermaid

@@ -1,0 +1,11 @@
+{
+  "startup_ms": 1134.4,
+  "first_render_ms": 507.7,
+  "update_ms": 307.4,
+  "mem_start_mb": 0.0,
+  "mem_end_mb": 0.0,
+  "mem_delta_mb": 0.0,
+  "html_template_kb": 22.1,
+  "markdown_it_kb": 120.7,
+  "total_web_assets_kb": 142.8
+}

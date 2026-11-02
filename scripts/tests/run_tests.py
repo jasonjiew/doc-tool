@@ -3,6 +3,12 @@
 
 from __future__ import annotations
 
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import argparse
 import os
 import subprocess
@@ -29,7 +35,7 @@ DEFAULT_TESTS = [
     "test_migration.py", "test_self_heal.py", "test_public_export.py",
     "test_review_docx.py", "test_table_format.py", "test_command_palette.py",
     "test_validate_adaptation.py", "test_branch_ui.py", "test_action_positioning.py",
-    "test_changes_refresh.py", "test_diagram_viewer_interaction.py", "test_operation_loading_overlay.py",
+    "test_changes_refresh.py", "test_diagram_viewer_interaction.py", "test_preview_fidelity_adapter.py", "test_markdown_fidelity_semantics.py", "test_style_and_resource_boundaries.py", "test_official_mermaid_fidelity.py", "test_mermaid_export_and_cache.py", "test_reading_continuity_and_sync.py", "test_packaging_and_delivery_fidelity.py", "test_preview_image_and_mermaid_dialog_regression.py", "test_operation_loading_overlay.py",
     "test_expression_contract.py", "test_prepared_source.py", "test_quality_gates_v27.py",
     "test_pipeline_gates_v27.py", "test_cli_check_v27.py", "test_contract_fidelity_v27.py",
     "test_schema_v2_migration.py", "test_chapter_order_variables_v28.py", "test_standard_pack_v28.py",

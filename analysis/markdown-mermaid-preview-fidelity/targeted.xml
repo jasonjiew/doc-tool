@@ -1,0 +1,201 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="11" failures="0" time="29.950"><testsuite name="doc-tool" tests="11" failures="0" time="29.950"><testcase name="test_preview_fidelity_adapter.py" classname="scripts.tests" time="1.489"><system-out>.QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+..Rejected unauthorized preview bridge action: execute_shell_command
+.Fidelity browser crashed (count=1): CrashedTerminationStatus (exit code -1073741819)
+.
+----------------------------------------------------------------------
+Ran 5 tests in 0.296s
+
+OK
+</system-out></testcase><testcase name="test_markdown_fidelity_semantics.py" classname="scripts.tests" time="2.276"><system-out>QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+......
+----------------------------------------------------------------------
+Ran 6 tests in 1.156s
+
+OK
+</system-out></testcase><testcase name="test_style_and_resource_boundaries.py" classname="scripts.tests" time="2.491"><system-out> Failed to make current.
+[26356:21688:1031/185206.065:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.065:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.066:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.066:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.066:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.066:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.079:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.084:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.114:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.114:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.114:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.114:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.114:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.114:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.114:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.114:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.114:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.115:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.115:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.115:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.115:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.128:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.134:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.164:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.164:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.164:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.164:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.164:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.164:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.164:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.164:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.164:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.166:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.166:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.166:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.166:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.180:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.188:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.279:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.279:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.279:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.279:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.279:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.279:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.279:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.279:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.279:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.281:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.281:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.281:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.281:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.283:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.288:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.330:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.330:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.331:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.331:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.331:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.331:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.331:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.331:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.331:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.333:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.333:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.333:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.333:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.347:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.352:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.380:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.380:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.381:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.381:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.381:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.381:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.381:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.381:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.381:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.382:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.382:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.382:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.382:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.395:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.400:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.432:ERROR:d3d_image_backing.cc(892)] Already being accessed for read
+[26356:21688:1031/185206.432:ERROR:shared_image_representation.cc(320)] Unable to initialize SkSurface
+SKIA: Failed to begin write access.
+[26356:21688:1031/185206.433:ERROR:shared_image_stub.cc(708)] SharedImageStub: context already lost
+[26356:21688:1031/185206.433:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.433:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.433:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.433:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.433:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.433:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.434:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.434:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.434:ERROR:shared_context_state.cc(648)] Failed to make current since context is marked as lost
+[26356:21688:1031/185206.434:ERROR:skia_output_surface_impl_on_gpu.cc(2294)] Failed to make current.
+[26356:21688:1031/185206.445:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26356:21688:1031/185206.451:ERROR:shared_image_manager.cc(221)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+.
+----------------------------------------------------------------------
+Ran 4 tests in 1.417s
+
+OK
+</system-out></testcase><testcase name="test_official_mermaid_fidelity.py" classname="scripts.tests" time="3.261"><system-out>QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+....This plugin does not support propagateSizeHints()
+This plugin does not support propagateSizeHints()
+..
+----------------------------------------------------------------------
+Ran 6 tests in 2.150s
+
+OK
+</system-out></testcase><testcase name="test_mermaid_export_and_cache.py" classname="scripts.tests" time="2.677"><system-out>QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 1.137s
+
+OK
+</system-out></testcase><testcase name="test_reading_continuity_and_sync.py" classname="scripts.tests" time="3.306"><system-out>QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 2.210s
+
+OK
+</system-out></testcase><testcase name="test_packaging_and_delivery_fidelity.py" classname="scripts.tests" time="0.926"><system-out>....
+----------------------------------------------------------------------
+Ran 4 tests in 0.410s
+
+OK
+</system-out></testcase><testcase name="test_v30_preview_instances.py" classname="scripts.tests" time="7.118"><system-out>[general] 生成完成: D:\ai_develop_project_space\ai-dev-hub\doc-tool\tmp\core-scratch\v30-instances-29104-1\.proj.import-staging-29104-s5gwkfnh\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+test_record_instances_writes_file_and_reports_coverage (__main__.InstanceRecordingTests.test_record_instances_writes_file_and_reports_coverage) ... ok
+test_resolve_project_can_record_and_expose_coverage (__main__.InstanceRecordingTests.test_resolve_project_can_record_and_expose_coverage) ... ok
+test_slot_filter_limits_registration (__main__.InstanceRecordingTests.test_slot_filter_limits_registration) ... [general] 生成完成: D:\ai_develop_project_space\ai-dev-hub\doc-tool\tmp\core-scratch\v30-instances-29104-1\slot-filter\.proj.import-staging-29104-5aofmcd3\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+[general] 生成完成: D:\ai_develop_project_space\ai-dev-hub\doc-tool\tmp\core-scratch\v30-instances-29104-1\slot-filter-none\.proj.import-staging-29104-3jr8wj_m\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+ok
+[general] 生成完成: D:\ai_develop_project_space\ai-dev-hub\doc-tool\tmp\core-scratch\v30-preview-29104-1\.proj.import-staging-29104-qbbwy7gs\output\.trial-build.docx
+[general] 插入元素=8, 表格=0, 图片=0, 去重媒体=0
+test_editor_preview_uses_resolved_text (__main__.PreviewSameSourceTests.test_editor_preview_uses_resolved_text) ... QFontDatabase: Cannot find font directory C:/Users/18098/AppData/Local/Programs/Python/Python313/Lib/site-packages/PySide6/lib/fonts.
+Note that Qt no longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ for example) or switch to fontconfig.
+ok
+test_readonly_html_export_uses_resolver (__main__.PreviewSameSourceTests.test_readonly_html_export_uses_resolver) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 5.601s
+
+OK
+</system-out></testcase><testcase name="test_readonly_html.py" classname="scripts.tests" time="1.368"><system-out>.
+----------------------------------------------------------------------
+Ran 1 test in 0.227s
+
+OK
+</system-out></testcase><testcase name="test_cli_machine.py" classname="scripts.tests" time="1.771"><system-out>............
+----------------------------------------------------------------------
+Ran 12 tests in 0.645s
+
+OK
+</system-out></testcase><testcase name="test_prepared_source.py" classname="scripts.tests" time="3.268"><system-out>[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[warn] 已生成静态目录缓存；页码需 Word 刷新后更新。
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-prepare-build-hbsc17de\project\output\预处理(1.0).docx
+[requirement] 插入元素=4, 表格=0, 图片=1, 去重媒体=0
+..[requirement] 解除 HYPERLINK 域 272 个（目标书签不存在，转为静态文本）
+[warn] 已生成静态目录缓存；页码需 Word 刷新后更新。
+[requirement] 生成完成: C:\Users\18098\AppData\Local\Temp\v27-prepare-build-lp6dq767\project\output\预处理(1.0).docx
+[requirement] 插入元素=5, 表格=0, 图片=2, 去重媒体=0
+[requirement] 校验报告: C:\Users\18098\AppData\Local\Temp\v27-prepare-build-lp6dq767\val_report.md
+[requirement] PASS=20 WARN=0 FAIL=0
+...............
+----------------------------------------------------------------------
+Ran 17 tests in 2.445s
+
+OK
+</system-out></testcase></testsuite></testsuites>

@@ -85,6 +85,7 @@ class DiagramViewerDialog(QDialog):
         mermaid_source: Optional[str] = None,
         on_edit_source: Optional[Callable[[], None]] = None,
         parent: Optional[QWidget] = None,
+        dark: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -96,9 +97,13 @@ class DiagramViewerDialog(QDialog):
         self._on_edit_source = on_edit_source
         self._zoom_factor = 1.0
         self._fit_mode = True
+        self._dark = dark
+        self._btn_style = ""
+        self._primary_btn_style = ""
 
         self._setup_ui()
         self._setup_shortcuts()
+        self._apply_theme()
         self._fit_to_window()
 
     def showEvent(self, event) -> None:
@@ -127,9 +132,8 @@ class DiagramViewerDialog(QDialog):
 
         # 底部浮动控制栏
         bottom_bar = QWidget(self)
-        bottom_bar.setStyleSheet(
-            "QWidget { background-color: #181920; border-top: 1px solid #2e313d; }"
-        )
+        bottom_bar.setObjectName("diagram_bottom_bar")
+        self._bottom_bar = bottom_bar
         bar_layout = QHBoxLayout(bottom_bar)
         bar_layout.setContentsMargins(16, 8, 16, 8)
         bar_layout.setSpacing(10)
@@ -141,14 +145,12 @@ class DiagramViewerDialog(QDialog):
             self.info_label = QLabel(f"原始分辨率: {orig_w} × {orig_h} px", bottom_bar)
         else:
             self.info_label = QLabel("无图像数据", bottom_bar)
-        self.info_label.setStyleSheet("QLabel { color: #94a3b8; font-size: 12px; }")
         bar_layout.addWidget(self.info_label)
 
         bar_layout.addStretch(1)
 
         # 缩放指示
         self.label_zoom = QLabel("100%", bottom_bar)
-        self.label_zoom.setStyleSheet("QLabel { color: #e2e8f0; font-size: 13px; font-weight: bold; min-width: 50px; }")
         self.label_zoom.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bar_layout.addWidget(self.label_zoom)
 
@@ -179,7 +181,7 @@ class DiagramViewerDialog(QDialog):
         # 分隔线
         sep = QFrame(bottom_bar)
         sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet("QFrame { color: #374151; }")
+        self._sep = sep
         bar_layout.addWidget(sep)
 
         # 保存图片按钮
@@ -349,17 +351,73 @@ class DiagramViewerDialog(QDialog):
             if v_bar:
                 v_bar.setValue(max(0, new_v))
 
+    def _apply_theme(self) -> None:
+        if self._dark:
+            self.setStyleSheet("QDialog { background-color: #1e2029; }")
+            self.scroll_area.setStyleSheet(
+                "QScrollArea { background-color: #1e2029; border: none; }"
+            )
+            self._bottom_bar.setStyleSheet(
+                "QWidget#diagram_bottom_bar { background-color: #181920; border-top: 1px solid #2e313d; }"
+            )
+            self.info_label.setStyleSheet("QLabel { color: #94a3b8; font-size: 12px; }")
+            self.label_zoom.setStyleSheet("QLabel { color: #e2e8f0; font-size: 13px; font-weight: bold; min-width: 50px; }")
+            self._sep.setStyleSheet("QFrame { color: #374151; }")
+            self._btn_style = (
+                "QPushButton { background-color: #262936; color: #e2e8f0; border: 1px solid #3b3f50; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 500; min-height: 24px; }"
+                "QPushButton:hover { background-color: #323648; color: #ffffff; border-color: #4f556d; }"
+                "QPushButton:pressed { background-color: #1e202c; }"
+                "QPushButton:disabled { background-color: #1a1b23; color: #64748b; border-color: #2a2d3a; }"
+            )
+            self._primary_btn_style = (
+                "QPushButton { background-color: #2563eb; color: #ffffff; border: 1px solid #3b82f6; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; min-height: 24px; }"
+                "QPushButton:hover { background-color: #1d4ed8; border-color: #60a5fa; }"
+                "QPushButton:pressed { background-color: #1e40af; }"
+            )
+        else:
+            self.setStyleSheet("QDialog { background-color: #f8fafc; }")
+            self.scroll_area.setStyleSheet(
+                "QScrollArea { background-color: #f8fafc; border: none; }"
+            )
+            self._bottom_bar.setStyleSheet(
+                "QWidget#diagram_bottom_bar { background-color: #ffffff; border-top: 1px solid #e2e8f0; }"
+            )
+            self.info_label.setStyleSheet("QLabel { color: #64748b; font-size: 12px; }")
+            self.label_zoom.setStyleSheet("QLabel { color: #0f172a; font-size: 13px; font-weight: bold; min-width: 50px; }")
+            self._sep.setStyleSheet("QFrame { color: #e2e8f0; }")
+            self._btn_style = (
+                "QPushButton { background-color: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 500; min-height: 24px; }"
+                "QPushButton:hover { background-color: #e2e8f0; color: #0f172a; border-color: #94a3b8; }"
+                "QPushButton:pressed { background-color: #cbd5e1; }"
+                "QPushButton:disabled { background-color: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }"
+            )
+            self._primary_btn_style = (
+                "QPushButton { background-color: #2563eb; color: #ffffff; border: 1px solid #3b82f6; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; min-height: 24px; }"
+                "QPushButton:hover { background-color: #1d4ed8; border-color: #60a5fa; }"
+                "QPushButton:pressed { background-color: #1e40af; }"
+            )
+
+        for btn in (self.btn_zoom_out, self.btn_zoom_in, self.btn_fit, self.btn_100, self.btn_save, self.btn_copy, self.btn_close):
+            btn.setStyleSheet(self._btn_style)
+        if hasattr(self, "btn_edit"):
+            self.btn_edit.setStyleSheet(self._primary_btn_style)
+
+    def set_dark(self, dark: bool) -> None:
+        if self._dark != dark:
+            self._dark = dark
+            self._apply_theme()
+
     def _reset_copy_btn(self, old_text: str) -> None:
         try:
             self.btn_copy.setText(old_text)
-            self.btn_copy.setStyleSheet("")
+            self.btn_copy.setStyleSheet(self._btn_style)
         except RuntimeError:
             pass
 
     def _reset_save_btn(self, old_text: str) -> None:
         try:
             self.btn_save.setText(old_text)
-            self.btn_save.setStyleSheet("")
+            self.btn_save.setStyleSheet(self._btn_style)
         except RuntimeError:
             pass
 

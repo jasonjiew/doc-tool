@@ -79,249 +79,11 @@ _FENCE_RE = re.compile(r"^```")
 _DRAFT_DEBOUNCE_MS = 1500
 
 
-@dataclass
-class _ImageHitInfo:
-    img_format: QTextFormat
-    pixmap: QPixmap
-    line_no: Optional[int]
-    is_mermaid: bool
-
-
-class _PreviewBrowser(QTextBrowser):
-    """自动按视口宽度等比缩放图片的 Markdown 预览浏览器，支持双击高清大图探索与右键图表工作台。"""
-
-    def __init__(self, parent=None, editor_panel=None):
-        super().__init__(parent)
-        self._last_width = -1
-        self._editor_panel = editor_panel
-        self.setMouseTracking(True)
-
-    def set_editor_panel(self, panel) -> None:
-        self._editor_panel = panel
-
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        super().resizeEvent(event)
-        if abs(self.viewport().width() - self._last_width) > 2:
-            self.adjust_images()
-
-    def adjust_images(self) -> None:
-        viewport_w = self.viewport().width()
-        self._last_width = viewport_w
-        doc = self.document()
-        doc_margin = doc.documentMargin()
-        avail_w = max(50.0, viewport_w - 2 * doc_margin - 28)
-
-        cursor = QTextCursor(doc)
-        block = doc.begin()
-        while block.isValid():
-            it = block.begin()
-            while not it.atEnd():
-                frag = it.fragment()
-                if frag.isValid():
-                    fmt = frag.charFormat()
-                    if fmt.isImageFormat():
-                        img_fmt = fmt.toImageFormat()
-                        prop_w = img_fmt.property(QTextFormat.Property.UserProperty + 1)
-                        prop_h = img_fmt.property(QTextFormat.Property.UserProperty + 2)
-                        if prop_w is None or prop_h is None:
-                            specified_w = img_fmt.width()
-                            specified_h = img_fmt.height()
-                            name = img_fmt.name()
-                            pix = doc.resource(
-                                QTextDocument.ResourceType.ImageResource,
-                                QUrl(name),
-                            )
-                            if not pix or pix.isNull():
-                                pix = doc.resource(
-                                    QTextDocument.ResourceType.ImageResource,
-                                    doc.baseUrl().resolved(QUrl(name)),
-                                )
-                            pix_w = float(pix.width()) if pix and not pix.isNull() else 0.0
-                            pix_h = float(pix.height()) if pix and not pix.isNull() else 0.0
-
-                            if specified_w > 0:
-                                base_w = float(specified_w)
-                                if specified_h > 0:
-                                    base_h = float(specified_h)
-                                elif pix_w > 0:
-                                    base_h = base_w * (pix_h / pix_w)
-                                else:
-                                    base_h = base_w
-                            elif pix_w > 0:
-                                base_w = pix_w
-                                base_h = pix_h
-                            else:
-                                base_w = 0.0
-                                base_h = 0.0
-
-                            img_fmt.setProperty(QTextFormat.Property.UserProperty + 1, base_w)
-                            img_fmt.setProperty(QTextFormat.Property.UserProperty + 2, base_h)
-                        else:
-                            base_w = float(prop_w)
-                            base_h = float(prop_h)
-
-                        if base_w > 0:
-                            target_w = min(base_w, avail_w)
-                            target_h = target_w * (base_h / base_w) if base_w > 0 else base_h
-                            # 限制单图最大高度，避免极长纵向图打断正文排版；长图可双击查看完整细节
-                            max_h = 520.0
-                            if target_h > max_h and base_h > 0:
-                                target_h = max_h
-                                target_w = target_h * (base_w / base_h)
-                            if abs(img_fmt.width() - target_w) > 0.5 or abs(img_fmt.height() - target_h) > 0.5:
-                                img_fmt.setWidth(target_w)
-                                img_fmt.setHeight(target_h)
-                                cursor.setPosition(frag.position())
-                                cursor.setPosition(
-                                    frag.position() + frag.length(), QTextCursor.MoveMode.KeepAnchor
-                                )
-                                cursor.setCharFormat(img_fmt)
-                it += 1
-            block = block.next()
-
-    def _image_at(self, pos: QPoint) -> Optional[_ImageHitInfo]:
-        cursor = self.cursorForPosition(pos)
-        doc = self.document()
-        pos_idx = cursor.position()
-        candidates = [pos_idx]
-        if pos_idx > 0:
-            candidates.append(pos_idx - 1)
-        for p in candidates:
-            cur = QTextCursor(doc)
-            cur.setPosition(p)
-            fmt = cur.charFormat()
-            if fmt.isImageFormat():
-                img_fmt = fmt.toImageFormat()
-                name = img_fmt.name()
-                pix = doc.resource(QTextDocument.ResourceType.ImageResource, QUrl(name))
-                if not pix or pix.isNull():
-                    pix = doc.resource(
-                        QTextDocument.ResourceType.ImageResource,
-                        doc.baseUrl().resolved(QUrl(name)),
-                    )
-                if pix and not pix.isNull():
-                    line_no = None
-                    href = fmt.anchorHref() or ""
-                    if "line-" in href:
-                        m = re.search(r"line-(\d+)", href)
-                        if m:
-                            line_no = int(m.group(1))
-                    if line_no is None:
-                        for aname in fmt.anchorNames():
-                            if "line-" in aname:
-                                m = re.search(r"line-(\d+)", aname)
-                                if m:
-                                    line_no = int(m.group(1))
-                                    break
-                    is_mermaid = False
-                    alt_text = img_fmt.stringProperty(QTextFormat.Property.ImageAltText) or ""
-                    if (
-                        "mermaid" in alt_text.lower()
-                        or "mermaid" in img_fmt.name().lower()
-                        or "mermaid" in (fmt.toolTip() or "").lower()
-                    ):
-                        is_mermaid = True
-                    elif line_no is not None and self._editor_panel:
-                        block = self._editor_panel.get_mermaid_block_at_line(line_no)
-                        if block is not None:
-                            is_mermaid = True
-                    return _ImageHitInfo(img_fmt, pix, line_no, is_mermaid)
-        return None
-
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            info = self._image_at(event.pos())
-            if info and not info.pixmap.isNull():
-                self._open_viewer(info)
-                event.accept()
-                return
-        super().mouseDoubleClickEvent(event)
-
-    def _open_viewer(self, info: _ImageHitInfo) -> None:
-        from doc_tool.ui.content.diagram_viewer import DiagramViewerDialog
-
-        mermaid_source = None
-        on_edit = None
-        title = "Mermaid 图表高清查看与探索" if info.is_mermaid else "图片高清查看与探索"
-        if info.line_no is not None and self._editor_panel:
-            block = self._editor_panel.get_mermaid_block_at_line(info.line_no)
-            if block:
-                mermaid_source = block.source
-                on_edit = lambda: self._editor_panel.open_mermaid_workbench(block.source, block)
-        dialog = DiagramViewerDialog(
-            info.pixmap,
-            title=title,
-            mermaid_source=mermaid_source,
-            on_edit_source=on_edit,
-            parent=self.window(),
-        )
-        dialog.exec()
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        info = self._image_at(event.pos())
-        if info and not info.pixmap.isNull():
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-            if info.is_mermaid:
-                self.setToolTip("💡 Mermaid 图表：双击放大并自由缩放平移 · 右键在工作台编辑")
-            else:
-                self.setToolTip("💡 双击放大查看高清大图 (滚轮缩放 / 抓手平移)")
-        else:
-            self.unsetCursor()
-            self.setToolTip("")
-        super().mouseMoveEvent(event)
-
-    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
-        info = self._image_at(event.pos())
-        menu = self.createStandardContextMenu()
-        if info and not info.pixmap.isNull():
-            first_action = menu.actions()[0] if menu.actions() else None
-
-            act_view = QAction("🔍 查看大图与自由缩放 (双击)", menu)
-            act_view.triggered.connect(lambda: self._open_viewer(info))
-            menu.insertAction(first_action, act_view)
-
-            if info.line_no is not None and self._editor_panel:
-                block = self._editor_panel.get_mermaid_block_at_line(info.line_no)
-                if block:
-                    act_edit = QAction("🖊 在 Mermaid 工作台中编辑...", menu)
-                    act_edit.triggered.connect(
-                        lambda: self._editor_panel.open_mermaid_workbench(block.source, block)
-                    )
-                    menu.insertAction(first_action, act_edit)
-
-                    act_src = QAction("📍 定位到 Markdown 源码", menu)
-                    act_src.triggered.connect(
-                        lambda: (
-                            self._editor_panel.highlight_line(info.line_no),
-                            self._editor_panel._flash_line(info.line_no),
-                        )
-                    )
-                    menu.insertAction(first_action, act_src)
-
-                    act_copy_src = QAction("📄 复制 Mermaid 源码", menu)
-                    act_copy_src.triggered.connect(
-                        lambda: QGuiApplication.clipboard().setText(block.source)
-                    )
-                    menu.insertAction(first_action, act_copy_src)
-                else:
-                    act_src = QAction("📍 定位到 Markdown 源码", menu)
-                    act_src.triggered.connect(
-                        lambda: (
-                            self._editor_panel.highlight_line(info.line_no),
-                            self._editor_panel._flash_line(info.line_no),
-                        )
-                    )
-                    menu.insertAction(first_action, act_src)
-
-            act_copy_img = QAction("📋 复制图片到剪贴板", menu)
-            act_copy_img.triggered.connect(
-                lambda: QGuiApplication.clipboard().setPixmap(info.pixmap)
-            )
-            menu.insertAction(first_action, act_copy_img)
-
-            menu.insertSeparator(first_action)
-
-        menu.exec(event.globalPos())
+from doc_tool.ui.content.preview_adapter import (
+    PreviewAdapter,
+    _PreviewBrowser,
+    _ImageHitInfo,
+)
 
 
 class EditorPanel(QWidget):
@@ -728,12 +490,18 @@ class EditorPanel(QWidget):
         # V2.7：预览统一为内置结构预览（Qt 文本浏览器 + 受控 HTML）。
         # WebEngine 分支已停用并从打包排除：稳定且不引入约 120 MB
         # 运行环境与额外进程兼容负担；精确分页仍以真实 Word 为准。
-        self._preview = _PreviewBrowser(preview_frame, editor_panel=self)
+        self._preview = PreviewAdapter(preview_frame, editor_panel=self)
         self._preview.setReadOnly(True)
         # 关闭外部链接自动打开：http(s) 链接改由 anchorClicked 处理器用系统浏览器
         # 打开；line-N 锚点用于预览点击定位到源行。
         self._preview.setOpenExternalLinks(False)
         self._preview.anchorClicked.connect(self._on_preview_anchor_clicked)
+        if hasattr(self._preview, "headingClicked"):
+            self._preview.headingClicked.connect(self.jump_to_heading)
+        if hasattr(self._preview, "mermaidEditRequested"):
+            self._preview.mermaidEditRequested.connect(self.open_mermaid_workbench)
+        if hasattr(self._preview, "mermaidLocateRequested"):
+            self._preview.mermaidLocateRequested.connect(self.locate_mermaid_source)
         preview_layout.addWidget(self._preview)
         splitter.addWidget(preview_frame)
         self._preview_frame = preview_frame
@@ -2015,10 +1783,25 @@ class EditorPanel(QWidget):
             target = export_png(result, self._assets_root, self._document_type())
             return image_reference(target, result)
 
-        # 批量转换所有 Mermaid 源码（包含裸源码与围栏块）为图片。批量优先
-        # mermaid-cli（若已安装，单块约 1~3s）；未安装 mmdc 时自动回退内置渲染器。
+        # 优先使用官方桌面渲染器（无 Node/npm 依赖，高保真生成 PNG，REQ-MM-05）
+        try:
+            from doc_tool.ui.content.mermaid_renderer import get_official_mermaid_renderer
+            official = get_official_mermaid_renderer()
+            def desktop_renderer(source: str, kind=None):
+                res = official.render(source, want_png=True)
+                if res and res.ok:
+                    return res
+                from doc_tool.application.content.mermaid import render as app_render
+                return app_render(source, kind=kind, use_cli=True)
+        except Exception:
+            desktop_renderer = None
+
         converted = batch_convert(
-            self._editor.toPlainText(), exporter, include_fenced=True, use_cli=True
+            self._editor.toPlainText(),
+            exporter,
+            include_fenced=True,
+            use_cli=True,
+            renderer=desktop_renderer,
         )
         if converted.success_count:
             cursor = self._editor.textCursor()
@@ -2428,20 +2211,25 @@ class EditorPanel(QWidget):
 
     def _refresh_preview(self, text: str) -> None:
         text = self._resolved_preview_text(text)
-        document = self._preview.document()
-        if hasattr(document, "setBaseUrl"):
-            document.setBaseUrl(self._preview_base_url())
-        if hasattr(document, "setHtml"):
-            document.setHtml(render_markdown_html(text, dark=self._dark))
-        if hasattr(self._preview, "adjust_images"):
-            self._preview.adjust_images()
-        if hasattr(self._preview, "moveCursor"):
-            self._preview.moveCursor(QTextCursor.MoveOperation.Start)
+        if hasattr(self._preview, "update_content"):
+            self._preview.update_content(text, self._preview_base_url())
+        else:
+            document = self._preview.document()
+            if hasattr(document, "setBaseUrl"):
+                document.setBaseUrl(self._preview_base_url())
+            if hasattr(document, "setHtml"):
+                document.setHtml(render_markdown_html(text, dark=self._dark))
+            if hasattr(self._preview, "adjust_images"):
+                self._preview.adjust_images()
+            if hasattr(self._preview, "moveCursor"):
+                self._preview.moveCursor(QTextCursor.MoveOperation.Start)
 
     def set_dark(self, dark: bool) -> None:
         """更新暗黑模式状态并刷新当前预览。"""
         if self._dark != dark:
             self._dark = dark
+            if hasattr(self._preview, "set_dark"):
+                self._preview.set_dark(dark)
             self._refresh_preview(self._editor.toPlainText())
 
     def _preview_base_url(self) -> QUrl:
