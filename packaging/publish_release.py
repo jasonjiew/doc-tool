@@ -80,7 +80,7 @@ def get_token() -> str:
     token = os.getenv("GITLAB_TOKEN")
     if not token:
         for arg in sys.argv[1:]:
-            if not arg.startswith("-") and ("glpat-" in arg or len(arg) >= 20):
+            if not arg.startswith("-"):
                 token = arg
                 break
     if not token:

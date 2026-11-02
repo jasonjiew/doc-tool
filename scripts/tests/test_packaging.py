@@ -409,7 +409,7 @@ class PublishReleaseTests(unittest.TestCase):
             self.assertEqual(self.mod.get_token(), "token_xyz")
 
     def test_get_token_missing_raises_runtime_error(self):
-        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "argv", ["publish_release.py"]):
+        with patch.dict(os.environ, {}, clear=True), patch.object(sys, "argv", ["publish_release.py"]), patch("pathlib.Path.exists", return_value=False):
             with self.assertRaises(RuntimeError) as ctx:
                 self.mod.get_token()
             self.assertIn("GITLAB_TOKEN", str(ctx.exception))
