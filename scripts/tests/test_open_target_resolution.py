@@ -33,7 +33,7 @@ class ResolveOpenTargetTests(unittest.TestCase):
         return target
 
     def test_project_directory_resolves_to_itself(self) -> None:
-        project = self._project("KF-2090-1-001 需求")
+        project = self._project("示例项目-1 需求")
         resolution = resolve_open_target(str(project))
         self.assertEqual(resolution.kind, "project")
         self.assertEqual(resolution.root, project)
@@ -45,15 +45,15 @@ class ResolveOpenTargetTests(unittest.TestCase):
         self.assertEqual(resolution.root, project)
 
     def test_middle_layer_directory_finds_single_project(self) -> None:
-        expected = self._project("requirements/KF-2090-1-001 康尚健康云软件需求说明书")
-        self._project("design/KF-2090-2-001 详细设计")
+        expected = self._project("requirements/示例项目-1 软件需求说明书")
+        self._project("design/示例项目-2 详细设计")
         resolution = resolve_open_target(str(self.root / "requirements"))
         self.assertEqual(resolution.kind, "project")
         self.assertEqual(resolution.root, expected)
 
     def test_parent_with_multiple_projects_is_ambiguous(self) -> None:
-        first = self._project("requirements/KF-2090-1-001")
-        second = self._project("design/KF-2090-2-001")
+        first = self._project("requirements/示例项目-1")
+        second = self._project("design/示例项目-2")
         resolution = resolve_open_target(str(self.root))
         self.assertEqual(resolution.kind, "ambiguous")
         self.assertEqual(set(resolution.candidates), {first, second})
