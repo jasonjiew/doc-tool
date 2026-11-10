@@ -54,6 +54,58 @@ class RefreshGuardTests(unittest.TestCase):
         self.assertIn("忙锁", problem)
         self.assertIn("~$", problem)
 
+    def test_short_name_owner_lock_uses_full_name(self):
+        from doc_tool.domain.word_operations import busy_lock_path
+
+        self.assertEqual(
+            Path(busy_lock_path(self.target)).name, "~$" + self.target.name
+        )
+
+    def test_owner_lock_name_follows_word_length_rule(self):
+        """真机实测（Word 16）：属主锁名去掉 ``~$`` 后至少保留 11 个字符。"""
+        from doc_tool.domain.word_operations import busy_lock_path
+
+        cases = (
+            ("out.docx", "~$out.docx"),
+            ("012345.docx", "~$012345.docx"),
+            ("0123456.docx", "~$123456.docx"),
+            ("01234567.docx", "~$234567.docx"),
+            ("DocTool 导出说明(1.0).docx", "~$cTool 导出说明(1.0).docx"),
+        )
+        for name, expected in cases:
+            with self.subTest(name=name):
+                self.assertEqual(
+                    Path(busy_lock_path(self.root / name)).name, expected
+                )
+
+    def test_long_name_owner_lock_drops_first_two_characters(self):
+        """真机规则：长文件名的属主锁是 ``~$`` + 去掉前两个字符的文件名。
+
+        历史实现按 ``~$`` + 完整文件名探测，导出稿的长中文名下永远找不到锁，
+        忙锁防护形同虚设，Word 会卡在不可见对话框上直到超时。
+        """
+        import refresh_fields
+        from doc_tool.domain.word_operations import (
+            busy_lock_candidates,
+            busy_lock_path,
+            find_busy_lock,
+        )
+
+        named = self.root / "DocTool 导出说明(1.0).docx"
+        named.write_bytes(b"PK\x03\x04demo")
+        lock = self.root / ("~$" + named.name[2:])
+        lock.write_text("owner", encoding="utf-8")
+
+        self.assertEqual(Path(busy_lock_path(named)).name, "~$" + named.name[2:])
+        lock_names = [Path(item).name for item in busy_lock_candidates(named)]
+        self.assertIn("~$" + named.name, lock_names)
+        self.assertIn("~$" + named.name[2:], lock_names)
+        self.assertEqual(find_busy_lock(named), str(lock))
+
+        problem = refresh_fields._output_write_problem(str(named))
+        self.assertIsNotNone(problem)
+        self.assertIn(lock.name, problem)
+
     def test_readonly_output_is_detected(self):
         import refresh_fields
 
@@ -124,6 +176,21 @@ class SuperviseCancelTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(reason, self.rf.REASON_LOCKED)
         worker.assert_not_called()
+        self.assertEqual(self.rf.LAST_REPORT.get("currentStage"), "open")
+
+    def test_supervise_short_circuits_on_long_name_busy_lock(self):
+        from pathlib import Path as _Path
+
+        named = self.root / "项目导出稿(v1.0).docx"
+        named.write_bytes(b"PK\x03\x04demo")
+        lock = self.root / ("~$" + named.name[2:])
+        lock.write_text("owner", encoding="utf-8")
+        with patch.object(self.rf, "refresh_worker") as worker:
+            ok, reason = self.rf.supervise(output_path=str(named), timeout=5)
+        self.assertFalse(ok)
+        self.assertEqual(reason, self.rf.REASON_LOCKED)
+        worker.assert_not_called()
+        self.assertIn(_Path(lock).name, str(self.rf.LAST_REPORT.get("stages") or ""))
         self.assertEqual(self.rf.LAST_REPORT.get("currentStage"), "open")
 
     def test_thread_mode_cancel_returns_quickly(self):

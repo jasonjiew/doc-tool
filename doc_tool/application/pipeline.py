@@ -203,6 +203,9 @@ class PipelineResult:
     pending_output_path: Optional[str] = None
     #: V4.0 40-B：本轮 Word 刷新的阶段/预算/归属/清理事实（缺字段表示未知）。
     wordRefresh: Dict[str, object] = field(default_factory=dict)
+    #: 本轮为何没有做 Word 刷新：``wps`` 表示 Word.Application 被 WPS 接管，
+    #: 结果是静态目录的待刷新稿（非正式）。空串表示未发生跳过。
+    word_skip_reason: str = ""
 
     @property
     def last_stage(self) -> Optional[StageEvent]:
@@ -611,7 +614,7 @@ def run_pipeline(
             _wps_takes_word = False
         if _wps_takes_word:
             skip_word_refresh = True
-            result.word_skip_reason = "wps"  # type: ignore[attr-defined]
+            result.word_skip_reason = "wps"
             log.warn(STAGE_WORD_REFRESH, "wps_replacing_word")
 
     # 高模式版本只能查看，任何构建都会写 output/、状态和清单，必须在 Word

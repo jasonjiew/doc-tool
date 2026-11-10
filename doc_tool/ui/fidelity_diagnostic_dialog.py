@@ -219,7 +219,14 @@ class FidelityDiagnosticDialog(QDialog):
     def _restart_app(self) -> None:
         program = sys.executable
         arguments = list(sys.argv[1:]) if getattr(sys, "frozen", False) else list(sys.argv)
-        started = QProcess.startDetached(program, arguments)
+        outcome = QProcess.startDetached(program, arguments)
+        # PySide6 的静态重载返回 ``(是否启动, pid)``，旧式绑定返回 bool。
+        # 原来直接 ``if not started``：失败结果是 ``(False, -1)`` 这样的非空
+        # 元组，恒为真，于是启动失败也照样退出应用，用户只看到窗口消失。
+        if isinstance(outcome, tuple):
+            started = bool(outcome and outcome[0])
+        else:
+            started = bool(outcome)
         if not started:
             self._status.setText("自动重启失败，请手动关闭并重新打开应用。")
             return

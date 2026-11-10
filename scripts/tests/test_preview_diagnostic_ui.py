@@ -70,6 +70,65 @@ class DiagnosticDialogTests(unittest.TestCase):
         clipboard = _QApplication.clipboard()
         self.assertIn("高保真预览诊断", clipboard.text())
 
+    def test_restart_failure_is_reported_instead_of_quitting(self) -> None:
+        """``QProcess.startDetached`` 在 PySide6 返回 ``(bool, pid)``。
+
+        失败结果是 ``(False, -1)``，非空元组恒为真；原实现直接 ``if not
+        started`` 会把失败当成成功，照样退出应用。
+        """
+        from unittest.mock import patch as _patch
+
+        from doc_tool.ui import fidelity_diagnostic_dialog as fdd
+
+        class FakeProcess:
+            @staticmethod
+            def startDetached(*_args, **_kwargs):
+                return (False, -1)
+
+        quit_calls = []
+
+        class FakeApplication:
+            @staticmethod
+            def quit() -> None:  # noqa: D401 - 记录调用
+                quit_calls.append(True)
+
+        dialog = fdd.FidelityDiagnosticDialog(report=self._report())
+        with _patch.object(fdd, "QProcess", FakeProcess), _patch.object(
+            fdd, "QApplication", FakeApplication
+        ):
+            dialog._restart_app()
+
+        self.assertEqual(quit_calls, [])
+        self.assertIn("自动重启失败", dialog._status.text())
+
+    def test_restart_success_quits_and_requests_restart(self) -> None:
+        from unittest.mock import patch as _patch
+
+        from doc_tool.ui import fidelity_diagnostic_dialog as fdd
+
+        class FakeProcess:
+            @staticmethod
+            def startDetached(*_args, **_kwargs):
+                return (True, 4242)
+
+        quit_calls = []
+
+        class FakeApplication:
+            @staticmethod
+            def quit() -> None:
+                quit_calls.append(True)
+
+        dialog = fdd.FidelityDiagnosticDialog(report=self._report())
+        restarted = []
+        dialog.restartRequested.connect(lambda: restarted.append(True))
+        with _patch.object(fdd, "QProcess", FakeProcess), _patch.object(
+            fdd, "QApplication", FakeApplication
+        ):
+            dialog._restart_app()
+
+        self.assertEqual(quit_calls, [True])
+        self.assertEqual(restarted, [True])
+
 
 if __name__ == "__main__":
     unittest.main()

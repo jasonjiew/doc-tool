@@ -153,9 +153,8 @@ from doc_tool.domain.word_operations import (  # noqa: E402
     STAGE_START,
     WordOperationReport,
     budgets_for_timeout,
-    busy_lock_path,
+    find_busy_lock,
     is_busy_lock_error,
-    is_file_busy,
     ownership_from_pid_diff,
     parse_stage_markers,
     stage_marker,
@@ -275,15 +274,12 @@ def _output_write_problem(path: str) -> Optional[str]:
     留下残留锁），此时 ``Documents.Open`` 会弹“文件正在使用”对话框并阻塞，
     必须直接失败并告诉用户怎么处理，而不是等满超时预算。
     """
-    lock = busy_lock_path(path)
-    try:
-        if os.path.exists(lock):
-            return (
-                "目标文档存在 Word 忙锁（{0}）：请关闭正在打开该文档的 Word；"
-                "确认已关闭后删除该 ~$ 锁文件再重试".format(lock)
-            )
-    except OSError:
-        pass
+    lock = find_busy_lock(path)
+    if lock:
+        return (
+            "目标文档存在 Word 忙锁（{0}）：请关闭正在打开该文档的 Word；"
+            "确认已关闭后删除该 ~$ 锁文件再重试".format(lock)
+        )
     try:
         with open(path, "r+b"):
             return None
@@ -419,12 +415,46 @@ def refresh_worker(
 LAST_REPORT: dict = {}
 
 
+def _has_visible_top_level_window(pid: int) -> Optional[bool]:
+    """该进程是否拥有可见顶层窗口；无法判断时返回 ``None``。
+
+    自动化专用的 WINWORD（``Visible=False``）没有可见窗口，用户自己打开的 Word
+    一定有。超时清理不能只凭“差集里只有一个新增 WINWORD”就认领并杀掉它，
+    否则会误杀用户正在编辑、尚未保存的文档。
+    """
+    try:
+        import win32gui
+        import win32process
+    except Exception:  # noqa: BLE001 - 没有 pywin32 时按无法判断处理
+        return None
+
+    found: list = []
+
+    def _visit(hwnd, _param):
+        try:
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
+            _thread_id, owner = win32process.GetWindowThreadProcessId(hwnd)
+            if int(owner) == int(pid):
+                found.append(hwnd)
+                return False
+        except Exception:  # noqa: BLE001 - 单个窗口查询失败不影响整体判断
+            return True
+        return True
+
+    try:
+        win32gui.EnumWindows(_visit, None)
+    except Exception:  # noqa: BLE001 - 枚举失败按无法判断处理
+        return None
+    return bool(found)
+
+
 def _fallback_pid_from_diff(pids_before) -> Optional[int]:
     """超时时用启动前后进程差集定位本次专用 Word。
 
     ``DispatchEx`` 卡在首次启动/许可弹窗时 worker 还没来得及记录 PID；此时
-    差集里恰好只有一个新增 WINWORD，可以安全断定是本次专用实例并清理它，
-    避免只能干等满预算。
+    差集里恰好只有一个新增 WINWORD，且它**没有可见窗口**（自动化实例）才认领
+    并清理。用户在这段时间里自己打开的 Word 有可见窗口，绝不按 PID 差集杀。
     """
     if os.name != "nt":
         return None
@@ -434,7 +464,14 @@ def _fallback_pid_from_diff(pids_before) -> Optional[int]:
     except Exception:  # noqa: BLE001 - 探测失败按未知处理
         return None
     if len(diff) == 1:
-        return int(next(iter(diff)))
+        candidate = int(next(iter(diff)))
+        visible = _has_visible_top_level_window(candidate)
+        if visible is None:
+            # 无法排除是用户自己打开的 Word：宁可留下残留事实，也不误杀文档。
+            return None
+        if visible:
+            return None
+        return candidate
     return None
 
 
@@ -676,14 +713,13 @@ def supervise(
     # 忙锁预检：文档被 Word 打开（或上次异常退出留下 ~$ 锁）时，
     # Documents.Open 会弹出“文件正在使用”对话框并阻塞；直接失败并告诉用户
     # 怎么处理，避免表现为“卡在 Word 刷新”。
-    if is_file_busy(output_path):
+    lock_path = find_busy_lock(output_path)
+    if lock_path:
         report = WordOperationReport(
             operation="word-refresh", source=document or "", target=output_path,
             budgets=budgets_for_timeout(timeout),
         )
-        detail = "目标文档存在 Word 忙锁（{0}），未启动 Word".format(
-            busy_lock_path(output_path)
-        )
+        detail = "目标文档存在 Word 忙锁（{0}），未启动 Word".format(lock_path)
         report.stage(STAGE_OPEN, detail, outcome=STAGE_FAILED)
         _publish_report(report)
         print("[{0}] [FAIL] {1}".format(label, detail), file=sys.stderr, flush=True)

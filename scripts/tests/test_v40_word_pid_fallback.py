@@ -19,11 +19,30 @@ import refresh_fields  # noqa: E402
 
 @unittest.skipUnless(os.name == "nt", "WINWORD 进程探测仅在 Windows 上可用")
 class WordPidFallbackTests(unittest.TestCase):
-    def test_single_new_process_is_attributed(self) -> None:
+    def test_single_new_invisible_process_is_attributed(self) -> None:
         with mock.patch.object(
             refresh_fields, "_get_winword_pids", return_value={101, 102, 103}
+        ), mock.patch.object(
+            refresh_fields, "_has_visible_top_level_window", return_value=False
         ):
             self.assertEqual(refresh_fields._fallback_pid_from_diff([101, 102]), 103)
+
+    def test_visible_new_process_is_never_killed(self) -> None:
+        """用户在这段时间自己打开的 Word 有可见窗口，不能按差集杀。"""
+        with mock.patch.object(
+            refresh_fields, "_get_winword_pids", return_value={101, 102, 103}
+        ), mock.patch.object(
+            refresh_fields, "_has_visible_top_level_window", return_value=True
+        ):
+            self.assertIsNone(refresh_fields._fallback_pid_from_diff([101, 102]))
+
+    def test_unknown_window_state_does_not_kill(self) -> None:
+        with mock.patch.object(
+            refresh_fields, "_get_winword_pids", return_value={101, 102, 103}
+        ), mock.patch.object(
+            refresh_fields, "_has_visible_top_level_window", return_value=None
+        ):
+            self.assertIsNone(refresh_fields._fallback_pid_from_diff([101, 102]))
 
     def test_multiple_new_processes_are_not_guessed(self) -> None:
         with mock.patch.object(

@@ -92,18 +92,64 @@ def parse_stage_markers(text: str) -> List[tuple]:
     return found
 
 
-def busy_lock_path(path) -> str:
-    """Word 的 ``~$`` 属主锁文件路径（用于判断文档是否已被占用）。"""
+#: 属主锁命名规则（Word 16 实测，.docx）：属主锁名去掉 ``~$`` 后至少保留
+#: 11 个字符——``out.docx``（9）→ ``~$out.docx``；``012345.docx``（11）→
+#: ``~$012345.docx``；``0123456.docx``（12）→ ``~$123456.docx``；
+#: ``01234567.docx``（13）→ ``~$234567.docx``；更长的名字只删前两个字符
+#: （``DocTool 说明(1.0).docx`` → ``~$Tool 说明(1.0).docx``）。
+BUSY_LOCK_MIN_SUFFIX = 11
+
+
+def _busy_lock_name(name: str) -> str:
+    """按 Word 真实规则生成属主锁文件名（含 ``~$`` 前缀）。"""
+    if len(name) <= BUSY_LOCK_MIN_SUFFIX:
+        return "~$" + name
+    drop = min(2, len(name) - BUSY_LOCK_MIN_SUFFIX)
+    return "~$" + name[drop:]
+
+
+def busy_lock_candidates(path) -> Tuple[str, ...]:
+    """Word 可能创建的 ``~$`` 属主锁路径（真实规则形态 + 全名兼容形态）。
+
+    历史实现只按“``~$`` + 完整文件名”探测，那只对 11 个字符以内的文件名成立；
+    导出稿普遍是较长的中文名，真实锁文件是删掉前 1～2 个字符的形式，于是忙锁
+    永远检测不到，Word 仍会在不可见对话框上卡满超时预算。这里给出真实形态，
+    并保留全名形态兼容其它版本，读取方按“存在即占用”判断。
+    """
     candidate = Path(path)
-    return str(candidate.with_name("~$" + candidate.name))
+    name = candidate.name
+    names = [_busy_lock_name(name)]
+    full_name = "~$" + name
+    if names[0] != full_name:
+        names.append(full_name)
+    return tuple(
+        dict.fromkeys(str(candidate.with_name(item)) for item in names)
+    )
+
+
+def busy_lock_path(path) -> str:
+    """Word 实际会创建的 ``~$`` 属主锁路径（用于提示用户删除哪个文件）。"""
+    candidate = Path(path)
+    return str(candidate.with_name(_busy_lock_name(candidate.name)))
+
+
+def find_busy_lock(path) -> Optional[str]:
+    """返回真实存在的 Word 属主锁路径；没有锁时为 ``None``。
+
+    只读探测，不清理任何进程，也不删除残留文件。
+    """
+    try:
+        for candidate in busy_lock_candidates(path):
+            if Path(candidate).exists():
+                return candidate
+    except Exception:  # noqa: BLE001 - 探测失败按未知处理
+        return None
+    return None
 
 
 def is_file_busy(path) -> bool:
     """目标文档是否已有 Word 属主锁（只读探测，不清理任何进程）。"""
-    try:
-        return Path(busy_lock_path(path)).exists()
-    except Exception:  # noqa: BLE001 - 探测失败按未知（不阻塞其他动作）
-        return False
+    return find_busy_lock(path) is not None
 
 STAGE_LABELS: Dict[str, str] = {
     STAGE_BUSY_LOCK: "等待 Word 忙锁",
@@ -555,7 +601,8 @@ __all__ = [
     "STAGE_DONE", "STAGE_TIMEOUT", "STAGE_FAILED", "STAGE_PENDING",
     "environment_facts",
     "STAGE_MARKER_PREFIX", "STAGE_ENTER", "stage_marker", "parse_stage_markers",
-    "busy_lock_path", "is_file_busy",
+    "BUSY_LOCK_MIN_SUFFIX", "busy_lock_candidates", "busy_lock_path",
+    "find_busy_lock", "is_file_busy",
     "OWNERSHIP_PID_DIFF", "OWNERSHIP_ACTIVE_WINDOW", "OWNERSHIP_HWND", "OWNERSHIP_UNKNOWN",
     "WordBudgets", "StageFact", "WordOwnership", "WordOperationReport", "StopOutcome",
     "total_budget_seconds", "budgets_for_timeout", "ownership_from_pid_diff",
