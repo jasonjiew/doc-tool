@@ -33,6 +33,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -256,8 +257,12 @@ def _run(
     cwd: Path,
     timeout: float,
     runner: Optional[Callable[..., subprocess.CompletedProcess]] = None,
+    env: Optional[dict] = None,
 ) -> subprocess.CompletedProcess:
-    """执行子进程（默认 subprocess.run，测试可注入假 runner）。"""
+    """执行子进程（默认 subprocess.run，测试可注入假 runner）。
+
+    ``env`` 只作用于真实子进程；注入 runner 的测试不受影响。
+    """
     if runner is not None:
         return runner(list(args), cwd=str(cwd))
     return subprocess.run(
@@ -266,6 +271,7 @@ def _run(
         capture_output=True,
         timeout=timeout,
         check=False,
+        env=env,
     )
 
 
@@ -1661,6 +1667,17 @@ def _git_unmerged_paths(
     return tuple(paths)
 
 
+def _mentions_no_upstream(lowered: str, output: str) -> bool:
+    """git 是否在说「当前分支没有上游分支」。"""
+    return (
+        "no tracking information" in lowered
+        or "no upstream" in lowered
+        or "has no upstream branch" in lowered
+        or "没有跟踪信息" in output
+        or "尚未配置上游" in output
+    )
+
+
 def _git_pull_changes(
     report: ChangeReport,
     *,
@@ -1670,10 +1687,22 @@ def _git_pull_changes(
     """git：执行 git pull，对比拉取前后 HEAD 统计带入文件；冲突时列未合并路径。"""
     repo_root = Path((report.repository_root or "").strip())
     git = shutil.which("git") or "git"
+    # 后台线程没有终端：必须显式关闭交互式凭据提示，否则凭据管理器弹窗会把
+    # 拉取拖到超时，用户只看到"拉取失败"。认证问题应立即返回可读原因。
+    git_env = dict(os.environ)
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+    git_env["GCM_INTERACTIVE"] = "never"
+    git_env["GIT_ASKPASS"] = git_env.get("GIT_ASKPASS") or "echo"
 
     def run_capture(args: Sequence[str]):
         try:
-            return _run([git] + list(args), cwd=repo_root, timeout=timeout, runner=runner)
+            return _run(
+                [git] + list(args),
+                cwd=repo_root,
+                timeout=timeout,
+                runner=runner,
+                env=git_env,
+            )
         except (OSError, subprocess.SubprocessError):
             return None
 
@@ -1713,6 +1742,22 @@ def _git_pull_changes(
                     output = stash_output
 
     if proc.returncode != 0:
+        # 没有配置上游分支（新分支/克隆后改名）时，显式指定远端与分支再试一次，
+        # 而不是把 git 的 "no tracking information" 直接甩给用户。
+        if _mentions_no_upstream(output.lower(), output):
+            proc_branch = run_capture(["rev-parse", "--abbrev-ref", "HEAD"])
+            branch = ""
+            if proc_branch is not None and proc_branch.returncode == 0:
+                branch = _decode(proc_branch.stdout).strip()
+            if branch and branch != "HEAD":
+                retried = run_capture(["pull", "origin", branch])
+                if retried is not None and retried.returncode == 0:
+                    proc = retried
+                    output = (
+                        _decode(retried.stdout) + _decode(retried.stderr)
+                    ).strip()
+
+    if proc.returncode != 0:
         conflicts = _git_unmerged_paths(repo_root, git, timeout, runner)
         # 重新根据最终 output 综合判定（兼容中英文 Git 诊断信息）
         is_untracked_conflict = (
@@ -1728,10 +1773,49 @@ def _git_pull_changes(
             or "在合并前暂存" in output
             or "本地修改将被合并操作覆盖" in output
         )
+        is_no_upstream = _mentions_no_upstream(output.lower(), output)
+        is_diverged = (
+            "need to specify how to reconcile divergent branches" in output.lower()
+            or "not possible to fast-forward" in output.lower()
+            or "non-fast-forward" in output.lower()
+            or "fetch first" in output.lower()
+            or "cannot fast-forward" in output.lower()
+            or "需要指定如何协调" in output
+            or "无法快进" in output
+        )
+        is_auth = (
+            "authentication failed" in output.lower()
+            or "could not read username" in output.lower()
+            or "could not read password" in output.lower()
+            or "terminal prompts disabled" in output.lower()
+            or "permission denied (publickey)" in output.lower()
+            or "身份验证失败" in output
+            or "鉴权失败" in output
+        )
         if is_untracked_conflict:
             error = (
                 "本地存在未跟踪的新增文件与远端冲突，导致拉取被中止。\n"
                 "建议先暂存（包含未跟踪文件）或删除/移动这些本地文件后再拉取。\n\n"
+                "Git 详细输出：\n{0}".format(output)
+            )
+        elif is_no_upstream:
+            error = (
+                "git pull 失败：当前分支没有配置上游分支（upstream）。\n"
+                "请在 Git 菜单为该分支指定远端跟踪分支，或在终端执行：\n"
+                "  git branch --set-upstream-to=<remote>/<branch>\n\n"
+                "Git 详细输出：\n{0}".format(output)
+            )
+        elif is_diverged:
+            error = (
+                "git pull 失败：本地与远端已分叉（双方各有新提交），不能直接快进。\n"
+                "请先在「Git」菜单选择变基拉取（git pull --rebase），或先合并再推送；"
+                "不要在分叉状态下反复拉取。\n\n"
+                "Git 详细输出：\n{0}".format(output)
+            )
+        elif is_auth:
+            error = (
+                "git pull 失败：需要重新登录 Git 凭据（工具不会弹出凭据窗口）。\n"
+                "请在终端执行一次 git pull 完成登录，然后回到工具重试。\n\n"
                 "Git 详细输出：\n{0}".format(output)
             )
         elif is_dirty_conflict:

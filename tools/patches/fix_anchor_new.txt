@@ -1,5 +1,0 @@
-    )
-
-
-def process_markdown(
-    path: str,

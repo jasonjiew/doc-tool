@@ -164,6 +164,7 @@ class ExportSettingsDialog(QDialog):
         saved_document_version: str = "",
         document_type: str = "general",
         document_properties: Optional[dict] = None,
+        refresh_default: bool = True,
         property_notice: str = "",
         notice: str = "",
         conflicts: Optional[Sequence[Dict[str, Any]]] = None,
@@ -325,7 +326,9 @@ class ExportSettingsDialog(QDialog):
 
         # Word 字段刷新
         self._refresh_box = QCheckBox("启用 Word 字段刷新（更新 TOC 目录、NUMPAGES 页码与域代码）", self._advanced_box)
-        self._refresh_box.setChecked(True)
+        # WPS 接管 Word.Application 时刷新不可靠：默认关闭，改用静态目录
+        # （条目正确、页码待刷新），用户仍可手动勾选。
+        self._refresh_box.setChecked(bool(refresh_default))
         self._refresh_box.setToolTip("使用本机 Microsoft Word 刷新文档目录、页码及文档属性域；若当前机器未安装 Word 可取消勾选")
         self._refresh_box.toggled.connect(self._refresh_summary)
         advanced_layout.addWidget(self._refresh_box)

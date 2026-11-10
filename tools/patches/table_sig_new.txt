@@ -1,4 +1,0 @@
-    row_height: Optional[int] = None,
-    extra: Optional[Dict[str, str]] = None,
-    available_width: Optional[int] = None,
-):

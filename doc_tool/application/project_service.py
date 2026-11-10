@@ -24,7 +24,7 @@ from doc_tool.domain.errors import (
     ProjectManifestError,
 )
 from doc_tool.domain.manifest import ProjectManifest
-from doc_tool.domain.paths import ProjectPaths
+from doc_tool.domain.paths import MANIFEST_NAME, ProjectPaths
 from doc_tool.domain.version import can_write_schema
 
 
@@ -132,6 +132,119 @@ class ProjectSummary:
     content_exists: bool
     output_exists: bool
     lock_info: Optional[dict] = None
+
+
+# ---------------------------------------------------------------------------
+# 打开目录的智能寻址
+# ---------------------------------------------------------------------------
+
+#: 向下探测项目时跳过的目录（构建产物、应用状态、依赖与缓存）。
+_DISCOVERY_SKIP_DIRS = {
+    ".git", ".svn", ".state", "output", "logs", "tmp", "temp",
+    "node_modules", "__pycache__", ".venv", ".pytest_cache",
+}
+
+#: 向下探测的最大层数（与 CLI 基线检查保持一致）。
+DISCOVERY_MAX_DEPTH = 3
+
+
+@dataclass(frozen=True)
+class OpenTargetResolution:
+    """打开目录的解析结果。
+
+    - ``project``：该目录就是一个文档项目；
+    - ``workspace``：该目录是文档工作区（含 ``workspace.yml``）；
+    - ``ambiguous``：目录下发现多个项目，交给界面让用户选；
+    - ``none``：目录及以下 N 层都没有项目清单。
+    """
+
+    kind: str
+    root: Optional[Path] = None
+    candidates: Tuple[Path, ...] = ()
+    message: str = ""
+
+
+def is_project_dir(path: Path) -> bool:
+    """目录本身是否带项目清单（``project.yml`` / ``project.yaml``）。"""
+    try:
+        return (Path(path) / MANIFEST_NAME).is_file() or (
+            Path(path) / "project.yaml"
+        ).is_file()
+    except OSError:
+        return False
+
+
+def discover_project_dirs(root: Path, max_depth: int = DISCOVERY_MAX_DEPTH) -> List[Path]:
+    """在 ``root`` 下（含自身）递归发现项目目录，最多向下 ``max_depth`` 层。
+
+    只做文件系统探测，不读清单内容；顺序按目录名自然排序，便于界面稳定展示。
+    """
+    root = Path(root)
+    if is_project_dir(root):
+        return [root]
+    found: List[Path] = []
+
+    def _walk(current: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            children = sorted(current.iterdir(), key=lambda item: item.name.lower())
+        except OSError:
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name.startswith(".") or child.name.lower() in _DISCOVERY_SKIP_DIRS:
+                continue
+            if is_project_dir(child):
+                found.append(child)
+            else:
+                _walk(child, depth + 1)
+
+    _walk(root, 1)
+    return found
+
+
+def resolve_open_target(path: str) -> OpenTargetResolution:
+    """把用户选择的目录解析成「可打开的项目 / 工作区 / 候选列表」。
+
+    典型场景：用户选的是 ``hcp-docs/requirements`` 这类中间层目录，或同时装了
+    多个文档项目的父目录。原先直接报「缺少 project.yml」，与用户意图无关。
+    """
+    text = str(path or "").strip()
+    if not text:
+        return OpenTargetResolution(
+            kind="none", message="未选择目录。"
+        )
+    root = Path(text).resolve()
+    if root.is_file() or root.name.lower() in ("project.yml", "project.yaml"):
+        root = root.parent
+    if is_project_dir(root):
+        return OpenTargetResolution(kind="project", root=root)
+    if (root / "workspace.yml").is_file():
+        return OpenTargetResolution(kind="workspace", root=root)
+
+    candidates = discover_project_dirs(root)
+    if len(candidates) == 1:
+        return OpenTargetResolution(kind="project", root=candidates[0])
+    if len(candidates) > 1:
+        return OpenTargetResolution(
+            kind="ambiguous",
+            root=root,
+            candidates=tuple(candidates),
+            message="所选目录下发现 {0} 个文档项目，请选择要打开的一个。".format(
+                len(candidates)
+            ),
+        )
+    return OpenTargetResolution(
+        kind="none",
+        root=root,
+        message=(
+            "所选目录及其下 {0} 层内没有找到 project.yml：{1}".format(
+                DISCOVERY_MAX_DEPTH, root
+            )
+        ),
+    )
 
 
 def open_project(project_root: str) -> ProjectSummary:

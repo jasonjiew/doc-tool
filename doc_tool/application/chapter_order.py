@@ -76,15 +76,49 @@ def resolve_chapter_order(
 
     unlisted = [item for item in discovered_list if item not in ordered]
     if unlisted:
-        warnings.append(
-            "未列入顺序的章节已追加在末尾：{0}".format("、".join(unlisted[:5]))
-        )
+        if _is_naturally_sorted(ordered):
+            for item in unlisted:
+                _insert_by_natural_key(ordered, item)
+            warnings.append(
+                "未列入顺序的章节已按编号插入：{0}".format("、".join(unlisted[:5]))
+            )
+        else:
+            # 声明顺序本身不是编号顺序（作者刻意重排过）：不要用编号覆盖作者选择。
+            ordered.extend(unlisted)
+            warnings.append(
+                "未列入顺序的章节已追加在末尾（当前为自定义章节顺序）：{0}".format(
+                    "、".join(unlisted[:5])
+                )
+            )
     return ChapterOrder(
-        ordered=ordered + unlisted,
+        ordered=ordered,
         missing=missing,
         unlisted=unlisted,
         warnings=warnings,
     )
+
+
+def _is_naturally_sorted(items: Sequence[str]) -> bool:
+    """声明顺序是否与编号自然序一致（一致时才可按编号插入新章节）。"""
+    from doc_tool.domain.content_index import path_natural_sort_key
+
+    keys = [path_natural_sort_key(str(item)) for item in items]
+    return keys == sorted(keys)
+
+
+def _insert_by_natural_key(ordered: List[str], item: str) -> None:
+    """把未声明章节插到「编号紧邻的前一个已声明章节」之后。
+
+    找不到更小的已声明章节时追加到末尾，保证不会把新章节顶到文档最前面。
+    """
+    from doc_tool.domain.content_index import path_natural_sort_key
+
+    key = path_natural_sort_key(item)
+    position = len(ordered)
+    for index, existing in enumerate(ordered):
+        if path_natural_sort_key(str(existing)) < key:
+            position = index + 1
+    ordered.insert(position, item)
 
 
 def _key(value: str) -> str:
@@ -104,6 +138,31 @@ def _match_discovered(entry: str, discovered: List[str], mapping: Dict[str, str]
         if candidate_key.endswith("/" + normalized) or candidate_key.endswith("/" + stem):
             return candidate
     return None
+
+
+def order_findings(
+    discovered: Sequence[str],
+    declared: Optional[Sequence[str]] = None,
+) -> List[str]:
+    """导出前的章节顺序体检，返回面向用户的提醒（空列表表示无异常）。
+
+    只描述事实与后果，不修改顺序：真正排序由 :func:`resolve_chapter_order` 决定。
+    """
+    order = resolve_chapter_order(discovered, declared)
+    findings: List[str] = []
+    if order.missing:
+        findings.append(
+            "清单声明的 {0} 个章节已不存在（可能被改名或移动）：{1}".format(
+                len(order.missing), "、".join(order.missing[:3])
+            )
+        )
+    if order.unlisted:
+        findings.append(
+            "有 {0} 个章节未列入清单顺序，导出时按编号插入：{1}".format(
+                len(order.unlisted), "、".join(order.unlisted[:3])
+            )
+        )
+    return findings
 
 
 @dataclass

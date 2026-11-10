@@ -1,8 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec：将 Doc Tool 打包为 Windows onedir 应用（PySide6）。
 
-任务 7.1（PySide6 迁移）：仅引入 QtCore/QtGui/QtWidgets/QtPdf，排除未用的
-QtWebEngine/QtNetwork/QtQml/QtMultimedia 等大件，控制体积；V2.7 起编辑器预览只用内置结构预览，WebEngine 分支已停用，因此该排除同时是产品边界。
+任务 7.1（PySide6 迁移）：主依赖 QtCore/QtGui/QtWidgets/QtPdf；高保真
+Markdown 预览需要 QtWebEngine/QtWebChannel，以及它们要拖进来的
+QtNetwork/QtQml（excludes 里同名项对 WebEngine 的依赖不生效）。单文件
+Qt6WebEngineCore.dll 约 150MB，是已知体积成本；QtMultimedia/Qt3D 等未使用
+的大件仍由 excludes 排除。
 
 构建命令：
     pyinstaller packaging/doc_tool.spec --noconfirm --clean

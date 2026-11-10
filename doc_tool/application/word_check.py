@@ -47,6 +47,8 @@ class WordAvailability:
     interactive_session: bool = False
     word_dispatchable: bool = False
     version: str = ""
+    #: ``Word.Application`` 是否被 WPS 接管（不是 Microsoft Word）。
+    wps_replacing_word: bool = False
     reasons: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -56,8 +58,41 @@ class WordAvailability:
             "interactiveSession": self.interactive_session,
             "wordDispatchable": self.word_dispatchable,
             "version": self.version,
+            "wpsReplacingWord": self.wps_replacing_word,
             "reasons": list(self.reasons),
         }
+
+
+#: Microsoft Word 的 COM 类标识。``Word.Application`` 的 CLSID 与它不一致时，
+#: 说明该 ProgID 已被其它办公软件（典型是 WPS Office）接管——此时
+#: ``DispatchEx("Word.Application")`` 启动的其实是 WPS，域刷新容易卡在不可见弹窗。
+MS_WORD_CLSID = "{000209FF-0000-0000-C000-000000000046}"
+
+
+def word_progid_clsid() -> Optional[str]:
+    """读取 ``HKCR\\Word.Application\\CLSID``；读不到（未安装）返回 ``None``。"""
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"Word.Application\CLSID") as key:
+            value, _ = winreg.QueryValueEx(key, "")
+        return str(value).strip()
+    except Exception:  # noqa: BLE001 - 注册表不可读按未知处理
+        return None
+
+
+def is_wps_replacing_word(clsid: Optional[str] = None) -> bool:
+    """``Word.Application`` 是否被 WPS 接管。
+
+    ``clsid`` 为空时读注册表；读不到就当未知（False），不误报成 WPS。
+    """
+    value = (clsid if clsid is not None else word_progid_clsid()) or ""
+    value = str(value).strip().upper()
+    if not value:
+        return False
+    return value != MS_WORD_CLSID.upper()
 
 
 def check_pywin32() -> bool:
@@ -429,6 +464,14 @@ def check_word_available(
     report.interactive_session = check_interactive_session()
     if not report.interactive_session:
         reasons.append("当前不是交互式 Windows 桌面会话（可能在服务或计划任务中运行）。")
+
+    report.wps_replacing_word = is_wps_replacing_word()
+    if report.wps_replacing_word:
+        # 只提示不阻断：WPS 也能打开/另存，但域刷新不可靠，必须让用户知道。
+        reasons.append(
+            "当前 Word.Application 由 WPS Office 接管（注册表 CLSID 不是 Microsoft Word），"
+            "字段刷新可能卡在不可见弹窗；建议取消「Word 字段刷新」或改用 Microsoft Word。"
+        )
 
     if dispatch_check and report.pywin32_available and report.interactive_session:
         # 给一个总超时保护：DispatchEx 在某些机器上首次启动可能慢

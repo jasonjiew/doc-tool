@@ -193,6 +193,19 @@ DEFAULT_TESTS = [
     "test_updater_service.py",
     "test_update_cli_and_ui.py",
     "simulate_update_scenarios.py",
+    # 高保真预览诊断（不可用原因 + 兼容模式）与打开目录智能寻址。
+    "test_preview_diagnostic.py",
+    "test_preview_diagnostic_ui.py",
+    "test_open_target_resolution.py",
+    # git pull 失败恢复（无上游/分叉/凭据）与 Word 启动阶段 PID 兜底。
+    "test_vcs_pull_recovery.py",
+    "test_v40_word_pid_fallback.py",
+    "test_word_wps_detection.py",
+    "test_export_refresh_default.py",
+    "test_docx_refresh.py",
+    "test_export_results_refresh_action.py",
+    "test_wps_word_refresh_guard.py",
+    "test_hidden_process.py",
 ]
 
 

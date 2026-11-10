@@ -102,26 +102,18 @@ invoke_args.json
 *.broken
 .tmp-*/
 
-# 本地回归、审查与交付归档产物
-/test-results-*.xml
+# 本地回归、审查、方案评审与临时分析产物
+/test-results*.xml
 /deliverables/
-/analysis/_core_tmp/
-/analysis/review-test-deps/
-/analysis/current-review-*
-/analysis/review-regressions-*.xml
-/analysis/ui-interaction-audit-20261002/
-/analysis/core-interaction-followup-*/
-/tools/mermaid-cli/probe.js
-analysis/ui-experience-next-audit-20261002/isolated-user/
-analysis/ui-experience-next-audit-20261002/sample-project/
-analysis/ui-experience-next-audit-20261002/sample-import.docx
-analysis/ui-experience-next-after-20261002/isolated-user/
-analysis/ui-experience-next-after-20261002/sample-project/
-analysis/ui-experience-next-after-20261002/sample-import.docx
-
-# LLM 编辑工作流的补丁规格中间产物（不属产品源码；重建依据见
-# docs/product-v3.0.0-code-review-and-fixes.md）
+/analysis/
+/方案评审/
+/tools/patches/
 tools/_patch*.json
+docs/release/evidence/*.xml
+docs/superpowers/
+EXECUTION_OPTIMIZATION_PLAN.md
+start-claude.bat
+/tools/mermaid-cli/probe.js
 
 # DeepSeek Harness 本地临时目录
 .dsh-tmp/

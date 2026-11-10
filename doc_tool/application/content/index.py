@@ -130,7 +130,11 @@ class ContentIndexService:
                         continue
                     rel = file_path.relative_to(self._content_root).as_posix()
                     result.append((rel, file_path))
-        result.sort(key=lambda item: item[0])
+        # 章节顺序按编号自然序（3.7.2 在 3.7.10 前），与章节树/预览保持一致；
+        # 原先的纯字典序会让多位数编号的小节排错位置，出稿顺序与界面不一致。
+        from doc_tool.domain.content_index import path_natural_sort_key
+
+        result.sort(key=lambda item: path_natural_sort_key(item[0]))
         return result
 
     def _doc_type_of(self, rel_path: str) -> str:

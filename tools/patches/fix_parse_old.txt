@@ -1,1 +1,0 @@
-            document = parse_blocks_file(markdown_path)

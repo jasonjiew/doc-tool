@@ -1,1 +1,0 @@
-    registry = build_registry(parsed_documents)

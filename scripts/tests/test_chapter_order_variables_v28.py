@@ -15,6 +15,7 @@ for candidate in (str(REPO_ROOT), str(REPO_ROOT / "scripts")):
 from doc_tool.application.chapter_order import (  # noqa: E402
     UNDEFINED_TEMPLATE,
     is_resource_path,
+    order_findings,
     resolve_chapter_order,
     resolve_variables,
 )
@@ -35,6 +36,44 @@ class ChapterOrderTests(unittest.TestCase):
         self.assertEqual(order.ordered, ["2 设计.md", "1 概述.md", "3 验证.md"])
         self.assertEqual(order.unlisted, ["3 验证.md"])
         self.assertTrue(order.warnings)
+
+    def test_unlisted_middle_chapter_inserted_by_number(self):
+        """新建/改名的中间章节应插到编号位置，而不是一律追加到文末。"""
+        discovered = ["1 概述.md", "1.2 范围.md", "1.3 定义.md"]
+        order = resolve_chapter_order(discovered, ["1 概述.md", "1.3 定义.md"])
+        self.assertEqual(
+            order.ordered, ["1 概述.md", "1.2 范围.md", "1.3 定义.md"]
+        )
+        self.assertIn("按编号插入", "".join(order.warnings))
+
+    def test_multi_digit_chapters_use_natural_order(self):
+        """新建的 1.4 应插在 1.2 与 1.10 之间（按编号，不按字典序）。"""
+        discovered = ["1.2 甲.md", "1.4 乙.md", "1.10 丙.md"]
+        order = resolve_chapter_order(discovered, ["1.2 甲.md", "1.10 丙.md"])
+        self.assertEqual(
+            order.ordered, ["1.2 甲.md", "1.4 乙.md", "1.10 丙.md"]
+        )
+
+    def test_custom_order_is_never_overridden(self):
+        """作者刻意重排（非编号顺序）时，未列出章节仍追加，不按编号插队。"""
+        order = resolve_chapter_order(
+            ["1 概述.md", "2 设计.md", "3 验证.md"], ["2 设计.md", "1 概述.md"]
+        )
+        self.assertEqual(order.ordered, ["2 设计.md", "1 概述.md", "3 验证.md"])
+        self.assertTrue(any("自定义" in item for item in order.warnings))
+
+    def test_order_findings_report_missing_and_unlisted(self):
+        findings = order_findings(
+            ["1 概述.md", "2 设计.md"], ["1 概述.md", "9 不存在.md"]
+        )
+        self.assertTrue(any("不存在" in item for item in findings), findings)
+        self.assertTrue(any("未列入" in item for item in findings), findings)
+
+    def test_order_findings_clean_when_everything_matches(self):
+        self.assertEqual(
+            order_findings(["1 概述.md", "2 设计.md"], ["1 概述.md", "2 设计.md"]),
+            [],
+        )
 
     def test_missing_declaration_reported_not_fatal(self):
         order = resolve_chapter_order(["1 概述.md"], ["9 不存在.md", "1 概述.md"])

@@ -439,6 +439,29 @@ class MarkdownStructureLintRuleTests(unittest.TestCase):
         self.assertTrue(findings[0].blocking)
         self.assertIn("括号不匹配", findings[0].message)
 
+    def test_check_mermaid_structure_accepts_sequence_async_arrow(self):
+        """序列图异步箭头 -) 是 Mermaid 官方合法语法，构建前检查不得阻断导入（E2001 回归）。"""
+        from doc_tool.domain.markdown_structure import check_mermaid_structure
+
+        lines = [
+            "# 2.9.2 时序图",
+            "",
+            "```mermaid",
+            "sequenceDiagram",
+            "  participant Serial",
+            "  participant MCU",
+            "  Serial-)MCU: 下发检测指令",
+            "  MCU--)Serial: 回传结果",
+            "```",
+        ]
+        self.assertEqual(check_mermaid_structure(lines), [])
+
+        broken = list(lines)
+        broken[6] = "  Serial MCU: 缺少箭头"
+        findings = check_mermaid_structure(broken)
+        self.assertEqual(len(findings), 1)
+        self.assertTrue(findings[0].blocking)
+
     def test_check_bare_mermaid_structure_with_preceding_comment(self):
         """裸 Mermaid 块前带注释时，行号精确指向错误代码行且 blocking=True。"""
         from doc_tool.domain.markdown_structure import check_mermaid_structure

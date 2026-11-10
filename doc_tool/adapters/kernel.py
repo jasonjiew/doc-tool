@@ -445,6 +445,15 @@ def refresh_with_project(
     V4.0 40-B：传入 ``report`` 时写入本轮真实阶段/预算/归属/清理事实
     （``refresh_fields.LAST_REPORT`` 的同源内容），供结果页说明“卡在哪一步”。
     """
+    try:
+        from doc_tool.application.word_check import is_wps_replacing_word
+
+        if is_wps_replacing_word():
+            # 防御：任何入口（GUI/CLI/按包正式化）都不要把 WPS 当 Word 用。
+            return False, "word_unavailable"
+    except Exception:  # noqa: BLE001 - 探测失败保持原有流程
+        pass
+
     ensure_kernel_importable()
     import refresh_fields  # noqa: E402
     from refresh_fields import supervise  # noqa: E402

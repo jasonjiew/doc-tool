@@ -1,2 +1,0 @@
-    _output_seen: Dict[str, int] = field(default_factory=dict)
-    _sequential: Dict[str, int] = field(default_factory=dict)

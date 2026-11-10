@@ -20,6 +20,25 @@ def _is_frozen() -> bool:
 
 
 def main() -> int:
+    # Windows GUI 没有控制台：所有子进程（git/svn/taskkill/渲染 worker）默认
+    # 不弹黑色控制台窗口，否则打开项目检测改动时会连续闪黑窗。
+    try:
+        from doc_tool.domain.hidden_process import install_windows_no_window_defaults
+
+        install_windows_no_window_defaults()
+    except Exception:  # noqa: BLE001 - 安装失败不得阻断启动
+        pass
+
+    # 高保真预览的兼容模式（禁用 Chromium 沙箱/GPU）只能经环境变量生效，
+    # 且必须在 QApplication/QtWebEngine 初始化前注入；用户在诊断弹窗里开启后
+    # 重启应用即走到这里。
+    try:
+        from doc_tool.application.preview_diagnostic import apply_compat_environment
+
+        apply_compat_environment()
+    except Exception:  # noqa: BLE001 - 诊断模块异常不得阻断启动
+        pass
+
     # PyInstaller 冻结应用使用 spawn 子进程对 Word COM 探测施加真实超时。
     try:
         import multiprocessing

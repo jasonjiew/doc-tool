@@ -117,12 +117,15 @@ def collect_chapter_markdown_paths(content_root) -> "List[str]":
     root = Path(content_root)
     if not root.is_dir():
         return []
+    from doc_tool.domain.content_index import path_natural_sort_key
+
     collected = []
     for current, directories, files in _os.walk(root):
         directories[:] = sorted(
-            name for name in directories if not name.startswith(".")
+            (name for name in directories if not name.startswith(".")),
+            key=path_natural_sort_key,
         )
-        for name in sorted(files):
+        for name in sorted(files, key=path_natural_sort_key):
             if not name.lower().endswith((".md", ".markdown")):
                 continue
             if name.startswith(".") or name.endswith((".bak", ".tmp")):
@@ -591,6 +594,21 @@ def run_pipeline(
 
     effective_app_version = app_version or APP_VERSION
     log = RuntimeLog(paths, app_version=effective_app_version)
+
+    # WPS 接管 Word.Application 时不进入 Word 刷新：它会以不可见弹窗阻塞，
+    # 表现为“卡在刷新 Word”最长等满超时预算。改为静态目录的诊断构建——
+    # 目录条目按编号生成、页码待刷新，仍可直接打开。
+    if not skip_word_refresh:
+        try:
+            from doc_tool.application.word_check import is_wps_replacing_word
+
+            _wps_takes_word = bool(is_wps_replacing_word())
+        except Exception:  # noqa: BLE001 - 探测失败保持原有行为
+            _wps_takes_word = False
+        if _wps_takes_word:
+            skip_word_refresh = True
+            result.word_skip_reason = "wps"  # type: ignore[attr-defined]
+            log.warn(STAGE_WORD_REFRESH, "wps_replacing_word")
 
     # 高模式版本只能查看，任何构建都会写 output/、状态和清单，必须在 Word
     # 探测及锁获取之前阻断。
@@ -1290,10 +1308,16 @@ def _run_pipeline_inner(
     # --- 阶段 3：Word 实机刷新（可选，临时文件） ---
     _check_cancel()
     if skip_word_refresh:
+        skip_detail = "已显式跳过 Word 实机刷新"
+        if getattr(result, "word_skip_reason", "") == "wps":
+            skip_detail = (
+                "检测到 Word.Application 由 WPS 接管，已跳过 Word 刷新"
+                "（目录按编号生成，页码待刷新）"
+            )
         result.events.append(StageEvent(
-            STAGE_WORD_REFRESH, "skipped", detail="已显式跳过 Word 实机刷新",
+            STAGE_WORD_REFRESH, "skipped", detail=skip_detail,
         ))
-        log.info(STAGE_WORD_REFRESH, "skipped")
+        log.info(STAGE_WORD_REFRESH, "skipped", {"reason": skip_detail})
         _record_stage(STAGE_WORD_REFRESH, "skipped")
     else:
         result.events.append(StageEvent(STAGE_WORD_REFRESH, "started"))

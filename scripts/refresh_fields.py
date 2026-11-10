@@ -327,6 +327,25 @@ def refresh_worker(
 LAST_REPORT: dict = {}
 
 
+def _fallback_pid_from_diff(pids_before) -> Optional[int]:
+    """超时时用启动前后进程差集定位本次专用 Word。
+
+    ``DispatchEx`` 卡在首次启动/许可弹窗时 worker 还没来得及记录 PID；此时
+    差集里恰好只有一个新增 WINWORD，可以安全断定是本次专用实例并清理它，
+    避免只能干等满预算。
+    """
+    if os.name != "nt":
+        return None
+    before = {int(item) for item in (pids_before or [])}
+    try:
+        diff = _get_winword_pids() - before
+    except Exception:  # noqa: BLE001 - 探测失败按未知处理
+        return None
+    if len(diff) == 1:
+        return int(next(iter(diff)))
+    return None
+
+
 def _bounded_supervise_in_thread(
     document: Optional[str],
     output_path: str,
@@ -385,6 +404,8 @@ def _bounded_supervise_in_thread(
             except Exception:
                 pass
 
+    # 启动前快照：卡在 DispatchEx 时 holder 拿不到 PID，超时后靠差集兜底。
+    holder["pidsBefore"] = sorted(_get_winword_pids())
     thread = threading.Thread(
         target=_worker, name="doc-tool-word-refresh-thread", daemon=True
     )
@@ -401,6 +422,8 @@ def _bounded_supervise_in_thread(
             ),
         )
         pid = holder.get("pid")
+        if pid is None:
+            pid = _fallback_pid_from_diff(holder.get("pidsBefore") or [])
         report.set_ownership(
             ownership_from_pid_diff(pid, holder.get("pidsBefore") or [])
         )

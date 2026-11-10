@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -324,6 +325,9 @@ class PreviewAdapter(QWidget):
         self._current_snapshot: Optional[PreviewSnapshot] = None
         self._is_dark: bool = False
         self._crash_count: int = 0
+        # 高保真初始化失败的真实原因（供诊断弹窗与现场反馈，不再只写日志）。
+        self._fidelity_error_text: str = ""
+        self._fidelity_error_traceback: str = ""
 
         self._init_ui()
         self._init_browsers()
@@ -362,6 +366,16 @@ class PreviewAdapter(QWidget):
         self._btn_mode.clicked.connect(self._toggle_mode_clicked)
         banner_layout.addWidget(self._btn_mode)
 
+        self._btn_diag = QPushButton("诊断/修复", self._banner_frame)
+        self._btn_diag.setStyleSheet(
+            "QPushButton { font-size: 11px; padding: 1px 8px; border: 1px solid #cbd5e1; border-radius: 3px; background: #ffffff; color: #b45309; }"
+            "QPushButton:hover { background: #fef3c7; }"
+        )
+        self._btn_diag.setToolTip("查看高保真预览不可用的具体原因，并按运行形态修复")
+        self._btn_diag.clicked.connect(self._open_diagnostic)
+        self._btn_diag.setVisible(False)
+        banner_layout.addWidget(self._btn_diag)
+
         layout.addWidget(self._banner_frame)
 
         # 堆叠视图
@@ -384,6 +398,8 @@ class PreviewAdapter(QWidget):
             self._fidelity_available = True
         except Exception as exc:
             logger.warning("QWebEngine unavailable for fidelity preview: %s", exc)
+            self._fidelity_error_text = "{0}: {1}".format(type(exc).__name__, exc)
+            self._fidelity_error_traceback = traceback.format_exc()
             self._fidelity_available = False
             self._fidelity_browser = None
 
@@ -402,7 +418,9 @@ class PreviewAdapter(QWidget):
         else:
             self._mode = PreviewMode.LIGHTWEIGHT
             self._stack.setCurrentWidget(self._light_browser)
-            self._lbl_status.setText("高保真组件不可用，已自动启用轻量近似模式")
+            self._lbl_status.setText(
+                "高保真组件不可用，已自动启用轻量近似模式（点「诊断/修复」查看原因）"
+            )
             self._update_banner_ui()
 
     def _update_banner_ui(self) -> None:
@@ -420,6 +438,7 @@ class PreviewAdapter(QWidget):
             )
             self._btn_mode.setText("切换高保真" if self._fidelity_available else "高保真不可用")
             self._btn_mode.setEnabled(self._fidelity_available)
+        self._btn_diag.setVisible(not self._fidelity_available)
 
     def _toggle_mode_clicked(self) -> None:
         if not self._fidelity_available:
@@ -456,6 +475,21 @@ class PreviewAdapter(QWidget):
 
     def is_fidelity_available(self) -> bool:
         return self._fidelity_available
+
+    def fidelity_error_text(self) -> str:
+        """最近一次高保真初始化失败的原因（空串表示未失败）。"""
+        return self._fidelity_error_text
+
+    def _open_diagnostic(self) -> None:
+        """打开诊断弹窗：展示原因、逐项检查与按运行形态的修复入口。"""
+        from doc_tool.ui.fidelity_diagnostic_dialog import FidelityDiagnosticDialog
+
+        dialog = FidelityDiagnosticDialog(
+            self.window(),
+            error_text=self._fidelity_error_text,
+            traceback_text=self._fidelity_error_traceback,
+        )
+        dialog.exec()
 
     def _on_fidelity_load_status(self, ok: bool, message: str) -> None:
         if not ok:

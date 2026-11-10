@@ -161,7 +161,7 @@ def _split_chain_edges(line: str):
         return None
     return [(segs[i], segs[i + 1], labels[i]) for i in range(len(segs) - 1)]
 _SEQ_MESSAGE_RE = re.compile(
-    r"^\s*(\w[\w/.-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))\s*"
+    r"^\s*(\w[\w/.-]*)\s*(-->>|->>|-->|->|-x|--x|-\)|--\))(?:[+-])?\s*"
     r"(\w[\w/.-]*)\s*:\s*(.+?)\s*$"
 )
 
@@ -510,10 +510,14 @@ def validate(source: str, kind: Optional[str] = None, *, use_official: bool = Fa
         if not line or line.startswith("%%") or _HTML_COMMENT_RE.match(line):
             continue
 
-        balance = _balanced_error(line, actual)
-        if balance:
-            errors.append(MermaidError(number, balance))
-            continue
+        # 序列图的消息/注释文本允许任意字符，且官方异步箭头 ``-)`` / ``--)`` 自带右括号；
+        # 通用括号配对检查会把这类合法语法误判为“括号不匹配”（构建前检查 E2001），
+        # 因此序列图跳过多行括号/引号配对，交由下方句式判定。
+        if actual != "sequenceDiagram":
+            balance = _balanced_error(line, actual)
+            if balance:
+                errors.append(MermaidError(number, balance))
+                continue
 
         if actual == "classDiagram":
             for ch in line:

@@ -14,7 +14,7 @@
 - **问题与建议反馈（Issues）**：<https://github.com/jasonjiew/doc-tool/issues> （欢迎在此提交任何使用问题、缺陷报告或改进建议）
 - **详细指南**：[docs/使用说明.md](docs/使用说明.md) / [docs/COLLEAGUE_AI_CLI_GUIDE.md](docs/COLLEAGUE_AI_CLI_GUIDE.md)
 - **主流程质量检查**：[团队共享规则、模块/需求表规范与执行状态](docs/mainflow-quality.md)（新规则按配置启用，旧项目不自动迁移）
-- **离线主流程智能化（本轮源码）**：[下一步建议、当前正文 F5、可选 AI 预览与采纳](docs/mainflow-intelligence.md) / [调研执行计划](docs/mainflow-intelligence-plan-20261016.md) / [执行验证交接](docs/mainflow-intelligence-execution-20261016.md)（源码实现、实机试点与已发布包分开记录）
+- **离线主流程智能化（本轮源码）**：[下一步建议、当前正文 F5、可选 AI 预览与采纳](docs/mainflow-intelligence.md)（源码实现、实机试点与已发布包分开记录）
 - **产品盘点与后续排程**：[当前功能总清单](docs/product-function-catalog.md) / [产品总路线图](docs/product-master-roadmap.md)
 
 ---

@@ -275,8 +275,15 @@ CORE_WORD_PROBE_SECONDS = 30.0
 
 def _word_available() -> bool:
     try:
-        from doc_tool.application.word_check import check_word_available
+        from doc_tool.application.word_check import (
+            check_word_available,
+            is_wps_replacing_word,
+        )
 
+        # WPS 接管 Word.Application 时刷新不可靠（隐藏弹窗会挂住进程），
+        # 直接按“无 Word”走静态目录/待刷新，避免快速导出绕过对话框默认值。
+        if is_wps_replacing_word():
+            return False
         return bool(
             check_word_available(dispatch_timeout_seconds=CORE_WORD_PROBE_SECONDS).available
         )

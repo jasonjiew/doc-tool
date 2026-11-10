@@ -75,6 +75,7 @@ class ExportResultsView(QWidget):
         on_open_settings: Optional[Callable[[object], None]] = None,
         on_select_round: Optional[Callable[[str], None]] = None,
         on_locate_source: Optional[Callable[[str, Optional[int]], None]] = None,
+        on_refresh_fields: Optional[Callable[[object], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -86,6 +87,7 @@ class ExportResultsView(QWidget):
         self._on_open_settings = on_open_settings
         self._on_select_round = on_select_round
         self._on_locate_source = on_locate_source
+        self._on_refresh_fields = on_refresh_fields
         self._primary_action_kind = ""
         self._rounds: List[object] = []
         self._current = None
@@ -236,8 +238,12 @@ class ExportResultsView(QWidget):
         if getattr(round_view, "has_usable_docx", False):
             if getattr(round_view, "has_pending_refresh", False):
                 self._primary_btn.setText("打开 Word (待刷新)")
+                self._primary_btn.setToolTip(
+                    "目录/页码尚未刷新：用 Word 打开后按 Ctrl+A，再按 F9 更新整个目录"
+                )
             else:
                 self._primary_btn.setText("打开 Word")
+                self._primary_btn.setToolTip("")
             self._primary_action_kind = "open_word"
             self._primary_btn.setVisible(True)
             self._primary_btn.setEnabled(True)
@@ -312,6 +318,13 @@ class ExportResultsView(QWidget):
                 and not _is_origin_unavailable(round_view)):
             act = self._more_menu.addAction("重试本次内容")
             act.triggered.connect(lambda: self._invoke(self._on_retry_formats))
+        # 待刷新稿：直接调 Word 刷新目录/页码，不必手动 F9。
+        if (self._on_refresh_fields is not None
+                and getattr(round_view, "has_pending_refresh", False)
+                and getattr(round_view, "has_usable_docx", False)):
+            act = self._more_menu.addAction("更新目录与页码 (Word)")
+            act.setToolTip("启动专用 Word 实例刷新该文档的目录、页码与域")
+            act.triggered.connect(lambda: self._invoke(self._on_refresh_fields))
         if self._primary_action_kind != "regenerate":
             act = self._more_menu.addAction("按当前内容生成")
             act.triggered.connect(lambda: self._invoke(self._on_regenerate_round))

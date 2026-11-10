@@ -197,12 +197,14 @@ class PublicExportTests(unittest.TestCase):
             copied, excluded = export.export_public_source(output)
             self.assertGreater(len(copied), 100, "净化导出应保留核心文件")
             # 公司目录与内部专用脚本被排除
+            tracked = export._tracked_files()
             for prefix in ("templates/", "config/", "content/", "assets/",
                            "analysis/", "scripts/migration/"):
-                self.assertTrue(
-                    any(rel.startswith(prefix) for rel in excluded),
-                    "应排除 {0}".format(prefix),
-                )
+                if any(rel.startswith(prefix) for rel in tracked):
+                    self.assertTrue(
+                        any(rel.startswith(prefix) for rel in excluded),
+                        "应排除 {0}".format(prefix),
+                    )
             # 校验通过：无被排除目录/隐藏文件进入导出
             problems = export.validate_export(output)
             self.assertEqual(problems, [])

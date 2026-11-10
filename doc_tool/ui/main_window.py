@@ -395,6 +395,7 @@ class MainWindow(QMainWindow):
             on_open_settings=self._on_export_settings_for_round,
             on_select_round=self._on_select_export_round,
             on_locate_source=self._on_locate_export_source,
+            on_refresh_fields=self._on_refresh_export_fields,
         )
         self._task_dock_widget.setWidget(self._task_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._task_dock_widget)
@@ -2440,6 +2441,34 @@ class MainWindow(QMainWindow):
         if path_obj.is_file() or path_obj.name.lower() in ("project.yml", "project.yaml"):
             path_obj = path_obj.parent
         path = str(path_obj)
+        # 目录智能寻址：用户常选到中间层目录（如 hcp-docs/requirements）、
+        # 工作区根目录，或同时含多个项目的父目录。先解析再打开，避免
+        # 「缺少 project.yml」这种与用户意图无关的失败。
+        from doc_tool.application.project_service import (
+            open_project,
+            resolve_open_target,
+        )
+        from doc_tool.domain.errors import DocToolError
+
+        resolution = resolve_open_target(path)
+        if resolution.kind == "workspace" and resolution.root is not None:
+            self._open_workspace_path(str(resolution.root))
+            return
+        if resolution.kind == "ambiguous":
+            chosen = self._choose_project_dir(resolution.candidates)
+            if chosen is None:
+                return
+            path = str(chosen)
+        elif resolution.kind == "project" and resolution.root is not None:
+            path = str(resolution.root)
+        elif resolution.kind == "none":
+            self._show_error(
+                "打开项目失败",
+                resolution.message,
+                "请选择包含 project.yml 的项目目录，或改用「研发工作区」。",
+            )
+            return
+
         # 重复打开保护：同一项目已在其它窗口打开 → 激活已有窗口。
         registry = self._window_registry
         if registry is not None:
@@ -2452,9 +2481,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_loading_overlay"):
             self._loading_overlay.start(proj_name, "正在解析项目配置与元数据…")
             QApplication.processEvents()
-
-        from doc_tool.application.project_service import open_project
-        from doc_tool.domain.errors import DocToolError
 
         try:
             summary = open_project(path)
@@ -2470,6 +2496,31 @@ class MainWindow(QMainWindow):
                 self._loading_overlay.finish_immediately()
             self._show_error("打开项目失败", str(exc)[:200])
             return
+
+    def _choose_project_dir(self, candidates) -> Optional[Path]:
+        """多候选时让用户选一个项目目录（取消返回 None）。"""
+        from PySide6.QtWidgets import QInputDialog
+
+        options = [str(item) for item in candidates]
+        chosen, accepted = QInputDialog.getItem(
+            self,
+            "选择文档项目",
+            "所选目录下发现多个文档项目，请选择要打开的一个：",
+            options,
+            0,
+            False,
+        )
+        if not accepted or chosen not in options:
+            return None
+        return Path(chosen)
+
+    def _open_workspace_path(self, root: str) -> None:
+        """把工作区根目录交给研发工作区窗口（不当作单项目打开）。"""
+        from doc_tool.ui.rd_workspace import RdWorkspaceDialog
+
+        self._rd_workspace_path = str(root)
+        dialog = RdWorkspaceDialog(self, root=str(root), parent=self)
+        dialog.exec()
 
     def _on_open_recent(self, path: str) -> None:
         """最近项目点击：在新窗口打开，不在当前窗口切换项目。
@@ -2915,6 +2966,19 @@ class MainWindow(QMainWindow):
         if path_obj.is_file() or path_obj.name.lower() in ("project.yml", "project.yaml"):
             path_obj = path_obj.parent
         path = str(path_obj)
+        from doc_tool.application.project_service import resolve_open_target
+
+        resolution = resolve_open_target(path)
+        if resolution.kind == "workspace" and resolution.root is not None:
+            self._open_workspace_path(str(resolution.root))
+            return
+        if resolution.kind == "ambiguous":
+            chosen = self._choose_project_dir(resolution.candidates)
+            if chosen is None:
+                return
+            path = str(chosen)
+        elif resolution.kind == "project" and resolution.root is not None:
+            path = str(resolution.root)
         registry = self._window_registry
         if registry is None or self._window_factory is None:
             # 单窗口环境（测试/无注册表）：退回当前窗口打开。
@@ -4811,6 +4875,43 @@ class MainWindow(QMainWindow):
                     conflicts.append(status)
         return conflicts
 
+    def _export_preflight_notice(self, context: dict) -> str:
+        """导出前体检：章节顺序与 Word 接管情况，提前说明成稿会暴露的问题。"""
+        lines: List[str] = []
+        manifest = getattr(self._project_summary, "manifest", None)
+        declared = list(getattr(manifest, "chapters", None) or [])
+        discovered = list(context.get("chapters") or [])
+        try:
+            from doc_tool.application.chapter_order import order_findings
+
+            lines.extend(order_findings(discovered, declared))
+        except Exception:  # noqa: BLE001 - 体检失败不得阻断导出
+            pass
+        try:
+            from doc_tool.application.word_check import is_wps_replacing_word
+
+            if is_wps_replacing_word():
+                lines.append(
+                    "检测到 Word.Application 由 WPS 接管：Word 字段刷新可能卡在不可见弹窗，"
+                    "建议取消勾选「启用 Word 字段刷新」，或安装 Microsoft Word。"
+                )
+        except Exception:  # noqa: BLE001 - 注册表不可读时跳过
+            pass
+        return "\n".join(lines)
+
+    def _default_export_refresh(self) -> bool:
+        """导出对话框的「Word 字段刷新」默认值。
+
+        WPS 接管 Word.Application 时刷新不可靠，默认改用静态目录兜底；
+        读不到注册表时保持原默认（开启）。
+        """
+        try:
+            from doc_tool.application.word_check import is_wps_replacing_word
+
+            return not is_wps_replacing_word()
+        except Exception:  # noqa: BLE001 - 探测失败按原默认处理
+            return True
+
     def _on_export_settings(self, preset_request=None, *, notice="") -> None:
         """打开导出设置；一次“开始导出”即提交原服务。"""
         from doc_tool.ui.export_settings_dialog import ExportSettingsDialog
@@ -4819,6 +4920,9 @@ class MainWindow(QMainWindow):
             self._show_status_message("请先打开项目后再使用导出设置")
             return
         context = self._export_settings_context()
+        preflight = self._export_preflight_notice(context)
+        if preflight:
+            notice = (notice + "\n" + preflight).strip() if notice else preflight
         conflicts = self._detect_export_conflicts(preset_request.scope if preset_request else None)
         dialog = ExportSettingsDialog(
             project_root=context["project_root"],
@@ -4834,6 +4938,7 @@ class MainWindow(QMainWindow):
             document_type=context.get("document_type", "general"),
             document_properties=context.get("document_properties"),
             property_notice=context.get("property_notice", ""),
+            refresh_default=self._default_export_refresh(),
             notice=notice,
             conflicts=conflicts,
             parent=self,
@@ -4999,6 +5104,101 @@ class MainWindow(QMainWindow):
                 self._finish_close()
 
     # --- UI 包 UI-C：非模态成果（逐文件、按轮次） ---
+
+    def _export_docx_path_for_round(self, round_view) -> str:
+        """本轮可原地刷新的 Word 成果路径；没有可用文件返回空串。"""
+        from doc_tool.application.intake_contract import FORMAT_DOCX
+
+        for item in getattr(round_view, "formats", []) or []:
+            if getattr(item, "format", "") != FORMAT_DOCX:
+                continue
+            candidate = str(getattr(item, "path", "") or "")
+            if candidate and Path(candidate).is_file():
+                return candidate
+        fallback = str(getattr(round_view, "docx_path", "") or "")
+        return fallback if fallback and Path(fallback).is_file() else ""
+
+    def _mark_round_refreshed(self, round_view) -> None:
+        """Word 刷新成功后把该轮标为已刷新（状态来自本次真实结果）。"""
+        from dataclasses import replace
+
+        from doc_tool.application.intake_contract import FORMAT_DOCX
+
+        formats = [
+            replace(item, status="ready", formal=True, message="")
+            if getattr(item, "format", "") == FORMAT_DOCX
+            else item
+            for item in getattr(round_view, "formats", []) or []
+        ]
+        warnings = [
+            warning
+            for warning in (getattr(round_view, "warnings", []) or [])
+            if "待刷新" not in str(warning) and "Ctrl+A" not in str(warning)
+        ]
+        updated = replace(round_view, formats=formats, warnings=warnings)
+        self._export_rounds.record(updated)
+        self._selected_round_id = updated.round_id
+
+    def _on_refresh_export_fields(self, round_view) -> None:
+        """对「待刷新」的导出稿调用 Word 刷新目录/页码（不改正文）。"""
+        path = self._export_docx_path_for_round(round_view)
+        if not path:
+            self._show_status_message("本轮没有可定位的 Word 成果文件，无法更新目录")
+            return
+        if self.runner.is_running:
+            self._show_status_message("已有任务正在运行，请稍后再更新目录")
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "更新目录与页码",
+            "将启动一个专用的 Microsoft Word 实例，打开该文档并刷新目录、页码与域。\n"
+            "大文档可能需要几分钟，期间请不要关闭该 Word 进程，也不要同时编辑同一文件。\n\n"
+            "现在开始吗？",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        timeout = 300
+        try:
+            timeout = int(
+                getattr(self._project_summary.manifest, "refreshTimeoutSeconds", 300)
+                or 300
+            )
+        except Exception:  # noqa: BLE001 - 清单不可读时用默认预算
+            timeout = 300
+
+        def _work():
+            from doc_tool.application.docx_refresh import refresh_docx_fields
+
+            return refresh_docx_fields(path, timeout=timeout)
+
+        def _done(result) -> None:
+            ok, reason = result if isinstance(result, tuple) else (False, "unknown")
+            if ok:
+                self._mark_round_refreshed(round_view)
+                self._refresh_export_results()
+                self._status_label.setText("✓ 目录与页码已刷新")
+                QMessageBox.information(
+                    self, "更新完成", "目录与页码已刷新，可直接打开文档。"
+                )
+            else:
+                self._status_label.setText("目录更新失败：{0}".format(reason))
+                QMessageBox.warning(
+                    self,
+                    "更新失败",
+                    "Word 刷新未完成（{0}）。\n"
+                    "可打开文档后按 Ctrl+A，再按 F9 手动更新；或改用诊断构建。".format(reason),
+                )
+
+        run_async_operation(
+            self,
+            _work,
+            title="正在更新目录与页码…",
+            description="正在用专用 Word 实例刷新目录、页码与域，请稍候…",
+            dark=getattr(self, "_dark", False),
+            on_success=_done,
+        )
 
     def _record_export_round(self, report) -> object:
         """把一轮真实报告登记到成果视图，并刷新入口计数（只存引用）。"""

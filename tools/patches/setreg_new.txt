@@ -1,2 +1,0 @@
-    registry = build_registry(parsed_documents)
-    set_active_registry(registry)

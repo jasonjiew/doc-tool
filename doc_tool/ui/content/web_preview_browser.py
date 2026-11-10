@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices, QTextCursor, QTextDocument
+from PySide6.QtGui import QColor, QDesktopServices, QTextCursor, QTextDocument
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -198,6 +198,12 @@ class WebPreviewBrowser(QWebEngineView):
 
         p = self.page()
         p.renderProcessTerminated.connect(self._on_render_process_terminated)
+        # 页面加载完成前，QWebEngineView 默认清屏会露出黑底（表现为预览区黑屏闪烁）；
+        # 显式给页面底色，深色主题在 set_dark 里同步。
+        try:
+            p.setBackgroundColor(QColor("#ffffff"))
+        except Exception:  # noqa: BLE001 - 旧版本 Qt 无此 API 时忽略
+            pass
 
         self._web_channel = QWebChannel(p)
         self._bridge = _WebPreviewBridge(self)
@@ -362,6 +368,12 @@ class WebPreviewBrowser(QWebEngineView):
     def set_dark(self, dark: bool) -> None:
         if self._dark != dark:
             self._dark = dark
+            try:
+                self.page().setBackgroundColor(
+                    QColor("#1e1e1e" if dark else "#ffffff")
+                )
+            except Exception:  # noqa: BLE001 - 底色设置失败不影响渲染
+                pass
             if self._page_ready:
                 js_dark = "true" if dark else "false"
                 self.page().runJavaScript(

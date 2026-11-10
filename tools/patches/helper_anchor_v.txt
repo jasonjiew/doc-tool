@@ -1,1 +1,0 @@
-def expected_content_events(

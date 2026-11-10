@@ -118,8 +118,12 @@ def discover_chapters(content_root) -> List[str]:
     root = Path(content_root)
     if not root.is_dir():
         return []
+    from doc_tool.domain.content_index import path_natural_sort_key
+
     found: List[str] = []
-    for path in sorted(root.rglob("*.md")):
+    for path in sorted(
+        root.rglob("*.md"), key=lambda item: path_natural_sort_key(item.as_posix())
+    ):
         if not path.is_file():
             continue
         relative = path.relative_to(root).as_posix()

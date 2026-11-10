@@ -902,6 +902,22 @@ class MermaidServiceTests(unittest.TestCase):
         self.assertEqual(errs[0].line, 1)
         self.assertIn("无法识别", errs[0].message)
 
+    def test_sequence_async_arrow_not_reported_as_bracket_mismatch(self):
+        """序列图官方异步箭头 -)/--) 与激活后缀不应误报“括号不匹配”（E2001 回归）。"""
+        from doc_tool.application.content.mermaid import validate
+
+        for code in (
+            "sequenceDiagram\n  participant Serial\n  Serial-)MCU: 下发检测指令\n",
+            "sequenceDiagram\n  MCU--)Serial: 回传结果\n",
+            "sequenceDiagram\n  A->>+B: 请求\n  B-->>-A: 回执\n",
+            "sequenceDiagram\n  Note over A,B: 备注(未闭合\n",
+        ):
+            self.assertEqual(validate(code), [], code)
+
+        # 结构性错误仍应被拦截
+        errs = validate("sequenceDiagram\n  A->>B --> C\n")
+        self.assertEqual([e.message for e in errs], ["无法识别的 sequenceDiagram 语句"])
+
     def test_flowchart_without_explicit_direction_renders_cleanly(self):
         """flowchart/graph 不带方向声明（flowchart / graph）默认 TD 且不抛异常。"""
         from doc_tool.application.content.mermaid import render
