@@ -37,6 +37,10 @@ def _chapter_text(source: Path, title: str, extra: str) -> str:
     return "{0}\n\n{1}\n\n{2}\n".format(title, demoted, extra)
 
 
+@unittest.skipUnless(
+    all(path.is_file() for path in REAL_DOCS),
+    "内部 v3.1 试点样例文档已从公共仓库移除（v3.0.4 清理）",
+)
 class RealDocumentHandoffTests(unittest.TestCase):
     """真实文档 + 两独立目录树（无 Git）的作者/评审人交接试点。"""
 

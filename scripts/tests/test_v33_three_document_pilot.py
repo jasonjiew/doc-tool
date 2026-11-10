@@ -44,6 +44,10 @@ def _demote(text: str) -> str:
     return "\n".join(lines)
 
 
+@unittest.skipUnless(
+    all(path.is_file() for _label, path, _terms in REAL_DOCUMENTS),
+    "内部 v3.3 试点样例文档已从公共仓库移除（v3.0.4 清理）",
+)
 class ThreeDocumentPilotTests(unittest.TestCase):
     """三类真实文档的辅助能力试点（自动化部分）。"""
 

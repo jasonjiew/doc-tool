@@ -34,6 +34,10 @@ ENVIRONMENT_KEYWORDS = {
 }
 
 
+@unittest.skipUnless(
+    RUNBOOK.is_file(),
+    "内部 v3 验收操作清单已从公共仓库移除（v3.0.4 清理）：{0}".format(RUNBOOK.name),
+)
 class AcceptanceRunbookTests(unittest.TestCase):
     def setUp(self):
         self.assertTrue(RUNBOOK.is_file(), "缺少验收操作清单：" + str(RUNBOOK))

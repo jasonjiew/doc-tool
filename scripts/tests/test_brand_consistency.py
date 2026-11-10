@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -68,6 +69,23 @@ SCAN_DIRS = ["doc_tool", "packaging"]
 
 # 可读取的文本扩展名。
 TEXT_SUFFIXES = {".py", ".iss", ".spec", ".ps1", ".txt", ".yml", ".yaml", ".json", ".md"}
+
+
+def _term_hits(lowered: str, term: str) -> bool:
+    """词条是否命中（大小写不敏感）。
+
+    纯 ASCII 词条要求两侧不是字母/数字：Word COM 属性名
+    ``UpdateLinksAtOpen`` 里含有连续字母 "ksat"，纯子串匹配会把合法 API
+    名称误判成内部编号（v3.0.4 新增 Word 自动化配置后即出现该误报）；
+    词边界匹配仍能命中 ``KSAT-123``、``ksat``、``KSHC_DOC`` 等真实用法。
+    中文等非 ASCII 词条保持子串匹配。
+    """
+    needle = term.lower()
+    if not needle.isascii():
+        return needle in lowered
+    return re.search(
+        r"(?<![a-z0-9])" + re.escape(needle) + r"(?![a-z0-9])", lowered
+    ) is not None
 
 
 class BrandingMetadataTests(unittest.TestCase):
@@ -157,7 +175,7 @@ class _ScanMixin:
                 continue
             lowered = text.lower()
             for term in terms:
-                if term.lower() in lowered:
+                if _term_hits(lowered, term):
                     hits.append("{0}: {1}".format(rel, term))
         return hits
 
@@ -179,7 +197,7 @@ class BrandConsistencySourceTests(_ScanMixin, unittest.TestCase):
             text = path.read_text(encoding="utf-8", errors="replace")
             lowered = text.lower()
             for term in FORBIDDEN_TERMS:
-                if term.lower() in lowered:
+                if _term_hits(lowered, term):
                     hits.append("{0}: {1}".format(path.name, term))
         self.assertEqual(hits, [])
 

@@ -88,6 +88,10 @@ class RunbookVerifierTests(unittest.TestCase):
         self.assertEqual(payload["schemaVersion"], 1)
         self.assertTrue(payload["local"])
 
+    @unittest.skipUnless(
+        (REPO_ROOT / "docs" / "product-v3-acceptance-runbook.md").is_file(),
+        "内部 v3 验收操作清单已从公共仓库移除（v3.0.4 清理）",
+    )
     def test_verification_doc_is_linked(self):
         runbook = (REPO_ROOT / "docs" / "product-v3-acceptance-runbook.md").read_text(encoding="utf-8")
         self.assertIn("product-v3-runbook-verification.md", runbook)

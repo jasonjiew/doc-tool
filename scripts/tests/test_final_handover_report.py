@@ -17,6 +17,10 @@ if str(REPO_ROOT) not in sys.path:
 REPORT = REPO_ROOT / "docs" / "product-v3-final-report.md"
 
 
+@unittest.skipUnless(
+    REPORT.is_file(),
+    "内部 v3 最终交付报告已从公共仓库移除（v3.0.4 清理）：{0}".format(REPORT.name),
+)
 class FinalHandoverReportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

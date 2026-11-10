@@ -46,6 +46,15 @@ class ReviewBundleTests(unittest.TestCase):
                 digest.update(chunk)
         return digest.hexdigest()
 
+    @unittest.skipUnless(
+        all((REPO_ROOT / rel).is_file() for rel in (
+            "docs/product-v3-release-readiness.md",
+            "docs/product-v3-audit-findings.md",
+            "docs/product-v3-handoff.md",
+            "docs/product-plan-v3-execution.md",
+        )),
+        "内部 v3 发布评审材料已从公共仓库移除（v3.0.4 清理）",
+    )
     def test_bundle_contains_all_deliverables_with_verifiable_hashes(self):
         manifest = self._build()
         root = Path(manifest["root"])
