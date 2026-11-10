@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import threading
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -273,7 +274,13 @@ def read_export_index(path) -> Optional[ExportReport]:
 CORE_WORD_PROBE_SECONDS = 30.0
 
 
-def _word_available() -> bool:
+def _word_refresh_readiness() -> Tuple[bool, str]:
+    """探测本机能否执行 Word 刷新，返回 ``(可用, 原因)``。
+
+    原因只面向用户，用于解释“为什么这轮是待刷新”：同一项目在不同机器/
+    设置下会得到不同结论（Word 探测失败、WPS 接管、设置未勾选），
+    只显示“待刷新”会让远程报障无法定位。
+    """
     try:
         from doc_tool.application.word_check import (
             check_word_available,
@@ -283,12 +290,52 @@ def _word_available() -> bool:
         # WPS 接管 Word.Application 时刷新不可靠（隐藏弹窗会挂住进程），
         # 直接按“无 Word”走静态目录/待刷新，避免快速导出绕过对话框默认值。
         if is_wps_replacing_word():
-            return False
-        return bool(
-            check_word_available(dispatch_timeout_seconds=CORE_WORD_PROBE_SECONDS).available
+            return False, "WPS 接管了 Word.Application（注册表 CLSID 不是 Microsoft Word）"
+        report = check_word_available(
+            dispatch_timeout_seconds=CORE_WORD_PROBE_SECONDS
         )
-    except Exception:  # noqa: BLE001 - 探测失败按不可用走待刷新兜底
-        return False
+        if report.available:
+            return True, ""
+        reasons = "；".join(str(item) for item in report.reasons if str(item).strip())
+        return False, "未检测到可用的 Microsoft Word：{0}".format(
+            reasons or "启动探测未通过"
+        )
+    except Exception as exc:  # noqa: BLE001 - 探测失败按不可用走待刷新兜底
+        return False, "Word 可用性探测失败：{0}: {1}".format(
+            type(exc).__name__, str(exc)[:160]
+        )
+
+
+#: 最近一次 ``_word_available()`` 探测的不可用原因（按线程隔离，避免并发导出串味）。
+_WORD_PROBE_REASON = threading.local()
+
+
+def _word_available() -> bool:
+    """兼容入口：只关心是否可用时使用；原因经线程局部变量带出。"""
+    available, reason = _word_refresh_readiness()
+    _WORD_PROBE_REASON.reason = "" if available else reason
+    return available
+
+
+def _last_word_probe_reason() -> str:
+    return str(getattr(_WORD_PROBE_REASON, "reason", "") or "")
+
+
+def _refresh_skip_note(
+    *,
+    requested: bool,
+    skipped_by_caller: bool,
+    available: bool,
+    probe_reason: str = "",
+) -> str:
+    """生成“本轮为什么没有做 Word 刷新”的面向用户说明（不需要时为空串）。"""
+    if not requested:
+        if skipped_by_caller:
+            return "未执行 Word 刷新：本次按参数跳过（诊断构建/CLI）"
+        return "未执行 Word 刷新：导出设置未启用「Word 字段刷新」"
+    if not available:
+        return "未执行 Word 刷新：{0}".format(probe_reason or "本机 Word 不可用")
+    return ""
 
 
 def _default_user_export_dir() -> Optional[Path]:
@@ -471,6 +518,7 @@ def _run_docx(
     refresh: bool,
     cancel_token: Optional[CancellationToken],
     progress,
+    skip_word_refresh: bool = False,
     pipeline_progress: Optional[Callable[[str, str, str], None]] = None,
     word_available: Optional[bool] = None,
     word_facts: Optional[Dict[str, object]] = None,
@@ -485,8 +533,24 @@ def _run_docx(
     paths = ProjectPaths(work)
     manifest = ProjectManifest.load(work)
     # 调用方已确定 Word 可用性时直接采用，避免重复探测（10s 超时会被误判为无 Word）。
-    resolved_word = (_word_available() if word_available is None else bool(word_available)) if refresh else False
+    probe_reason = ""
+    if not refresh:
+        resolved_word = False
+    elif word_available is None:
+        resolved_word = _word_available()
+        if not resolved_word:
+            probe_reason = _last_word_probe_reason()
+    else:
+        resolved_word = bool(word_available)
+        if not resolved_word:
+            probe_reason = "调用方判定本机 Word 不可用"
     use_refresh = bool(refresh) and resolved_word
+    refresh_note = _refresh_skip_note(
+        requested=bool(refresh),
+        skipped_by_caller=bool(skip_word_refresh),
+        available=resolved_word,
+        probe_reason=probe_reason,
+    )
     if progress is not None:
         try:
             progress("docx", "开始生成 Word")
@@ -509,6 +573,15 @@ def _run_docx(
         document_properties=fields.get("documentProperties"),
     )
     _collected_word_report(result, word_report)
+    if not refresh_note and getattr(result, "word_skip_reason", "") == "wps":
+        refresh_note = "未执行 Word 刷新：WPS 接管了 Word.Application"
+    if result.error_code == "E5003":
+        # 取消发生在 Word 刷新期间：本轮没有可交付的新成果，不能把上一次的
+        # 正式输出当成“本轮可读稿”复制到导出目录。
+        return FormatResult(
+            format=FORMAT_DOCX, status=STATUS_CANCELLED,
+            message="已取消：本次未生成新的 Word 成果（上次有效输出保留）",
+        ), ""
     source_output = None
     pending = False
     if result.success and result.output_path and Path(result.output_path).is_file():
@@ -539,6 +612,19 @@ def _run_docx(
     elif not result.success:
         failed_stage = result.last_stage.stage if result.last_stage else ""
         error_code = result.error_code or ""
+
+    if failed_ev is not None and failed_ev.stage == "word_refresh":
+        detail = " ".join(str(failed_ev.detail or "").split())
+        if len(detail) > 160:
+            detail = detail[:160] + "…"
+        refresh_note = "Word 刷新失败（{0}）：{1}".format(
+            failed_ev.error_code or result.error_code or "未知错误码",
+            detail or "原因未记录",
+        )
+    elif result.error_code == "E5003" or (
+        failed_ev is not None and failed_ev.status == "cancelled"
+    ):
+        refresh_note = "Word 刷新已取消（E5003）"
 
     if source_output is None:
         detail = (failed_ev.detail if failed_ev and failed_ev.detail else "") or (result.last_stage.detail if result.last_stage else "构建未产出可用文件")
@@ -590,6 +676,8 @@ def _run_docx(
             warnings.append(
                 "版式在 Word 刷新后应用，未能再次刷新：本稿标为待刷新（不沿用旧正式状态）"
             )
+    if refresh_note and refresh_note not in warnings:
+        warnings.append(refresh_note)
     if formal:
         # 正式状态记录随源文件在快照项目目录；目标目录需要自己的记录，
         # 否则下游（按包正式化/复核）会把已刷新的正式稿误判为待刷新。
@@ -624,8 +712,11 @@ def _run_docx(
         format=FORMAT_DOCX, status=status, path=str(target),
         sha256=sha256_file(target), backend="kernel", formal=formal,
         warnings=warnings,
-        message=("正式状态登记待完成（可读稿已刷新）" if status == STATUS_PENDING_REGISTRATION
-                 else "" if formal else "目录/页码待刷新"),
+        message=(
+            "正式状态登记待完成（可读稿已刷新）" if status == STATUS_PENDING_REGISTRATION
+            else "" if formal
+            else (refresh_note or "目录/页码待刷新")
+        ),
         failed_stage=failed_stage,
         error_code=error_code,
         locations=locations,
@@ -1004,6 +1095,7 @@ def run_project_export(
                 result, new_docx_path = _run_docx(
                     snapshot, request, destination, report.outputName,
                     refresh=bool(request.refresh) and not skip_word_refresh,
+                    skip_word_refresh=skip_word_refresh,
                     cancel_token=cancel_token, progress=progress,
                     pipeline_progress=pipeline_progress,
                     word_available=word_available,
@@ -1088,6 +1180,15 @@ def run_project_export(
         report.warnings.append("严格模式：{0} 未达到正式要求".format(
             "、".join(format_label(item) for item in report.strict_violations())
         ))
+    docx_result = report.result_for(FORMAT_DOCX)
+    if (
+        docx_result is not None
+        and docx_result.status == STATUS_PENDING_REFRESH
+        and docx_result.message
+    ):
+        note = "Word 刷新未完成：{0}".format(docx_result.message)
+        if note not in report.warnings:
+            report.warnings.append(note)
     report.executionId = exec_id
     diag = ExportDiagnostics(
         executionId=exec_id,

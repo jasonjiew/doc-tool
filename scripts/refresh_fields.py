@@ -122,6 +122,10 @@ REASON_TIMEOUT = "timeout"
 REASON_WORD_UNAVAILABLE = "word_unavailable"
 REASON_SAVE_FAILED = "save_failed"
 REASON_REFRESH_FAILED = "refresh_failed"
+# 目标文档被 Word 占用（~$ 忙锁）或不可写：不启动 Word，立即给出可执行处置。
+REASON_LOCKED = "locked"
+# 用户在 Word 刷新期间取消：终止本次专用 Word，不当作超时。
+REASON_CANCELLED = "cancelled"
 
 _REASON_MARKER = "[REASON] "
 _REASON_KEYS = (
@@ -130,12 +134,16 @@ _REASON_KEYS = (
     REASON_WORD_UNAVAILABLE,
     REASON_SAVE_FAILED,
     REASON_REFRESH_FAILED,
+    REASON_LOCKED,
+    REASON_CANCELLED,
 )
 
 # --- V4.0 40-B：阶段事实（跨进程用 stderr 标记传递，不引入第二套业务） ---
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from doc_tool.domain.word_operations import (  # noqa: E402
+    STAGE_CANCELLED,
     STAGE_ENTER,
+    STAGE_FAILED,
     STAGE_LABELS,
     STAGE_OPEN,
     STAGE_PENDING,
@@ -145,6 +153,9 @@ from doc_tool.domain.word_operations import (  # noqa: E402
     STAGE_START,
     WordOperationReport,
     budgets_for_timeout,
+    busy_lock_path,
+    is_busy_lock_error,
+    is_file_busy,
     ownership_from_pid_diff,
     parse_stage_markers,
     stage_marker,
@@ -183,6 +194,8 @@ def _classify_failure(exc: BaseException) -> str:
         or "拒绝访问" in text
     ):
         return REASON_WORD_UNAVAILABLE
+    if is_busy_lock_error(exc):
+        return REASON_LOCKED
     return REASON_REFRESH_FAILED
 
 
@@ -228,10 +241,61 @@ def _update_all_story_fields(document) -> None:
                 break
 
 
+def _configure_word_application(word) -> None:
+    """把 Word 调成“不弹任何 UI/提示”的自动化模式。
+
+    ``DisplayAlerts`` 只抑制常规警告；含外部链接的文档打开时仍可能弹出
+    “是否更新链接”之类的模态框，在 ``Visible=False`` 下同样会卡住自动化调用。
+    这里先把 ``UpdateLinksAtOpen`` 关掉，是“卡在 Word 刷新”最常见的可预防原因。
+    """
+    word.Visible = False
+    word.DisplayAlerts = 0  # wdAlertsNone
+    for name, value in (("ScreenUpdating", False), ("EnableEvents", False)):
+        try:
+            setattr(word, name, value)
+        except Exception:  # noqa: BLE001 - 个别版本不支持该属性
+            pass
+    try:
+        word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
+    except Exception:  # noqa: BLE001
+        pass
+    options = getattr(word, "Options", None)
+    if options is not None:
+        for name, value in (("UpdateLinksAtOpen", False), ("ConfirmConversions", False)):
+            try:
+                setattr(options, name, value)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _output_write_problem(path: str) -> Optional[str]:
+    """返回目标 DOCX 不可写的原因（``None`` 表示可写）。
+
+    优先看 Word 的 ``~$`` 忙锁：锁文件存在说明文档正被打开（或上次异常退出
+    留下残留锁），此时 ``Documents.Open`` 会弹“文件正在使用”对话框并阻塞，
+    必须直接失败并告诉用户怎么处理，而不是等满超时预算。
+    """
+    lock = busy_lock_path(path)
+    try:
+        if os.path.exists(lock):
+            return (
+                "目标文档存在 Word 忙锁（{0}）：请关闭正在打开该文档的 Word；"
+                "确认已关闭后删除该 ~$ 锁文件再重试".format(lock)
+            )
+    except OSError:
+        pass
+    try:
+        with open(path, "r+b"):
+            return None
+    except OSError as exc:
+        return "目标文档不可写（{0}）：请关闭占用程序、去掉只读属性后重试".format(exc)
+
+
 def refresh_worker(
     document: Optional[str] = None,
     output_path: Optional[str] = None,
     pid_holder: Optional[dict] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> int:
     try:
         import win32com.client
@@ -251,6 +315,11 @@ def refresh_worker(
         print("[FAIL] 待刷新文档不存在: {0}".format(output), file=sys.stderr, flush=True)
         print("{0}{1}".format(_REASON_MARKER, REASON_REFRESH_FAILED), file=sys.stderr, flush=True)
         return 1
+    problem = _output_write_problem(output)
+    if problem:
+        print("[FAIL] {0}".format(problem), file=sys.stderr, flush=True)
+        print("{0}{1}".format(_REASON_MARKER, REASON_LOCKED), file=sys.stderr, flush=True)
+        return 1
     # 显示标签：项目上下文无 doc_type 时用文件名替代，避免消息出现 None。
     if document is None:
         document = os.path.basename(output)
@@ -259,6 +328,10 @@ def refresh_worker(
     opened = None
     word_pid = None
     try:
+        if cancel_event is not None and cancel_event.is_set():
+            print("[{0}] 已取消，未启动 Word".format(document), file=sys.stderr, flush=True)
+            print("{0}{1}".format(_REASON_MARKER, REASON_CANCELLED), file=sys.stderr, flush=True)
+            return 1
         _report_stage(STAGE_ENTER, "等待可用的 Word 会话")
         pids_before = _get_winword_pids()
         _report_stage(STAGE_START, "启动专用 Word 实例")
@@ -266,13 +339,17 @@ def refresh_worker(
         word_pid = _word_pid(word, pids_before)
         if pid_holder is not None and word_pid:
             pid_holder["pid"] = word_pid
-        word.Visible = False
-        word.DisplayAlerts = 0  # wdAlertsNone
-        # msoAutomationSecurityForceDisable: never execute document macros.
-        try:
-            word.AutomationSecurity = 3
-        except Exception:
-            pass
+        _configure_word_application(word)
+        if cancel_event is not None and cancel_event.is_set():
+            _report_stage(STAGE_QUIT, "用户取消，退出 Word")
+            try:
+                word.Quit(SaveChanges=False)
+            except Exception:  # noqa: BLE001
+                pass
+            word = None
+            print("[{0}] 已取消".format(document), file=sys.stderr, flush=True)
+            print("{0}{1}".format(_REASON_MARKER, REASON_CANCELLED), file=sys.stderr, flush=True)
+            return 1
 
         print("[{0}] Word 打开并刷新: {1}".format(document, output), flush=True)
         _report_stage(STAGE_OPEN, "打开待刷新文档")
@@ -281,6 +358,21 @@ def refresh_worker(
             word_pid = _word_pid(word)
             if pid_holder is not None and word_pid:
                 pid_holder["pid"] = word_pid
+        if cancel_event is not None and cancel_event.is_set():
+            _report_stage(STAGE_QUIT, "用户取消，退出 Word")
+            try:
+                opened.Close(SaveChanges=False)
+            except Exception:  # noqa: BLE001
+                pass
+            opened = None
+            try:
+                word.Quit(SaveChanges=False)
+            except Exception:  # noqa: BLE001
+                pass
+            word = None
+            print("[{0}] 已取消".format(document), file=sys.stderr, flush=True)
+            print("{0}{1}".format(_REASON_MARKER, REASON_CANCELLED), file=sys.stderr, flush=True)
+            return 1
         _report_stage(STAGE_PROCESS, "更新域与目录")
         _update_all_story_fields(opened)
         for index in range(1, int(opened.TablesOfContents.Count) + 1):
@@ -351,6 +443,7 @@ def _bounded_supervise_in_thread(
     output_path: str,
     timeout: int,
     label: str,
+    cancel_token=None,
 ) -> Tuple[bool, str, Optional[WordOperationReport]]:
     """在工作线程内**有界**监督 Word 刷新，并登记真实阶段/归属/清理事实。
 
@@ -391,6 +484,7 @@ def _bounded_supervise_in_thread(
                     document=document,
                     output_path=output_path,
                     pid_holder=holder,
+                    cancel_event=cancel_event,
                 )
         except Exception as exc:
             stderr_buf.write("[{0}] [FAIL] Word 刷新失败: {1!r}\n".format(label, exc))
@@ -406,21 +500,58 @@ def _bounded_supervise_in_thread(
 
     # 启动前快照：卡在 DispatchEx 时 holder 拿不到 PID，超时后靠差集兜底。
     holder["pidsBefore"] = sorted(_get_winword_pids())
+    cancel_event = threading.Event()
     thread = threading.Thread(
         target=_worker, name="doc-tool-word-refresh-thread", daemon=True
     )
     started = time.monotonic()
     thread.start()
-    thread.join(float(timeout))
 
-    if thread.is_alive():
-        stage = report.currentStage or STAGE_PROCESS
-        report.note_timeout(
-            stage,
-            "阶段「{0}」超过预算 {1} 秒，已按停止预算处理".format(
-                STAGE_LABELS.get(stage, stage), timeout
-            ),
-        )
+    cancelled = False
+    overrun_stage = ""
+    if cancel_token is None:
+        # 兼容原调用方：没有取消令牌时保持“整段预算一次等待”的语义。
+        thread.join(float(timeout))
+    else:
+        deadline = started + float(timeout)
+        stage_name = ""
+        stage_started = started
+        while thread.is_alive():
+            if cancel_token.is_cancelled:
+                cancel_event.set()
+                cancelled = True
+                break
+            current = report.currentStage or STAGE_START
+            if current != stage_name:
+                stage_name = current
+                stage_started = time.monotonic()
+            now = time.monotonic()
+            if now >= deadline:
+                break
+            # 单个阶段也有预算：卡在启动/打开/刷新/保存时不再干等总预算。
+            if now - stage_started > report.budgets.for_stage(stage_name):
+                overrun_stage = stage_name
+                break
+            thread.join(min(0.2, max(0.0, deadline - now)))
+
+    if cancelled or overrun_stage or thread.is_alive():
+        stage = overrun_stage or report.currentStage or STAGE_PROCESS
+        if cancelled:
+            report.stage(stage, "用户取消任务，已终止本次专用 Word", outcome=STAGE_CANCELLED)
+        elif overrun_stage:
+            report.note_timeout(
+                stage,
+                "阶段「{0}」超过阶段预算 {1:.0f} 秒，已按停止预算处理".format(
+                    STAGE_LABELS.get(stage, stage), report.budgets.for_stage(stage)
+                ),
+            )
+        else:
+            report.note_timeout(
+                stage,
+                "阶段「{0}」超过总预算 {1} 秒，已按停止预算处理".format(
+                    STAGE_LABELS.get(stage, stage), timeout
+                ),
+            )
         pid = holder.get("pid")
         if pid is None:
             pid = _fallback_pid_from_diff(holder.get("pidsBefore") or [])
@@ -432,11 +563,29 @@ def _bounded_supervise_in_thread(
             kill=(lambda: _kill_process_tree(pid)) if pid else None,
             is_alive=thread.is_alive,
         )
-        thread.join(max(0.0, float(report.budgets.cleanup)))
+        if cancelled and not report.ownership.provable:
+            # 取消但未证明 Word 归属：只留 1 秒协作退出时间，不能让用户
+            # 点完“取消”又干等满停止预算（线程是 daemon，不会阻止退出）。
+            thread.join(1.0)
+        else:
+            thread.join(max(0.0, float(report.budgets.cleanup)))
         if thread.is_alive():
             report.note_residual("刷新线程在停止预算内仍在回收中")
+        if cancelled:
+            print(
+                "[{0}] [FAIL] Word 刷新已取消，{1}".format(label, stop.summary_line()),
+                file=sys.stderr,
+                flush=True,
+            )
+            return (False, REASON_CANCELLED, report)
+        if overrun_stage:
+            message = "Word 刷新在阶段「{0}」超过阶段预算".format(
+                STAGE_LABELS.get(overrun_stage, overrun_stage)
+            )
+        else:
+            message = "Word 刷新超过 {0} 秒".format(timeout)
         print(
-            "[{0}] [FAIL] Word 刷新超过 {1} 秒，{2}".format(label, timeout, stop.summary_line()),
+            "[{0}] [FAIL] {1}，{2}".format(label, message, stop.summary_line()),
             file=sys.stderr,
             flush=True,
         )
@@ -486,9 +635,12 @@ def _supervise_in_thread(
     output_path: str,
     timeout: int,
     label: str,
+    cancel_token=None,
 ) -> Tuple[bool, str]:
     """兼容入口：仍返回 ``(是否成功, 原因键)``，真实事实写入 ``LAST_REPORT``。"""
-    ok, reason, report = _bounded_supervise_in_thread(document, output_path, timeout, label)
+    ok, reason, report = _bounded_supervise_in_thread(
+        document, output_path, timeout, label, cancel_token=cancel_token
+    )
     LAST_REPORT.clear()
     if report is not None:
         LAST_REPORT.update(report.to_dict())
@@ -499,6 +651,7 @@ def supervise(
     document: Optional[str] = None,
     output_path: Optional[str] = None,
     timeout: Optional[int] = None,
+    cancel_token=None,
 ) -> Tuple[bool, str]:
     """Supervise the Word refresh worker with a timeout.
 
@@ -520,6 +673,22 @@ def supervise(
             timeout = int(config.get("refresh", {}).get("timeoutSeconds", 900))
     label = document or os.path.basename(output_path)
 
+    # 忙锁预检：文档被 Word 打开（或上次异常退出留下 ~$ 锁）时，
+    # Documents.Open 会弹出“文件正在使用”对话框并阻塞；直接失败并告诉用户
+    # 怎么处理，避免表现为“卡在 Word 刷新”。
+    if is_file_busy(output_path):
+        report = WordOperationReport(
+            operation="word-refresh", source=document or "", target=output_path,
+            budgets=budgets_for_timeout(timeout),
+        )
+        detail = "目标文档存在 Word 忙锁（{0}），未启动 Word".format(
+            busy_lock_path(output_path)
+        )
+        report.stage(STAGE_OPEN, detail, outcome=STAGE_FAILED)
+        _publish_report(report)
+        print("[{0}] [FAIL] {1}".format(label, detail), file=sys.stderr, flush=True)
+        return (False, REASON_LOCKED)
+
     # 在 PyInstaller 冻结环境下，sys.executable 是 DocTool.exe 而非 python 解释器；
     # 重新拉起会导致重复启动图形主窗口或命令行参数不识别。
     # 此时切换为线程监督模式，同样具备超时看门狗与专用 Word 进程清理保护。
@@ -533,6 +702,7 @@ def supervise(
             output_path=output_path,
             timeout=timeout,
             label=label,
+            cancel_token=cancel_token,
         )
 
     command = [
@@ -571,10 +741,35 @@ def supervise(
 
     reader = threading.Thread(target=_reader, name="doc-tool-word-refresh-stages", daemon=True)
     reader.start()
+    cancelled = False
+    overrun_stage = ""
     try:
         # 只用后台读线程排空 stderr：communicate() 会再抢一个读者，
         # 两个读者互相截断输出，阶段标记与 [REASON] 都会丢失。
-        process.wait(timeout=timeout)
+        if cancel_token is None:
+            process.wait(timeout=timeout)
+        else:
+            deadline = time.monotonic() + float(timeout)
+            stage_name = ""
+            stage_started = time.monotonic()
+            while process.poll() is None:
+                if cancel_token.is_cancelled:
+                    cancelled = True
+                    break
+                current = report.currentStage or STAGE_START
+                if current != stage_name:
+                    stage_name = current
+                    stage_started = time.monotonic()
+                now = time.monotonic()
+                if now >= deadline:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                if now - stage_started > report.budgets.for_stage(stage_name):
+                    overrun_stage = stage_name
+                    break
+                try:
+                    process.wait(timeout=min(0.2, max(0.01, deadline - now)))
+                except subprocess.TimeoutExpired:
+                    continue
     except subprocess.TimeoutExpired:
         stage = report.currentStage or STAGE_PROCESS
         report.note_timeout(
@@ -602,6 +797,45 @@ def supervise(
             flush=True,
         )
         return (False, REASON_TIMEOUT)
+    if cancelled or overrun_stage:
+        stage = overrun_stage or report.currentStage or STAGE_PROCESS
+        if cancelled:
+            report.stage(stage, "用户取消任务，已终止本次专用 Word", outcome=STAGE_CANCELLED)
+        else:
+            report.note_timeout(
+                stage,
+                "阶段「{0}」超过阶段预算 {1:.0f} 秒，已按停止预算处理".format(
+                    STAGE_LABELS.get(stage, stage), report.budgets.for_stage(stage)
+                ),
+            )
+        report.set_ownership(ownership_from_pid_diff(process.pid, []))
+        stop = stop_and_cleanup(
+            report,
+            kill=lambda: _kill_process_tree(process.pid),
+            is_alive=lambda: process.poll() is None,
+        )
+        try:
+            process.wait(timeout=max(1.0, float(report.budgets.cleanup)))
+        except Exception:  # noqa: BLE001 - 停止预算内未退出时保留残留事实
+            pass
+        reader.join(1.0)
+        _publish_report(report)
+        if cancelled:
+            print(
+                "[{0}] [FAIL] Word 刷新已取消，{1}".format(label, stop.summary_line()),
+                file=sys.stderr,
+                flush=True,
+            )
+            return (False, REASON_CANCELLED)
+        print(
+            "[{0}] [FAIL] Word 刷新在阶段「{1}」超过阶段预算，{2}".format(
+                label, STAGE_LABELS.get(stage, stage), stop.summary_line()
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+        return (False, REASON_TIMEOUT)
+
     reader.join(2.0)
     text = "".join(chunks)
     if process.returncode == 0:

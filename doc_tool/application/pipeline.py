@@ -37,6 +37,7 @@ from doc_tool.domain.errors import (
     IncompatibleSchemaError,
     ProjectLockBusyError,
     ValidationError,
+    WordDocumentBusyError,
     WordNotAvailableError,
     WordRefreshTimeoutError,
     WordSaveFailedError,
@@ -377,6 +378,8 @@ def _refresh_error(reason: str, timeout_seconds: int) -> DocToolError:
             user_message="Word 刷新过程中保存文档失败。",
             suggested_action="请关闭其他 Word 进程后重试；上次有效输出已保留。",
         )
+    if reason == "locked":
+        return WordDocumentBusyError()
     return WordNotAvailableError(
         user_message="Word 刷新失败，请查看日志中的详细错误",
         suggested_action="请确认 Microsoft Word 可用且文档未损坏后重试。",
@@ -569,7 +572,8 @@ def run_pipeline(
     回调在后台线程内触发，实现方需自行转发到 UI 线程；不传则不发进度。
 
     任务 5.1/5.4/5.5：管线自动获取/释放项目锁，写入脱敏轮转日志，
-    并在阶段边界检查取消令牌。Word 保存与构建原子写入受临界区保护。
+    并在阶段边界检查取消令牌。构建原子写入受临界区保护；Word 刷新在
+    独立专用进程/线程中执行，取消时终止该进程并清理临时产物。
 
     任务 7.1：正式模式（``skip_word_refresh=False``）在启动前再次确认 Word
     可用，避免锁已获取后才发现 Word 缺失。
@@ -1323,13 +1327,13 @@ def _run_pipeline_inner(
         result.events.append(StageEvent(STAGE_WORD_REFRESH, "started"))
         log.info(STAGE_WORD_REFRESH, "started")
         try:
-            # Word 保存是临界区：取消在保存完成前不中断
+            # Word 刷新跑在独立专用进程/线程里：取消必须能立刻终止它，
+            # 不能整体包在 critical_section 里（否则用户要等满刷新预算）。
             word_report: Dict[str, object] = {}
-            with token.critical_section():
-                ok, refresh_reason = refresh_with_project(
-                    manifest, paths, output_override=str(temp_output),
-                    report=word_report,
-                )
+            ok, refresh_reason = refresh_with_project(
+                manifest, paths, output_override=str(temp_output),
+                report=word_report, cancel_token=token,
+            )
             # V4.0 40-B：把本轮真实阶段/归属/清理事实附到事件上（缺字段为未知）。
             if word_report:
                 result.wordRefresh = word_report
@@ -1342,6 +1346,11 @@ def _run_pipeline_inner(
                 log.info(STAGE_WORD_REFRESH, "succeeded")
                 _record_stage(STAGE_WORD_REFRESH, "succeeded")
             else:
+                if refresh_reason == "cancelled" or token.is_cancelled:
+                    raise CancelledError(
+                        "任务已被取消（Word 刷新已终止，临时产物已清理）。",
+                        suggested_action="可在安全阶段后重新启动任务；上次有效输出已保留。",
+                    )
                 err = _refresh_error(refresh_reason, manifest.refreshTimeoutSeconds)
                 result.events.append(StageEvent(
                     STAGE_WORD_REFRESH, "failed",

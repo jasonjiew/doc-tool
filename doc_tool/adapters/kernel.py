@@ -432,6 +432,7 @@ def refresh_with_project(
     paths: ProjectPaths,
     output_override: Optional[Union[str, Path]] = None,
     report: Optional[dict] = None,
+    cancel_token=None,
 ) -> Tuple[bool, str]:
     """以项目上下文调用 ``refresh_fields.supervise``。
 
@@ -463,6 +464,7 @@ def refresh_with_project(
     outcome = supervise(
         output_path=output_path,
         timeout=manifest.refreshTimeoutSeconds,
+        cancel_token=cancel_token,
     )
     if report is not None:
         fresh = getattr(refresh_fields, "LAST_REPORT", {}) or {}

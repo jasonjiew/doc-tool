@@ -123,6 +123,7 @@ STAGE_ORDER = (
 STAGE_DONE = "done"
 STAGE_TIMEOUT = "timeout"
 STAGE_FAILED = "failed"
+STAGE_CANCELLED = "cancelled"
 STAGE_PENDING = "pending"
 
 # --- 归属证据 ---

@@ -406,6 +406,7 @@ def error_presentation(error_code: str, detail: str = "") -> tuple[str, str]:
         errors.WordNotAvailableError,
         errors.WordRefreshTimeoutError,
         errors.WordSaveFailedError,
+        errors.WordDocumentBusyError,
         errors.ProjectLockBusyError,
         errors.IncompatibleSchemaError,
         errors.ProjectManifestError,

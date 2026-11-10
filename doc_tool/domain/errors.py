@@ -236,6 +236,17 @@ class WordSaveFailedError(DocToolError):
     suggested_action = "请关闭其他 Word 进程后重试；上次有效输出已保留。"
 
 
+class WordDocumentBusyError(DocToolError):
+    """导出文档被 Word 占用或锁文件残留，刷新无法开始。"""
+
+    code = "E3004"
+    user_message = "导出文档正被 Word 占用或不可写，Word 刷新无法开始。"
+    suggested_action = (
+        "请关闭正在打开该导出文档的 Word 窗口；若确认已关闭，删除同目录下的 "
+        "~$ 开头锁文件后重试。"
+    )
+
+
 # --- 项目模型与锁（E4xxx） ---
 
 

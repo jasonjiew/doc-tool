@@ -367,6 +367,13 @@ class ExportResultsView(QWidget):
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
             layout.addWidget(path_label)
+        # 可打开但状态为“待刷新”时，标题只显示状态；把真实原因补一行，
+        # 否则远程机器上“为什么没刷新”在界面上完全看不出来。
+        if item.can_open and item.message:
+            reason_label = QLabel(item.message, row)
+            reason_label.setObjectName("statusMuted")
+            reason_label.setWordWrap(True)
+            layout.addWidget(reason_label)
         buttons = QHBoxLayout()
         buttons.setContentsMargins(0, 0, 0, 0)
         if item.can_open:
