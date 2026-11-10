@@ -29,7 +29,7 @@
   ```powershell
   $env:GITLAB_TOKEN = "glpat-xxxxxxxxxxxxxxxxxxxx"
   ```
-- 确认当前版本号已在 [`doc_tool/domain/version.py`](../../doc_tool/domain/version.py) 完成升级（如 `v3.0.3`），并在 Git 打上对应 Tag。
+- 确认当前版本号已在 [`doc_tool/domain/version.py`](../../doc_tool/domain/version.py) 完成升级（如 `v3.0.4`），并在 Git 打上对应 Tag。
 
 ### 4.2 本地打包资产（构建安装包与便携版）
 在项目根目录下依次执行：
@@ -41,8 +41,8 @@ powershell -File build_exe.ps1 -Portable -SkipTests
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" packaging\installer.iss
 
 # 3. 生成安装包 SHA-256 校验和与 SBOM
-python -c "import hashlib; h = hashlib.sha256(open('packaging/Output/DocTool-Setup-3.0.3.exe', 'rb').read()).hexdigest().upper(); open('packaging/Output/DocTool-Setup-3.0.3.exe.sha256', 'w').write(f'{h}  DocTool-Setup-3.0.3.exe\n')"
-python packaging\generate_sbom.py --requirements requirements.txt --requirements requirements-build.txt --cyclonedx packaging\Output\DocTool-3.0.3.cdx.json --spdx packaging\Output\DocTool-3.0.3.spdx.json
+python -c "import hashlib; h = hashlib.sha256(open('packaging/Output/DocTool-Setup-3.0.4.exe', 'rb').read()).hexdigest().upper(); open('packaging/Output/DocTool-Setup-3.0.4.exe.sha256', 'w').write(f'{h}  DocTool-Setup-3.0.4.exe\n')"
+python packaging\generate_sbom.py --requirements requirements.txt --requirements requirements-build.txt --cyclonedx packaging\Output\DocTool-3.0.4.cdx.json --spdx packaging\Output\DocTool-3.0.4.spdx.json
 ```
 
 ### 4.3 执行手动发布与上传
@@ -55,4 +55,4 @@ python packaging/publish_release.py
 ### 4.4 验证发布结果
 访问内网 GitLab 仓库 Releases 页面核验：
 - 访问地址：`http://192.168.0.242:8899/application/ai/doc-tool/-/releases`
-- 确认目标版本标签（如 `v3.0.3`）已正常显示，包含完整的版本更新日志，且 **“Assets” 区域必须列出安装包、免安装便携版、校验和及 SBOM 的直接下载链接**。
+- 确认目标版本标签（如 `v3.0.4`）已正常显示，包含完整的版本更新日志，且 **“Assets” 区域必须列出安装包、免安装便携版、校验和及 SBOM 的直接下载链接**。

@@ -21,7 +21,7 @@ stages:
   - release
 
 variables:
-  APP_VERSION: "3.0.3"
+  APP_VERSION: "3.0.4"
   PYTHON_VERSION: "3.13"
   COVERAGE_MIN: "60"
 
