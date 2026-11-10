@@ -20,6 +20,10 @@ def _is_frozen() -> bool:
 
 
 def main() -> int:
+    # 全局日志最先初始化：所有模块的 logging 调用都应落盘，即使后续启动失败
+    # 也能在 %APPDATA%\DocTool\logs\doc-tool.log 留下证据。
+    _bootstrap_logging()
+
     # Windows GUI 没有控制台：所有子进程（git/svn/taskkill/渲染 worker）默认
     # 不弹黑色控制台窗口，否则打开项目检测改动时会连续闪黑窗。
     try:
@@ -72,10 +76,48 @@ def main() -> int:
         try:
             return _run_gui(QApplication)
         except Exception as exc:  # noqa: BLE001 - 启动期兜底，必须兜住一切
+            import logging
+
+            logging.getLogger("doc_tool.startup").exception("GUI 启动失败")
             from doc_tool.application import self_heal
 
             return self_heal.report_startup_failure(exc)
     return _run_gui(QApplication)
+
+
+def _bootstrap_logging() -> None:
+    """初始化全局滚动日志、未捕获异常钩子与原生崩溃日志。
+
+    日志初始化失败不得阻断启动：没有日志仍要能打开界面。
+    """
+    try:
+        from doc_tool.application.app_logging import (
+            enable_faulthandler,
+            install_exception_hooks,
+            log_startup_banner,
+            setup_app_logging,
+        )
+
+        setup_app_logging()
+        install_exception_hooks()
+        enable_faulthandler()
+        log_startup_banner()
+    except Exception:  # noqa: BLE001 - 诊断初始化异常不得阻断启动
+        pass
+
+
+def _log_shutdown() -> None:
+    """退出前写一条收尾日志并刷新缓冲，保证日志包拿到完整内容。"""
+    try:
+        import logging
+        import os
+
+        logging.getLogger("doc_tool.startup").info("Doc Tool 退出（pid=%s）", os.getpid())
+        from doc_tool.application.app_logging import flush_logging
+
+        flush_logging()
+    except Exception:  # noqa: BLE001 - 收尾失败不得影响退出
+        pass
 
 
 def _run_gui(QApplication) -> int:
@@ -91,6 +133,17 @@ def _run_gui(QApplication) -> int:
     app.setApplicationName(APP_SETTINGS_APPLICATION_KEY)
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setOrganizationName(ORGANIZATION_SETTINGS_KEY)
+
+    # Qt 告警与未捕获异常统一进同一份日志；环境快照紧跟在启动横幅之后，
+    # 组员回传日志时第一页就能看到机器环境。
+    try:
+        from doc_tool.application.environment_snapshot import log_environment_snapshot
+        from doc_tool.ui.diagnostics_hooks import install_qt_diagnostics
+
+        install_qt_diagnostics(app)
+        log_environment_snapshot()
+    except Exception:  # noqa: BLE001 - 诊断初始化异常不得阻断启动
+        pass
 
     # 首次启动：把内部版旧命名空间中的非敏感偏好（窗口几何、最近项目）
     # 只读迁移到公共命名空间；旧值保留，已有公共设置则不覆盖。
@@ -122,6 +175,7 @@ def _run_gui(QApplication) -> int:
 
     window = create_window()
     window.show()
+    app.aboutToQuit.connect(_log_shutdown)
     return app.exec()
 
 

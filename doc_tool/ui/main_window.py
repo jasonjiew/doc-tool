@@ -891,6 +891,15 @@ class MainWindow(QMainWindow):
         about_action.setShortcut(QKeySequence("F1"))
         about_action.triggered.connect(self._on_about)
         help_menu.addAction(about_action)
+        # 应用级日志与一键报障：与项目内的「工具 → 打开日志目录」区分，
+        # 即使没有打开项目也能导出诊断包。
+        help_menu.addSeparator()
+        self._open_app_logs_action = QAction("打开应用日志目录", self)
+        self._open_app_logs_action.triggered.connect(self._on_open_app_logs)
+        help_menu.addAction(self._open_app_logs_action)
+        self._export_diagnostics_action = QAction("导出诊断日志包（ZIP）…", self)
+        self._export_diagnostics_action.triggered.connect(self._on_export_diagnostics)
+        help_menu.addAction(self._export_diagnostics_action)
 
         # 标签切换 Ctrl+1..5（底部面板）
         for index in range(1, 6):
@@ -1674,6 +1683,21 @@ class MainWindow(QMainWindow):
                 category="帮助",
                 description="检查并下载在线升级包",
                 callback=self._on_check_update_manual,
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="导出诊断日志包（ZIP）…",
+                category="帮助",
+                description="把应用日志与环境快照打包到桌面，便于发给维护人员",
+                callback=self._on_export_diagnostics,
+            )
+        )
+        items.append(
+            PaletteItem(
+                title="打开应用日志目录",
+                category="帮助",
+                callback=self._on_open_app_logs,
             )
         )
 
@@ -4047,6 +4071,56 @@ class MainWindow(QMainWindow):
             self._open_directory_or_warn(
                 self._project_summary.paths.logs_dir, "日志目录", create=True
             )
+
+    def _on_open_app_logs(self) -> None:
+        """帮助菜单：打开 %APPDATA%/DocTool/logs（项目日志仍在「工具」菜单）。"""
+        from doc_tool.application.app_logging import ensure_log_directory
+
+        directory = ensure_log_directory()
+        if directory is None:
+            self._show_error(
+                "无法打开应用日志目录",
+                "所有候选日志目录都不可写，无法确定日志位置。",
+                "请检查 %APPDATA%、%TEMP% 与用户目录的写权限。",
+            )
+            return
+        self._open_directory_or_warn(directory, "应用日志目录", create=True)
+
+    def _on_export_diagnostics(self) -> None:
+        """帮助菜单：把应用日志与环境快照打包成 ZIP（默认落桌面）。"""
+        from doc_tool.application.diagnostics_export import export_diagnostic_bundle
+
+        try:
+            bundle = export_diagnostic_bundle()
+        except OSError as exc:
+            self._show_error(
+                "导出诊断日志包失败",
+                "无法生成诊断日志包：{0}".format(exc),
+                "可改用「帮助 → 打开应用日志目录」手动收集日志。",
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 - 诊断导出不得打断使用
+            self._show_error(
+                "导出诊断日志包失败",
+                "{0}: {1}".format(type(exc).__name__, exc),
+                "可改用「帮助 → 打开应用日志目录」手动收集日志。",
+            )
+            return
+
+        self._show_status_message("诊断日志包已导出：{0}".format(bundle))
+        logger.info("诊断日志包已导出：%s", bundle)
+        if self._is_test_environment():
+            return
+
+        box = QMessageBox(self)
+        box.setWindowTitle("诊断日志已导出")
+        box.setText("诊断日志包已导出到：\n{0}".format(bundle))
+        box.setInformativeText("把该 ZIP 原样发给维护人员即可；日志不含文档正文。")  # noqa: E501
+        open_button = box.addButton("打开所在文件夹", QMessageBox.ButtonRole.ActionRole)
+        box.addButton("关闭", QMessageBox.ButtonRole.AcceptRole)
+        box.exec()
+        if box.clickedButton() is open_button:
+            self._open_directory(bundle.parent)
 
     def _on_project_settings(self) -> None:
         if not self._project_summary or self.runner.is_running:
