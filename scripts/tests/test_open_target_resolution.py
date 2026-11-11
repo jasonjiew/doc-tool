@@ -24,7 +24,10 @@ class ResolveOpenTargetTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
-        self.root = Path(self._tmp.name)
+        # Windows CI 的临时目录可能是 8.3 短名（如 C:\Users\RUNNER~1\...），而
+        # resolve_open_target 会返回规范化长路径；夹具先解析成同一形态再比较，
+        # 否则同一目录会因写法不同被判为不相等（v3.0.4 发布门禁即因此失败）。
+        self.root = Path(self._tmp.name).resolve()
 
     def _project(self, relative: str) -> Path:
         target = self.root / relative
