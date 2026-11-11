@@ -108,8 +108,24 @@ jobs:
         run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt -r requirements-build.txt --no-cache-dir
 
       - name: 单元测试与覆盖率（下限 ${{ env.COVERAGE_MIN }}%）
+        id: tests
         shell: pwsh
-        run: python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN --fail-fast --workers 2
+        run: |
+          python scripts\tests\run_tests.py --coverage --coverage-min $env:COVERAGE_MIN --fail-fast --workers 2 2>&1 | Tee-Object -FilePath test-run.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            # 失败详情写入岗位注解（公开可读），并随 test-reports 上传：
+            # 无人值守的标签发布也能定位到具体用例，而不只是“步骤退出码 1”。
+            $lines = Get-Content test-run.log -Encoding UTF8 |
+              Select-String -Pattern '^(FAILED|ERROR):|^(FAIL|ERROR): |^FAILED \(|Traceback|AssertionError|覆盖率|未达到' |
+              Select-Object -Last 40
+            if ($lines) {
+              foreach ($line in $lines) { Write-Host ("::error::" + $line.Line) }
+            } else {
+              Write-Host '::error::测试步骤失败，但未匹配到失败行（详见 test-run.log）'
+            }
+          }
+          exit $code
 
       - name: 依赖漏洞审计
         if: always()
@@ -138,6 +154,7 @@ jobs:
           name: test-reports
           path: |
             test-results.xml
+            test-run.log
             coverage.xml
             coverage.json
             dependency-audit.json
